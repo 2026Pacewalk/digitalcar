@@ -1,0 +1,199 @@
+import { z } from "zod";
+import bcrypt from "bcryptjs";
+import { TRPCError } from "@trpc/server";
+import { createRouter, publicQuery, authedQuery } from "./middleware";
+import { getDb } from "./queries/connection";
+import { users, resellerProfiles } from "@db/schema";
+import { eq } from "drizzle-orm";
+import { createToken } from "./lib/jwt";
+
+export const authRouter = createRouter({
+  register: publicQuery
+    .input(
+      z.object({
+        email: z.string().email(),
+        password: z.string().min(6),
+        fullName: z.string().min(2),
+        phone: z.string().optional(),
+        role: z.enum(["reseller", "customer"]).default("customer"),
+        companyName: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+
+      const existing = await db.query.users.findFirst({
+        where: eq(users.email, input.email),
+      });
+
+      if (existing) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Email already registered",
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(input.password, 12);
+
+      const [user] = await db
+        .insert(users)
+        .values({
+          email: input.email,
+          password: hashedPassword,
+          fullName: input.fullName,
+          phone: input.phone || null,
+          role: input.role,
+          status: "active",
+        });
+
+      const insertedUser = await db.query.users.findFirst({
+        where: eq(users.id, user.insertId),
+      });
+
+      if (!insertedUser) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create user",
+        });
+      }
+
+      // Create reseller profile if registering as reseller
+      if (input.role === "reseller" && input.companyName) {
+        await db.insert(resellerProfiles).values({
+          userId: insertedUser.id,
+          companyName: input.companyName,
+          commissionRate: "10.00",
+        });
+      }
+
+      const token = await createToken({
+        userId: insertedUser.id,
+        email: insertedUser.email,
+        role: insertedUser.role,
+      });
+
+      return {
+        user: {
+          id: insertedUser.id,
+          email: insertedUser.email,
+          fullName: insertedUser.fullName,
+          role: insertedUser.role,
+          status: insertedUser.status,
+          avatar: insertedUser.avatar,
+        },
+        token,
+      };
+    }),
+
+  login: publicQuery
+    .input(
+      z.object({
+        email: z.string().email(),
+        password: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+
+      const user = await db.query.users.findFirst({
+        where: eq(users.email, input.email),
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid email or password",
+        });
+      }
+
+      const isValid = await bcrypt.compare(input.password, user.password);
+
+      if (!isValid) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid email or password",
+        });
+      }
+
+      if (user.status === "suspended") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Account suspended. Contact support.",
+        });
+      }
+
+      // Update last login
+      await db
+        .update(users)
+        .set({ lastLoginAt: new Date() })
+        .where(eq(users.id, user.id));
+
+      const token = await createToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          status: user.status,
+          avatar: user.avatar,
+        },
+        token,
+      };
+    }),
+
+  me: authedQuery.query(({ ctx }) => {
+    return {
+      id: ctx.user.id,
+      email: ctx.user.email,
+      fullName: ctx.user.fullName,
+      role: ctx.user.role,
+      status: ctx.user.status,
+      avatar: ctx.user.avatar,
+      phone: ctx.user.phone,
+    };
+  }),
+
+  logout: authedQuery.mutation(() => {
+    return { success: true };
+  }),
+
+  changePassword: authedQuery
+    .input(
+      z.object({
+        currentPassword: z.string(),
+        newPassword: z.string().min(6),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, ctx.user.id),
+      });
+
+      if (!user) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      }
+
+      const isValid = await bcrypt.compare(input.currentPassword, user.password);
+      if (!isValid) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Current password is incorrect",
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(input.newPassword, 12);
+      await db
+        .update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, ctx.user.id));
+
+      return { success: true };
+    }),
+});
