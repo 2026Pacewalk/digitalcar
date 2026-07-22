@@ -161,7 +161,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
         <p class="grev-empty-txt">Loved our service? Rate us on Google!</p>
       </div>`;
   const reviewCards = reviews.length
-    ? `<div class="grev-list">${reviews.map((rv) => `
+    ? `<div class="grev-list">${reviews.slice(0, 5).map((rv) => `
         <div class="grev-card">
           <div class="grev-card-top">
             <span class="grev-ava">${(s(rv.name)[0] || "G").toUpperCase()}</span>

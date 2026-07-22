@@ -44,8 +44,11 @@ export default function CustomerReviews() {
   const count = val("google_review_count");
   const fillPct = Math.max(0, Math.min(100, (rating / 5) * 100));
 
+  const MAX_REVIEWS = 5;
+  const atLimit = reviews.items.length >= MAX_REVIEWS;
   const [draft, setDraft] = useState<{ name: string; rating: number; text: string }>({ name: "", rating: 5, text: "" });
   const addReview = () => {
+    if (atLimit) return toast.error(`You can feature up to ${MAX_REVIEWS} reviews`);
     if (!draft.name.trim()) return toast.error("Add the reviewer's name");
     reviews.add({ name: draft.name.trim(), rating: draft.rating, text: draft.text.trim(), date: "" });
     setDraft({ name: "", rating: 5, text: "" });
@@ -80,23 +83,31 @@ export default function CustomerReviews() {
       </Panel>
 
       {/* ── Featured reviews ── */}
-      <Panel title="Featured Reviews" subtitle="Hand-pick a few of your best reviews to showcase on the card">
-        <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 space-y-3 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} className={fieldCls} placeholder="Reviewer name (e.g. Rohit K.)" />
-            <div className="flex items-center gap-2 h-10 px-3 rounded-xl bg-white border border-[#E2E8F0]">
-              <span className="text-[11px] text-[#64748B] font-medium">Rating</span>
-              <Stars value={draft.rating} onPick={(n) => setDraft((d) => ({ ...d, rating: n }))} size={17} />
-            </div>
+      <Panel title="Featured Reviews"
+        subtitle="Optional — hand-pick up to 5 of your best reviews to showcase on the card"
+        right={<span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${atLimit ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#F1F5F9] text-[#64748B]"}`}>{reviews.items.length}/{MAX_REVIEWS}</span>}>
+        {atLimit ? (
+          <div className="rounded-xl border border-[#FDE68A] bg-[#FEF3C7]/50 px-4 py-3 mb-4 text-xs text-[#92400E] font-medium">
+            You've added the maximum of {MAX_REVIEWS} featured reviews. Remove one to add another.
           </div>
-          <textarea value={draft.text} onChange={(e) => setDraft((d) => ({ ...d, text: e.target.value }))} className={areaCls} placeholder="What did they say? (optional)" rows={2} />
-          <button onClick={addReview} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[#0F172A] text-white text-sm font-semibold hover:bg-[#1E293B] transition-colors"><Plus size={15} /> Add review</button>
-        </div>
+        ) : (
+          <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 space-y-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} className={fieldCls} placeholder="Reviewer name (e.g. Rohit K.)" />
+              <div className="flex items-center gap-2 h-10 px-3 rounded-xl bg-white border border-[#E2E8F0]">
+                <span className="text-[11px] text-[#64748B] font-medium">Rating</span>
+                <Stars value={draft.rating} onPick={(n) => setDraft((d) => ({ ...d, rating: n }))} size={17} />
+              </div>
+            </div>
+            <textarea value={draft.text} onChange={(e) => setDraft((d) => ({ ...d, text: e.target.value }))} className={areaCls} placeholder="What did they say? (optional)" rows={2} />
+            <button onClick={addReview} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[#0F172A] text-white text-sm font-semibold hover:bg-[#1E293B] transition-colors"><Plus size={15} /> Add review</button>
+          </div>
+        )}
 
         {reviews.items.length === 0 ? (
           <div className="text-center py-6">
             <MessageSquareQuote size={22} className="mx-auto text-[#CBD5E1] mb-1.5" />
-            <p className="text-xs text-[#94A3B8]">No featured reviews yet — add a few above.</p>
+            <p className="text-xs text-[#94A3B8]">No featured reviews yet — this section is optional. Add a few above, or skip it.</p>
           </div>
         ) : (
           <div className="space-y-2.5">
