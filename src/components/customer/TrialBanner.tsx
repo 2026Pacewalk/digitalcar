@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { Clock, Lock, Zap, TrendingUp, ArrowRight, AlertTriangle, Users, Eye, MessageSquare } from "lucide-react";
+import { Clock, Lock, Zap, TrendingUp, ArrowRight, AlertTriangle, Users, Eye, MessageSquare, BadgePercent } from "lucide-react";
+import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
 
 /* FOMO-driven trial banner: live countdown, loss-aversion (their views/leads
    at risk), social proof, and urgency — nudging trial users to upgrade. */
@@ -10,8 +11,15 @@ export default function TrialBanner({ isTrial, expiredOn, days, views, leads }: 
   const navigate = useNavigate();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
+  const [offerExp, setOfferExp] = useState<number>(0);
+  useEffect(() => { if (isTrial) setOfferExp(getOfferExpiry()); }, [isTrial]);
 
   if (!isTrial) return null;
+
+  const offerMs = offerExp - now;
+  const offerActive = offerExp > 0 && offerMs > 0;
+  const offerH = Math.floor(offerMs / 3_600_000);
+  const offerM = Math.floor((offerMs % 3_600_000) / 60_000);
 
   const expiry = expiredOn && expiredOn !== "0000-00-00"
     ? new Date(String(expiredOn).replace(" ", "T").slice(0, 10) + "T23:59:59").getTime()
@@ -77,6 +85,15 @@ export default function TrialBanner({ isTrial, expiredOn, days, views, leads }: 
           <div className="flex items-center gap-4 mt-3.5 text-[11px] text-white/80">
             <span className="inline-flex items-center gap-1.5"><Eye size={13} className="text-white/60" /> <b>{views.toLocaleString("en-IN")}</b> views at risk</span>
             <span className="inline-flex items-center gap-1.5"><MessageSquare size={13} className="text-white/60" /> <b>{leads.toLocaleString("en-IN")}</b> leads at risk</span>
+          </div>
+        )}
+
+        {/* Limited-time offer */}
+        {offerActive && (
+          <div className="flex items-center gap-2 mt-3.5 rounded-xl bg-white/12 ring-1 ring-white/15 px-3 py-2">
+            <BadgePercent size={16} className="text-white shrink-0" />
+            <p className="text-[12px] text-white flex-1 leading-tight"><b>{OFFER_PERCENT}% OFF</b> if you upgrade now</p>
+            <span className="text-[11px] font-bold text-white bg-white/15 rounded-md px-2 py-1 tabular-nums">ends in {offerH}h {String(offerM).padStart(2, "0")}m</span>
           </div>
         )}
 

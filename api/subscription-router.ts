@@ -35,6 +35,7 @@ export const subscriptionRouter = createRouter({
         packageId: z.number(),
         billingCycle: z.enum(["monthly", "yearly"]),
         paymentMethod: z.enum(["stripe", "paypal", "razorpay"]),
+        offerPercent: z.number().min(0).max(50).optional(), // limited-time upgrade offer
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -69,6 +70,9 @@ export const subscriptionRouter = createRouter({
         charged = Math.max(0, round2(base - adjustment));
         stored = round2(base); // plan value, so the next upgrade credits the full paid-up amount
       }
+      // Apply the limited-time upgrade offer on top of whatever they pay now.
+      const offerPct = input.offerPercent && input.offerPercent > 0 ? input.offerPercent : 0;
+      if (offerPct) charged = round2(charged * (1 - offerPct / 100));
       const amount = stored.toFixed(2);
       const now = new Date();
       const periodEnd = new Date(now);

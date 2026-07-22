@@ -505,3 +505,39 @@ main{box-shadow:none;padding:0;}
 </section></div></main>
 </body></html>`;
 }
+
+/* Shown at the public card URL when the owner's plan/trial has expired.
+   Keeps it visitor-friendly and turns the dead page into a signup opportunity. */
+export function buildPausedHtml(c: CustomerRecord): string {
+  const accent = s(c.color) || "#F7B31C";
+  const name = esc(c.company_name) || esc(c.name) || "This business";
+  const slug = s(c.slug);
+  const ref = s(c.referral_code) || slug;
+  const signup = `/signup${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Montserrat',system-ui,sans-serif;}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#0F172A,#1E293B);padding:24px;}
+.pw{width:100%;max-width:360px;background:#fff;border-radius:24px;padding:34px 26px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.35);}
+.ic{width:74px;height:74px;border-radius:20px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;background:${accent}1f;color:${accent};font-size:30px;}
+h1{font-size:19px;font-weight:800;color:#0F172A;line-height:1.3;}
+.sub{font-size:13px;color:#64748B;margin-top:8px;line-height:1.6;}
+.name{font-weight:700;color:#0F172A;}
+.cta{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:22px;height:50px;border-radius:14px;background:linear-gradient(135deg,${accent},${darken(accent, 0.16)});color:#0F172A;font-weight:700;font-size:14px;text-decoration:none;box-shadow:0 8px 20px ${accent}55;}
+.hint{font-size:11px;color:#94A3B8;margin-top:10px;}
+.brand{margin-top:24px;font-size:11px;color:#94A3B8;}
+.brand b{color:${accent};}
+</style></head>
+<body>
+  <div class="pw">
+    <div class="ic"><i class="fa fa-hourglass-half"></i></div>
+    <h1>This card is currently unavailable</h1>
+    <p class="sub"><span class="name">${name}</span>'s digital card is temporarily paused. Please check back soon.</p>
+    <a class="cta" href="${signup}" target="_top"><i class="fa fa-bolt"></i> Create your own free card</a>
+    <p class="hint">Set up your own digital card in minutes — 30 days free.</p>
+    <p class="brand">Powered by <b>DigitalCarda</b></p>
+  </div>
+</body></html>`;
+}

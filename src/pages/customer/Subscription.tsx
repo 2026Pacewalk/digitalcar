@@ -1,9 +1,10 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
-import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2, BadgePercent } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
 const inr = (v: number) => "₹" + (Number(v) || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -34,17 +35,26 @@ export default function CustomerSubscription() {
 
   const [isYearly, setIsYearly] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [offerExp, setOfferExp] = useState<number>(0);
+  useEffect(() => { setOfferExp(getOfferExpiry()); const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
   const currentPkgId = subscription?.package?.id;
   const currentPaid = Number(subscription?.amount) || 0;
   const hasPaid = currentPaid > 0;
   // Referral discount only applies to the first paid plan (never on later upgrades).
   const dPct = discount?.eligible && !hasPaid ? discount.percent : 0;
+  // Limited-time upgrade offer
+  const offerMs = offerExp - now;
+  const offerActive = offerExp > 0 && offerMs > 0;
+  const offerPct = offerActive ? OFFER_PERCENT : 0;
+  const offerH = Math.floor(offerMs / 3_600_000), offerM = Math.floor((offerMs % 3_600_000) / 60_000);
+  const applyOffer = (v: number) => (offerPct ? Math.round(v * (1 - offerPct / 100) * 100) / 100 : v);
 
   const choose = async (packageId: number, name: string) => {
     setBusyId(packageId);
     try {
-      const res = await subscribeMut.mutateAsync({ packageId, billingCycle: isYearly ? "yearly" : "monthly", paymentMethod: "razorpay" });
+      const res = await subscribeMut.mutateAsync({ packageId, billingCycle: isYearly ? "yearly" : "monthly", paymentMethod: "razorpay", offerPercent: offerPct || undefined });
       if (res.isUpgrade) {
         toast.success(`Upgraded to ${name} — ${inr(res.adjustment)} adjusted, you pay ${inr(res.charged)}`);
       } else if (res.discountPercent > 0) {
@@ -90,6 +100,18 @@ export default function CustomerSubscription() {
           </div>
         )}
 
+        {/* Limited-time offer banner */}
+        {offerActive && (
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#7f1d1d] to-[#c2410c] px-4 py-3.5 flex items-center gap-3">
+            <span className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0"><BadgePercent size={19} className="text-white" /></span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white">Limited-time offer — extra {OFFER_PERCENT}% OFF</p>
+              <p className="text-[12px] text-white/70">Applied automatically at checkout below. Don't miss it!</p>
+            </div>
+            <span className="text-[12px] font-bold text-white bg-white/15 rounded-lg px-2.5 py-1.5 tabular-nums shrink-0">{offerH}h {String(offerM).padStart(2, "0")}m left</span>
+          </div>
+        )}
+
         {/* Billing Toggle */}
         <div className="flex items-center justify-center gap-3">
           <span className={`text-sm font-medium ${!isYearly ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>Monthly</span>
@@ -110,6 +132,7 @@ export default function CustomerSubscription() {
             const isUpgrade = hasPaid && !isCurrent && isPaid;
             const discounted = dPct > 0 && isPaid ? Math.round(base * (1 - dPct / 100) * 100) / 100 : base;
             const payable = isUpgrade ? Math.max(0, Math.round((base - currentPaid) * 100) / 100) : discounted;
+            const finalPrice = isPaid ? applyOffer(payable) : base; // limited-time offer on top
             const popular = idx === 1;
             const busy = busyId === plan.id;
 
@@ -125,23 +148,16 @@ export default function CustomerSubscription() {
                   </div>
                 </div>
                 <div className="mb-4">
-                  {isUpgrade ? (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-[#0F172A]">{inr(payable)}</span>
-                      <span className="text-sm text-[#94A3B8] line-through">{inr(base)}</span>
-                    </div>
-                  ) : dPct > 0 && isPaid ? (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-[#0F172A]">{inr(discounted)}</span>
-                      <span className="text-sm text-[#94A3B8] line-through">{inr(base)}</span>
-                    </div>
-                  ) : (
-                    <span className="text-3xl font-bold text-[#0F172A]">{inr(base)}</span>
-                  )}
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold text-[#0F172A]">{inr(finalPrice)}</span>
+                    {isPaid && finalPrice < base && <span className="text-sm text-[#94A3B8] line-through">{inr(base)}</span>}
+                  </div>
                   <span className="text-sm text-[#94A3B8]">/{isYearly ? "mo, billed yearly" : "month"}</span>
-                  {isUpgrade
-                    ? <span className="ml-2 text-[11px] font-semibold text-blue-600">−{inr(currentPaid)} adjusted</span>
-                    : dPct > 0 && isPaid && <span className="ml-2 text-[11px] font-semibold text-emerald-600">−{dPct}% referral</span>}
+                  <span className="ml-2 inline-flex flex-wrap gap-1.5 align-middle">
+                    {isUpgrade && <span className="text-[11px] font-semibold text-blue-600">−{inr(currentPaid)} adjusted</span>}
+                    {dPct > 0 && isPaid && <span className="text-[11px] font-semibold text-emerald-600">−{dPct}% referral</span>}
+                    {offerPct > 0 && isPaid && <span className="text-[11px] font-semibold text-red-600">−{offerPct}% offer</span>}
+                  </span>
                 </div>
                 <div className="space-y-2.5 mb-6">
                   {featuresFor(plan).map((f, i) => (
