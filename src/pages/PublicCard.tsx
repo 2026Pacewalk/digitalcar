@@ -1,11 +1,11 @@
-import { useParams } from "react-router";
+import { useParams, Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useEffect, useState } from "react";
 import {
   Phone, Mail, MapPin, Globe, Share2, Download, MessageCircle,
   X, Send, Check, FileText, Briefcase, ChevronRight, MessageSquare,
   Linkedin, Facebook, Instagram, Twitter, Youtube,
-  Clock, Star,
+  Clock, Star, Hourglass, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -75,6 +75,24 @@ export default function PublicCard() {
 
   const profile = profileBlock?.content as Record<string, string> || {};
   const contact = contactBlock?.content as Record<string, string> || {};
+
+  // Owner's trial/plan expired → paused public card (with a signup CTA).
+  if (card.ownerPaused) {
+    const owner = profile.company || profile.name || card.title || "This business";
+    const signup = `/signup${card.ownerReferralCode ? `?ref=${encodeURIComponent(card.ownerReferralCode)}` : ""}`;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0F172A] to-[#1E293B] p-6">
+        <div className="w-full max-w-sm bg-white rounded-[24px] p-8 text-center shadow-premium-lg">
+          <div className="w-[74px] h-[74px] rounded-2xl bg-[#FEF3C7] text-[#F7B31C] flex items-center justify-center mx-auto mb-5"><Hourglass size={30} /></div>
+          <h1 className="text-lg font-extrabold text-[#0F172A] leading-snug">This card is currently unavailable</h1>
+          <p className="text-[13px] text-[#64748B] mt-2 leading-relaxed"><span className="font-semibold text-[#0F172A]">{owner}</span>&apos;s digital card is temporarily paused. Please check back soon.</p>
+          <Link to={signup} className="mt-6 h-12 rounded-2xl gradient-gold text-[#0F172A] font-bold text-sm flex items-center justify-center gap-2 hover:shadow-gold transition-all"><Zap size={17} /> Create your own free card</Link>
+          <p className="text-[11px] text-[#94A3B8] mt-2.5">Set up your own digital card in minutes — 30 days free.</p>
+          <p className="text-[11px] text-[#94A3B8] mt-5">Powered by <span className="text-[#F7B31C] font-semibold">DigitalCarda</span></p>
+        </div>
+      </div>
+    );
+  }
   const about = aboutBlock?.content as Record<string, string> || {};
   const services = servicesBlock?.content as { items?: Array<{name: string; description?: string}> } || {};
   const whatsapp = whatsappBlock?.content as Record<string, string> || {};

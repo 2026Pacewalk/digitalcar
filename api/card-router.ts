@@ -81,9 +81,21 @@ export const cardRouter = createRouter({
       // "Create Your Free Card" CTA can credit them for the referral.
       const owner = await db.query.users.findFirst({
         where: eq(users.id, card.userId),
-        columns: { referralCode: true },
+        columns: { referralCode: true, role: true },
       });
-      return { ...card, ownerReferralCode: owner?.referralCode ?? null };
+      // Pause the public card if the owner's trial/plan has expired.
+      let ownerPaused = false;
+      if (owner && owner.role !== "super_admin") {
+        const sub = await db.query.subscriptions.findFirst({
+          where: eq(subscriptions.userId, card.userId),
+          orderBy: [desc(subscriptions.createdAt)],
+        });
+        if (sub) {
+          const ended = sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) < new Date() : false;
+          ownerPaused = ["expired", "cancelled", "suspended"].includes(sub.status) || ended;
+        }
+      }
+      return { ...card, ownerReferralCode: owner?.referralCode ?? null, ownerPaused };
     }),
 
   create: authedQuery
