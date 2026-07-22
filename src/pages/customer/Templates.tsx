@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
+import { trpc } from "@/providers/trpc";
 
 const SWATCHES = ["#F7B31C", "#14243E", "#3B82F6", "#A21CAF", "#06B6D4", "#EF4444", "#0F172A", "#EAB308", "#16A34A", "#DB2777"];
 const SECONDARY_SWATCHES = ["#0F172A", "#1E293B", "#0f2b2e", "#3f1d2e", "#1e1b4b", "#422006", "#0c4a6e", "#14532d", "#3b0764", "#414141"];
@@ -72,18 +73,20 @@ function ColorRow({
 
 export default function CustomerTemplates() {
   const { data, update } = useCustomer();
+  const { data: siteConfig } = trpc.template.siteConfig.useQuery();
+  const chose = !!String(data.theme || "");
   const [sel, setSel] = useState<number>(Number(data.theme) || 1);
   const [color, setColor] = useState<string>(String(data.color || "#F7B31C"));
   const [secondary, setSecondary] = useState<string>(String(data.color2 || ""));
   const [query, setQuery] = useState("");
   const [dirty, setDirty] = useState(false);
 
-  // Seed from the customer record once it loads
+  // Seed from the customer record — or the super-admin default if the user hasn't chosen yet
   useEffect(() => {
-    setSel(Number(data.theme) || 1);
-    setColor(String(data.color || "#F7B31C"));
-    setSecondary(String(data.color2 || ""));
-  }, [data.theme, data.color, data.color2]);
+    setSel(Number(data.theme) || Number(siteConfig?.defaultId) || 1);
+    setColor(String(data.color || siteConfig?.defaultColor || "#F7B31C"));
+    setSecondary(String(data.color2 || (chose ? "" : siteConfig?.defaultSecondary) || ""));
+  }, [data.theme, data.color, data.color2, siteConfig?.defaultId, siteConfig?.defaultColor, siteConfig?.defaultSecondary, chose]);
 
   // Real thumbnails: the user's own card data rendered in each of the 31 templates
   const thumbs = useMemo(() => {
@@ -96,7 +99,9 @@ export default function CustomerTemplates() {
   const pickSecondary = (c: string) => { setSecondary(c); setDirty(true); };
   const save = () => { update({ theme: String(sel), color, color2: secondary }); setDirty(false); toast.success(`Template ${sel} applied to your card`); };
 
+  const disabled = new Set(siteConfig?.disabled ?? []);
   const list = Array.from({ length: TEMPLATE_COUNT }, (_, i) => i + 1)
+    .filter((n) => !disabled.has(n)) // hidden by admin
     .filter((n) => !query || `template ${n}`.includes(query.toLowerCase().trim()) || String(n) === query.trim());
 
   return (
@@ -141,6 +146,7 @@ export default function CustomerTemplates() {
                 <button key={n} onClick={() => pick(n)}
                   className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all group ${selected ? "border-[#F7B31C] shadow-gold ring-2 ring-[#F7B31C]/20" : "border-[#F1F5F9] hover:border-[#F7B31C]/50 hover:-translate-y-0.5 hover:shadow-premium"}`}>
                   {selected && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F7B31C] flex items-center justify-center z-10 shadow"><Check size={13} className="text-[#0F172A]" /></span>}
+                  {siteConfig?.defaultId === n && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
                   <div className="relative w-full overflow-hidden bg-[#F8FAFC] pointer-events-none" style={{ aspectRatio: "3 / 4.4" }}>
                     <iframe title={`Template ${n}`} srcDoc={thumbs[n - 1]} scrolling="no" tabIndex={-1} loading="lazy"
                       style={{ width: "375px", height: "560px", border: 0, transform: "scale(0.5)", transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />

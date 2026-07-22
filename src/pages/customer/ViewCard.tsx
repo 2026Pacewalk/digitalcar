@@ -25,6 +25,7 @@ export default function CustomerViewCard() {
   const qrcodes = useLocalList<Qr>("dc_qrcode", [], contentSeeder("qrcodes"));
   const reviews = useLocalList<Review>("dc_reviews", []);
   const { data: program } = trpc.referral.myProgram.useQuery();
+  const { data: siteConfig } = trpc.template.siteConfig.useQuery();
   const [copied, setCopied] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -39,10 +40,19 @@ export default function CustomerViewCard() {
   const slug = String(data.slug || "acme-digital");
   const url = `https://digitalcarda.in/${slug}`;
 
+  // Users who haven't picked their own template fall back to the super-admin default.
+  const chose = !!String(data.theme || "");
+  const themed = chose ? data : {
+    ...data,
+    theme: siteConfig?.defaultId ?? data.theme,
+    color: data.color || siteConfig?.defaultColor,
+    color2: data.color2 || siteConfig?.defaultSecondary,
+  };
+
   const html = useMemo(
-    () => buildCardHtml({ ...data, referral_code: program?.code || "" }, products.items, gallery.items, videos.items, offers.items, qrcodes.items, reviews.items),
+    () => buildCardHtml({ ...themed, referral_code: program?.code || "" }, products.items, gallery.items, videos.items, offers.items, qrcodes.items, reviews.items),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, program?.code, products.items, gallery.items, videos.items, offers.items, qrcodes.items, reviews.items, nonce]
+    [themed, program?.code, products.items, gallery.items, videos.items, offers.items, qrcodes.items, reviews.items, nonce]
   );
 
   const copy = async () => {
