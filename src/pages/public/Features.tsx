@@ -57,7 +57,7 @@ export default function Features() {
 
         <div className="mt-16 text-center bg-gradient-to-br from-[#0F172A] to-[#1E293B] rounded-3xl p-10 sm:p-14">
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Ready to Create Your Digital Card?</h2>
-          <p className="text-sm text-[#94A3B8] mb-6 max-w-lg mx-auto">Start your 7-day free trial and access all features instantly. No credit card required.</p>
+          <p className="text-sm text-[#94A3B8] mb-6 max-w-lg mx-auto">Start a 30-day free trial that requires no credit card details upfront.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">
               Start Free Trial <Check size={16} />

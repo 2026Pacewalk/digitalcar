@@ -154,7 +154,7 @@ export default function Templates() {
                   ))}
                 </div>
                 <Link to="/signup" className="btn-gold h-12 w-full inline-flex items-center justify-center gap-2">Use this template <ArrowRight size={16} /></Link>
-                <p className="text-[11px] text-[#94A3B8] text-center mt-2">Free 7-day trial · no card required</p>
+                <p className="text-[11px] text-[#94A3B8] text-center mt-2">30 Days Free Cardless Trial</p>
               </div>
             </div>
           </div>

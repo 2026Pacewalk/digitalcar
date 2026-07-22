@@ -100,11 +100,11 @@ export default function Signup() {
     <div className="min-h-screen bg-[#F8FAFC] flex">
       <AuthBrandPanel
         heading="Create your free digital card"
-        subtitle="Join thousands of businesses on DigitalCarda. Start your 7-day free trial and publish a professional card in minutes."
+        subtitle="Join thousands of businesses on DigitalCarda. Start a 30-day free trial that requires no credit card details upfront and publish a professional card in minutes."
         footer={
           <div className="grid grid-cols-2 gap-2.5">
             {[
-              "7-day free trial", "No credit card", "Instant setup", "Share anywhere",
+              "30-Day Free Trial", "No credit card", "Instant setup", "Share anywhere",
             ].map((t, i) => (
               <div key={i} className="flex items-center gap-2 text-[13px] text-[#CBD5E1]">
                 <span className="w-4 h-4 rounded-full bg-[#F7B31C]/20 flex items-center justify-center shrink-0"><Check size={10} className="text-[#F7B31C]" /></span>
@@ -131,7 +131,7 @@ export default function Signup() {
 
           <div className="text-center mb-6">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E] mb-3">
-              <ShieldCheck size={12} /> Free 7-day trial
+              <ShieldCheck size={12} /> 30 Days Free Cardless Trial
             </span>
             <h1 className="text-2xl sm:text-[1.7rem] font-extrabold text-[#0F172A] tracking-tight">Create Your Account</h1>
             <p className="text-sm text-[#64748B] mt-1">No credit card required · Cancel anytime</p>
@@ -230,7 +230,7 @@ export default function Signup() {
             </label>
 
             <button type="submit" disabled={loading} className="w-full h-12 gradient-gold text-[#0F172A] rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-60">
-              {loading ? <><Loader2 size={18} className="animate-spin" /> Creating account…</> : <><UserPlus size={18} /> Start 7-Day Free Trial</>}
+              {loading ? <><Loader2 size={18} className="animate-spin" /> Creating account…</> : <><UserPlus size={18} /> Start 30-Day Free Trial</>}
             </button>
           </form>
 

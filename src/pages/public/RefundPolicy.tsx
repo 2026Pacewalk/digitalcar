@@ -19,7 +19,7 @@ export default function RefundPolicy() {
           <section>
             <h2 className="text-lg font-semibold text-[#0F172A] mb-3">2. Free Trial</h2>
             <p className="text-sm text-[#64748B] leading-relaxed">
-              All new users are eligible for a 7-day free trial. No payment information is required to start the trial. You can cancel anytime during the trial period without any charge.
+              All new users are eligible for a 30-day free trial that requires no credit card details upfront. No payment information is required to start the trial. You can cancel anytime during the trial period without any charge.
             </p>
           </section>
 

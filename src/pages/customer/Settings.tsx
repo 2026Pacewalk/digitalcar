@@ -23,7 +23,7 @@ const MODULES = [
 const SWATCHES = ["#F7B31C", "#14243E", "#3B82F6", "#A21CAF", "#06B6D4", "#EF4444", "#0F172A", "#EAB308"];
 
 const PKG: Record<number, { name: string; amount: number; days: number }> = {
-  7: { name: "Trial", amount: 0, days: 7 },
+  7: { name: "Trial", amount: 0, days: 30 },
   5: { name: "Starter", amount: 1499, days: 365 },
   6: { name: "Standard", amount: 2499, days: 1095 },
 };

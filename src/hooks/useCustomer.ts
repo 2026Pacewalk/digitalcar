@@ -83,7 +83,7 @@ function seedFromAuth(u: AuthUserLite): CustomerRecord {
     paytm_number: "", phone_pe: "", google_pay: "", upi: "",
     facebook: "", twitter: "", instagram: "", youtube: "", pinterest: "", linkedin: "",
     google_review: "",
-    activated_on: today(), expired_on: plusDays(7), package_id: 7, views: 0,
+    activated_on: today(), expired_on: plusDays(30), package_id: 7, views: 0,
   };
 }
 

@@ -49,12 +49,12 @@ const EMPTY: Customer = {
 };
 
 const PKG: Record<number, { name: string; amount: number; days: number }> = {
-  7: { name: "TRIAL", amount: 0, days: 7 },
+  7: { name: "TRIAL", amount: 0, days: 30 },
   5: { name: "STARTER", amount: 1499, days: 365 },
   6: { name: "STANDARD", amount: 2499, days: 1095 },
 };
 const PLAN_LIST = [
-  { id: 7, name: "Trial", amount: "0/-", days: "7 Days" },
+  { id: 7, name: "Trial", amount: "0/-", days: "30 Days" },
   { id: 5, name: "STARTER", amount: "1499/-", days: "365 Days" },
   { id: 6, name: "STANDARD", amount: "2499/-", days: "1095 Days" },
 ];

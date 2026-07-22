@@ -4,7 +4,7 @@ import { useState } from "react";
 
 const plans = [
   {
-    name: "Trial", price: "Rs. 0", period: "7 Days", popular: false,
+    name: "Trial", price: "Rs. 0", period: "30 Days", popular: false,
     features: ["1 Digital Card", "Basic Template", "Basic Contact Buttons", "Shareable Link", "Limited Features"],
     cta: "Start Free Trial",
   },
@@ -27,7 +27,7 @@ const plans = [
 
 const faqs = [
   { q: "Can I upgrade or downgrade my plan?", a: "Yes, you can upgrade or downgrade your plan at any time. The difference will be prorated." },
-  { q: "Is there a free trial?", a: "Absolutely! We offer a 7-day free trial with full access to all Starter features." },
+  { q: "Is there a free trial?", a: "Absolutely! We offer a 30-day free trial that requires no credit card details upfront, with full access to all Starter features." },
   { q: "What payment methods do you accept?", a: "We accept UPI, credit/debit cards, net banking, Paytm, and GPay." },
   { q: "Can I get a refund?", a: "Yes, we offer a 7-day money-back guarantee on all paid plans." },
   { q: "Do you offer discounts for annual billing?", a: "Our Starter and Standard plans are already priced annually for the best value." },
@@ -43,7 +43,7 @@ export default function Pricing() {
         <div className="text-center max-w-3xl mx-auto mb-16">
           <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E] mb-4">Pricing</span>
           <h1 className="text-4xl sm:text-5xl font-bold text-[#0F172A]">Simple Pricing for Every Business</h1>
-          <p className="mt-4 text-base text-[#64748B]">Start with a free 7-day trial. Upgrade when you are ready. No hidden fees.</p>
+          <p className="mt-4 text-base text-[#64748B]">Start a 30-day free trial that requires no credit card details upfront. Upgrade when you are ready. No hidden fees.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

@@ -278,7 +278,7 @@ function HeroSection() {
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Link to="/signup" className="btn-gold h-12 px-7 flex items-center justify-center gap-2 text-base">
-                Start Free 7-Day Trial <ArrowRight size={18} />
+                30 Days Free Cardless Trial <ArrowRight size={18} />
               </Link>
               <Link to="/templates" className="btn-navy h-12 px-7 flex items-center justify-center gap-2 text-base">
                 <Eye size={18} /> View Templates
@@ -921,7 +921,7 @@ function ResellerSection() {
 /* ─── Pricing ─── */
 function PricingSection() {
   const plans = [
-    { name: "Trial", price: "₹0", period: "7 Days", popular: false, cta: "Start Free Trial", features: ["1 Digital Card", "Basic Template", "Basic Contact Buttons", "Shareable Link", "Limited Features"] },
+    { name: "Trial", price: "₹0", period: "30 Days", popular: false, cta: "Start Free Trial", features: ["1 Digital Card", "Basic Template", "Basic Contact Buttons", "Shareable Link", "Limited Features"] },
     { name: "Starter", price: "₹1,499", period: "/ year", popular: true, cta: "Upgrade Now", features: ["1 Digital Card", "Products & Services", "Social Links", "WhatsApp Button", "QR Code", "Enquiry Form", "Basic Analytics", "SEO Settings"] },
     { name: "Standard", price: "₹2,499", period: "/ 3 years", popular: false, cta: "Upgrade Now", features: ["Everything in Starter", "Gallery & Videos", "Payment QR", "Offers", "PDF Downloads", "Advanced Analytics", "Google Reviews", "Priority Support"] },
     { name: "Premium", price: "Custom", period: "pricing", popular: false, cta: "Contact Sales", features: ["Custom Domain", "AI Content Tools", "Multilingual Card", "CRM Sync", "Advanced Integrations", "Team Access", "Premium Templates", "Dedicated Support"] },
@@ -929,7 +929,7 @@ function PricingSection() {
   return (
     <section className="py-20 bg-[#F8FAFC]" id="pricing">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeading eyebrow="Pricing" title="Simple Pricing for Every Business" subtitle="Choose the plan that fits your needs. Start with a free 7-day trial — no card required." />
+        <SectionHeading eyebrow="Pricing" title="Simple Pricing for Every Business" subtitle="Choose the plan that fits your needs. Start a 30-day free trial that requires no credit card details upfront." />
         <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pt-3">
           {plans.map((plan, i) => (
             <div key={i} className={`rounded-2xl p-6 card-hover relative ${plan.popular ? "bg-[#0F172A] shadow-premium-lg ring-2 ring-[#F7B31C]" : "bg-white shadow-premium border border-[#F1F5F9]"}`}>

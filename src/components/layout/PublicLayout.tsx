@@ -8,7 +8,7 @@ import {
 
 const defaultSEO = {
   title: "DigitalCarda - AI-Powered Digital Business Cards & Smart Microsites",
-  description: "Create stunning digital business cards with QR codes, lead tracking, payment links, social media, products, videos, and AI-powered analytics. Start your free 7-day trial.",
+  description: "Create stunning digital business cards with QR codes, lead tracking, payment links, social media, products, videos, and AI-powered analytics. Start a 30-day free trial that requires no credit card details upfront.",
 };
 
 const seoMap: Record<string, { title: string; description: string }> = {
@@ -27,7 +27,7 @@ const seoMap: Record<string, { title: string; description: string }> = {
   },
   "/pricing": {
     title: "Pricing - DigitalCarda | Simple Pricing for Every Business",
-    description: "Start with a free 7-day trial. Plans from Rs. 1499/year. Includes AI tools, QR codes, analytics, custom domains, and reseller options.",
+    description: "Start a 30-day free trial that requires no credit card details upfront. Plans from Rs. 1499/year. Includes AI tools, QR codes, analytics, custom domains, and reseller options.",
   },
   "/ai-card-generator": {
     title: "AI Card Generator - DigitalCarda | Build Cards with AI",
@@ -59,7 +59,7 @@ const seoMap: Record<string, { title: string; description: string }> = {
   },
   "/signup": {
     title: "Sign Up - DigitalCarda | Create Your Free Digital Card",
-    description: "Start your 7-day free trial. Create beautiful digital business cards with AI-powered tools, QR codes, and lead tracking.",
+    description: "Start a 30-day free trial that requires no credit card details upfront. Create beautiful digital business cards with AI-powered tools, QR codes, and lead tracking.",
   },
   "/privacy": {
     title: "Privacy Policy - DigitalCarda",
@@ -260,8 +260,8 @@ export default function PublicLayout() {
                 <div className="rounded-[15px] bg-white px-4 py-3 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-[#FEF3C7] flex items-center justify-center shrink-0"><Sparkles size={17} className="text-[#F7B31C]" /></div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[#0F172A]">Start Free 7-Day Trial</p>
-                    <p className="text-[11px] text-[#64748B]">No card required · Cancel anytime</p>
+                    <p className="text-sm font-bold text-[#0F172A]">30 Days Free Cardless Trial</p>
+                    <p className="text-[11px] text-[#64748B]">No credit card details required</p>
                   </div>
                   <ArrowRight size={16} className="text-[#F7B31C] shrink-0" />
                 </div>
@@ -417,7 +417,7 @@ export default function PublicLayout() {
             <MessageCircle size={20} />
           </a>
           <Link to="/signup" className="btn-gold flex-1 h-12 flex items-center justify-center gap-2 text-base">
-            Start Free 7-Day Trial <ArrowRight size={18} />
+            30 Days Free Cardless Trial <ArrowRight size={18} />
           </Link>
         </div>
       </div>
