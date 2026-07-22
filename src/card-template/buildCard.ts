@@ -42,7 +42,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const slug = s(c.slug);
   const cardUrl = `https://digitalcarda.in/${slug}`;
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
-  const specs = s(c.specialities).split(",").map((x) => x.trim()).filter(Boolean);
+  const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean);
   const initial = (s(c.name)[0] || "D").toUpperCase();
   const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='12' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
 
@@ -58,22 +58,26 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     detail("fa fa-map-marker-alt", s(c.google_map) || "#", s(c.address)),
   ].join("");
 
-  const aboutRow = (label: string, v: string) =>
-    v ? `<tr class="table-row"><td class="lable"><h3>${esc(label)}</h3><span class="lable-seprator">:</span></td><td class="lable-text"><p>${esc(v)}</p></td></tr>` : "";
+  const infoItem = (icon: string, label: string, v: string) =>
+    v ? `<div class="about-info-item">
+        <span class="about-info-ic"><i class="${icon}"></i></span>
+        <span class="about-info-txt"><span class="about-info-k">${esc(label)}</span><span class="about-info-v">${esc(v)}</span></span>
+      </div>` : "";
+  const aboutInfo = [
+    infoItem("fa fa-building", "Company", s(c.company_name)),
+    infoItem("fa fa-briefcase", "Business", s(c.nature)),
+    infoItem("fa fa-calendar-alt", "Established", s(c.establishment)),
+    infoItem("fa fa-file-invoice", "GST Number", s(c.gst)),
+  ].join("");
 
   const aboutSection = on(c.about_on) && (s(c.company_name) || s(c.about_us)) ? `
     <div id="about-section" class="section-container">
       <div class="section-header">${esc(s(c.about) || "About Us")}</div>
-      <div class="about-con">
-        <table class="about-table">
-          ${aboutRow("Company Name", s(c.company_name))}
-          ${aboutRow("GST Number", s(c.gst))}
-          ${aboutRow("Year of Est.", s(c.establishment))}
-          ${aboutRow("Nature of Business", s(c.nature))}
-        </table>
-        ${s(c.about_us) ? `<p style="margin-top:10px">${esc(c.about_us)}</p>` : ""}
-        ${specs.length ? `<p class="speciality-lable">${esc(s(c.specialties_title) || "Our Specialties")}</p>
-          <ul class="speciality-list">${specs.map((x) => `<li><i class="fa fa-check"></i>${esc(x)}</li>`).join("")}</ul>` : ""}
+      <div class="about-modern">
+        ${aboutInfo ? `<div class="about-info">${aboutInfo}</div>` : ""}
+        ${s(c.about_us) ? `<div class="about-text"><i class="fa fa-quote-left about-quote"></i><p>${esc(c.about_us)}</p></div>` : ""}
+        ${specs.length ? `<p class="about-spec-title"><i class="fa fa-star"></i> ${esc(s(c.specialties_title) || "Our Specialties")}</p>
+          <div class="about-chips">${specs.map((x) => `<span class="about-chip"><i class="fa fa-check"></i>${esc(x)}</span>`).join("")}</div>` : ""}
       </div>
     </div>` : "";
 
