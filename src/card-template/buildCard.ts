@@ -1,6 +1,16 @@
 import mainCss from "./main.css?raw";
-import style1Css from "./style1.css?raw";
 import type { CustomerRecord } from "@/hooks/useCustomer";
+import { fixMojibake } from "@/lib/cardContent";
+
+/* All 31 legacy templates (style1.css … style31.css) loaded as raw strings. */
+const STYLE_MODULES = import.meta.glob("./styles/style*.css", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+const STYLES: Record<string, string> = {};
+for (const [path, css] of Object.entries(STYLE_MODULES)) {
+  const n = path.match(/style(\d+)\.css$/)?.[1];
+  if (n) STYLES[n] = css;
+}
+export const TEMPLATE_COUNT = 31;
+const styleFor = (theme: number) => STYLES[String(Math.min(TEMPLATE_COUNT, Math.max(1, Number(theme) || 1)))] || STYLES["1"] || "";
 
 type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
 type Gallery = { id: number; name: string; filename: string };
@@ -28,6 +38,7 @@ const SOCIAL_FA: Record<string, string> = {
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = []): string {
   const accent = s(c.color) || "#F7B31C";
   const accentDark = darken(accent, 0.16);
+  const theme = String(Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1)));
   const slug = s(c.slug);
   const cardUrl = `https://digitalcarda.in/${slug}`;
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
@@ -66,17 +77,38 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>
     </div>` : "";
 
+  // Smart product CTA — the action adapts to the button label the user chose.
+  const phone = s(c.mobile1).replace(/[^\d+]/g, "");
+  const mapLink = s(c.google_map);
+  const email = s(c.email);
+  const waMsg = (name: string) => encodeURIComponent(`Hi, I'm interested in "${s(name)}". Please share more details.`);
+  const smartBtn = (p: Product): { href: string; target: string; icon: string } => {
+    const t = s(p.button_title).toLowerCase();
+    const link = s(p.button);
+    if (/call|phone|dial|ring/.test(t) && phone) return { href: `tel:${phone}`, target: "_self", icon: "fa fa-phone-alt" };
+    if (/whatsapp|chat/.test(t) && wa) return { href: `https://wa.me/${wa}/?text=${waMsg(p.name)}`, target: "_blank", icon: "fab fa-whatsapp" };
+    if (/visit|map|location|direction|reach|near|store|shop\b/.test(t) && (mapLink || link)) return { href: mapLink || link, target: "_blank", icon: "fa fa-map-marker-alt" };
+    if (/mail|email/.test(t) && email) return { href: `mailto:${email}?subject=${encodeURIComponent("Enquiry: " + s(p.name))}&body=${waMsg(p.name)}`, target: "_self", icon: "fa fa-envelope" };
+    if (/buy|order|shop|cart|book|reserve|site|web|learn|know|offer|quote|get/.test(t) && link) return { href: link, target: "_blank", icon: "fa fa-arrow-right" };
+    if (link) return { href: link, target: "_blank", icon: "fa fa-external-link-alt" };
+    if (wa) return { href: `https://wa.me/${wa}/?text=${waMsg(p.name)}`, target: "_blank", icon: "fa fa-paper-plane" };
+    return { href: "#enquiry-section", target: "_self", icon: "fa fa-paper-plane" };
+  };
+
   const servicesSection = on(c.product_on) && products.length ? `
     <div id="products-section" class="section-container">
       <div class="section-header">${esc(s(c.product) || "Services")}</div>
-      ${products.map((p) => `
+      ${products.map((p) => {
+        const b = smartBtn(p);
+        return `
         <div class="product-card">
           <div class="heading-2"><h5>${esc(p.name)}</h5></div>
           ${(p.price || p.offer_price) ? `<div style="padding:2px 0 6px" class="heading-2">Price ${p.price && p.offer_price ? `<strike style="color:#666"> ₹${esc(p.price)}</strike>` : ""} <strong> ₹${esc(p.offer_price || p.price)}</strong></div>` : ""}
           ${p.filename ? `<img src="${esc(p.filename)}" class="img-fluid" style="width:100%;border-radius:4px" ${IMG} onerror="this.style.display='none'">` : ""}
-          ${p.description ? `<div class="heading-2" style="margin-top:14px"><h5>Other Detail</h5></div><div style="font-size:13px">${p.description}</div>` : ""}
-          <div class="text-right" style="margin-top:12px"><a href="https://wa.me/${esc(wa)}/?text=${encodeURIComponent("Hey! I am interested in " + s(p.name))}" class="product-enquiry-btn" target="_blank">${esc(p.button_title || "Send Enquiry")}</a></div>
-        </div>`).join("")}
+          ${p.description ? `<div class="heading-2" style="margin-top:14px"><h5>Other Detail</h5></div><div style="font-size:13px">${fixMojibake(p.description)}</div>` : ""}
+          <div class="text-right" style="margin-top:12px"><a href="${b.href}" class="product-enquiry-btn" target="${b.target}" rel="noopener"><i class="${b.icon}" style="margin-right:6px"></i>${esc(p.button_title || "Send Enquiry")}</a></div>
+        </div>`;
+      }).join("")}
     </div>` : "";
 
   const payIcon = (name: string) => `https://digitalcarda.in/images/${name}.png`;
@@ -162,26 +194,26 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const enquirySection = on(c.enquiry_on) ? `
     <div id="enquiry-section" class="section-container">
       <div class="section-header">${esc(s(c.enquiry) || "Enquiry Form")}</div>
-      <form onsubmit="this.innerHTML='<p class=&quot;dc-sent&quot;>✓ Thank you! We will get back to you shortly.</p>';return false;">
-        <div class="dc-field"><i class="fa fa-user"></i><input class="dc-input" placeholder="Your Name" required></div>
-        <div class="dc-field"><i class="fa fa-phone-alt"></i><input class="dc-input" placeholder="Contact Number" required></div>
-        <div class="dc-field"><i class="fa fa-envelope"></i><input class="dc-input" type="email" placeholder="Email"></div>
-        <div class="dc-field ta"><i class="fa fa-comment-dots"></i><textarea class="dc-input" placeholder="Your requirement" rows="3"></textarea></div>
+      <form onsubmit="return dcSendEnquiry(this)">
+        <div class="dc-field"><i class="fa fa-user"></i><input name="name" class="dc-input" placeholder="Your Name" required></div>
+        <div class="dc-field"><i class="fa fa-phone-alt"></i><input name="contact" class="dc-input" placeholder="Contact Number" required></div>
+        <div class="dc-field"><i class="fa fa-envelope"></i><input name="email" class="dc-input" type="email" placeholder="Email"></div>
+        <div class="dc-field ta"><i class="fa fa-comment-dots"></i><textarea name="description" class="dc-input" placeholder="Your requirement" rows="3"></textarea></div>
         <button type="submit" class="dc-btn dc-btn-primary"><i class="fa fa-paper-plane"></i> Send Enquiry</button>
       </form>
     </div>` : "";
 
   const shareSection = `
-    <div class="section-container">
+    <div class="section-container dc-share">
       <div class="section-header">Share with others on WhatsApp</div>
       <form onsubmit="var n=this.num.value.replace(/[^0-9]/g,'');if(n)window.open('https://wa.me/'+ (n.length===10?'91'+n:n) +'/?text=' + encodeURIComponent('${cardUrl}'),'_blank');return false;">
-        <div class="dc-phone" style="max-width:340px;margin:0 auto 14px">
+        <div class="dc-phone" style="max-width:340px;margin:0 auto 8px">
           <span class="cc"><i class="fas fa-mobile-alt" style="color:var(--theme-color)"></i> +91</span>
           <input name="num" placeholder="Enter WhatsApp number" inputmode="numeric" required>
         </div>
-        <div style="max-width:340px;margin:0 auto"><button type="submit" class="dc-btn dc-btn-wa"><i class="fab fa-whatsapp" style="font-size:18px"></i> Share</button></div>
+        <div style="max-width:340px;margin:0 auto"><button type="submit" class="dc-btn dc-btn-wa"><i class="fab fa-whatsapp" style="font-size:16px"></i> Share</button></div>
       </form>
-      <div style="max-width:340px;margin:16px auto 0">
+      <div style="max-width:340px;margin:8px auto 0">
         <a href="javascript:void(0)" onclick="saveVCard()" class="dc-btn dc-btn-dark"><i class="fa fa-download"></i> Save Contact in Your Phonebook</a>
       </div>
     </div>`;
@@ -208,7 +240,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Open+Sans:wght@400;600;700&display=swap">
 <style>
 ${mainCss}
-${style1Css}
+${styleFor(Number(theme))}
 :root{--theme-color:${accent};}
 html{scroll-behavior:smooth;}
 body{background:#f1f1f1;}
@@ -241,9 +273,22 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-phone:focus-within{border-color:${accent};background:#fff;box-shadow:0 0 0 3px ${accent}30;}
 .dc-phone .cc{display:flex;align-items:center;gap:5px;padding:0 14px;background:#f1f3f5;font-weight:700;font-size:14px;color:#333;border-right:1px solid #e6e8eb;}
 .dc-phone input{flex:1;min-width:0;border:none;outline:none;padding:0 14px;height:48px;font-size:14px;background:transparent;color:#111;}
+/* Compact Share section */
+.dc-share{padding-top:12px;padding-bottom:12px;}
+.dc-share .section-header{margin-bottom:12px;}
+.dc-share .dc-phone .cc,.dc-share .dc-phone input{height:40px;}
+.dc-share .dc-btn{height:40px;font-size:14px;border-radius:10px;}
 .dc-sent{color:#12a150;font-weight:600;text-align:center;padding:16px 0;}
+/* Bottom login / signup bar */
+.dc-bottom-bar{display:flex;background:#fdf0d5;border-top:2px solid #f3d9a0;margin-top:16px;border-radius:8px;overflow:hidden;}
+.dc-bottom-bar a{flex:1;text-align:center;font-weight:700;font-size:14px;color:#14243E;text-decoration:none;padding:15px 8px;transition:background .15s;}
+.dc-bottom-bar a:first-child{border-right:1px solid #e6c98a;}
+.dc-bottom-bar a:hover{background:#fbe6b8;}
+/* Floating Save Contact button (small) */
+.dc-save-fab{position:fixed;right:14px;bottom:150px;width:44px;height:44px;border-radius:50%;background:#14243E;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.28);z-index:1000;color:#fff;font-size:17px;text-decoration:none;transition:transform .15s;}
+.dc-save-fab:hover{transform:scale(1.08);}
 </style></head>
-<body>
+<body data-theme="${theme}">
 <main>
   <div class="page-wrapper">
     <section id="home-section">
@@ -272,8 +317,13 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
     ${enquirySection}
     ${shareSection}
     <div class="copyright-wrapper"><p>Powered by <a href="https://digitalcarda.in" target="_blank">DigitalCarda</a></p></div>
+    <div class="dc-bottom-bar">
+      <a href="/login" target="_top">Customer Login</a>
+      <a href="/signup" target="_top">Create Your Free Card</a>
+    </div>
   </div>
 </main>
+<a href="javascript:void(0)" onclick="saveVCard()" class="dc-save-fab" aria-label="Save Contact" title="Save Contact"><i class="fa fa-user-plus"></i></a>
 ${footer}
 <div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:99999;align-items:center;justify-content:center;flex-direction:column">
   <span onclick="lbClose()" style="position:absolute;top:12px;right:18px;color:#fff;font-size:32px;line-height:1;cursor:pointer">&times;</span>
@@ -317,6 +367,26 @@ function playVid(el,id){ el.outerHTML='<div style="position:relative;padding-bot
 document.getElementById('lightbox').addEventListener('click', function(e){ if(e.target.id==='lightbox') lbClose(); });
 document.addEventListener('keydown', function(e){ var lb=document.getElementById('lightbox'); if(lb&&lb.style.display==='flex'){ if(e.key==='Escape')lbClose(); else if(e.key==='ArrowLeft')lbPrev(); else if(e.key==='ArrowRight')lbNext(); } });
 function goSection(id){ var el=document.getElementById(id); if(!el) return; var h=document.documentElement, b=document.body, prev=h.style.scrollBehavior; h.style.scrollBehavior='auto'; var y=el.getBoundingClientRect().top+(window.pageYOffset||h.scrollTop||b.scrollTop||0); window.scrollTo(0,y); h.style.scrollBehavior=prev; }
+function dcSendEnquiry(form){
+  try{
+    function pad(n){return (n<10?'0':'')+n;}
+    var d=new Date();
+    var ts=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+    var e={ id:'new_'+d.getTime()+'_'+Math.floor(Math.random()*1e4),
+      name:(form.name.value||'').trim(), contact:(form.contact.value||'').trim(),
+      email:(form.email.value||'').trim(), description:(form.description.value||'').trim(),
+      uname:'${slug}', created_on:ts, status:'new' };
+    var key='dc_new_enquiries', list=[];
+    try{ list=JSON.parse(localStorage.getItem(key)||'[]'); if(!Array.isArray(list))list=[]; }catch(_){ list=[]; }
+    list.push(e);
+    localStorage.setItem(key, JSON.stringify(list));
+    localStorage.setItem('dc_enquiry_ping', String(d.getTime())); /* wake cross-tab listeners */
+    try{ window.dispatchEvent(new CustomEvent('dc:new-enquiry',{detail:e})); }catch(_){}
+    try{ if(window.parent && window.parent!==window) window.parent.dispatchEvent(new CustomEvent('dc:new-enquiry',{detail:e})); }catch(_){}
+  }catch(err){}
+  form.innerHTML='<p class="dc-sent">✓ Thank you! We will get back to you shortly.</p>';
+  return false;
+}
 function openShare(){ document.getElementById('shareModal').style.display='flex'; }
 function closeShare(){ document.getElementById('shareModal').style.display='none'; }
 function copyShare(){ var u='${cardUrl}'; if(navigator.clipboard){navigator.clipboard.writeText(u).then(function(){alert('Link copied');});}else{alert(u);} }
@@ -327,5 +397,52 @@ function saveVCard(){
   var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = '${slug || "card"}.vcf'; a.click();
 }
 </script>
+</body></html>`;
+}
+
+/* Renders only the FIRST PAGE (home section) of a card with a given template —
+   used for the template picker thumbnails. No scripts, no other sections. */
+export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
+  const accent = s(c.color) || "#F7B31C";
+  const theme = Math.min(TEMPLATE_COUNT, Math.max(1, Number(themeNum) || 1));
+  const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
+  const initial = (s(c.name)[0] || "D").toUpperCase();
+  const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='12' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
+  const social = Object.keys(SOCIAL_FA).filter((k) => s(c[k]))
+    .map((k) => `<li><a href="javascript:void(0)"><i class="${SOCIAL_FA[k]}"></i></a></li>`).join("")
+    || `<li><a href="javascript:void(0)"><i class="fab fa-facebook-f"></i></a></li><li><a href="javascript:void(0)"><i class="fab fa-instagram"></i></a></li>`;
+  const detail = (icon: string, text: string) =>
+    text ? `<div class="home-single-details"><a href="javascript:void(0)"><i class="${icon}"></i><span>${esc(text)}</span></a></div>` : "";
+  const homeDetails = [
+    detail("fa fa-phone-alt", s(c.mobile1) || "+91 00000 00000"),
+    detail("fa fa-globe", s(c.url) || "www.yoursite.com"),
+    detail("fa fa-envelope", s(c.email) || "you@email.com"),
+    detail("fa fa-map-marker-alt", s(c.address) || "Your business address"),
+  ].join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap">
+<style>
+${mainCss}
+${styleFor(theme)}
+:root{--theme-color:${accent};}
+html,body{margin:0;background:#fff;overflow:hidden;}
+main{box-shadow:none;padding:0;}
+#home-card-share,.view,.footer{display:none !important;}
+</style></head>
+<body data-theme="${theme}">
+<main><div class="page-wrapper"><section id="home-section">
+  <div class="home-section-content">
+    <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'"></div></div>
+    <div class="home-social"><p>Follow Us</p><ul class="social-icons">${social}</ul></div>
+    <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation) || "Designation"}</p></div>
+    <div class="home-details">${homeDetails}</div>
+    <div class="home-call-whatsapp">
+      <a href="tel:${esc(c.mobile1)}" class="call-icon"><i class="fa fa-phone-alt"></i><span>Call</span></a>
+      <a href="https://wa.me/${esc(wa)}" class="whatapp-icon" target="_blank"><i class="fab fa-whatsapp"></i><span>Whatsapp</span></a>
+    </div>
+  </div>
+  <div class="home-extra-one"></div><div class="home-extra-two"></div><div class="home-extra-three"></div><div class="home-extra-four"></div>
+</section></div></main>
 </body></html>`;
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Info, Save, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/customer/ModuleShell";
@@ -9,8 +9,13 @@ export default function CustomerAbout() {
   const [aboutTitle, setAboutTitle] = useState<string | null>(null);
   const [about, setAbout] = useState<string | null>(null);
   const [specTitle, setSpecTitle] = useState<string | null>(null);
-  const [specs, setSpecs] = useState<string[]>(() => String(data.specialities ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+  const [specs, setSpecs] = useState<string[]>([]);
   const [newSpec, setNewSpec] = useState("");
+
+  // Sync specialities once the customer data has loaded from storage
+  useEffect(() => {
+    setSpecs(String(data.specialities ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+  }, [data.specialities]);
 
   const aboutTitleV = aboutTitle ?? String(data.about ?? "About Us");
   const aboutV = about ?? String(data.about_us ?? "");

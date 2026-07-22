@@ -15,7 +15,8 @@ export const DEFAULT_CUSTOMER: CustomerRecord = {
   bank_name: "", ifsc: "", account_holder: "", account_number: "", account_type: "current",
   paytm_number: "", phone_pe: "", google_pay: "", upi: "",
   facebook: "", twitter: "", instagram: "", youtube: "", pinterest: "", linkedin: "",
-  google_map: "", google_review: "", social_title: "Follow Us",
+  google_map: "https://g.page/pacewalk?share", google_review: "", social_title: "Follow Us",
+  password: "Admin@786", activated_on: "2026-07-20", expired_on: "2029-07-19",
   package_id: 6, views: 5627,
 };
 
@@ -51,17 +52,38 @@ export function useCustomer() {
   return { data, update };
 }
 
-/* Generic localStorage-backed collection (products, gallery, videos, uploads…) */
-export function useLocalList<T extends { id: number }>(key: string, seed: T[] = []) {
+/* Generic localStorage-backed collection (products, gallery, videos, uploads…).
+   When the key is absent, `asyncSeed` (if given) loads the real content once and persists it. */
+export function useLocalList<T extends { id: number }>(key: string, seed: T[] = [], asyncSeed?: () => Promise<T[]>) {
   const [items, setItems] = useState<T[]>(seed);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) setItems(JSON.parse(raw));
-    } catch { /* keep seed */ }
+    let cancelled = false;
+    const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+    const raw = read(key);
+    let parsed: T[] | null = null;
+    try { parsed = raw ? (JSON.parse(raw) as T[]) : null; } catch { parsed = null; }
+    const seededMark = key + "::seeded";
+    const alreadySeeded = read(seededMark) === "1";
+    const isEmpty = !parsed || (Array.isArray(parsed) && parsed.length === 0);
+
+    // Seed real content once when the list is missing/empty and hasn't been seeded before.
+    if (asyncSeed && isEmpty && !alreadySeeded) {
+      asyncSeed()
+        .then((arr) => {
+          if (cancelled) return;
+          setItems(arr);
+          try { localStorage.setItem(key, JSON.stringify(arr)); localStorage.setItem(seededMark, "1"); } catch { /* ignore */ }
+        })
+        .catch(() => { /* leave empty */ })
+        .finally(() => { if (!cancelled) setReady(true); });
+      return () => { cancelled = true; };
+    }
+    if (parsed) setItems(parsed);
     setReady(true);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   const persist = useCallback((next: T[]) => {

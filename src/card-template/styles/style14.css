@@ -1,0 +1,399 @@
+@import url('https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+#home-section{
+font-family: 'Jost', sans-serif;
+}
+/*lower section border css=======================
+=============================================*/
+ .section-container::before {
+	border:none;
+	width: 65%;
+	left: 0;
+	height: 6px;
+	top:2px;
+	background-color: var(--theme-color);
+	border-radius: 0 10px 10px 0px;
+}
+.section-container::after{
+	width: 65%;
+	
+	height: 6px;
+	top:10px;
+	background-color: var(--theme-color);
+	border-radius: 10px 0 0 10px;
+	
+}
+.section-footer::before {
+	border:none;
+	height: 4px;
+	background-color: #414141;
+	width: 55%;
+	bottom: 8px;
+	right: 0;
+	left: auto;
+	border-radius: 10px 0 0 10px;
+}
+.section-footer::after{
+	border:none;
+	height: 4px;
+	background-color: var(--theme-color);
+	width: 55%;
+	border-radius: 0 10px 10px 0;
+	bottom:2px;
+	left: 0;
+}
+/*lower section border css__________________
+_______________end__________________________*/
+
+/*==========home section new css===============
+=============================================*/
+#home-section{
+	background-color: #fff;
+	position: relative;
+	z-index: 1;
+	overflow: hidden;
+}
+#home-section .view{
+	position: relative;
+	display: -ms-flexbox;
+	display: flex;
+	/*-ms-flex-pack: center ;
+	justify-content: center ;*/
+	/*-ms-flex-align: center;
+	align-items: center ;*/
+
+	
+
+
+}
+/*#home-section .view::before{
+	content: "";
+	z-index: -1;
+	top:0;
+	left:0;
+	background-color: var(--theme-color);
+	position: absolute;
+	width: 50px;
+	height: 50px;
+
+}*/
+#home-section .view .view-icon{
+	color: #fff;
+	background-color: var(--theme-color);
+	padding: 2px 2px 2px 8px;
+}
+#home-section .view .view-number{
+	font-size: 12px;
+	font-weight: 600;
+	color: #fff;
+	background-color: var(--theme-color);
+	padding: 4px 10px 2px 4px;
+	border-bottom-right-radius: 10px;
+
+}
+#home-section .view .view-number p{
+		margin-bottom: 5px;
+	}
+#home-section .home-brand .home-brand-img img{
+	height: 140px;
+	width: 140px;
+	object-fit: contain;
+}
+#home-section .home-brand .home-brand-img{
+	max-width: 160px;
+	margin: 0 auto;
+}
+#home-section .home-social .social-icons{
+	list-style: none;
+	display: flex;
+	justify-content: center;
+	margin-bottom: 5px;
+}
+#home-section .home-social p{
+	text-align: center;
+	font-size: 12px;
+	margin-bottom: 2px;
+	color: #414141;
+	text-transform: capitalize;
+}
+#home-section .home-social .social-icons li a{
+	display: inline-block;
+	height: 30px;
+	width: 30px;
+	line-height: 30px;
+	text-align: center;
+	font-size: 10px;
+	margin-right:4px;
+	background-color: var(--theme-color);
+	border-radius: 50%;
+	color: #fff;
+	position: relative;
+}
+/*#home-section .home-social .social-icons li:not(:last-child) a::after{
+	content:"";
+	border-right:1px solid #d1d2d1;
+	position: absolute;
+	height: 100%;
+	right: -2px;
+}*/
+#home-section .owner-details{
+	 margin-top: 10px;    
+	 position: relative;
+	 border-left:2px solid var(--theme-color);
+	 text-align: left;
+	 border-left: 5px solid var(--theme-color);
+	margin-left: 20px;
+	padding-left: 20px;
+	padding-right: 20px;
+}
+
+#home-section .owner-details .owner-name {
+	font-weight: 600;
+	font-size: 1.5rem;
+	text-transform: uppercase;
+	color: #414143;
+	margin-bottom: 0px;
+
+
+}
+#home-section .owner-details .owner-designation{
+	font-size: 1rem;
+	font-weight: 500;
+	text-transform: uppercase;
+	color: var(--theme-color);
+	position: relative;
+	z-index: 1;
+	margin-bottom: 0;
+}
+
+#home-section .home-details{
+	text-align: left;
+	padding: 20px 50px 2px;
+}
+#home-section .home-details .home-single-details a {
+	display: flex;
+	margin-bottom: 20px;
+	align-items: center;
+}
+#home-section .home-details .home-single-details i{
+	font-size: 1.5rem;
+	min-width: 36px;
+	border-right:1px solid rgba(0,0,0,0.1);
+}
+#home-section .home-details .home-single-details span{
+	padding-left:15px;
+	font-size: 1rem;
+	line-height: 19px;
+	color: #414141;
+}
+#home-section .home-call-whatsapp{
+	display: flex;
+	justify-content: center;
+	-ms-flex-pack: center;
+	padding-bottom:5px;
+}
+#home-section .home-call-whatsapp .call-icon{
+	background-color: var(--theme-color);
+	padding:5px 15px;
+	display: flex;
+	justify-content: center;
+	-ms-flex-pack: center ;
+	align-items: center;
+	border-radius: 5px;
+	margin-right: 2px;
+}
+
+#home-section .home-call-whatsapp .call-icon span{
+	font-size: 1.5rem;
+	display: inline-block;
+	font-weight:400;
+	text-transform: uppercase;
+	padding-left: 10px;
+	color: #fff;
+}
+#home-section .home-call-whatsapp .call-icon i{
+	display: inline-block;
+	height: 25px;
+	width: 25px;
+	line-height: 25px;
+	text-align: center;
+	background-color: #fff;
+	border-radius: 4px;
+	font-size: 15px;
+}
+#home-section .home-call-whatsapp .whatapp-icon{
+	background-color: var(--theme-color);
+	padding:5px 15px;
+	display: flex;
+	justify-content: center;
+	-ms-flex-pack: center ;
+	align-items: center;
+	border-radius:5px;
+}
+#home-section .home-call-whatsapp .whatapp-icon i{
+	display: inline-block;
+	font-size: 25px;
+	color: #fff;
+}
+#home-section .home-call-whatsapp  .whatapp-icon span{
+	font-size: 1.5rem;
+	display: inline-block;
+	font-weight:400;
+	color: #fff;
+	text-transform: uppercase;
+	padding-left: 10px;
+}
+
+#home-section .home-extra-one::before {
+	content: "";
+	position: absolute;
+	width: 30px;
+	border-bottom:15px solid var(--theme-color);
+	border-left: 15px solid transparent;
+	bottom:0px;
+	right: 0;
+	z-index: 2;
+}
+#home-section .home-extra-one::after {
+	content: "";
+	position: absolute;
+	width: 30px;
+	border-bottom:15px solid var(--theme-color);
+	border-right: 15px solid transparent;
+	bottom:0px;
+	left: 0;
+	z-index: 1;
+}
+#home-section .home-extra-two{
+	position: absolute;
+	width: 250px;
+	height: 170px;
+	background-color:  var(--theme-color);
+	top:0;
+	right: 50%;
+	z-index: -3;
+	border-radius: 0 0 20px 20px;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}
+#home-section .home-extra-three {
+	position: absolute;
+	width: 220px;
+	height: 200px;
+	background-color:  #414141;
+	top:0;
+	right: 50%;
+	z-index: -1;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}
+#home-section .home-extra-five {
+	position: absolute;
+	width: 230px;
+	height: 204px;
+	background-color:#d1d2d4;
+	top:0;
+	right: 50%;
+	z-index: -2;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}
+#home-section .home-extra-four{
+	top:200px;
+	width: 220px;
+	position: absolute;
+	border-left: 110px solid transparent;
+	border-right: 110px solid transparent;
+	border-top: 50px solid #414141;
+	right: 50%;
+	z-index: -1;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}
+#home-section .home-extra-six{
+	top:204px;
+	width: 230px;
+	position: absolute;
+	border-left: 115px solid transparent;
+	border-right: 115px solid transparent;
+	border-top: 55px solid #d1d2d4;
+	right: 50%;
+	z-index: -2;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}
+#home-section .svg-parent-1 svg{
+	display: none;
+}
+
+
+#home-section .svg-parent-2 svg{
+	display: none;
+}
+#home-section .home-social{
+	min-height: 52px;
+	margin-top: 100px;
+}
+/*==========home section css_______ end*/
+
+/*==========responsive=======================
+=============================================*/
+@media only screen and (max-width: 768px) {
+	:root{
+		font-size: 13px;
+	}
+	
+		
+}
+/*home section new end*/
+
+.section-container::before{
+	width: 100%;
+	height: 4px;
+	top:0;
+	background-color: #414141;
+}
+.section-container::after {
+	position: absolute;
+	width: 50%;
+	border-top:15px solid var(--theme-color);
+	border-right: 15px solid transparent;
+	top:0;
+	left: 0;
+	z-index: 1;
+	height: 0;
+	border-radius: 0;
+	background-color: transparent;
+}
+.section-footer::before {
+	width: 100%;
+	height: 4px;
+	bottom:0;
+}
+.section-footer::after {
+	position: absolute;
+	width: 50%;
+	border-bottom:15px solid var(--theme-color);
+	border-left: 15px solid transparent;
+	bottom:0;
+	right: 0;
+	left: auto;
+	z-index: 1;
+	height: 0;
+	border-radius: 0;
+	background-color: transparent;
+}

@@ -2,6 +2,7 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import type { ReactNode } from "react";
 import { ImagePlus } from "lucide-react";
 import { fileToDataUrl } from "@/hooks/useCustomer";
+import NotificationBell from "@/components/NotificationBell";
 
 export const fieldCls =
   "h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-3.5 text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#94A3B8]";
@@ -49,11 +50,11 @@ export function Panel({ title, subtitle, children, right }: { title: string; sub
   );
 }
 
-export function ImagePick({ value, onChange, className = "w-24 h-24", label = "Upload" }: { value?: string; onChange: (dataUrl: string) => void; className?: string; label?: string }) {
+export function ImagePick({ value, onChange, className = "w-24 h-24", label = "Upload", fit = "cover" }: { value?: string; onChange: (dataUrl: string) => void; className?: string; label?: string; fit?: "cover" | "contain" }) {
   return (
-    <label className={`${className} rounded-xl border-2 border-dashed border-[#E2E8F0] hover:border-[#F7B31C] bg-[#F8FAFC] flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-colors shrink-0`}>
+    <label className={`${className} rounded-xl border-2 border-dashed border-[#E2E8F0] hover:border-[#F7B31C] ${fit === "contain" ? "bg-white p-1.5" : "bg-[#F8FAFC]"} flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-colors shrink-0`}>
       {value ? (
-        <img src={value} alt="preview" className="w-full h-full object-cover" />
+        <img src={value} alt="preview" referrerPolicy="no-referrer" className={`w-full h-full ${fit === "contain" ? "object-contain" : "object-cover"}`} />
       ) : (
         <span className="flex flex-col items-center gap-1 text-[#94A3B8]">
           <ImagePlus size={20} /><span className="text-[10px] font-medium">{label}</span>
@@ -84,7 +85,10 @@ export default function ModuleShell({
               {subtitle && <p className="text-xs text-[#64748B]">{subtitle}</p>}
             </div>
           </div>
-          {actions}
+          <div className="flex items-center gap-2">
+            {actions}
+            <NotificationBell />
+          </div>
         </header>
         {children}
       </div>

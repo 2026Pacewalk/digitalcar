@@ -1,0 +1,424 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&display=swap');
+#home-section{
+font-family: 'Oswald', sans-serif;
+}
+/*lower section border css=======================
+=============================================*/
+ .section-container::before {
+	border:none;
+	width: 65%;
+	left: 0;
+	height: 6px;
+	top:2px;
+	background-color: var(--theme-color);
+	border-radius: 0 10px 10px 0px;
+}
+.section-container::after{
+	width: 65%;
+	
+	height: 6px;
+	top:10px;
+	background-color: var(--theme-color);
+	border-radius: 10px 0 0 10px;
+	
+}
+.section-footer::before {
+	border:none;
+	height: 4px;
+	background-color: #1b2432;
+	width: 55%;
+	bottom: 8px;
+	right: 0;
+	left: auto;
+	border-radius: 10px 0 0 10px;
+}
+.section-footer::after{
+	border:none;
+	height: 4px;
+	background-color: var(--theme-color);
+	width: 55%;
+	border-radius: 0 10px 10px 0;
+	bottom:2px;
+	left: 0;
+}
+/*lower section border css__________________
+_______________end__________________________*/
+
+/*==========home section new css===============
+=============================================*/
+#home-section{
+	background-color: #fff;
+	position: relative;
+	z-index: 1;
+	overflow: hidden;
+}
+#home-section .view{
+	position: relative;
+	display: -ms-flexbox;
+	display: flex;
+	/*-ms-flex-pack: center ;
+	justify-content: center ;*/
+	/*-ms-flex-align: center;
+	align-items: center ;*/
+
+	
+
+
+}
+/*#home-section .view::before{
+	content: "";
+	z-index: -1;
+	top:0;
+	left:0;
+	background-color: var(--theme-color);
+	position: absolute;
+	width: 50px;
+	height: 50px;
+
+}*/
+#home-section .view .view-icon{
+	color: #fff;
+	background-color: var(--theme-color);
+	padding: 2px 2px 2px 8px;
+}
+#home-section .view .view-number{
+	font-size: 12px;
+	font-weight: 600;
+	color: #fff;
+	background-color: var(--theme-color);
+	padding: 4px 10px 2px 4px;
+	border-bottom-right-radius: 10px;
+
+}
+#home-section .view .view-number p{
+		margin-bottom: 5px;
+	}
+#home-section .home-brand .home-brand-img img{
+	height: 140px;
+	width: 140px;
+	object-fit: contain;
+}
+#home-section .home-brand .home-brand-img{
+	max-width: 160px;
+	margin: 0 auto;
+}
+#home-section .home-social .social-icons{
+	list-style: none;
+	display: flex;
+	justify-content: center;
+	margin-bottom: 5px;
+}
+#home-section .home-social p{
+	text-align: center;
+	font-size: 12px;
+	margin-bottom: 2px;
+	color: #000;
+	text-transform: capitalize;
+}
+#home-section .home-social .social-icons li a{
+	display: inline-block;
+	height: 30px;
+	width: 30px;
+	line-height: 30px;
+	text-align: center;
+	font-size: 10px;
+	margin-right:4px;
+	background-color: var(--theme-color);
+	border-radius: 50%;
+	color: #fff;
+	position: relative;
+}
+/*#home-section .home-social .social-icons li:not(:last-child) a::after{
+	content:"";
+	border-right:1px solid #d1d2d1;
+	position: absolute;
+	height: 100%;
+	right: -2px;
+}*/
+#home-section .owner-details{
+	 margin-top: 10px;    
+	 position: relative;
+	 text-align: center;
+	padding-left: 20px;
+	padding-right: 20px;
+}
+#home-section .owner-details::before{
+	content: "";
+	height: 40px;
+	width: 40px;
+	background-color: var(--theme-color);
+	left: -20px;
+	top:50%;
+	position: absolute;
+	-webkit-transform: translateY(-50%);
+	-moz-transform: translateY(-50%);
+	-ms-transform: translateY(-50%);
+	-o-transform: translateY(-50%);
+	transform: translateY(-50%);
+}
+#home-section .owner-details::after{
+	content: "";
+	height: 40px;
+	width: 40px;
+	background-color: var(--theme-color);
+	right: -20px;
+	top:50%;
+	position: absolute;
+	-webkit-transform: translateY(-50%);
+	-moz-transform: translateY(-50%);
+	-ms-transform: translateY(-50%);
+	-o-transform: translateY(-50%);
+	transform: translateY(-50%);
+}
+
+#home-section .owner-details .owner-name {
+	font-weight: 600;
+	font-size: 1.5rem;
+	text-transform: uppercase;
+	color: #000;
+	margin-bottom: 0px;
+
+
+}
+#home-section .owner-details .owner-designation{
+	font-size: 1rem;
+	font-weight: 500;
+	text-transform: uppercase;
+	color: var(--theme-color);
+	position: relative;
+	z-index: 1;
+	margin-bottom: 0;
+}
+
+#home-section .home-details{
+	text-align: left;
+	padding: 20px 50px 30px;
+}
+#home-section .home-details .home-single-details a {
+	display: flex;
+	margin-bottom: 20px;
+	align-items: center;
+}
+#home-section .home-details .home-single-details i{
+	font-size: .9rem;
+	height: 25px;
+	width: 30px;
+	text-align: center;
+	line-height: 25px;
+	min-width: 30px;
+	border-right:1px solid rgba(0,0,0,0.1);
+	position: relative;
+	background-color: var(--theme-color);
+	color: #fff;
+}
+
+#home-section .home-details .home-single-details i::after{
+	content: "";
+	  position: absolute;
+	  bottom: -15px;
+	  left: 0;
+	  width: 0;
+	  height: 0;
+	  border-left: 15px solid transparent;
+	  border-right: 15px solid transparent;
+	  border-top: 15px solid var(--theme-color);
+	  -webkit-filter: brightness(80%);
+	  filter: brightness(85%);
+}
+#home-section .home-details .home-single-details:nth-child(even)  i{
+	background-color: #1b2432;
+}
+#home-section .home-details .home-single-details:nth-child(even)  i::after{
+	border-top: 15px solid  #1b2432;
+}
+#home-section .home-details .home-single-details span{
+	padding-left:15px;
+	font-size: 1rem;
+	line-height: 19px;
+	color: #000;
+}
+#home-section .home-call-whatsapp{
+	display: flex;
+	justify-content: center;
+	-ms-flex-pack: center;
+}
+#home-section .home-call-whatsapp .call-icon{
+	background-color: var(--theme-color);
+	padding:5px 15px;
+	display: flex;
+	justify-content: center;
+	-ms-flex-pack: center ;
+	align-items: center;
+	width: 40%;
+	
+}
+
+#home-section .home-call-whatsapp .call-icon span{
+	font-size: 1.5rem;
+	display: inline-block;
+	font-weight:400;
+	text-transform: uppercase;
+	padding-left: 10px;
+	color: #fff;
+}
+#home-section .home-call-whatsapp .call-icon i{
+	display: inline-block;
+	height: 25px;
+	width: 25px;
+	line-height: 25px;
+	text-align: center;
+	background-color: #fff;
+	border-radius: 4px;
+	font-size: 15px;
+}
+#home-section .home-call-whatsapp .whatapp-icon{
+	background-color:#1b2432;
+	padding:5px 15px;
+	display: flex;
+	justify-content: center;
+	-ms-flex-pack: center ;
+	align-items: center;
+	width: 60%;
+}
+#home-section .home-call-whatsapp .whatapp-icon i{
+	display: inline-block;
+	font-size: 25px;
+	color: #0f0;
+}
+#home-section .home-call-whatsapp  .whatapp-icon span{
+	font-size: 1.5rem;
+	display: inline-block;
+	font-weight:400;
+	color: #fff;
+	text-transform: uppercase;
+	padding-left: 10px;
+}
+#home-section .home-extra-three {
+	position: absolute;
+	width: 100%;
+	height: 190px;
+	background:  #1b2432;
+	top:0;
+	right: 50%;
+	z-index: -1;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}
+#home-section .home-extra-four{
+	top:190px;
+	width: 100%;
+	position: absolute;
+	border-left: 240px solid transparent;
+	border-right: 240px solid transparent;
+	border-top: 50px solid  #1b2432;
+	right: 50%;
+	z-index: -1;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}
+#home-section .home-extra-five{
+	top:196px;
+	width: 50%;
+	height: 20px;
+	background-color: var(--theme-color);
+	position: absolute;
+	z-index: -1;
+	-webkit-transform: rotate(12deg);
+	-moz-transform: rotate(12deg);
+	-ms-transform: rotate(12deg);
+	-o-transform: rotate(12deg);
+	transform: rotate(12deg);
+	left: -60px;
+}
+#home-section .home-extra-six{
+	top:196px;
+	width: 50%;
+	height: 20px;
+	background-color: var(--theme-color);
+	position: absolute;
+	z-index: -1;
+	-webkit-transform: rotate(-12deg);
+	-moz-transform: rotate(-12deg);
+	-ms-transform: rotate(-12deg);
+	-o-transform: rotate(-12deg);
+	transform: rotate(-12deg);
+	right: -60px;
+}
+#home-section .svg-parent-1 svg{
+	display: none;
+}
+
+
+#home-section .svg-parent-2 svg{
+	display: none;
+}
+#home-section .home-social{
+	min-height: 52px;
+	margin-top: 100px;
+}
+/*==========home section css_______ end*/
+
+/*==========responsive=======================
+=============================================*/
+@media only screen and (max-width: 768px) {
+	:root{
+		font-size: 13px;
+	}
+	
+		
+}
+/*home section new end*/
+
+.section-container::before{
+	width: 100%;
+	height: 4px;
+	top:0;
+	background-color: #1b2432;
+}
+.section-container::after {
+	position: absolute;
+	width: 0;
+	border-top:15px solid var(--theme-color);
+	border-right: 15px solid transparent;
+	border-left: 15px solid transparent;
+	top:0;
+	left: 50%;
+	-webkit-transform: translateX(-50%);
+	-moz-transform: translateX(-50%);
+	-ms-transform: translateX(-50%);
+	-o-transform: translateX(-50%);
+	transform: translateX(-50%);
+	z-index: 1;
+	height: 0;
+	border-radius: 0;
+	background-color: transparent;
+}
+.section-footer::before {
+	width: 100%;
+	height: 4px;
+	bottom:0;
+}
+.section-footer::after {
+		position: absolute;
+	width: 0;
+	border-bottom:15px solid var(--theme-color);
+	border-right: 15px solid transparent;
+	border-left: 15px solid transparent;
+	bottom:0;
+	left: 50%;
+	-webkit-transform: translateX(-50%);
+	-moz-transform: translateX(-50%);
+	-ms-transform: translateX(-50%);
+	-o-transform: translateX(-50%);
+	transform: translateX(-50%);
+	z-index: 1;
+	height: 0;
+	border-radius: 0;
+	background-color: transparent;
+}

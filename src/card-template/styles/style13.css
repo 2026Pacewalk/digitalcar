@@ -1,0 +1,380 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+#home-section{
+	font-family: 'Kanit', sans-serif;
+}
+/*lower section border css=======================
+=============================================*/
+ .section-container::before {
+	border:none;
+	width: 65%;
+	left: 0;
+	height: 6px;
+	top:2px;
+	background-color: var(--theme-color);
+	border-radius: 0 10px 10px 0px;
+}
+.section-container::after{
+	width: 65%;
+	
+	height: 6px;
+	top:10px;
+	background-color: var(--theme-color);
+	border-radius: 10px 0 0 10px;
+	
+}
+.section-footer::before {
+	border:none;
+	height: 4px;
+	background-color:  var(--theme-color);
+	width: 55%;
+	bottom: 8px;
+	right: 0;
+	left: auto;
+	border-radius: 10px 0 0 10px;
+}
+
+
+/*lower section border css__________________
+_______________end__________________________*/
+
+/*==========home section new css===============
+=============================================*/
+#home-section{
+	background-color: #fff;
+	position: relative;
+	z-index: 1;
+	overflow: hidden;
+}
+#home-section .view{
+	position: relative;
+	display: -ms-flexbox;
+	display: flex;
+	/*-ms-flex-pack: center ;
+	justify-content: center ;*/
+	/*-ms-flex-align: center;
+	align-items: center ;*/
+
+	
+
+
+}
+
+/*#home-section .view::before{
+	content: "";
+	z-index: -1;
+	top:0;
+	left:0;
+	background-color: var(--theme-color);
+	position: absolute;
+	width: 50px;
+	height: 50px;
+
+}*/
+#home-section .view .view-icon{
+	color:#fff;
+	background-color: var(--theme-color);
+	padding: 2px 2px 2px 8px;
+}
+#home-section .view .view-number{
+	font-size: 12px;
+	font-weight: 600;
+	color:#fff;
+	background-color: var(--theme-color);
+	padding: 4px 10px 2px 4px;
+	border-bottom-right-radius: 10px;
+
+}
+#home-section .view .view-number p{
+		margin-bottom: 5px;
+	}
+#home-section .home-brand .home-brand-img img{
+	height: 140px;
+	width: 140px;
+	object-fit: contain;
+}
+#home-section .home-brand .home-brand-img{
+	max-width: 160px;
+	margin: 0 auto;
+}
+#home-section .home-social .social-icons{
+	list-style: none;
+	display: flex;
+	justify-content: center;
+	padding-bottom: 5px;
+	margin-bottom: 0;
+}
+
+#home-section .home-social p{
+	text-align: center;
+	font-size: 12px;
+	margin-bottom: 2px;
+	padding-top: 4px;
+	color: #282627;
+	text-transform: capitalize;
+	
+}
+#home-section .home-social .social-icons li a{
+	display: inline-block;
+	height: 30px;
+	width: 30px;
+	line-height: 30px;
+	text-align: center;
+	font-size: 10px;
+	margin-right:4px;
+	background-color: var(--theme-color);
+	border-radius: 50%;
+	color:#fff;
+	position: relative;
+}
+/*#home-section .home-social .social-icons li:not(:last-child) a::after{
+	content:"";
+	border-right:1px solid #d1d2d1;
+	position: absolute;
+	height: 100%;
+	right: -2px;
+}*/
+#home-section .owner-details{
+	 margin-top: 10px;    
+	 padding-top: 10px;    
+	 position: relative;  
+	 z-index: 99; 
+	 background-color: var(--theme-color); 
+	 
+}
+#home-section .owner-details::after {
+	content: "";
+	position: absolute;
+	height: 1px;
+	width: 15px;
+	background-color: #fff;
+	top:50%;
+	top:calc(50% - 1px);
+	right: 25px;
+}
+#home-section .owner-details .owner-name {
+	font-weight: 500;
+	font-size: 1.5rem;
+	text-transform: uppercase;
+	color: #fff;
+	margin-bottom: 0px;
+
+
+
+}
+#home-section .owner-details .owner-designation{
+	font-size: .8rem;
+	font-weight: 400;
+	text-transform: uppercase;
+	color: #fff;
+	margin-bottom:0;
+	padding-bottom: 10px;
+	letter-spacing: 1px;
+}
+
+
+
+#home-section .home-details{
+	text-align: left;
+	padding: 0;
+	background-color: #fff;
+}
+#home-section .home-details .home-single-details a {
+	display: flex;
+	align-items: center;
+	position: relative;
+	z-index: 1;
+	background-color: #282627;
+	border-bottom: 1px solid rgba(255,255,255,0.2);
+	padding: 10px 30px 10px 25px;
+
+}
+#home-section .home-details .home-single-details a::after {
+	content: "";
+	position: absolute;
+	height: 1px;
+	width: 15px;
+	background-color: #fff;
+	top:50%;
+	top:calc(50% - 1px);
+	right: 25px;
+}
+/*#home-section .home-details .home-single-details:nth-child(odd) a{
+	
+	background:none;
+	
+}
+#home-section .home-details .home-single-details:nth-child(odd) a::after{
+	content: "";
+	position: absolute;
+	height: 100%;
+	width: 100%;
+	top:0;
+	left:0;
+	background-color: #282627;
+	
+	z-index: -1;
+}*/
+#home-section .home-details .home-single-details i {
+	font-size: 1.2rem;
+	min-width: 45px;
+	padding: 15px 0;
+	text-align: center;
+	color: var(--theme-color);
+	background-color: #fff;
+	position: relative;
+	z-index: 1;
+	margin: 4px 9px;
+}
+/*#home-section .home-details .home-single-details:nth-child(even) i::after{
+	content: "";
+	position: absolute;
+	height: 100%;
+	width: 100%;
+	top:0;
+	left:0;
+	background-color: rgba(0,0,0,0.2);
+	z-index: -1;
+}*/
+#home-section .home-details .home-single-details span{
+	padding-left:15px;
+	padding-right:15px;
+	font-size: 1rem;
+	line-height: 19px;
+	color: #fff;
+	font-weight: 300;
+}
+#home-section .home-call-whatsapp{
+	display: flex;
+	background-color: #414141;
+}
+#home-section .home-call-whatsapp .call-icon{
+	background-color: var(--theme-color);
+	width: 100%;
+	padding:10px 10px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	border-right: 2px solid #fff;
+	
+}
+
+#home-section .home-call-whatsapp .call-icon span{
+	font-size: 1.6rem;
+	display: inline-block;
+	font-weight:500;
+	text-transform: uppercase;
+	padding-left: 10px;
+	color: #fff;
+}
+#home-section .home-call-whatsapp .call-icon i{
+	display: inline-block;
+	height: 25px;
+	width: 25px;
+	line-height: 25px;
+	text-align: center;
+	background-color: #fff;
+	border-radius: 4px;
+	font-size: 16px;
+}
+#home-section .home-call-whatsapp .whatapp-icon{
+	background-color: var(--theme-color);
+	width: 100%;
+	padding:10px 10px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+#home-section .home-call-whatsapp .whatapp-icon i{
+	display: inline-block;
+	font-size: 26px;
+	color: #fff;
+}
+#home-section .home-call-whatsapp  .whatapp-icon span{
+	font-size: 1.6rem;
+	display: inline-block;
+	font-weight:500;
+	color: #fff;
+	text-transform: uppercase;
+	padding-left: 10px;
+}
+#home-section .home-call-whatsapp {
+	position: relative;
+	z-index: 2;
+}
+
+#home-section .home-extra-one {
+	position: absolute;
+	height: 20px;
+	width: 50%;
+	background-color: var(--theme-color);
+	top:0px;
+	right: 50%;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}
+
+#home-section .svg-parent-1 svg{
+	display: none;
+}
+
+
+#home-section .svg-parent-2 svg{
+	display: none;
+}
+#home-section .home-social{
+	min-height: 52px;
+}
+/*==========home section css_______ end*/
+
+/*==========responsive=======================
+=============================================*/
+@media only screen and (max-width: 768px) {
+	:root{
+		font-size: 13px;
+	}
+	
+		
+}
+/*home section new end*/
+
+.section-container::before{
+	width: 100%;
+	height: 6px;
+	top:0;
+}
+.section-container::after {
+		content: "";
+	position: absolute;
+	height: 1px;
+	width: 50%;
+	background-color: #fff;
+	top:2px;
+	right: 50%;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}
+.section-footer::before {
+	width: 100%;
+	height: 4px;
+	bottom:0;
+	display: none;
+}
+.section-footer::after {
+	width: 50%;
+	bottom:0;
+	height: 5px;
+	background-color:var(--theme-color);
+	right: 50%;
+	-webkit-transform: translateX(50%);
+	-moz-transform: translateX(50%);
+	-o-transform: translateX(50%);
+	-ms-transform: translateX(50%);
+	transform: translateX(50%);
+}

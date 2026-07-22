@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Tag, Plus, Trash2, Pencil, X, Save, Search, ImageOff, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Field, fieldCls, areaCls, ImagePick, LimitBar } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, packageLimit } from "@/hooks/useCustomer";
+import { contentSeeder, cleanPlain } from "@/lib/cardContent";
 
 type Offer = { id: number; title: string; description: string; valid: string; filename: string };
 const blank: Omit<Offer, "id"> = { title: "", description: "", valid: "", filename: "" };
@@ -11,7 +12,20 @@ const fmt = (s: string) => { if (!s) return "—"; const d = new Date(s); return
 export default function CustomerOffers() {
   const { data } = useCustomer();
   const limit = packageLimit(Number(data.package_id), "offer");
-  const { items, add, update, remove } = useLocalList<Offer>("dc_offers");
+  const { items, add, update, remove, persist, ready } = useLocalList<Offer>("dc_offers", [], contentSeeder("offers"));
+
+  // One-time cleanup of any already-stored offers that still hold raw HTML / mangled encoding.
+  useEffect(() => {
+    if (!ready || items.length === 0) return;
+    let changed = false;
+    const next = items.map((o) => {
+      const description = cleanPlain(o.description); const title = cleanPlain(o.title);
+      if (description !== o.description || title !== o.title) { changed = true; return { ...o, description, title }; }
+      return o;
+    });
+    if (changed) persist(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<Omit<Offer, "id">>(blank);
@@ -31,7 +45,7 @@ export default function CustomerOffers() {
   const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const openAdd = () => { if (full) { toast.error("Offer limit reached — upgrade your package."); return; } setForm(blank); setEditId(null); setOpen(true); };
-  const openEdit = (o: Offer) => { const { id, ...rest } = o; void id; setForm(rest); setEditId(o.id); setOpen(true); };
+  const openEdit = (o: Offer) => { const { id, ...rest } = o; void id; setForm({ ...rest, title: cleanPlain(rest.title), description: cleanPlain(rest.description) }); setEditId(o.id); setOpen(true); };
   const save = () => {
     if (!form.title && !form.description) { toast.error("Add a title or description"); return; }
     if (editId !== null) { update(editId, form); toast.success("Offer updated"); }
@@ -71,7 +85,7 @@ export default function CustomerOffers() {
                   <td className="px-4 py-3 text-[#94A3B8]">{(safePage - 1) * pageSize + i + 1}</td>
                   <td className="px-4 py-3 font-medium text-[#0F172A]">{o.title || "—"}</td>
                   <td className="px-4 py-3 text-xs text-[#64748B] whitespace-nowrap">{fmt(o.valid)}</td>
-                  <td className="px-4 py-3 text-xs text-[#475569] max-w-[260px]"><span className="line-clamp-2">{o.description || "—"}</span></td>
+                  <td className="px-4 py-3 text-xs text-[#475569] max-w-[260px]"><span className="line-clamp-2">{cleanPlain(o.description) || "—"}</span></td>
                   <td className="px-4 py-3">
                     <div className="w-14 h-14 rounded-lg bg-[#F8FAFC] overflow-hidden flex items-center justify-center">
                       {o.filename ? <img src={o.filename} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : <ImageOff size={18} className="text-[#CBD5E1]" />}

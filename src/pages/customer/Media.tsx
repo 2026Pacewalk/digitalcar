@@ -3,6 +3,7 @@ import { Image as ImageIcon, Video, Trash2, Plus, Play, ImagePlus } from "lucide
 import { toast } from "sonner";
 import ModuleShell, { fieldCls, LimitBar } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
+import { contentSeeder } from "@/lib/cardContent";
 
 type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
@@ -17,8 +18,8 @@ export default function CustomerMedia() {
   const gLimit = packageLimit(Number(data.package_id), "gallery");
   const vLimit = packageLimit(Number(data.package_id), "video");
   const [tab, setTab] = useState<"gallery" | "video">("gallery");
-  const gallery = useLocalList<Gallery>("dc_gallery");
-  const videos = useLocalList<Vid>("dc_videos");
+  const gallery = useLocalList<Gallery>("dc_gallery", [], contentSeeder("gallery"));
+  const videos = useLocalList<Vid>("dc_videos", [], contentSeeder("videos"));
   const [vt, setVt] = useState(""); const [vu, setVu] = useState("");
   const videoFull = videos.items.length >= vLimit;
 

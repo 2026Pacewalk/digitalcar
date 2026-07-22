@@ -6,6 +6,7 @@ import {
   Copy, Check, ShieldAlert, ArrowRight, Share2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { loadNewEnquiries } from "@/hooks/useEnquiryNotifications";
 
 type Customer = {
   id: number; name: string; username: string; email: string;
@@ -65,13 +66,25 @@ export default function CustomerDashboard() {
   }, [customer.expired_on, pkg.days]);
   const active = daysPending > 0;
 
-  // enquiries count for this card
+  // live enquiries count = historical + card submissions − deleted
   useEffect(() => {
     if (!slug) { setEnquiries(0); return; }
+    let baseIds: string[] = [];
+    const deletedSet = () => { try { return new Set(JSON.parse(localStorage.getItem("dc_deleted_enquiries") || "[]")); } catch { return new Set<string>(); } };
+    const recount = () => {
+      const del = deletedSet();
+      const freshIds = loadNewEnquiries(slug).map((e) => e.id);
+      const all = new Set([...baseIds, ...freshIds]);
+      setEnquiries([...all].filter((id) => !del.has(id)).length);
+    };
     fetch("/enquiries.json")
       .then((r) => r.json())
-      .then((d: { uname: string }[]) => setEnquiries(d.filter((e) => e.uname === slug).length))
+      .then((d: { id: string; uname: string }[]) => { baseIds = d.filter((e) => e.uname === slug).map((e) => String(e.id)); recount(); })
       .catch(() => setEnquiries(0));
+    const onStorage = () => recount();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("dc:new-enquiry", onStorage as EventListener);
+    return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("dc:new-enquiry", onStorage as EventListener); };
   }, [slug]);
 
   const copyLink = async () => {
@@ -86,7 +99,7 @@ export default function CustomerDashboard() {
 
   const tiles = [
     { title: pkg.name, sub: active ? "Active" : "Expired", foot: `${daysPending.toLocaleString("en-IN")} Days Pending`, icon: Database, from: "#16A34A", to: "#22C55E" },
-    { title: enquiries === null ? "…" : String(enquiries), sub: "Enquiries", foot: "Click here to view", icon: MessageSquare, from: "#D97706", to: "#F59E0B", onClick: () => navigate("/dashboard/leads") },
+    { title: enquiries === null ? "…" : String(enquiries), sub: "Enquiries", foot: "Click here to view", icon: MessageSquare, from: "#D97706", to: "#F59E0B", onClick: () => navigate("/dashboard/enquiry") },
     { title: customer.views.toLocaleString("en-IN"), sub: "Total Views", foot: " ", icon: Eye, from: "#0891B2", to: "#06B6D4" },
   ];
 
@@ -122,10 +135,10 @@ export default function CustomerDashboard() {
               <div>
                 <h4 className="text-[#F7B31C] font-bold text-sm mb-3">View &amp; Edit Your Digital Business Card</h4>
                 <div className="flex flex-wrap gap-2.5">
-                  <a href={cardUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#14243E] hover:bg-[#F8FAFC] transition-colors">
+                  <Link to="/dashboard/view" className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#14243E] hover:bg-[#F8FAFC] transition-colors">
                     <Eye size={15} /> View Your Digital Business Card
-                  </a>
-                  <Link to="/dashboard/builder" className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#14243E] hover:bg-[#F8FAFC] transition-colors">
+                  </Link>
+                  <Link to="/dashboard/home" className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#14243E] hover:bg-[#F8FAFC] transition-colors">
                     <Pencil size={15} /> Edit Your Digital Business Card
                   </Link>
                 </div>

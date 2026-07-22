@@ -3,9 +3,10 @@ import { useNavigate, useLocation } from "react-router";
 import {
   Home, Palette, Users, BarChart3, User,
   Plus, Eye, Share2, CreditCard, X,
-  Settings, LogOut, HelpCircle, Menu,
+  Settings, LogOut, HelpCircle, Menu, Bell,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useEnquiryNotifications } from "@/hooks/useEnquiryNotifications";
 
 /* ─── Mobile Layout Context ─── */
 interface MobileLayoutContextType {
@@ -43,6 +44,7 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { unreadCount } = useEnquiryNotifications();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -96,12 +98,26 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
                 <h1 className="text-sm font-bold text-[#0F172A]">DigitalCarda</h1>
               </div>
             </div>
-            <button
-              onClick={() => navigate("/dashboard/profile")}
-              className="w-9 h-9 rounded-full gradient-gold flex items-center justify-center shrink-0"
-            >
-              <span className="text-[#0F172A] text-xs font-bold">{(user?.fullName || "U").charAt(0).toUpperCase()}</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => navigate("/dashboard/enquiry")}
+                className="w-9 h-9 rounded-xl hover:bg-[#F1F5F9] flex items-center justify-center shrink-0 relative"
+                aria-label="Enquiries"
+              >
+                <Bell size={19} className={unreadCount > 0 ? "text-[#F7B31C]" : "text-[#0F172A]"} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full border-2 border-white flex items-center justify-center animate-pulse">
+                    <span className="text-[9px] font-bold text-white leading-none">{unreadCount > 9 ? "9+" : unreadCount}</span>
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => navigate("/dashboard/profile")}
+                className="w-9 h-9 rounded-full gradient-gold flex items-center justify-center shrink-0"
+              >
+                <span className="text-[#0F172A] text-xs font-bold">{(user?.fullName || "U").charAt(0).toUpperCase()}</span>
+              </button>
+            </div>
           </div>
         </header>
 

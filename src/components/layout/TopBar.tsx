@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebar } from "./SidebarContext";
-import { Menu, Bell, Search, Settings, LogOut, X, User, Lock, Activity, ChevronDown } from "lucide-react";
+import { Menu, Search, Settings, LogOut, User, Lock, Activity, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router";
+import NotificationBell from "@/components/NotificationBell";
 
 interface TopBarProps {
   title: string;
@@ -15,7 +16,6 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   return (
@@ -64,39 +64,7 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
           </div>
 
           {/* Notifications */}
-          <div className="relative">
-            <button
-              onClick={() => setNotifOpen(!notifOpen)}
-              className="w-9 h-9 rounded-lg hover:bg-[#F1F5F9] flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-all relative"
-            >
-              <Bell size={16} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-            </button>
-            {notifOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
-                <div className="absolute right-0 top-10 w-72 bg-white rounded-2xl shadow-premium-lg border border-[#F1F5F9] p-4 z-20">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-bold text-[#0F172A]">Notifications</p>
-                    <span className="text-[10px] text-[#94A3B8]">3 new</span>
-                  </div>
-                  <div className="space-y-2">
-                    {[
-                      { title: "New lead captured", desc: "Enquiry from Raj Sharma", time: "2m ago" },
-                      { title: "Card view milestone", desc: "Your card hit 5,000 views", time: "1h ago" },
-                      { title: "Subscription renewal", desc: "Renewed for 1 year", time: "3h ago" },
-                    ].map((n, i) => (
-                      <div key={i} className="p-2.5 rounded-xl hover:bg-[#F8FAFC] transition-colors cursor-pointer">
-                        <p className="text-xs font-medium text-[#0F172A]">{n.title}</p>
-                        <p className="text-[10px] text-[#64748B] mt-0.5">{n.desc}</p>
-                        <p className="text-[9px] text-[#94A3B8] mt-1">{n.time}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          <NotificationBell />
 
           {/* Profile Dropdown */}
           <div className="relative ml-1 pl-2 border-l border-[#F1F5F9]">

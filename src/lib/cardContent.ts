@@ -29,14 +29,63 @@ export function decodeSpecialities(raw: unknown): string {
     .join(",");
 }
 
+/* Characters produced by UTF-8-as-latin1 mangling (and Windows-1252 punctuation).
+   A run of 2+ of these is unrecoverable garbage — usually a mangled bullet/checkmark. */
+const MOJI_CLUSTER = /[-¿ÂÃÅâŒœŠšŸŽžˆ˜–—‘’‚“”„†‡•…‰‹›€™]{2,}/g;
+
+/* Legacy data is doubly UTF-8-as-latin1 mangled (e.g. ₹ shows as "Ã¢âÂ¹",
+   a bullet shows as "Ã¢Åâ"). Reverse the reversible layers, patch the common
+   symbols, then collapse any remaining garbage cluster into a clean bullet. */
+export function fixMojibake(raw: unknown): string {
+  let out = String(raw ?? "");
+  for (let i = 0; i < 2; i++) {
+    if (!/[ÃÂ]/.test(out)) break;
+    try { const d = decodeURIComponent(escape(out)); if (!d || d === out) break; out = d; } catch { break; }
+  }
+  return out
+    .replace(/Ã¢[^\x00-\x7F]*Â?¹|â[^\x00-\x7F]*¹|â‚¹/g, "₹")
+    .replace(/â€™/g, "'")
+    .replace(/â€œ|â€/g, '"')
+    .replace(/â€“|â€”/g, "-")
+    .replace(MOJI_CLUSTER, "•")
+    .replace(/[ÂÃ](?=\s|$|•)/g, "");
+}
+
 /* Product descriptions are HTML-encoded; decode entities but keep the markup. */
 export function decodeHtml(html: unknown): string {
   const t = document.createElement("textarea");
   t.innerHTML = String(html ?? "");
-  return t.value.trim();
+  return fixMojibake(t.value).trim();
+}
+
+/* Decode entities, strip markup and repair encoding → clean plain text.
+   Block boundaries (</p>, <br>, </li>…) become " · " so list items don't merge. */
+export function cleanPlain(raw: unknown): string {
+  const html = String(raw ?? "")
+    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n");
+  const t = document.createElement("div");
+  t.innerHTML = html;
+  return fixMojibake(t.textContent || "")
+    .replace(/[•\n]+/g, " · ")
+    .replace(/\s*·\s*/g, " · ")
+    .replace(/^(\s*·\s*)+|(\s*·\s*)+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 type Raw = Record<string, string>;
+
+/* Returns an async seeder for useLocalList that loads a single content category
+   for the currently-impersonated customer (slug read from localStorage). */
+export function contentSeeder<K extends keyof Awaited<ReturnType<typeof loadCustomerContent>>>(category: K) {
+  return async () => {
+    let slug = "pacewalk";
+    try { slug = JSON.parse(localStorage.getItem("dc_customer") || "{}").slug || "pacewalk"; } catch { /* default */ }
+    const content = await loadCustomerContent(slug);
+    return content[category] as Awaited<ReturnType<typeof loadCustomerContent>>[K];
+  };
+}
 
 export async function loadCustomerContent(slug: string) {
   const j = (u: string) => fetch(u).then((r) => r.json()).catch(() => [] as Raw[]);
@@ -54,7 +103,7 @@ export async function loadCustomerContent(slug: string) {
     gallery: mine(gals).map((g) => ({ id: Number(g.id), name: g.name || "", filename: imgUrl("gallery", g.filename) })),
     videos: mine(vids).map((v) => ({ id: Number(v.id), title: v.title || "Video", url: `https://www.youtube.com/watch?v=${v.name}` })),
     offers: mine(offs).map((o) => ({
-      id: Number(o.id), title: decodeHtml(o.title) || "", description: decodeHtml(o.name) || "",
+      id: Number(o.id), title: cleanPlain(o.title) || "", description: cleanPlain(o.name) || "",
       valid: (o.valid || "").split(" ")[0], filename: imgUrl("offer", o.filename),
     })),
     qrcodes: mine(qrs).map((q) => ({ id: Number(q.id), name: q.name || "Pay Online", filename: imgUrl("qrcode", q.filename) })),

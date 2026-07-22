@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import ModuleShell from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList } from "@/hooks/useCustomer";
+import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
 
 type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
@@ -15,11 +16,11 @@ type Qr = { id: number; name: string; filename: string };
 export default function CustomerViewCard() {
   const navigate = useNavigate();
   const { data } = useCustomer();
-  const products = useLocalList<Product>("dc_products");
-  const gallery = useLocalList<Gallery>("dc_gallery");
-  const videos = useLocalList<Vid>("dc_videos");
-  const offers = useLocalList<Offer>("dc_offers");
-  const qrcodes = useLocalList<Qr>("dc_qrcode");
+  const products = useLocalList<Product>("dc_products", [], contentSeeder("products"));
+  const gallery = useLocalList<Gallery>("dc_gallery", [], contentSeeder("gallery"));
+  const videos = useLocalList<Vid>("dc_videos", [], contentSeeder("videos"));
+  const offers = useLocalList<Offer>("dc_offers", [], contentSeeder("offers"));
+  const qrcodes = useLocalList<Qr>("dc_qrcode", [], contentSeeder("qrcodes"));
   const [copied, setCopied] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [isMobile, setIsMobile] = useState(false);

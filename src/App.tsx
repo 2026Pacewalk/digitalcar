@@ -57,6 +57,7 @@ import CustomerReviews from "./pages/customer/Reviews";
 import PublicCard from "./pages/PublicCard";
 import NotFound from "./pages/NotFound";
 import { Toaster } from "@/components/ui/sonner";
+import EnquiryToaster from "@/components/EnquiryToaster";
 
 function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
   const { user, isLoading } = useAuth();
@@ -78,6 +79,7 @@ export default function App() {
   return (
     <>
       <Toaster position="top-center" />
+      <EnquiryToaster />
       <Routes>
         {/* Public website */}
         <Route element={<PublicLayout />}>
