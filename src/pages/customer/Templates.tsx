@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { LayoutGrid, Check, Eye, Save, Palette, Search } from "lucide-react";
+import { LayoutGrid, Check, Eye, Save, Palette, Search, Pipette, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
@@ -8,6 +8,67 @@ import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
 
 const SWATCHES = ["#F7B31C", "#14243E", "#3B82F6", "#A21CAF", "#06B6D4", "#EF4444", "#0F172A", "#EAB308", "#16A34A", "#DB2777"];
 const SECONDARY_SWATCHES = ["#0F172A", "#1E293B", "#0f2b2e", "#3f1d2e", "#1e1b4b", "#422006", "#0c4a6e", "#14532d", "#3b0764", "#414141"];
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+/* Reusable colour control: big live swatch + "any colour" wheel + hex + presets */
+function ColorRow({
+  label, hint, value, placeholder, swatches, allowClear, onChange, ring = "#0F172A",
+}: {
+  label: string; hint: string; value: string; placeholder?: string; swatches: string[];
+  allowClear?: boolean; onChange: (v: string) => void; ring?: string;
+}) {
+  const nativeRef = useRef<HTMLInputElement>(null);
+  const [hex, setHex] = useState(value);
+  useEffect(() => setHex(value), [value]);
+  const current = value || placeholder || "#0F172A";
+  const commitHex = (v: string) => {
+    let h = v.trim(); if (h && !h.startsWith("#")) h = "#" + h;
+    setHex(h);
+    if (h === "" && allowClear) onChange("");
+    else if (HEX_RE.test(h)) onChange(h.toLowerCase());
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[11px] font-semibold text-[#64748B]">{label} <span className="font-normal text-[#94A3B8]">· {hint}</span></p>
+        {allowClear && value && <button onClick={() => onChange("")} className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#F7B31C] hover:text-[#D97706]"><RotateCcw size={11} /> Default</button>}
+      </div>
+      <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Live current swatch → opens the OS colour picker */}
+        <button type="button" onClick={() => nativeRef.current?.click()} title="Choose any colour"
+          className="relative w-11 h-11 rounded-xl border-2 border-white shadow-premium ring-1 ring-[#E2E8F0] overflow-hidden shrink-0 active:scale-95 transition-transform"
+          style={{ background: current }}>
+          <input ref={nativeRef} type="color" value={value || "#0F172A"} onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 opacity-0 cursor-pointer" tabIndex={-1} />
+        </button>
+
+        {/* "Any colour" wheel button */}
+        <button type="button" onClick={() => nativeRef.current?.click()}
+          className="inline-flex items-center gap-1.5 h-11 px-3 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] transition-colors shrink-0">
+          <span className="w-5 h-5 rounded-full shrink-0" style={{ background: "conic-gradient(from 0deg,#ef4444,#f59e0b,#eab308,#22c55e,#06b6d4,#3b82f6,#a855f7,#ec4899,#ef4444)" }} />
+          <span className="text-xs font-semibold text-[#334155]"><Pipette size={12} className="inline -mt-0.5 mr-0.5" />Any colour</span>
+        </button>
+
+        {/* Hex input */}
+        <div className="flex items-center h-11 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3">
+          <span className="text-[#94A3B8] text-sm">#</span>
+          <input value={hex.replace(/^#/, "")} onChange={(e) => commitHex(e.target.value.replace(/[^0-9a-fA-F]/g, "").slice(0, 6))}
+            placeholder={placeholder ? placeholder.replace(/^#/, "") : "hex"} className="w-16 h-full bg-transparent text-sm font-mono outline-none placeholder:text-[#CBD5E1]" />
+        </div>
+      </div>
+
+      {/* Presets */}
+      <div className="flex items-center gap-2 flex-wrap mt-2.5">
+        {swatches.map((c) => (
+          <button key={c} onClick={() => onChange(c)} aria-label={c}
+            className={`w-8 h-8 rounded-lg ring-2 transition-all ${value.toLowerCase() === c.toLowerCase() ? "scale-110" : "ring-transparent hover:scale-105"}`}
+            style={{ background: c, ...(value.toLowerCase() === c.toLowerCase() ? { boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${ring}` } : {}) }} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function CustomerTemplates() {
   const { data, update } = useCustomer();
@@ -48,42 +109,15 @@ export default function CustomerTemplates() {
       }>
 
       {/* ── Colours ── */}
-      <Panel title="Colour combination" subtitle="Fully customise your card — primary accent + secondary (dark sections)">
-        {/* Primary */}
-        <p className="text-[11px] font-semibold text-[#64748B] mb-2">Primary <span className="font-normal text-[#94A3B8]">· buttons, highlights & icons</span></p>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-2 py-1.5">
-            <input type="color" value={color} onChange={(e) => pickColor(e.target.value)} className="w-8 h-8 rounded-lg border border-[#E2E8F0] cursor-pointer bg-transparent" />
-            <input value={color} onChange={(e) => pickColor(e.target.value)} className="w-24 h-8 bg-transparent text-sm font-mono outline-none" />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {SWATCHES.map((c) => (
-              <button key={c} onClick={() => pickColor(c)} aria-label={c}
-                className={`w-9 h-9 rounded-lg ring-2 transition-all ${color.toLowerCase() === c.toLowerCase() ? "ring-[#0F172A] scale-110" : "ring-transparent hover:scale-105"}`}
-                style={{ background: c }} />
-            ))}
-          </div>
+      <Panel title="Colour combination" subtitle="Choose any colour — primary accent + secondary (dark sections)">
+        <div className="space-y-5">
+          <ColorRow label="Primary" hint="buttons, highlights & icons" value={color}
+            swatches={SWATCHES} onChange={pickColor} ring="#0F172A" />
+          <div className="h-px bg-[#F1F5F9]" />
+          <ColorRow label="Secondary" hint="dark section backgrounds" value={secondary} placeholder="#0F172A"
+            swatches={SECONDARY_SWATCHES} allowClear onChange={pickSecondary} ring="#F7B31C" />
         </div>
-
-        {/* Secondary */}
-        <div className="flex items-center justify-between mt-5 mb-2">
-          <p className="text-[11px] font-semibold text-[#64748B]">Secondary <span className="font-normal text-[#94A3B8]">· dark section backgrounds</span></p>
-          {secondary && <button onClick={() => pickSecondary("")} className="text-[10px] font-semibold text-[#F7B31C] hover:text-[#D97706]">Reset to template default</button>}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-2 py-1.5">
-            <input type="color" value={secondary || "#0F172A"} onChange={(e) => pickSecondary(e.target.value)} className="w-8 h-8 rounded-lg border border-[#E2E8F0] cursor-pointer bg-transparent" />
-            <input value={secondary} onChange={(e) => pickSecondary(e.target.value)} placeholder="default" className="w-24 h-8 bg-transparent text-sm font-mono outline-none placeholder:text-[#CBD5E1]" />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {SECONDARY_SWATCHES.map((c) => (
-              <button key={c} onClick={() => pickSecondary(c)} aria-label={c}
-                className={`w-9 h-9 rounded-lg ring-2 transition-all ${secondary.toLowerCase() === c.toLowerCase() ? "ring-[#F7B31C] scale-110" : "ring-transparent hover:scale-105"}`}
-                style={{ background: c }} />
-            ))}
-          </div>
-        </div>
-        <p className="text-[11px] text-[#94A3B8] mt-2">Leave secondary empty to keep each template's original dark colour.</p>
+        <p className="text-[11px] text-[#94A3B8] mt-4">Tip: tap the colour circle or “Any colour” to open the full colour picker. Leave secondary on Default to keep each template's original dark shade.</p>
       </Panel>
 
       {/* ── Gallery ── */}
