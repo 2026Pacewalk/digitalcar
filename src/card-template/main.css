@@ -472,6 +472,49 @@ padding: 0px;
 .about-chip i{color:var(--theme-color);font-size:11px;}
 @media (max-width:360px){.about-info{grid-template-columns:1fr;}}
 
+/* ── Google Reviews ──────────────────────────────── */
+.grev-stars{position:relative;display:inline-block;color:#e2e5ea;font-size:19px;letter-spacing:2px;line-height:1;white-space:nowrap;}
+.grev-stars-fill{position:absolute;top:0;left:0;overflow:hidden;white-space:nowrap;color:#FBBC05;}
+.grev-stars.grev-stars-sm{font-size:13px;letter-spacing:1px;}
+.grev-summary{
+	display:flex;align-items:center;gap:16px;
+	background:rgba(66,133,244,.06);
+	border:1px solid rgba(66,133,244,.14);
+	border-radius:14px;padding:14px 16px;margin-bottom:14px;
+}
+.grev-score{font-size:38px;font-weight:800;color:#0f172a;line-height:1;}
+.grev-summary-txt{display:flex;flex-direction:column;gap:6px;}
+.grev-count{font-size:12px;color:#64748b;display:inline-flex;align-items:center;gap:6px;}
+.grev-count i{color:#4285F4;}
+.grev-empty{text-align:center;padding:6px 0 4px;}
+.grev-empty-stars{font-size:26px;letter-spacing:3px;color:#FBBC05;line-height:1;}
+.grev-empty-txt{font-size:13px;color:#555;margin:8px 0 4px;}
+.grev-list{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
+.grev-card{
+	background:#fff;border:1px solid rgba(15,23,42,.07);
+	border-radius:12px;padding:12px 14px;
+	box-shadow:0 3px 10px rgba(72,72,72,.05);
+}
+.grev-card-top{display:flex;align-items:center;gap:10px;}
+.grev-ava{
+	width:34px;height:34px;border-radius:50%;flex-shrink:0;
+	background:var(--theme-color);color:#fff;font-weight:700;font-size:15px;
+	display:inline-flex;align-items:center;justify-content:center;
+}
+.grev-card-meta{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;}
+.grev-name{font-size:13px;font-weight:700;color:#0f172a;line-height:1.2;}
+.grev-g{color:#4285F4;font-size:15px;flex-shrink:0;}
+.grev-text{font-size:12.5px;line-height:19px;color:#475569;margin:9px 0 0;}
+.grev-date{font-size:10.5px;color:#94a3b8;margin-top:6px;display:block;}
+.grev-btn-wrap{text-align:center;margin-top:4px;}
+.grev-btn{
+	display:inline-flex;align-items:center;gap:9px;
+	background:#4285F4;color:#fff;padding:12px 26px;border-radius:10px;
+	font-weight:600;text-decoration:none;font-size:15px;
+	box-shadow:0 4px 14px rgba(66,133,244,.35);
+}
+.grev-btn i{font-size:17px;}
+
 .other-links-wrapper .other-links-wrappe-lable{
 	font-size: 14px;
 	font-weight: 700;

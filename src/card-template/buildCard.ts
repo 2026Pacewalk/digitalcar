@@ -17,6 +17,7 @@ type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
 type Offer = { id: number; title: string; description: string; valid: string; filename: string };
 type Qr = { id: number; name: string; filename: string };
+type Review = { id: number; name: string; rating: number | string; text: string; date?: string };
 
 const s = (v: unknown) => String(v ?? "").trim();
 const on = (v: unknown) => Number(v ?? 1) === 1;
@@ -35,7 +36,7 @@ const SOCIAL_FA: Record<string, string> = {
   twitter: "fab fa-twitter", pinterest: "fab fa-pinterest-p", linkedin: "fab fa-linkedin",
 };
 
-export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = []): string {
+export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
   const accent = s(c.color) || "#F7B31C";
   const accentDark = darken(accent, 0.16);
   const theme = String(Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1)));
@@ -141,16 +142,45 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>` : ""}
     </div>` : "";
 
-  const googleReviewSection = s(c.google_review) ? `
-    <div id="review-section" class="section-container" style="text-align:center">
-      <div class="section-header" style="text-align:left">Google Reviews</div>
-      <div style="padding:6px 0">
-        <div style="font-size:26px;letter-spacing:3px;color:#FBBC05;line-height:1">★★★★★</div>
-        <p style="font-size:13px;color:#555;margin:8px 0 14px">Loved our service? Rate us on Google!</p>
-        <a href="${esc(c.google_review)}" target="_blank" style="display:inline-flex;align-items:center;gap:9px;background:#4285F4;color:#fff;padding:12px 26px;border-radius:8px;font-weight:600;text-decoration:none;box-shadow:0 4px 12px rgba(66,133,244,.35);font-size:15px">
-          <i class="fab fa-google" style="font-size:17px"></i> Write a Review
-        </a>
-      </div>
+  const ratingNum = Number(s(c.google_rating)) || 0;
+  const reviewCount = s(c.google_review_count);
+  const starRow = (rating: number, extraClass = "") => {
+    const pct = Math.max(0, Math.min(100, (rating / 5) * 100));
+    return `<span class="grev-stars ${extraClass}"><span class="grev-stars-fill" style="width:${pct}%">★★★★★</span>★★★★★</span>`;
+  };
+  const summaryBlock = ratingNum > 0
+    ? `<div class="grev-summary">
+        <div class="grev-score">${ratingNum.toFixed(1)}</div>
+        <div class="grev-summary-txt">
+          ${starRow(ratingNum)}
+          ${reviewCount ? `<span class="grev-count"><i class="fab fa-google"></i> Based on ${esc(reviewCount)} Google reviews</span>` : ""}
+        </div>
+      </div>`
+    : `<div class="grev-empty">
+        <div class="grev-empty-stars">★★★★★</div>
+        <p class="grev-empty-txt">Loved our service? Rate us on Google!</p>
+      </div>`;
+  const reviewCards = reviews.length
+    ? `<div class="grev-list">${reviews.map((rv) => `
+        <div class="grev-card">
+          <div class="grev-card-top">
+            <span class="grev-ava">${(s(rv.name)[0] || "G").toUpperCase()}</span>
+            <span class="grev-card-meta">
+              <span class="grev-name">${esc(rv.name) || "Google user"}</span>
+              ${starRow(Number(rv.rating) || 5, "grev-stars-sm")}
+            </span>
+            <i class="fab fa-google grev-g"></i>
+          </div>
+          ${s(rv.text) ? `<p class="grev-text">${esc(rv.text)}</p>` : ""}
+          ${s(rv.date) ? `<span class="grev-date">${esc(rv.date)}</span>` : ""}
+        </div>`).join("")}</div>`
+    : "";
+  const googleReviewSection = (s(c.google_review) || ratingNum > 0 || reviews.length) ? `
+    <div id="review-section" class="section-container">
+      <div class="section-header">Google Reviews</div>
+      ${summaryBlock}
+      ${reviewCards}
+      ${s(c.google_review) ? `<div class="grev-btn-wrap"><a href="${esc(c.google_review)}" target="_blank" class="grev-btn"><i class="fab fa-google"></i> Write a Review</a></div>` : ""}
     </div>` : "";
 
   const qrSection = on(c.qrcode_on) && (qrcodes.length || slug) ? `
@@ -222,16 +252,20 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>
     </div>`;
 
+  // Footer icons mirror the sections that are actually on the card — disable a
+  // module in Settings and its section string is empty, so its icon drops out.
   const footerItems = [
-    { id: "home-section", icon: "fa fa-home", label: "Home" },
-    { id: "about-section", icon: "fas fa-briefcase", label: "About Us" },
-    { id: "products-section", icon: "fas fa-box-open", label: "Services" },
-    { id: "payment-section", icon: "fas fa-money-bill-alt", label: "Payment" },
-    { id: "qrcode-section", icon: "fas fa-qrcode", label: "QR Code" },
-    { id: "gallery-section", icon: "fa fa-photo-video", label: "Gallery" },
-    { id: "video-section", icon: "fa fa-video", label: "Video" },
-    { id: "enquiry-section", icon: "fas fa-comment-alt", label: "Enquiry" },
-  ];
+    { id: "home-section", icon: "fa fa-home", label: "Home", show: true },
+    { id: "about-section", icon: "fas fa-briefcase", label: s(c.about) || "About Us", show: !!aboutSection },
+    { id: "products-section", icon: "fas fa-box-open", label: s(c.product) || "Services", show: !!servicesSection },
+    { id: "offers-section", icon: "fas fa-tags", label: s(c.offer) || "Offers", show: !!offersSection },
+    { id: "payment-section", icon: "fas fa-money-bill-alt", label: s(c.payment) || "Payment", show: !!paymentSection },
+    { id: "qrcode-section", icon: "fas fa-qrcode", label: "QR Code", show: !!qrSection },
+    { id: "review-section", icon: "fab fa-google", label: "Reviews", show: !!googleReviewSection },
+    { id: "gallery-section", icon: "fa fa-photo-video", label: s(c.gallery) || "Gallery", show: !!gallerySection },
+    { id: "video-section", icon: "fa fa-video", label: s(c.video) || "Video", show: !!videoSection },
+    { id: "enquiry-section", icon: "fas fa-comment-alt", label: s(c.enquiry) || "Enquiry", show: !!enquirySection },
+  ].filter((f) => f.show);
   const footer = `<div class="footer"><ul class="footer-menu">${footerItems.map((f) =>
     `<li><a href="javascript:void(0)" onclick="goSection('${f.id}')" class="footer-menu-link"><i class="${f.icon}"></i><p>${f.label}</p></a></li>`).join("")}</ul></div>`;
 

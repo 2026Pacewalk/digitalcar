@@ -13,6 +13,7 @@ type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
 type Offer = { id: number; title: string; description: string; valid: string; filename: string };
 type Qr = { id: number; name: string; filename: string };
+type Review = { id: number; name: string; rating: number; text: string; date?: string };
 
 export default function CustomerViewCard() {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function CustomerViewCard() {
   const videos = useLocalList<Vid>("dc_videos", [], contentSeeder("videos"));
   const offers = useLocalList<Offer>("dc_offers", [], contentSeeder("offers"));
   const qrcodes = useLocalList<Qr>("dc_qrcode", [], contentSeeder("qrcodes"));
+  const reviews = useLocalList<Review>("dc_reviews", []);
   const { data: program } = trpc.referral.myProgram.useQuery();
   const [copied, setCopied] = useState(false);
   const [nonce, setNonce] = useState(0);
@@ -38,9 +40,9 @@ export default function CustomerViewCard() {
   const url = `https://digitalcarda.in/${slug}`;
 
   const html = useMemo(
-    () => buildCardHtml({ ...data, referral_code: program?.code || "" }, products.items, gallery.items, videos.items, offers.items, qrcodes.items),
+    () => buildCardHtml({ ...data, referral_code: program?.code || "" }, products.items, gallery.items, videos.items, offers.items, qrcodes.items, reviews.items),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, program?.code, products.items, gallery.items, videos.items, offers.items, qrcodes.items, nonce]
+    [data, program?.code, products.items, gallery.items, videos.items, offers.items, qrcodes.items, reviews.items, nonce]
   );
 
   const copy = async () => {
