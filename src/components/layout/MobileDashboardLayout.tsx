@@ -8,8 +8,8 @@ import {
   ToggleRight, Search, ReceiptText, KeyRound, Gift,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useEnquiryNotifications } from "@/hooks/useEnquiryNotifications";
 import ProfileMenu from "@/components/ProfileMenu";
+import NotificationBell from "@/components/NotificationBell";
 
 /* ─── Mobile Layout Context (drawer) ─── */
 interface MobileLayoutContextType {
@@ -206,7 +206,6 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { unreadCount } = useEnquiryNotifications();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -283,18 +282,7 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
                     {headerAction}
                   </span>
                 )}
-                <button
-                  onClick={() => navigate(cfg.bell)}
-                  className="w-10 h-10 rounded-full active:bg-[#F1F5F9] flex items-center justify-center shrink-0 relative"
-                  aria-label="Notifications"
-                >
-                  <Bell size={20} className={unreadCount > 0 ? "text-[#F7B31C]" : "text-[#334155]"} />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 min-w-[15px] h-[15px] px-1 bg-red-500 rounded-full border-2 border-white flex items-center justify-center">
-                      <span className="text-[8px] font-bold text-white leading-none">{unreadCount > 9 ? "9+" : unreadCount}</span>
-                    </span>
-                  )}
-                </button>
+                <NotificationBell />
                 <ProfileMenu />
               </div>
             </div>

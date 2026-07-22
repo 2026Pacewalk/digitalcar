@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { subscriptions, subscriptionPackages, invoices, appSettings } from "@db/schema";
+import { subscriptions, subscriptionPackages, invoices, appSettings, notifications } from "@db/schema";
 import { eq, desc, sql, and, gt } from "drizzle-orm";
 
 const DEFAULT_DISCOUNT = 15;
@@ -94,6 +94,41 @@ export const subscriptionRouter = createRouter({
         paymentGateway: input.paymentMethod,
       }).$returningId();
 
+      // GST invoice — plan prices are GST-inclusive, so extract the 18% component
+      try {
+        const totalPaid = charged;
+        const taxable = Math.round((totalPaid / 1.18) * 100) / 100;
+        const gst = Math.round((totalPaid - taxable) * 100) / 100;
+        await db.insert(invoices).values({
+          subscriptionId: result[0].id,
+          userId: ctx.user.id,
+          invoiceNumber: `DC-${now.getFullYear()}-${String(result[0].id).padStart(5, "0")}`,
+          amount: taxable.toFixed(2),
+          taxAmount: gst.toFixed(2),
+          totalAmount: totalPaid.toFixed(2),
+          currency: "INR",
+          status: "paid",
+          paidAt: now,
+          dueDate: now,
+          gateway: input.paymentMethod,
+        });
+      } catch { /* non-critical */ }
+
+      // Notify the user their plan is live (shows in the top bell)
+      try {
+        await db.insert(notifications).values({
+          userId: ctx.user.id,
+          type: "plan",
+          title: existingPaid ? `Upgraded to ${pkg.name} 🚀` : `${pkg.name} plan activated 🎉`,
+          message: existingPaid
+            ? `₹${adjustment.toFixed(2)} was adjusted from your previous plan — you paid ₹${charged.toFixed(2)}.`
+            : discountPct > 0
+              ? `Your ${discountPct}% referral discount was applied — you paid ₹${charged.toFixed(2)}.`
+              : `Your ${pkg.name} plan is now active. Enjoy all its features!`,
+          link: "/dashboard/settings?tab=package",
+        });
+      } catch { /* non-critical */ }
+
       const subscription = await db.query.subscriptions.findFirst({
         where: eq(subscriptions.id, result[0].id),
         with: { package: true },
@@ -180,6 +215,7 @@ export const subscriptionRouter = createRouter({
     return db.query.invoices.findMany({
       where: eq(invoices.userId, ctx.user.id),
       orderBy: [desc(invoices.createdAt)],
+      with: { subscription: { with: { package: true } } },
     });
   }),
 });

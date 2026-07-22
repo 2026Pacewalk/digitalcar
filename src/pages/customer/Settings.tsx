@@ -3,6 +3,7 @@ import { Settings as SettingsIcon, Save, KeyRound, Package as PackageIcon, Recei
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router";
 import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/customer/ModuleShell";
+import InvoicePanel from "@/components/customer/InvoicePanel";
 import { useCustomer, scopedKey } from "@/hooks/useCustomer";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
 
@@ -198,19 +199,7 @@ export default function CustomerSettings() {
       )}
 
       {/* ── INVOICE ── */}
-      {tab === "invoice" && (
-        <Panel title="My Invoices" subtitle="Payment receipts for your card">
-          <div className="flex items-start gap-3 rounded-xl bg-[#FEF3C7]/60 border border-[#FDE68A] px-4 py-3 mb-4">
-            <Info size={16} className="text-[#B45309] mt-0.5 shrink-0" />
-            <p className="text-xs text-[#92400E] leading-relaxed">GST invoices are generated automatically for payments made through our secure gateway. Once you upgrade, your invoice will be available here to view and download anytime.</p>
-          </div>
-          <div className="bg-white rounded-2xl border border-[#F1F5F9] p-12 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3"><ReceiptText size={24} className="text-[#94A3B8]" /></div>
-            <p className="text-sm font-medium text-[#0F172A]">No invoices yet</p>
-            <p className="text-xs text-[#94A3B8] mt-1">Invoices for gateway payments will appear here.</p>
-          </div>
-        </Panel>
-      )}
+      {tab === "invoice" && <InvoicePanel buyer={data} />}
 
       {/* ── PASSWORD ── */}
       {tab === "password" && (

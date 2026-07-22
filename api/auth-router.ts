@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, resellerProfiles, referrals } from "@db/schema";
+import { users, resellerProfiles, referrals, notifications } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { createToken } from "./lib/jwt";
 
@@ -83,9 +83,28 @@ export const authRouter = createRouter({
               code: input.referralCode.toUpperCase(),
               status: "joined",
             });
+            // Tell the referrer someone joined with their link
+            await db.insert(notifications).values({
+              userId: referrer.id,
+              type: "referral_joined",
+              title: "New referral signup 🎉",
+              message: `${insertedUser.fullName} just joined with your referral link. You'll earn cash when they upgrade to a paid plan.`,
+              link: "/dashboard/refer",
+            });
           }
         } catch { /* referral linking is best-effort */ }
       }
+
+      // Welcome message in the new user's bell
+      try {
+        await db.insert(notifications).values({
+          userId: insertedUser.id,
+          type: "welcome",
+          title: "Welcome to DigitalCarda 👋",
+          message: "Your account is ready. Complete your card profile to start getting enquiries.",
+          link: "/dashboard/home",
+        });
+      } catch { /* non-critical */ }
 
       const token = await createToken({
         userId: insertedUser.id,
