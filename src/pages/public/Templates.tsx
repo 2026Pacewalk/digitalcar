@@ -1,117 +1,59 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { TEMPLATES, renderTemplate } from "@/data/templates";
-import type { TemplateColors, CardData } from "@/data/templates";
-import TemplatePreviewModal from "@/components/template/TemplatePreviewModal";
 import {
-  Search, Eye, Check, Lock, ArrowRight, Filter, Palette,
+  Eye, ArrowRight, Palette, X, Sparkles, Check, Phone, ShoppingBag,
+  QrCode, ImageIcon, Star, MessageSquare, Share2, Download, Wallet,
 } from "lucide-react";
+import { trpc } from "@/providers/trpc";
+import { buildCardThumb, buildCardHtml } from "@/card-template/buildCard";
+import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
 
-const categories = ["All", "Classic", "Professional", "Minimal", "Corporate", "Modern", "Creative", "Premium"];
+type Preset = { id: number; name: string; style: number; primary: string; secondary: string; active: boolean };
 
-const demoCardData: CardData = {
-  businessName: "Apex Digital Solutions",
-  ownerName: "Raj Sharma",
-  designation: "Founder & CEO",
-  phone: "+91 98765 43210",
-  whatsapp: "919876543210",
-  email: "raj@apexdigital.in",
-  website: "www.apexdigital.in",
-  address: "12B, Sector 18, Gurgaon, Haryana 122001",
-  socialLinks: [
-    { platform: "facebook", url: "#" },
-    { platform: "instagram", url: "#" },
-    { platform: "youtube", url: "#" },
-    { platform: "linkedin", url: "#" },
-  ],
+/* Everything every card comes with — shown next to the preview */
+const CARD_FEATURES = [
+  { icon: Phone, label: "Click-to-call & WhatsApp" },
+  { icon: ShoppingBag, label: "Products / Services" },
+  { icon: Wallet, label: "Payments & UPI" },
+  { icon: QrCode, label: "Payment QR codes" },
+  { icon: ImageIcon, label: "Photo & video gallery" },
+  { icon: Star, label: "Google reviews" },
+  { icon: MessageSquare, label: "Enquiry form" },
+  { icon: Share2, label: "Social links" },
+  { icon: Download, label: "Save to contacts (vCard)" },
+];
+
+/* A polished sample business shown inside every template preview */
+const DEMO = {
+  ...DEFAULT_CUSTOMER,
+  name: "Aarav Sharma", designation: "Founder & CEO", company_name: "Acme Digital",
+  mobile1: "+91 98765 43210", email: "hello@acmedigital.example", url: "https://acmedigital.example",
+  address: "MG Road, Bengaluru, Karnataka 560001",
+  about_us: "Acme Digital is a full-service marketing agency helping brands grow online.",
+  facebook: "#", instagram: "#", youtube: "#", linkedin: "#",
 };
 
-/* ─── Mini Template Card (live HTML render) ─── */
-function MiniTemplateCard({
-  templateId, colors, data,
-  isPremium,
-  onPreview,
-}: {
-  templateId: number; colors: TemplateColors; data: CardData;
-  isPremium: boolean;
-  onPreview: () => void;
-}) {
-  const html = useMemo(() => renderTemplate(templateId, data, colors), [templateId, colors, data]);
-  const tmpl = TEMPLATES.find((t) => t.id === templateId);
-
+/* Fixed-width preview that shows the COMPLETE first page (375×560 → scaled to fit) */
+const CARD_W = 210, SCALE = CARD_W / 375, CARD_H = Math.round(560 * SCALE);
+function Thumb({ style, primary, secondary }: { style: number; primary: string; secondary: string }) {
+  const html = useMemo(() => buildCardThumb({ ...DEMO, color: primary, color2: secondary }, style), [style, primary, secondary]);
   return (
-    <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden card-hover group">
-      {/* Preview Area — scaled down live render */}
-      <div className="relative bg-[#F8FAFC] p-3 flex justify-center overflow-hidden">
-        <div
-          className="w-[180px] rounded-[16px] overflow-hidden shadow-md bg-white"
-          style={{ transform: "scale(0.85)", transformOrigin: "top center", height: "330px", marginBottom: "-50px" }}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-
-        {/* Hover overlay with Preview button */}
-        <div className="absolute inset-0 bg-[#0F172A]/0 group-hover:bg-[#0F172A]/40 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100 gap-2 z-10">
-          <button
-            onClick={onPreview}
-            className="h-10 px-5 bg-white text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg hover:scale-105 transition-transform"
-          >
-            <Eye size={16} /> Preview
-          </button>
-        </div>
-
-        {/* Premium badge */}
-        {isPremium && (
-          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-[#0F172A]/80 backdrop-blur-sm px-2 py-1 rounded-lg">
-            <Lock size={10} className="text-[#F7B31C]" />
-            <span className="text-[9px] font-semibold text-[#F7B31C]">Premium</span>
-          </div>
-        )}
-      </div>
-
-      {/* Card Info */}
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-[#0F172A]">{tmpl?.name}</h3>
-          <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#64748B] font-medium capitalize">
-            {tmpl?.category}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          {/* Color dots */}
-          <div className="flex gap-1">
-            <div className="w-3 h-3 rounded-full border border-[#E2E8F0]" style={{ background: colors.primary }} />
-            <div className="w-3 h-3 rounded-full border border-[#E2E8F0]" style={{ background: colors.secondary }} />
-            <div className="w-3 h-3 rounded-full border border-[#E2E8F0]" style={{ background: colors.accent }} />
-          </div>
-          <span className="text-[10px] text-[#94A3B8] capitalize">{tmpl?.layoutType} layout</span>
-        </div>
-      </div>
+    <div className="relative overflow-hidden bg-[#F8FAFC] pointer-events-none" style={{ width: CARD_W, height: CARD_H }}>
+      <iframe title={`Style ${style}`} srcDoc={html} scrolling="no" tabIndex={-1} loading="lazy"
+        style={{ width: "375px", height: "560px", border: 0, transform: `scale(${SCALE})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
     </div>
   );
 }
 
 export default function Templates() {
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
-  const [colors] = useState<TemplateColors>({ primary: "#F7B31C", secondary: "#0F172A", accent: "#14B8A6" });
-  const [selectedId, setSelectedId] = useState<number>(1);
-  const [previewId, setPreviewId] = useState<number | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const { data } = trpc.template.presets.useQuery();
+  const presets = useMemo(() => ((data?.list ?? []) as Preset[]).filter((p) => p.active), [data]);
+  const [preview, setPreview] = useState<Preset | null>(null);
 
-  const filtered = TEMPLATES.filter((t) => {
-    const matchesSearch = !search || t.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = category === "All" || t.category === category;
-    return matchesSearch && matchesCategory && t.isActive;
-  });
-
-  const handlePreview = (id: number) => {
-    setPreviewId(id);
-    setIsPreviewOpen(true);
-  };
-
-  const handleSelect = (id: number) => {
-    setSelectedId(id);
-  };
+  const previewHtml = useMemo(
+    () => (preview ? buildCardHtml({ ...DEMO, color: preview.primary, color2: preview.secondary }, [], [], [], [], [], []) : ""),
+    [preview]
+  );
 
   return (
     <div className="pt-24 pb-20">
@@ -119,78 +61,99 @@ export default function Templates() {
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
           <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E] mb-4">Templates</span>
-          <h1 className="text-4xl sm:text-5xl font-bold text-[#0F172A]">Choose from Beautiful Ready-to-Use Templates</h1>
+          <h1 className="text-4xl sm:text-5xl font-bold text-[#0F172A]">{presets.length || 31} Ready-to-Use Card Designs</h1>
           <p className="mt-4 text-base text-[#64748B]">
-            Select a professional card design, customize colors, upload your logo, add business details, and publish instantly.
+            Every design comes with its own colour combination. Pick one, add your details, and publish your digital card in minutes — or fine-tune the colours to match your brand.
           </p>
-        </div>
-
-        {/* Search + Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
-          <div className="relative w-full sm:w-80">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-            <input
-              type="text"
-              placeholder="Search templates..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-11 bg-white rounded-xl pl-10 pr-4 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/20 shadow-premium transition-all placeholder:text-[#94A3B8]"
-            />
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  category === cat ? "bg-[#0F172A] text-white" : "bg-white border border-[#E2E8F9] text-[#64748B] hover:bg-[#F8FAFC]"
-                }`}
-              >{cat}</button>
-            ))}
+          <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
+            <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">Start free <ArrowRight size={16} /></Link>
+            <Link to="/pricing" className="btn-ghost h-12 px-8 inline-flex items-center justify-center gap-2 border border-[#E2E8F0]">View pricing</Link>
           </div>
         </div>
 
-        {/* Template Grid */}
-        {filtered.length === 0 ? (
+        {/* Grid */}
+        {presets.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 shadow-premium border border-[#F1F5F9] text-center">
             <Palette size={32} className="text-[#CBD5E1] mx-auto mb-3" />
-            <p className="text-sm text-[#94A3B8]">No templates found matching your criteria</p>
+            <p className="text-sm text-[#94A3B8]">Loading templates…</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filtered.map((t) => (
-              <MiniTemplateCard
-                key={t.id}
-                templateId={t.id}
-                colors={t.colors}
-                data={demoCardData}
-                isPremium={t.isPremium}
-                onPreview={() => handlePreview(t.id)}
-              />
+          <div className="flex flex-wrap justify-center gap-4">
+            {presets.map((p) => (
+              <div key={p.id} className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden group card-hover" style={{ width: CARD_W }}>
+                <div className="relative">
+                  <Thumb style={p.style} primary={p.primary} secondary={p.secondary} />
+                  <div className="absolute inset-0 bg-[#0F172A]/0 group-hover:bg-[#0F172A]/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 z-10">
+                    <button onClick={() => setPreview(p)} className="h-9 px-4 bg-white text-[#0F172A] rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg hover:scale-105 transition-transform"><Eye size={14} /> Preview</button>
+                  </div>
+                </div>
+                <div className="p-3 border-t border-[#F1F5F9]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full border border-black/10 shrink-0" style={{ background: p.primary }} />
+                    <span className="w-3 h-3 rounded-full border border-black/10 shrink-0" style={{ background: p.secondary }} />
+                    <h3 className="text-[13px] font-semibold text-[#0F172A] truncate">{p.name}</h3>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         )}
 
-        {/* AI Generator CTA */}
+        {/* AI CTA */}
         <div className="mt-16 text-center bg-gradient-to-br from-[#0F172A] to-[#1E293B] rounded-3xl p-10 sm:p-14">
-          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Can&apos;t Find the Perfect Template?</h2>
-          <p className="text-sm text-[#94A3B8] mb-6 max-w-lg mx-auto">Use our AI Card Generator to create a custom card tailored to your business and industry.</p>
-          <Link to="/ai-card-generator" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">
-            Try AI Card Generator <ArrowRight size={16} />
-          </Link>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#F7B31C] mb-3"><Sparkles size={13} /> AI powered</span>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Can&apos;t find the perfect template?</h2>
+          <p className="text-sm text-[#94A3B8] mb-6 max-w-lg mx-auto">Let our AI Card Generator build a custom card tailored to your business and industry.</p>
+          <Link to="/ai-card-generator" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">Try AI Card Generator <ArrowRight size={16} /></Link>
         </div>
       </div>
 
-      {/* Preview Modal */}
-      <TemplatePreviewModal
-        isOpen={isPreviewOpen}
-        templateId={previewId}
-        colors={colors}
-        cardData={demoCardData}
-        selectedId={selectedId}
-        onClose={() => setIsPreviewOpen(false)}
-        onSelect={handleSelect}
-      />
+      {/* Preview modal — phone mockup + features */}
+      {preview && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="absolute inset-0 bg-[#0F172A]/75 backdrop-blur-sm" onClick={() => setPreview(null)} />
+          <div className="relative z-10 w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden my-8">
+            <button onClick={() => setPreview(null)} className="absolute top-4 right-4 z-20 w-9 h-9 rounded-xl bg-[#0F172A]/5 hover:bg-[#0F172A]/10 text-[#0F172A] flex items-center justify-center"><X size={18} /></button>
+            <div className="grid grid-cols-1 md:grid-cols-2">
+              {/* Phone mockup */}
+              <div className="bg-gradient-to-br from-[#0F172A] via-[#172033] to-[#1E293B] p-6 sm:p-8 flex justify-center relative overflow-hidden">
+                <div className="absolute -right-8 -top-10 w-40 h-40 rounded-full bg-[#F7B31C]/20 blur-3xl pointer-events-none" />
+                {/* device */}
+                <div className="relative w-[240px] shrink-0" style={{ height: "500px" }}>
+                  <div className="absolute inset-0 rounded-[2.4rem] bg-[#0b1120] p-2.5 shadow-2xl ring-1 ring-white/10">
+                    <div className="relative w-full h-full rounded-[1.9rem] overflow-hidden bg-white">
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-[#0b1120] rounded-b-2xl z-10" />
+                      <iframe title={preview.name} srcDoc={previewHtml} style={{ width: "375px", height: "780px", border: 0, transform: "scale(0.6)", transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Features */}
+              <div className="p-6 sm:p-8">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-4 h-4 rounded-full border border-black/10" style={{ background: preview.primary }} />
+                  <span className="w-4 h-4 rounded-full border border-black/10" style={{ background: preview.secondary }} />
+                  <h3 className="text-xl font-bold text-[#0F172A]">{preview.name}</h3>
+                </div>
+                <p className="text-[13px] text-[#64748B] mb-5">A one-page digital card with its own colour combination — packed with everything you need to convert visitors.</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8] mb-2.5">What's included</p>
+                <div className="grid grid-cols-1 gap-2 mb-6">
+                  {CARD_FEATURES.map((f) => (
+                    <div key={f.label} className="flex items-center gap-2.5">
+                      <span className="w-7 h-7 rounded-lg bg-[#FEF3C7] flex items-center justify-center shrink-0"><f.icon size={14} className="text-[#D97706]" /></span>
+                      <span className="text-[13px] text-[#334155] font-medium">{f.label}</span>
+                      <Check size={14} className="text-emerald-500 ml-auto shrink-0" />
+                    </div>
+                  ))}
+                </div>
+                <Link to="/signup" className="btn-gold h-12 w-full inline-flex items-center justify-center gap-2">Use this template <ArrowRight size={16} /></Link>
+                <p className="text-[11px] text-[#94A3B8] text-center mt-2">Free 7-day trial · no card required</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
