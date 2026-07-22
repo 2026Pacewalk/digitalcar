@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router";
+import { useEffect, useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { toast } from "sonner";
 import {
@@ -25,7 +25,16 @@ const iconCls = "absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = searchParams.get("next");
+  const next = nextPath && nextPath.startsWith("/") ? nextPath : "";
   const loginMut = trpc.auth.login.useMutation();
+
+  // Already signed in and sent here to reactivate → go straight to the target.
+  useEffect(() => {
+    if (next && localStorage.getItem("auth_token") && localStorage.getItem("digitalcarda_user")) navigate(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [tab, setTab] = useState<"customer" | "reseller" | "admin">("customer");
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -46,7 +55,7 @@ export default function Login() {
       localStorage.setItem("auth_token", res.token);
       localStorage.setItem("digitalcarda_user", JSON.stringify(res.user));
       toast.success("Welcome back!");
-      navigate(routeFor(res.user.role));
+      navigate(next || routeFor(res.user.role));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Invalid email or password");
       setLoading(false);

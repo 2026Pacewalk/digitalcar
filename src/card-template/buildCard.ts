@@ -527,7 +527,9 @@ h1{font-size:19px;font-weight:800;color:#0F172A;line-height:1.3;}
 .name{font-weight:700;color:#0F172A;}
 .cta{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:22px;height:50px;border-radius:14px;background:linear-gradient(135deg,${accent},${darken(accent, 0.16)});color:#0F172A;font-weight:700;font-size:14px;text-decoration:none;box-shadow:0 8px 20px ${accent}55;}
 .hint{font-size:11px;color:#94A3B8;margin-top:10px;}
-.brand{margin-top:24px;font-size:11px;color:#94A3B8;}
+.owner{display:inline-flex;align-items:center;gap:6px;margin-top:20px;padding-top:16px;border-top:1px solid #F1F5F9;font-size:12px;font-weight:600;color:#0F172A;text-decoration:none;}
+.owner i{color:${accent};}
+.brand{margin-top:14px;font-size:11px;color:#94A3B8;}
 .brand b{color:${accent};}
 </style></head>
 <body>
@@ -537,6 +539,7 @@ h1{font-size:19px;font-weight:800;color:#0F172A;line-height:1.3;}
     <p class="sub"><span class="name">${name}</span>'s digital card is temporarily paused. Please check back soon.</p>
     <a class="cta" href="${signup}" target="_top"><i class="fa fa-bolt"></i> Create your own free card</a>
     <p class="hint">Set up your own digital card in minutes — 30 days free.</p>
+    <a class="owner" href="/login?next=/dashboard/subscription" target="_top"><i class="fa fa-redo"></i> Own this card? Log in to reactivate it</a>
     <p class="brand">Powered by <b>DigitalCarda</b></p>
   </div>
 </body></html>`;

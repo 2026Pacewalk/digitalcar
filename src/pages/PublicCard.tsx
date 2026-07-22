@@ -5,7 +5,7 @@ import {
   Phone, Mail, MapPin, Globe, Share2, Download, MessageCircle,
   X, Send, Check, FileText, Briefcase, ChevronRight, MessageSquare,
   Linkedin, Facebook, Instagram, Twitter, Youtube,
-  Clock, Star, Hourglass, Zap,
+  Clock, Star, Hourglass, Zap, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -88,7 +88,10 @@ export default function PublicCard() {
           <p className="text-[13px] text-[#64748B] mt-2 leading-relaxed"><span className="font-semibold text-[#0F172A]">{owner}</span>&apos;s digital card is temporarily paused. Please check back soon.</p>
           <Link to={signup} className="mt-6 h-12 rounded-2xl gradient-gold text-[#0F172A] font-bold text-sm flex items-center justify-center gap-2 hover:shadow-gold transition-all"><Zap size={17} /> Create your own free card</Link>
           <p className="text-[11px] text-[#94A3B8] mt-2.5">Set up your own digital card in minutes — 30 days free.</p>
-          <p className="text-[11px] text-[#94A3B8] mt-5">Powered by <span className="text-[#F7B31C] font-semibold">DigitalCarda</span></p>
+          <div className="mt-5 pt-4 border-t border-[#F1F5F9]">
+            <Link to="/login?next=/dashboard/subscription" className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#0F172A] hover:text-[#D97706] transition-colors"><RefreshCw size={13} /> Own this card? Log in to reactivate it</Link>
+            <p className="text-[10px] text-[#94A3B8] mt-2">Powered by <span className="text-[#F7B31C] font-semibold">DigitalCarda</span></p>
+          </div>
         </div>
       </div>
     );
