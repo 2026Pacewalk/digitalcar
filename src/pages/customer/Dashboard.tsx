@@ -3,12 +3,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   CalendarClock, MessageSquare, Eye, Pencil, MessageCircle,
-  Copy, Check, ShieldAlert, ChevronRight, CreditCard,
+  Copy, Check, ShieldAlert, ChevronRight, CreditCard, Wallet, Gift,
+  ShoppingBag, ImageIcon, Share2, Star, Upload, QrCode, Info, Home as HomeIcon,
+  Sparkles, ArrowRight, TrendingUp, Layers,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { toast } from "sonner";
-import { loadNewEnquiries } from "@/hooks/useEnquiryNotifications";
-import { readCustomer } from "@/hooks/useCustomer";
+import { loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
+import { readCustomer, scopedKey } from "@/hooks/useCustomer";
+import { trpc } from "@/providers/trpc";
 
 /* Glass action button for the dark hero card (icon + tiny label) */
 function GlassAction({ icon: Icon, label, onClick, tone = "default", active = false }: {
@@ -33,12 +36,16 @@ type Customer = {
   id: number; name: string; username: string; email: string;
   mobile1: string; mobile2: string; slug: string; package_id: number;
   views: number; expired_on: string | null; email_verify: number;
+  logo: string; about_us: string; address: string; url: string;
+  upi: string; bank_name: string; google_review: string;
+  facebook: string; twitter: string; instagram: string; youtube: string; pinterest: string; linkedin: string;
 };
 
-const DEFAULT: Customer = {
-  id: 8, name: "Aarav Sharma", username: "acme-digital", email: "hello@acmedigital.example",
-  mobile1: "+91 98765 43210", mobile2: "919876543210", slug: "acme-digital",
-  package_id: 6, views: 1284, expired_on: "2028-06-30", email_verify: 0,
+const EMPTY: Customer = {
+  id: 0, name: "", username: "", email: "", mobile1: "", mobile2: "", slug: "",
+  package_id: 7, views: 0, expired_on: null, email_verify: 0,
+  logo: "", about_us: "", address: "", url: "", upi: "", bank_name: "", google_review: "",
+  facebook: "", twitter: "", instagram: "", youtube: "", pinterest: "", linkedin: "",
 };
 
 const PKG: Record<number, { name: string; amount: number; days: number }> = {
@@ -53,20 +60,71 @@ const PLAN_LIST = [
 ];
 
 const CARD_BASE = "https://digitalcarda.in/";
+const inr = (v: number) => "₹" + (Number(v) || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+
+/* Read a user-scoped localStorage list length (products, gallery, …) */
+function listCount(base: string): number {
+  try {
+    const raw = localStorage.getItem(scopedKey(base));
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.length : 0;
+  } catch { return 0; }
+}
+
+/* Completion ring (SVG) */
+function ScoreRing({ pct }: { pct: number }) {
+  const R = 26, C = 2 * Math.PI * R;
+  const color = pct >= 80 ? "#16A34A" : pct >= 50 ? "#F7B31C" : "#EF4444";
+  return (
+    <div className="relative w-[72px] h-[72px] shrink-0">
+      <svg width="72" height="72" viewBox="0 0 72 72" className="-rotate-90">
+        <circle cx="36" cy="36" r={R} fill="none" stroke="#F1F5F9" strokeWidth="7" />
+        <circle cx="36" cy="36" r={R} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
+          strokeDasharray={C} strokeDashoffset={C * (1 - pct / 100)} className="transition-all duration-700" />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[15px] font-extrabold text-[#0F172A] leading-none tabular-nums">{pct}%</span>
+      </div>
+    </div>
+  );
+}
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
-  const [customer, setCustomer] = useState<Customer>(DEFAULT);
+  const [customer, setCustomer] = useState<Customer>(EMPTY);
+  const [counts, setCounts] = useState({ products: 0, offers: 0, gallery: 0, videos: 0, uploads: 0, qrcodes: 0, upi: 0, banks: 0 });
   const [enquiries, setEnquiries] = useState<number | null>(null);
+  const [recentEnqs, setRecentEnqs] = useState<Enq[]>([]);
   const [copied, setCopied] = useState(false);
 
+  // Refer & Earn wallet — live from the backend for the signed-in user
+  const { data: program } = trpc.referral.myProgram.useQuery(undefined, { retry: false });
+
   useEffect(() => {
-    const c = readCustomer(); // scoped to the logged-in user (seeded from their account)
+    const c = readCustomer(); // scoped to the logged-in user
     setCustomer({
+      ...EMPTY,
       id: c.id, name: c.name || "Customer", username: (c.username as string) || c.slug,
       email: c.email || "", mobile1: (c.mobile1 as string) || "", mobile2: (c.mobile2 as string) || (c.mobile1 as string) || "",
       slug: c.slug || "", package_id: Number(c.package_id) || 7,
-      views: Number(c.views) || 0, expired_on: c.expired_on as string, email_verify: Number(c.email_verify) || 0,
+      views: Number(c.views) || 0, expired_on: (c.expired_on as string) || null, email_verify: Number(c.email_verify) || 0,
+      logo: (c.logo as string) || "", about_us: (c.about_us as string) || "", address: (c.address as string) || "",
+      url: (c.url as string) || "", upi: (c.upi as string) || "", bank_name: (c.bank_name as string) || "",
+      google_review: (c.google_review as string) || "",
+      facebook: (c.facebook as string) || "", twitter: (c.twitter as string) || "", instagram: (c.instagram as string) || "",
+      youtube: (c.youtube as string) || "", pinterest: (c.pinterest as string) || "", linkedin: (c.linkedin as string) || "",
+    });
+    const products = listCount("dc_products");
+    let offers = 0;
+    try {
+      const raw = localStorage.getItem(scopedKey("dc_products"));
+      offers = raw ? (JSON.parse(raw) as { isOffer?: boolean }[]).filter((p) => p.isOffer).length : 0;
+    } catch { /* 0 */ }
+    setCounts({
+      products: products - offers, offers,
+      gallery: listCount("dc_gallery"), videos: listCount("dc_videos"),
+      uploads: listCount("dc_uploads"), qrcodes: listCount("dc_qrcode"),
+      upi: listCount("dc_upi"), banks: listCount("dc_banks"),
     });
   }, []);
 
@@ -89,19 +147,39 @@ export default function CustomerDashboard() {
     const deletedSet = () => { try { return new Set(JSON.parse(localStorage.getItem("dc_deleted_enquiries") || "[]")); } catch { return new Set<string>(); } };
     const recount = () => {
       const del = deletedSet();
-      const freshIds = loadNewEnquiries(slug).map((e) => e.id);
+      const fresh = loadNewEnquiries(slug);
+      const freshIds = fresh.map((e) => e.id);
       const all = new Set([...baseIds, ...freshIds]);
       setEnquiries([...all].filter((id) => !del.has(id)).length);
+      setRecentEnqs(fresh.filter((e) => !del.has(e.id)).slice(-3).reverse());
     };
     fetch("/enquiries.json")
       .then((r) => r.json())
       .then((d: { id: string; uname: string }[]) => { baseIds = d.filter((e) => e.uname === slug).map((e) => String(e.id)); recount(); })
-      .catch(() => setEnquiries(0));
+      .catch(() => recount());
     const onStorage = () => recount();
     window.addEventListener("storage", onStorage);
     window.addEventListener("dc:new-enquiry", onStorage as EventListener);
     return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("dc:new-enquiry", onStorage as EventListener); };
   }, [slug]);
+
+  /* ─── Smart completion score ─── */
+  const hasSocial = !!(customer.facebook || customer.twitter || customer.instagram || customer.youtube || customer.pinterest || customer.linkedin);
+  const hasPayments = counts.upi > 0 || counts.banks > 0 || !!customer.upi || !!customer.bank_name || counts.qrcodes > 0;
+  const checks: { done: boolean; label: string; path: string }[] = [
+    { done: !!customer.logo, label: "Add your logo / photo", path: "/dashboard/home" },
+    { done: !!(customer.mobile1 && customer.address), label: "Complete contact details", path: "/dashboard/home" },
+    { done: !!customer.about_us, label: "Write your About Us", path: "/dashboard/about" },
+    { done: counts.products + counts.offers > 0, label: "Add products / services", path: "/dashboard/products?tab=products" },
+    { done: hasPayments, label: "Add payment details", path: "/dashboard/payments" },
+    { done: counts.gallery + counts.videos > 0, label: "Add gallery images", path: "/dashboard/media" },
+    { done: hasSocial, label: "Link social profiles", path: "/dashboard/social" },
+    { done: !!customer.google_review, label: "Add Google review link", path: "/dashboard/reviews" },
+    { done: counts.uploads > 0, label: "Upload your eBrochure", path: "/dashboard/uploads" },
+  ];
+  const doneCount = checks.filter((c) => c.done).length;
+  const pct = Math.round((doneCount / checks.length) * 100);
+  const nextSteps = checks.filter((c) => !c.done).slice(0, 3);
 
   const copyLink = async () => {
     try { await navigator.clipboard.writeText(cardUrl); setCopied(true); toast.success("Card link copied"); setTimeout(() => setCopied(false), 1800); }
@@ -112,11 +190,33 @@ export default function CustomerDashboard() {
     const text = encodeURIComponent(`Here is my digital business card: ${cardUrl}`);
     window.open(num ? `https://wa.me/${num}?text=${text}` : `https://wa.me/?text=${text}`, "_blank");
   };
+  const copyRefLink = async () => {
+    if (!program?.code) return;
+    try { await navigator.clipboard.writeText(`${window.location.origin}/signup?ref=${program.code}`); toast.success("Referral link copied"); }
+    catch { toast.error("Copy failed"); }
+  };
 
   const stats = [
-    { icon: CalendarClock, value: daysPending.toLocaleString("en-IN"), label: active ? "Days left" : "Plan expired", bg: active ? "#DCFCE7" : "#FEE2E2", fg: active ? "#16A34A" : "#DC2626" },
+    { icon: CalendarClock, value: daysPending.toLocaleString("en-IN"), label: active ? "Days left" : "Plan expired", bg: active ? "#DCFCE7" : "#FEE2E2", fg: active ? "#16A34A" : "#DC2626", onClick: () => navigate("/dashboard/settings?tab=package") },
     { icon: MessageSquare, value: enquiries === null ? "…" : String(enquiries), label: "Enquiries", bg: "#FEF3C7", fg: "#D97706", onClick: () => navigate("/dashboard/enquiry") },
-    { icon: Eye, value: customer.views.toLocaleString("en-IN"), label: "Total Views", bg: "#CFFAFE", fg: "#0891B2" },
+    { icon: Eye, value: customer.views.toLocaleString("en-IN"), label: "Total Views", bg: "#CFFAFE", fg: "#0891B2", onClick: () => navigate("/dashboard/analytics") },
+    { icon: Wallet, value: inr(program?.wallet?.balance ?? 0), label: "Wallet", bg: "#EDE9FE", fg: "#7C3AED", onClick: () => navigate("/dashboard/refer") },
+  ];
+
+  /* ─── Module grid: every card module with a live count/state ─── */
+  const modules = [
+    { icon: HomeIcon, label: "Profile", value: customer.logo ? "Ready" : "Set up", ok: !!customer.logo, path: "/dashboard/home" },
+    { icon: Info, label: "About Us", value: customer.about_us ? "Added" : "Write", ok: !!customer.about_us, path: "/dashboard/about" },
+    { icon: ShoppingBag, label: "Products", value: String(counts.products), ok: counts.products > 0, path: "/dashboard/products?tab=products" },
+    { icon: Sparkles, label: "Offers", value: String(counts.offers), ok: counts.offers > 0, path: "/dashboard/products?tab=offers" },
+    { icon: Wallet, label: "Payments", value: hasPayments ? "Ready" : "Add", ok: hasPayments, path: "/dashboard/payments" },
+    { icon: QrCode, label: "QR Codes", value: String(counts.qrcodes), ok: counts.qrcodes > 0, path: "/dashboard/payments" },
+    { icon: ImageIcon, label: "Gallery", value: String(counts.gallery + counts.videos), ok: counts.gallery + counts.videos > 0, path: "/dashboard/media" },
+    { icon: Share2, label: "Social", value: hasSocial ? "Linked" : "Link", ok: hasSocial, path: "/dashboard/social" },
+    { icon: Star, label: "Reviews", value: customer.google_review ? "Linked" : "Add", ok: !!customer.google_review, path: "/dashboard/reviews" },
+    { icon: Upload, label: "Uploads", value: String(counts.uploads), ok: counts.uploads > 0, path: "/dashboard/uploads" },
+    { icon: Layers, label: "Bulk Create", value: "Team", ok: true, path: "/dashboard/bulk" },
+    { icon: Gift, label: "Refer & Earn", value: program ? `${program.stats.joined} joined` : "Share", ok: true, path: "/dashboard/refer" },
   ];
 
   return (
@@ -139,6 +239,7 @@ export default function CustomerDashboard() {
                 </div>
                 <p className="text-[15px] font-bold text-white truncate mt-0.5">@{slug}</p>
               </div>
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/10 ring-1 ring-white/10 text-[#F7B31C] uppercase tracking-wide shrink-0">{pkg.name}</span>
             </div>
             <div className="flex items-center gap-2 mt-4">
               <GlassAction icon={Eye} label="View" onClick={() => navigate("/dashboard/view")} />
@@ -149,24 +250,122 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
+        {/* ─── Smart completion ─── */}
+        {pct < 100 ? (
+          <div className="bg-white rounded-2xl border border-[#F1F5F9] shadow-premium p-4">
+            <div className="flex items-center gap-4">
+              <ScoreRing pct={pct} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-[#0F172A]">Card completion</p>
+                <p className="text-[11px] text-[#64748B] mt-0.5">{doneCount} of {checks.length} sections done — complete cards get more enquiries.</p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {nextSteps.map((s) => (
+                    <button key={s.label} onClick={() => navigate(s.path)}
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-[#FEF3C7] text-[#92400E] hover:bg-[#FDE68A] transition-colors active:scale-95">
+                      {s.label} <ArrowRight size={10} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-gradient-to-r from-[#ECFDF5] to-[#F0FDF4] border border-emerald-100 p-3.5 flex items-center gap-3">
+            <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Check size={17} /></span>
+            <p className="text-xs text-emerald-800 flex-1 leading-snug"><b>Your card is 100% complete.</b> Share it everywhere to get more enquiries.</p>
+            <button onClick={shareWhatsApp} className="h-9 px-3.5 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors shrink-0">Share</button>
+          </div>
+        )}
+
         {/* ─── Stats ─── */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {stats.map((s, i) => (
             <div key={i} onClick={s.onClick}
-              className={`relative overflow-hidden bg-white rounded-2xl border border-[#F1F5F9] shadow-premium p-4 ${s.onClick ? "cursor-pointer active:scale-[0.98] transition-transform" : ""}`}>
+              className="relative overflow-hidden bg-white rounded-2xl border border-[#F1F5F9] shadow-premium p-4 cursor-pointer active:scale-[0.98] transition-transform">
               <s.icon className="absolute -right-2 -bottom-2 opacity-[0.06]" size={64} style={{ color: s.fg }} />
               <div className="relative">
                 <div className="flex items-center justify-between">
                   <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: s.bg, color: s.fg }}>
                     <s.icon size={16} />
                   </span>
-                  {s.onClick && <ChevronRight size={14} className="text-[#CBD5E1]" />}
+                  <ChevronRight size={14} className="text-[#CBD5E1]" />
                 </div>
-                <p className="text-2xl font-bold text-[#0F172A] mt-3 leading-none tabular-nums">{s.value}</p>
+                <p className="text-xl font-bold text-[#0F172A] mt-3 leading-none tabular-nums truncate">{s.value}</p>
                 <p className="text-[11px] text-[#64748B] mt-1 truncate">{s.label}</p>
               </div>
             </div>
           ))}
+        </div>
+
+        {/* ─── Modules grid ─── */}
+        <div className="bg-white rounded-2xl border border-[#F1F5F9] shadow-premium p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-[#0F172A]">Your modules</p>
+            <button onClick={() => navigate("/dashboard/settings?tab=module")} className="text-[11px] font-semibold text-[#F7B31C] hover:text-[#D97706] transition-colors">Manage</button>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+            {modules.map((m) => (
+              <button key={m.label} onClick={() => navigate(m.path)}
+                className="group relative rounded-xl border border-[#F1F5F9] hover:border-[#F7B31C]/40 hover:shadow-premium bg-[#FAFBFC] hover:bg-white p-3 text-center transition-all active:scale-[0.97]">
+                <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${m.ok ? "bg-emerald-400" : "bg-amber-400"}`} />
+                <span className="w-9 h-9 rounded-xl bg-white group-hover:bg-[#FEF3C7] border border-[#F1F5F9] flex items-center justify-center mx-auto transition-colors">
+                  <m.icon size={16} className="text-[#64748B] group-hover:text-[#D97706] transition-colors" />
+                </span>
+                <p className="text-[10px] font-semibold text-[#0F172A] mt-1.5 truncate">{m.label}</p>
+                <p className={`text-[9px] mt-0.5 truncate ${m.ok ? "text-[#94A3B8]" : "text-amber-600 font-semibold"}`}>{m.value}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ─── Recent enquiries + Refer strip ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Recent enquiries */}
+          <div className="bg-white rounded-2xl border border-[#F1F5F9] shadow-premium overflow-hidden">
+            <div className="px-4 py-3 border-b border-[#F1F5F9] flex items-center justify-between">
+              <p className="text-xs font-semibold text-[#0F172A]">Recent enquiries</p>
+              <button onClick={() => navigate("/dashboard/enquiry")} className="text-[11px] font-semibold text-[#F7B31C] hover:text-[#D97706] transition-colors">View all</button>
+            </div>
+            {recentEnqs.length === 0 ? (
+              <div className="p-6 text-center">
+                <span className="w-10 h-10 rounded-xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-2"><MessageSquare size={18} className="text-[#94A3B8]" /></span>
+                <p className="text-[12px] font-medium text-[#0F172A]">No new enquiries</p>
+                <p className="text-[10px] text-[#94A3B8] mt-0.5">Share your card to start receiving leads.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[#F1F5F9]">
+                {recentEnqs.map((e) => (
+                  <button key={e.id} onClick={() => navigate("/dashboard/enquiry")} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#FAFBFC] transition-colors text-left">
+                    <span className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center shrink-0 text-[#0F172A] text-[11px] font-bold">{(e.name || "?").charAt(0).toUpperCase()}</span>
+                    <span className="min-w-0 flex-1">
+                      <p className="text-[12px] font-semibold text-[#0F172A] truncate">{e.name || "Visitor"}</p>
+                      <p className="text-[10px] text-[#94A3B8] truncate">{e.contact || e.email || "—"}</p>
+                    </span>
+                    <ChevronRight size={14} className="text-[#CBD5E1] shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Refer & Earn */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0F172A] via-[#172033] to-[#1E293B] p-4 shadow-premium">
+            <Gift className="absolute -right-3 -bottom-4 text-[#F7B31C] opacity-10" size={96} />
+            <div className="relative">
+              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#F7B31C]/15 text-[#F7B31C] ring-1 ring-[#F7B31C]/20"><TrendingUp size={10} /> Earn {program?.commissionPercent ?? 15}% cash</span>
+              <p className="text-[14px] font-bold text-white mt-2">Refer friends, fill your wallet</p>
+              <p className="text-[11px] text-white/55 mt-0.5 leading-snug">They save {program?.discountPercent ?? 15}% — you earn {program?.commissionPercent ?? 15}% of every paid plan.</p>
+              <div className="flex items-center gap-2 mt-3">
+                <button onClick={copyRefLink} disabled={!program}
+                  className="flex-1 h-9 rounded-lg bg-white/10 ring-1 ring-white/10 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 hover:bg-white/20 transition-colors disabled:opacity-40 truncate px-2">
+                  <Copy size={12} /> {program?.code || "…"}
+                </button>
+                <button onClick={() => navigate("/dashboard/refer")} className="h-9 px-3.5 rounded-lg gradient-gold text-[#0F172A] text-[11px] font-bold flex items-center gap-1 hover:shadow-gold transition-all">
+                  Open <ArrowRight size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* ─── Plans ─── */}
