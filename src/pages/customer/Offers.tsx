@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Tag, Plus, Trash2, Pencil, X, Save, Search, ImageOff, Calendar } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { Field, fieldCls, areaCls, ImagePick, LimitBar } from "@/components/customer/ModuleShell";
+import ModuleShell, { Field, fieldCls, areaCls, ImagePick, LimitBar, Tip } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, packageLimit } from "@/hooks/useCustomer";
 import { contentSeeder, cleanPlain } from "@/lib/cardContent";
 
@@ -58,6 +58,7 @@ export default function CustomerOffers() {
     <ModuleShell title="Offers / Deals" subtitle="Promote your offers and deals on your card" icon={Tag}
       actions={<button onClick={openAdd} disabled={full} className={`flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${full ? "bg-[#F1F5F9] text-[#94A3B8] cursor-not-allowed" : "gradient-gold text-[#0F172A] hover:shadow-gold"}`}><Plus size={16} /> Add More</button>}>
       <LimitBar used={items.length} limit={limit} unit="offers" />
+      <Tip>Give every offer a deadline — a little urgency turns browsers into buyers. Add a code or button so you can track who claims it.</Tip>
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-[#64748B]">

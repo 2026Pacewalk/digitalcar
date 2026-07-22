@@ -1,9 +1,9 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router";
-import { Users, CreditCard, DollarSign, TrendingUp, ArrowUpRight, Plus, Eye } from "lucide-react";
+import { Users, CreditCard, IndianRupee, TrendingUp, ArrowUpRight, Plus, Eye } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const chartData = [
@@ -25,34 +25,33 @@ export default function ResellerDashboard() {
   const stats = [
     { label: "My Customers", value: "45", change: "+8%", icon: Users, color: "bg-[#FEF3C7] text-[#92400E]" },
     { label: "Active Cards", value: "128", change: "+12%", icon: CreditCard, color: "bg-[#D1FAE5] text-[#065F46]" },
-    { label: "Commission", value: "$1,450", change: "+18%", icon: DollarSign, color: "bg-[#DBEAFE] text-[#1E40AF]" },
+    { label: "Commission", value: "₹1,450", change: "+18%", icon: IndianRupee, color: "bg-[#DBEAFE] text-[#1E40AF]" },
     { label: "Conversion", value: "24%", change: "+3%", icon: TrendingUp, color: "bg-[#FCE7F3] text-[#9D174D]" },
   ];
 
   return (
-    <DashboardLayout>
-      <TopBar title="Dashboard" subtitle={`Welcome back, ${user?.fullName?.split(" ")[0] || "Reseller"}`} />
-      <div className="p-6 space-y-6">
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="Dashboard" subtitle={`Welcome back, ${user?.fullName?.split(" ")[0] || "Reseller"}`} /></div>
+      <div className="p-4 sm:p-6 space-y-4 max-w-6xl mx-auto">
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {stats.map((stat, i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9] card-hover">
-              <div className="flex items-start justify-between mb-3">
-                <div className={`w-10 h-10 rounded-xl ${stat.color} flex items-center justify-center`}><stat.icon size={18} /></div>
-                <span className="badge-green flex items-center gap-0.5"><ArrowUpRight size={10} />{stat.change}</span>
+            <div key={i} className="bg-white rounded-2xl p-3.5 shadow-premium border border-[#F1F5F9]">
+              <div className="flex items-center justify-between">
+                <span className={`w-8 h-8 rounded-lg ${stat.color} flex items-center justify-center`}><stat.icon size={16} /></span>
+                <span className="badge-green flex items-center gap-0.5 !text-[10px] !px-1.5 !py-0.5"><ArrowUpRight size={10} />{stat.change}</span>
               </div>
-              <p className="text-2xl font-bold text-[#0F172A]">{stat.value}</p>
-              <p className="text-xs text-[#64748B] mt-0.5">{stat.label}</p>
+              <p className="text-2xl font-bold text-[#0F172A] mt-2.5 leading-none tabular-nums">{stat.value}</p>
+              <p className="text-[11px] text-[#64748B] mt-1">{stat.label}</p>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Chart */}
-          <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">
-            <h2 className="text-base font-semibold text-[#0F172A] mb-1">Revenue & Customers</h2>
-            <p className="text-xs text-[#64748B] mb-6">Monthly performance</p>
-            <div className="h-[280px]">
+          <div className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
+            <h2 className="text-sm font-semibold text-[#0F172A] mb-4">Revenue &amp; Customers <span className="text-[#94A3B8] font-normal">· monthly</span></h2>
+            <div className="h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
@@ -69,31 +68,29 @@ export default function ResellerDashboard() {
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">
-            <h2 className="text-base font-semibold text-[#0F172A] mb-4">Quick Actions</h2>
-            <div className="space-y-2.5">
+          <div className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
+            <h2 className="text-sm font-semibold text-[#0F172A] mb-3">Quick Actions</h2>
+            <div className="space-y-1.5">
               {[
                 { label: "Add Customer", icon: Plus, action: () => navigate("/reseller/customers") },
                 { label: "View Customers", icon: Users, action: () => navigate("/reseller/customers") },
                 { label: "View Analytics", icon: Eye, action: () => {} },
               ].map((action, i) => (
-                <button key={i} onClick={action.action} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-[#F8FAFC] transition-colors text-left group">
-                  <div className="w-10 h-10 rounded-xl bg-[#F1F5F9] flex items-center justify-center">
-                    <action.icon size={16} className="text-[#64748B]" />
+                <button key={i} onClick={action.action} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#F8FAFC] transition-colors text-left">
+                  <div className="w-8 h-8 rounded-lg bg-[#F1F5F9] flex items-center justify-center shrink-0">
+                    <action.icon size={15} className="text-[#64748B]" />
                   </div>
                   <span className="text-sm font-medium text-[#0F172A] flex-1">{action.label}</span>
                 </button>
               ))}
             </div>
-            <div className="mt-6 pt-6 border-t border-[#F1F5F9]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center">
-                  <DollarSign size={16} className="text-[#F7B31C]" />
-                </div>
-                <div>
-                  <p className="text-xs text-[#94A3B8]">Commission Rate</p>
-                  <p className="text-lg font-bold text-[#0F172A]">20%</p>
-                </div>
+            <div className="mt-4 pt-4 border-t border-[#F1F5F9] flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-[#FEF3C7] flex items-center justify-center shrink-0">
+                <IndianRupee size={15} className="text-[#F7B31C]" />
+              </div>
+              <div>
+                <p className="text-[11px] text-[#94A3B8]">Commission Rate</p>
+                <p className="text-sm font-bold text-[#0F172A]">20%</p>
               </div>
             </div>
           </div>
@@ -101,11 +98,8 @@ export default function ResellerDashboard() {
 
         {/* Recent Customers */}
         <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
-          <div className="p-6 border-b border-[#F1F5F9] flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-[#0F172A]">Recent Customers</h2>
-              <p className="text-xs text-[#64748B] mt-0.5">Latest signups</p>
-            </div>
+          <div className="p-4 sm:p-5 border-b border-[#F1F5F9] flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[#0F172A]">Recent Customers</h2>
             <button onClick={() => navigate("/reseller/customers")} className="text-xs text-[#F7B31C] hover:text-[#D97706] font-medium">View All</button>
           </div>
           <div className="overflow-x-auto">
@@ -113,14 +107,14 @@ export default function ResellerDashboard() {
               <thead>
                 <tr className="bg-[#F8FAFC]">
                   {["Customer", "Plan", "Date"].map((h) => (
-                    <th key={h} className="text-left text-[11px] font-semibold text-[#64748B] uppercase tracking-wider px-6 py-3">{h}</th>
+                    <th key={h} className="text-left text-[11px] font-semibold text-[#64748B] uppercase tracking-wider px-4 py-3">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
                 {recentCustomers.map((c, i) => (
                   <tr key={i} className="hover:bg-[#F8FAFC] transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full gradient-gold flex items-center justify-center">
                           <span className="text-[#0F172A] text-xs font-bold">{c.name.charAt(0)}</span>
@@ -131,8 +125,8 @@ export default function ResellerDashboard() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4"><span className="badge-gold">{c.plan}</span></td>
-                    <td className="px-6 py-4 text-sm text-[#94A3B8]">{c.date}</td>
+                    <td className="px-4 py-3"><span className="badge-gold">{c.plan}</span></td>
+                    <td className="px-4 py-3 text-sm text-[#94A3B8]">{c.date}</td>
                   </tr>
                 ))}
               </tbody>
@@ -140,6 +134,6 @@ export default function ResellerDashboard() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

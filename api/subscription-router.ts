@@ -1,8 +1,21 @@
 import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { subscriptions, subscriptionPackages, invoices } from "@db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { subscriptions, subscriptionPackages, invoices, appSettings } from "@db/schema";
+import { eq, desc, sql, and, gt } from "drizzle-orm";
+
+const DEFAULT_DISCOUNT = 15;
+/** Referral discount % for a referee's first paid plan (0 if not eligible). */
+async function referralDiscountFor(db: ReturnType<typeof getDb>, user: { id: number; referredById: number | null }): Promise<number> {
+  if (!user.referredById) return 0;
+  const alreadyPaid = await db.query.subscriptions.findFirst({
+    where: and(eq(subscriptions.userId, user.id), gt(subscriptions.amount, "0")),
+  });
+  if (alreadyPaid) return 0; // one-time only
+  const row = await db.query.appSettings.findFirst({ where: eq(appSettings.key, "referral_discount_percent") });
+  const pct = row ? Number(row.value) : DEFAULT_DISCOUNT;
+  return Number.isFinite(pct) ? pct : DEFAULT_DISCOUNT;
+}
 
 export const subscriptionRouter = createRouter({
   mySubscription: authedQuery.query(async ({ ctx }) => {
@@ -29,7 +42,32 @@ export const subscriptionRouter = createRouter({
       });
       if (!pkg) throw new Error("Package not found");
 
-      const amount = input.billingCycle === "yearly" ? pkg.yearlyPrice : pkg.monthlyPrice;
+      const round2 = (v: number) => Math.round(v * 100) / 100;
+      const base = Number(input.billingCycle === "yearly" ? pkg.yearlyPrice : pkg.monthlyPrice);
+
+      // Is this the user's first paid plan, or an upgrade from one they already pay for?
+      const existingPaid = await db.query.subscriptions.findFirst({
+        where: and(eq(subscriptions.userId, ctx.user.id), gt(subscriptions.amount, "0")),
+        orderBy: [desc(subscriptions.createdAt)],
+      });
+
+      let discountPct = 0;   // referral discount — first paid plan only
+      let adjustment = 0;    // credit for what they already paid on the current plan
+      let charged: number;   // what they pay right now
+      let stored: number;    // amount saved on the subscription row
+
+      if (!existingPaid) {
+        // First paid plan → apply the one-time referral discount (if eligible).
+        discountPct = await referralDiscountFor(db, ctx.user);
+        charged = round2(base * (1 - discountPct / 100));
+        stored = charged;
+      } else {
+        // Upgrade → no discount/commission; credit the old amount toward the new plan.
+        adjustment = Number(existingPaid.amount);
+        charged = Math.max(0, round2(base - adjustment));
+        stored = round2(base); // plan value, so the next upgrade credits the full paid-up amount
+      }
+      const amount = stored.toFixed(2);
       const now = new Date();
       const periodEnd = new Date(now);
       if (input.billingCycle === "yearly") {
@@ -47,17 +85,25 @@ export const subscriptionRouter = createRouter({
         status: pkg.trialDays > 0 ? "trial" : "active",
         billingCycle: input.billingCycle,
         amount,
-        currency: "USD",
+        currency: "INR",
         trialEndsAt: pkg.trialDays > 0 ? trialEnd : null,
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
         paymentGateway: input.paymentMethod,
       }).$returningId();
 
-      return db.query.subscriptions.findFirst({
+      const subscription = await db.query.subscriptions.findFirst({
         where: eq(subscriptions.id, result[0].id),
         with: { package: true },
       });
+      return {
+        subscription,
+        planPrice: base,
+        discountPercent: discountPct,
+        adjustment,
+        charged,
+        isUpgrade: !!existingPaid,
+      };
     }),
 
   cancel: authedQuery

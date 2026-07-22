@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { TEMPLATES, renderTemplate } from "@/data/templates";
 import type { TemplateColors, CardData } from "@/data/templates";
@@ -76,8 +76,8 @@ export default function AdminTemplates() {
   };
 
   return (
-    <DashboardLayout>
-      <TopBar title="Template Manager" subtitle="Manage card templates" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="Template Manager" subtitle="Manage card templates" /></div>
       <div className="p-6 space-y-6">
         {/* Toolbar */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
@@ -234,6 +234,6 @@ export default function AdminTemplates() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

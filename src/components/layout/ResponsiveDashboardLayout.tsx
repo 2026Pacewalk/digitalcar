@@ -4,10 +4,21 @@ import MobileDashboardLayout from "./MobileDashboardLayout";
 
 /* ─── Responsive Dashboard Layout
  * Desktop: Sidebar + TopBar (DashboardLayout)
- * Mobile: Bottom Nav + FAB + Sticky Header (MobileDashboardLayout)
+ * Mobile: Native app bar + Bottom Tab Bar + FAB (MobileDashboardLayout)
+ *
+ * Works for customer, reseller, and admin sections — the mobile layout adapts
+ * its navigation to the signed-in user's role.
  */
 
-export default function ResponsiveDashboardLayout({ children }: { children: ReactNode }) {
+export default function ResponsiveDashboardLayout({
+  children,
+  title,
+  subtitle,
+}: {
+  children: ReactNode;
+  title?: string;
+  subtitle?: string;
+}) {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -20,5 +31,5 @@ export default function ResponsiveDashboardLayout({ children }: { children: Reac
   if (isMobile) {
     return <MobileDashboardLayout>{children}</MobileDashboardLayout>;
   }
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return <DashboardLayout title={title} subtitle={subtitle}>{children}</DashboardLayout>;
 }

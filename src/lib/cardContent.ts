@@ -1,5 +1,6 @@
 /* Helpers to load a customer's real card content (from the extracted DB tables)
    and decode the quirks of the legacy schema. */
+import { scopedKey } from "@/hooks/useCustomer";
 
 const IMG_BASE = "https://digitalcarda.in/otdo-panel/uploads";
 
@@ -80,8 +81,8 @@ type Raw = Record<string, string>;
    for the currently-impersonated customer (slug read from localStorage). */
 export function contentSeeder<K extends keyof Awaited<ReturnType<typeof loadCustomerContent>>>(category: K) {
   return async () => {
-    let slug = "pacewalk";
-    try { slug = JSON.parse(localStorage.getItem("dc_customer") || "{}").slug || "pacewalk"; } catch { /* default */ }
+    let slug = "acme-digital";
+    try { slug = JSON.parse(localStorage.getItem(scopedKey("dc_customer")) || "{}").slug || "acme-digital"; } catch { /* default */ }
     const content = await loadCustomerContent(slug);
     return content[category] as Awaited<ReturnType<typeof loadCustomerContent>>[K];
   };

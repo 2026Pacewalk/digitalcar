@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { ShoppingBag, Plus, Pencil, Trash2, X, Save, ImageOff, Tag, MousePointerClick, ChevronDown, Check, AlertTriangle, Type, Link2, Zap } from "lucide-react";
+import { useSearchParams } from "react-router";
+import { ShoppingBag, Plus, Pencil, Trash2, X, Save, ImageOff, Tag, MousePointerClick, ChevronDown, Check, AlertTriangle, Type, Link2, Zap, Calendar, Repeat, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { Field, fieldCls, areaCls, ImagePick, LimitBar } from "@/components/customer/ModuleShell";
+import ModuleShell, { Field, fieldCls, areaCls, ImagePick, LimitBar, Tip } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, packageLimit } from "@/hooks/useCustomer";
 import { contentSeeder, cleanPlain } from "@/lib/cardContent";
 
-type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
-const blank: Omit<Product, "id"> = { name: "", filename: "", price: "", offer_price: "", description: "", button: "", button_title: "Buy Now" };
+type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string; isOffer?: boolean; valid?: string };
+const blank: Omit<Product, "id"> = { name: "", filename: "", price: "", offer_price: "", description: "", button: "", button_title: "Buy Now", isOffer: false, valid: "" };
+const fmtDate = (s?: string) => { if (!s) return ""; const d = new Date(s); return isNaN(d.getTime()) ? s : d.toLocaleDateString("en-GB").replace(/\//g, "-"); };
 
 // Common business call-to-action labels (grouped for the dropdown)
 const CTA_GROUPS: { label: string; options: string[] }[] = [
@@ -32,8 +34,35 @@ const ctaHint = (title: string) => {
 
 export default function CustomerProducts() {
   const { data } = useCustomer();
-  const limit = packageLimit(Number(data.package_id), "product");
-  const { items, add, update, remove } = useLocalList<Product>("dc_products", [], contentSeeder("products"));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isOfferTab = searchParams.get("tab") === "offers";
+  const setTab = (t: "products" | "offers") => setSearchParams({ tab: t }, { replace: true });
+  const { items: allItems, add, update, remove, persist, ready } = useLocalList<Product>("dc_products", [], contentSeeder("products"));
+  const items = allItems.filter((p) => !!p.isOffer === isOfferTab);
+  const productCount = allItems.filter((p) => !p.isOffer).length;
+  const offerCount = allItems.filter((p) => p.isOffer).length;
+  const limit = packageLimit(Number(data.package_id), isOfferTab ? "offer" : "product");
+
+  // One-time merge of any legacy stand-alone offers (dc_offers) into this list as offers.
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      if (localStorage.getItem("dc_offers::merged") === "1") return;
+      localStorage.setItem("dc_offers::merged", "1");
+      const raw = localStorage.getItem("dc_offers");
+      const old = raw ? (JSON.parse(raw) as { title?: string; description?: string; filename?: string; valid?: string }[]) : [];
+      if (Array.isArray(old) && old.length) {
+        let nextId = Math.max(0, ...allItems.map((x) => x.id));
+        const migrated: Product[] = old.map((o) => ({
+          id: ++nextId, name: cleanPlain(o.title) || "Offer", filename: o.filename || "",
+          price: "", offer_price: "", description: cleanPlain(o.description) || "",
+          button: "", button_title: "Get Offer", isOffer: true, valid: o.valid || "",
+        }));
+        persist([...allItems, ...migrated]);
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<Omit<Product, "id">>(blank);
@@ -70,30 +99,39 @@ export default function CustomerProducts() {
   const fOffer = Number(String(form.offer_price).replace(/[^\d.]/g, ""));
   const liveOff = fOffer > 0 && fPrice > 0 && fOffer < fPrice ? Math.round(((fPrice - fOffer) / fPrice) * 100) : 0;
 
-  const openAdd = () => { if (full) { toast.error("Product limit reached — upgrade your package."); return; } setForm(blank); setOrigDesc(""); setBtCustom(false); setEditId(null); setOpen(true); };
+  const openAdd = () => { if (full) { toast.error(`${isOfferTab ? "Offer" : "Product"} limit reached — upgrade your package.`); return; } setForm({ ...blank, isOffer: isOfferTab }); setOrigDesc(""); setBtCustom(false); setEditId(null); setOpen(true); };
   const openEdit = (p: Product) => { const { id, ...rest } = p; void id; setForm({ ...rest, description: cleanPlain(rest.description) }); setOrigDesc(rest.description); setBtCustom(!!rest.button_title && !CTA_OPTIONS.includes(rest.button_title)); setEditId(p.id); setOpen(true); };
   const save = () => {
-    if (!form.name.trim()) { toast.error("Product name is required"); return; }
+    if (!form.name.trim()) { toast.error(`${form.isOffer ? "Offer" : "Product"} name is required`); return; }
     // Keep the original HTML (clickable link on the card) when the description wasn't edited
     const description = form.description === cleanPlain(origDesc) ? origDesc : form.description;
     const payload = { ...form, description };
-    if (editId !== null) { update(editId, payload); toast.success("Product updated"); }
-    else { add(payload); toast.success("Product added"); }
+    const label = form.isOffer ? "Offer" : "Product";
+    if (editId !== null) { update(editId, payload); toast.success(`${label} updated`); }
+    else { add(payload); toast.success(`${label} added`); }
     setOpen(false);
   };
-  const set = (k: keyof Omit<Product, "id">, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof Omit<Product, "id">, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
-    <ModuleShell title="Products & Services" subtitle="Showcase what you sell on your card" icon={ShoppingBag}
-      actions={<button onClick={openAdd} disabled={full} className={`flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${full ? "bg-[#F1F5F9] text-[#94A3B8] cursor-not-allowed" : "gradient-gold text-[#0F172A] hover:shadow-gold"}`}><Plus size={16} /> Add Product</button>}>
-      <LimitBar used={items.length} limit={limit} unit="products" />
+    <ModuleShell title={isOfferTab ? "Offers / Deals" : "Products / Services"} subtitle={isOfferTab ? "Promote limited-time offers on your card" : "Showcase what you sell on your card"} icon={isOfferTab ? Tag : ShoppingBag}
+      actions={<button onClick={openAdd} disabled={full} className={`flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${full ? "bg-[#F1F5F9] text-[#94A3B8] cursor-not-allowed" : "gradient-gold text-[#0F172A] hover:shadow-gold"}`}><Plus size={16} /> {isOfferTab ? "Add Offer" : "Add Product"}</button>}>
+
+      {/* Tab switcher */}
+      <div className="flex rounded-xl bg-[#F1F5F9] p-1 text-[13px] font-semibold">
+        <button onClick={() => setTab("products")} className={`flex-1 h-9 rounded-lg transition-colors ${!isOfferTab ? "bg-white text-[#0F172A] shadow-sm" : "text-[#64748B]"}`}>Products / Services{productCount ? ` (${productCount})` : ""}</button>
+        <button onClick={() => setTab("offers")} className={`flex-1 h-9 rounded-lg transition-colors ${isOfferTab ? "bg-white text-[#0F172A] shadow-sm" : "text-[#64748B]"}`}>Offers / Deals{offerCount ? ` (${offerCount})` : ""}</button>
+      </div>
+
+      <LimitBar used={items.length} limit={limit} unit={isOfferTab ? "offers" : "products"} />
+      <Tip>{isOfferTab ? "Give every offer a deadline — a little urgency turns browsers into buyers. Convert any product into an offer with the ↻ button." : "Lead with your best-sellers and use sharp, square photos with a clear price and a \"Buy Now\" button — visitors decide in seconds."}</Tip>
 
       {items.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3"><ShoppingBag size={24} className="text-[#94A3B8]" /></div>
-          <p className="text-sm font-medium text-[#0F172A]">No products yet</p>
-          <p className="text-xs text-[#94A3B8] mt-1 mb-4">Add products to display them on your digital card.</p>
-          <button onClick={openAdd} className="inline-flex items-center gap-2 h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold"><Plus size={16} /> Add your first product</button>
+          <div className="w-14 h-14 rounded-2xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3">{isOfferTab ? <Tag size={24} className="text-[#94A3B8]" /> : <ShoppingBag size={24} className="text-[#94A3B8]" />}</div>
+          <p className="text-sm font-medium text-[#0F172A]">No {isOfferTab ? "offers" : "products"} yet</p>
+          <p className="text-xs text-[#94A3B8] mt-1 mb-4">Add {isOfferTab ? "offers to promote deals" : "products to display them"} on your digital card.</p>
+          <button onClick={openAdd} className="inline-flex items-center gap-2 h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold"><Plus size={16} /> Add your first {isOfferTab ? "offer" : "product"}</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -111,15 +149,19 @@ export default function CustomerProducts() {
                     ? <img src={p.filename} alt={p.name} referrerPolicy="no-referrer" className="w-full h-full object-contain p-2 transition-transform duration-500 group-hover:scale-105" />
                     : <div className="w-full h-full flex items-center justify-center"><ImageOff size={28} className="text-[#CBD5E1]" /></div>}
 
-                  {/* Discount badge */}
-                  {hasDiscount && (
-                    <span className="absolute top-2 left-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-[#EF4444] to-[#F97316] text-white text-[9px] font-bold shadow-sm leading-none">
-                      <Tag size={8} /> {pct}% OFF
-                    </span>
-                  )}
+                  {/* Badges */}
+                  <div className="absolute top-2 left-2 flex flex-col gap-1">
+                    {p.isOffer && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-[#F7B31C] to-[#D97706] text-white text-[9px] font-bold shadow-sm leading-none"><Sparkles size={8} /> OFFER</span>
+                    )}
+                    {hasDiscount && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-[#EF4444] to-[#F97316] text-white text-[9px] font-bold shadow-sm leading-none"><Tag size={8} /> {pct}% OFF</span>
+                    )}
+                  </div>
 
                   {/* Hover actions (always visible on mobile) */}
                   <div className="absolute top-3 right-3 flex gap-1.5 opacity-100 sm:opacity-0 sm:translate-y-1 sm:group-hover:opacity-100 sm:group-hover:translate-y-0 transition-all duration-200">
+                    <button onClick={() => { update(p.id, { isOffer: !p.isOffer }); toast.success(p.isOffer ? "Moved to Products / Services" : "Converted to Offer / Deal"); }} className="w-8 h-8 rounded-lg bg-white/95 backdrop-blur shadow-md text-[#334155] hover:text-[#F7B31C] flex items-center justify-center" aria-label={p.isOffer ? "Move to products" : "Convert to offer"} title={p.isOffer ? "Move to Products / Services" : "Convert to Offer / Deal"}><Repeat size={14} /></button>
                     <button onClick={() => openEdit(p)} className="w-8 h-8 rounded-lg bg-white/95 backdrop-blur shadow-md text-[#334155] hover:text-[#F7B31C] flex items-center justify-center" aria-label="Edit"><Pencil size={14} /></button>
                     <button onClick={() => setConfirm(p.id)} className="w-8 h-8 rounded-lg bg-white/95 backdrop-blur shadow-md text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center" aria-label="Delete"><Trash2 size={14} /></button>
                   </div>
@@ -129,6 +171,7 @@ export default function CustomerProducts() {
                 <div className="p-4 flex flex-col flex-1">
                   <h3 className="text-sm font-bold text-[#0F172A] line-clamp-1">{p.name}</h3>
                   {desc && <p className="text-xs text-[#64748B] mt-1 line-clamp-2 leading-relaxed break-words">{desc}</p>}
+                  {p.isOffer && p.valid && <p className="text-[10px] text-[#B45309] font-semibold mt-1.5 inline-flex items-center gap-1"><Calendar size={10} /> Valid till {fmtDate(p.valid)}</p>}
 
                   {/* Price */}
                   <div className="mt-3 pt-3 border-t border-[#F1F5F9] flex items-end justify-between gap-2">
@@ -196,8 +239,8 @@ export default function CustomerProducts() {
                 {editId !== null ? <Pencil size={18} className="text-[#0F172A]" /> : <Plus size={18} className="text-[#0F172A]" />}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-[#0F172A]">{editId !== null ? "Edit Product" : "Add Product"}</h3>
-                <p className="text-xs text-[#64748B]">Showcase a product or service on your card</p>
+                <h3 className="text-base font-bold text-[#0F172A]">{editId !== null ? "Edit" : "Add"} {form.isOffer ? "Offer / Deal" : "Product / Service"}</h3>
+                <p className="text-xs text-[#64748B]">{form.isOffer ? "Promote a limited-time offer on your card" : "Showcase a product or service on your card"}</p>
               </div>
               <button onClick={() => setOpen(false)} className="w-9 h-9 rounded-lg hover:bg-[#F1F5F9] text-[#64748B] flex items-center justify-center shrink-0"><X size={18} /></button>
             </div>
@@ -229,6 +272,19 @@ export default function CustomerProducts() {
                 <textarea value={form.description} onChange={(e) => set("description", e.target.value.slice(0, DESC_MAX))} className={areaCls} placeholder="Briefly describe this product or service…" />
                 <div className="flex justify-end mt-1"><span className={`text-[10px] ${form.description.length >= DESC_MAX ? "text-amber-600 font-semibold" : "text-[#94A3B8]"}`}>{form.description.length}/{DESC_MAX}</span></div>
               </Field>
+
+              {/* Convert to offer toggle */}
+              <div className={`rounded-xl border px-3.5 py-3 transition-colors ${form.isOffer ? "border-[#F7B31C] bg-[#FEF3C7]/40" : "border-[#E2E8F0] bg-[#F8FAFC]"}`}>
+                <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
+                  <span className="text-xs font-semibold text-[#334155] flex items-center gap-2"><Sparkles size={15} className="text-[#F7B31C]" /> Mark as Offer / Deal <span className="font-normal text-[#94A3B8]">(shows in the Offers tab)</span></span>
+                  <input type="checkbox" checked={!!form.isOffer} onChange={(e) => set("isOffer", e.target.checked)} className="w-4 h-4 accent-[#F7B31C]" />
+                </label>
+                {form.isOffer && (
+                  <div className="mt-3">
+                    <Field label="Valid Until"><div className="relative"><Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input type="date" value={form.valid || ""} onChange={(e) => set("valid", e.target.value)} className={`${fieldCls} pl-9`} /></div></Field>
+                  </div>
+                )}
+              </div>
 
               {/* Price (MRP) + Offer Price */}
               <div className="grid grid-cols-2 gap-3">

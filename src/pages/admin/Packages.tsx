@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { useState } from "react";
@@ -350,8 +350,8 @@ export default function AdminPackages() {
   const [showForm, setShowForm] = useState(false);
 
   return (
-    <DashboardLayout>
-      <TopBar title="Packages" subtitle="Manage subscription plans & features" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="Packages" subtitle="Manage subscription plans & features" /></div>
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -404,7 +404,7 @@ export default function AdminPackages() {
                     </div>
                   </div>
                   <div className="mb-4">
-                    <span className="text-2xl font-bold text-[#0F172A]">${pkg.monthlyPrice as string || "0"}</span>
+                    <span className="text-2xl font-bold text-[#0F172A]">₹{Number(pkg.monthlyPrice || 0).toLocaleString("en-IN")}</span>
                     <span className="text-sm text-[#94A3B8]">/month</span>
                   </div>
                   <div className="space-y-2 mb-6">
@@ -438,6 +438,6 @@ export default function AdminPackages() {
         {/* ── Package Feature List ── */}
         <PackageFeatureList />
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

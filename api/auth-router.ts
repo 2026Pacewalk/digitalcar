@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, resellerProfiles } from "@db/schema";
+import { users, resellerProfiles, referrals } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { createToken } from "./lib/jwt";
 
@@ -17,6 +17,7 @@ export const authRouter = createRouter({
         phone: z.string().optional(),
         role: z.enum(["reseller", "customer"]).default("customer"),
         companyName: z.string().optional(),
+        referralCode: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -64,6 +65,26 @@ export const authRouter = createRouter({
           companyName: input.companyName,
           commissionRate: "10.00",
         });
+      }
+
+      // Apply referral (Refer & Earn) — both the referrer and this new user get a discount
+      if (input.referralCode) {
+        try {
+          const referrer = await db.query.users.findFirst({
+            where: eq(users.referralCode, input.referralCode.toUpperCase()),
+          });
+          if (referrer && referrer.id !== insertedUser.id) {
+            await db.update(users).set({ referredById: referrer.id }).where(eq(users.id, insertedUser.id));
+            // Reward is credited later by an admin once this user buys a paid plan.
+            await db.insert(referrals).values({
+              referrerId: referrer.id,
+              refereeId: insertedUser.id,
+              refereeEmail: insertedUser.email,
+              code: input.referralCode.toUpperCase(),
+              status: "joined",
+            });
+          }
+        } catch { /* referral linking is best-effort */ }
       }
 
       const token = await createToken({

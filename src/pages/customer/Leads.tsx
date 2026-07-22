@@ -122,7 +122,7 @@ export default function CustomerLeads() {
 
   return (
     <ResponsiveDashboardLayout>
-      <TopBar title="Leads" subtitle="Manage your captured leads" />
+      <div className="hidden md:block"><TopBar title="Leads" subtitle="Manage your captured leads" /></div>
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Search + Filter */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

@@ -6,11 +6,12 @@ import Signup from "./pages/Signup";
 import Home from "./pages/public/Home";
 import Features from "./pages/public/Features";
 import Templates from "./pages/public/Templates";
-import SampleCards from "./pages/public/SampleCards";
 import Industries from "./pages/public/Industries";
 import Pricing from "./pages/public/Pricing";
+import BulkCards from "./pages/public/BulkCards";
 import AIGenerator from "./pages/public/AIGenerator";
 import Resellers from "./pages/public/Resellers";
+import ReferEarnPublic from "./pages/public/ReferEarn";
 import CustomDomain from "./pages/public/CustomDomain";
 import Contact from "./pages/public/Contact";
 import Privacy from "./pages/public/Privacy";
@@ -26,6 +27,7 @@ import AdminMigration from "./pages/admin/Migration";
 import AdminCards from "./pages/admin/Cards";
 import AdminAnalytics from "./pages/admin/Analytics";
 import AdminLeads from "./pages/admin/Leads";
+import AdminReferrals from "./pages/admin/Referrals";
 import AdminSettings from "./pages/admin/Settings";
 import AdminProfile from "./pages/admin/Profile";
 import ResellerDashboard from "./pages/reseller/Dashboard";
@@ -35,6 +37,7 @@ import CustomerDashboard from "./pages/customer/Dashboard";
 import CardBuilder from "./pages/customer/CardBuilder";
 import CustomerTemplates from "./pages/customer/Templates";
 import CustomerCards from "./pages/customer/Cards";
+import CustomerBulkCreate from "./pages/customer/BulkCreate";
 import CustomerAnalytics from "./pages/customer/Analytics";
 import CustomerLeads from "./pages/customer/Leads";
 import CustomerSubscription from "./pages/customer/Subscription";
@@ -51,9 +54,8 @@ import CustomerSocial from "./pages/customer/Social";
 import CustomerUploads from "./pages/customer/Uploads";
 import CustomerEnquiry from "./pages/customer/Enquiry";
 import CustomerViewCard from "./pages/customer/ViewCard";
-import CustomerQRCode from "./pages/customer/QRCode";
-import CustomerOffers from "./pages/customer/Offers";
 import CustomerReviews from "./pages/customer/Reviews";
+import CustomerReferEarn from "./pages/customer/ReferEarn";
 import PublicCard from "./pages/PublicCard";
 import NotFound from "./pages/NotFound";
 import { Toaster } from "@/components/ui/sonner";
@@ -86,11 +88,12 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/features" element={<Features />} />
           <Route path="/templates" element={<Templates />} />
-          <Route path="/sample-cards" element={<SampleCards />} />
           <Route path="/industries" element={<Industries />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/bulk-cards" element={<BulkCards />} />
           <Route path="/ai-card-generator" element={<AIGenerator />} />
           <Route path="/resellers" element={<Resellers />} />
+          <Route path="/refer-earn" element={<ReferEarnPublic />} />
           <Route path="/custom-domain" element={<CustomDomain />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/privacy" element={<Privacy />} />
@@ -116,6 +119,7 @@ export default function App() {
         <Route path="/admin/cards" element={<RoleRoute allowedRoles={["super_admin"]}><AdminCards /></RoleRoute>} />
         <Route path="/admin/analytics" element={<RoleRoute allowedRoles={["super_admin"]}><AdminAnalytics /></RoleRoute>} />
         <Route path="/admin/leads" element={<RoleRoute allowedRoles={["super_admin"]}><AdminLeads /></RoleRoute>} />
+        <Route path="/admin/referrals" element={<RoleRoute allowedRoles={["super_admin"]}><AdminReferrals /></RoleRoute>} />
         <Route path="/admin/settings" element={<RoleRoute allowedRoles={["super_admin"]}><AdminSettings /></RoleRoute>} />
         <Route path="/admin/profile" element={<RoleRoute allowedRoles={["super_admin"]}><AdminProfile /></RoleRoute>} />
 
@@ -130,6 +134,8 @@ export default function App() {
         <Route path="/dashboard/builder/:cardId" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardBuilder /></RoleRoute>} />
         <Route path="/dashboard/templates" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerTemplates /></RoleRoute>} />
         <Route path="/dashboard/cards" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerCards /></RoleRoute>} />
+        <Route path="/dashboard/bulk" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerBulkCreate /></RoleRoute>} />
+        <Route path="/dashboard/refer" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerReferEarn /></RoleRoute>} />
         <Route path="/dashboard/analytics" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerAnalytics /></RoleRoute>} />
         <Route path="/dashboard/leads" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerLeads /></RoleRoute>} />
         <Route path="/dashboard/subscription" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSubscription /></RoleRoute>} />
@@ -146,8 +152,10 @@ export default function App() {
         <Route path="/dashboard/uploads" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerUploads /></RoleRoute>} />
         <Route path="/dashboard/enquiry" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerEnquiry /></RoleRoute>} />
         <Route path="/dashboard/view" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerViewCard /></RoleRoute>} />
-        <Route path="/dashboard/qrcode" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerQRCode /></RoleRoute>} />
-        <Route path="/dashboard/offers" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerOffers /></RoleRoute>} />
+        {/* QR code is now part of the Payments module */}
+        <Route path="/dashboard/qrcode" element={<Navigate to="/dashboard/payments" replace />} />
+        {/* Offers / Deals is now the offers tab of the Products module */}
+        <Route path="/dashboard/offers" element={<Navigate to="/dashboard/products?tab=offers" replace />} />
         <Route path="/dashboard/reviews" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerReviews /></RoleRoute>} />
 
         <Route path="*" element={<NotFound />} />

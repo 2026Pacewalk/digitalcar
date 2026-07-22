@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Settings as SettingsIcon, Save, Search, Palette, ToggleRight, KeyRound, Package as PackageIcon, ReceiptText, Check, Info, Calendar, IndianRupee, Eye, Pencil } from "lucide-react";
+import { Settings as SettingsIcon, Save, KeyRound, Package as PackageIcon, ReceiptText, Check, Info, Calendar, IndianRupee, Eye, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/customer/ModuleShell";
-import { useCustomer } from "@/hooks/useCustomer";
+import { useCustomer, scopedKey } from "@/hooks/useCustomer";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
 
 /* Card sections — labels match the legacy user-module.php */
@@ -27,9 +27,19 @@ const PKG: Record<number, { name: string; amount: number; days: number }> = {
   6: { name: "Standard", amount: 2499, days: 1095 },
 };
 
+const TAB_IDS = ["module", "theme", "seo", "package", "invoice", "password"] as const;
+type TabId = (typeof TAB_IDS)[number];
+
 export default function CustomerSettings() {
   const { data, update } = useCustomer();
-  const [tab, setTab] = useState<"module" | "theme" | "seo" | "package" | "invoice" | "password">("module");
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab") as TabId | null;
+  const [tab, setTab] = useState<TabId>(urlTab && TAB_IDS.includes(urlTab) ? urlTab : "module");
+
+  // Sync the active tab when navigating via the sidebar (?tab=...)
+  useEffect(() => {
+    if (urlTab && TAB_IDS.includes(urlTab)) setTab(urlTab);
+  }, [urlTab]);
   const [form, setForm] = useState<Record<string, string>>({});
   const [pwd, setPwd] = useState("");
   const [pwd2, setPwd2] = useState("");
@@ -48,7 +58,7 @@ export default function CustomerSettings() {
   // Seed the customer's real SEO data (separate `seo` table, keyed by user id) if not present yet.
   useEffect(() => {
     let stored: Record<string, unknown> = {};
-    try { stored = JSON.parse(localStorage.getItem("dc_customer") || "{}"); } catch { /* default */ }
+    try { stored = JSON.parse(localStorage.getItem(scopedKey("dc_customer")) || "{}"); } catch { /* default */ }
     if (stored.seo_title !== undefined && stored.seo_title !== null) return;
     if (data.seo_title !== undefined) return;
     const id = Number(stored.id ?? data.id);
@@ -86,34 +96,17 @@ export default function CustomerSettings() {
   })();
   const active = daysLeft > 0;
 
-  const TABS = [
-    { id: "module" as const, label: "Module", icon: ToggleRight },
-    { id: "theme" as const, label: "Select Theme", icon: Palette },
-    { id: "seo" as const, label: "SEO", icon: Search },
-    { id: "package" as const, label: "Package", icon: PackageIcon },
-    { id: "invoice" as const, label: "Invoice", icon: ReceiptText },
-    { id: "password" as const, label: "Password", icon: KeyRound },
-  ];
   const showTopSave = tab === "module" || tab === "theme" || tab === "seo";
 
   return (
     <ModuleShell title="Settings" subtitle="Modules, theme, SEO, package & account" icon={SettingsIcon}
       actions={showTopSave ? <button onClick={() => save()} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save</button> : undefined}>
-      {/* Tabs */}
-      <div className="flex gap-1.5 flex-wrap">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`inline-flex items-center gap-1.5 px-3.5 h-10 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? "bg-[#0F172A] text-white" : "bg-white border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"}`}>
-            <t.icon size={15} /> {t.label}
-          </button>
-        ))}
-      </div>
-
       {/* ── MODULE ── */}
       {tab === "module" && (
         <Panel title="Module Settings" subtitle="Add or remove sections shown on your digital card">
           <div className="flex items-start gap-3 rounded-xl bg-[#FEF3C7]/60 border border-[#FDE68A] px-4 py-3 mb-4">
             <Info size={16} className="text-[#B45309] mt-0.5 shrink-0" />
-            <p className="text-xs text-[#92400E] leading-relaxed"><b>Dear Customer,</b> tick a module to show it on your digital card, untick to hide it. You can also rename each section's title.</p>
+            <p className="text-xs text-[#92400E] leading-relaxed">Switch a section on to feature it on your card, or off to hide it — and rename any title to match your brand. Every change goes live on your card instantly.</p>
           </div>
           <div className="divide-y divide-[#F1F5F9]">
             {MODULES.map((m) => (
@@ -209,7 +202,7 @@ export default function CustomerSettings() {
         <Panel title="My Invoices" subtitle="Payment receipts for your card">
           <div className="flex items-start gap-3 rounded-xl bg-[#FEF3C7]/60 border border-[#FDE68A] px-4 py-3 mb-4">
             <Info size={16} className="text-[#B45309] mt-0.5 shrink-0" />
-            <p className="text-xs text-[#92400E] leading-relaxed"><b>Dear Customer,</b> you can view and download your Digital Business Card invoice only if you have paid through our website payment gateway.</p>
+            <p className="text-xs text-[#92400E] leading-relaxed">GST invoices are generated automatically for payments made through our secure gateway. Once you upgrade, your invoice will be available here to view and download anytime.</p>
           </div>
           <div className="bg-white rounded-2xl border border-[#F1F5F9] p-12 text-center">
             <div className="w-14 h-14 rounded-2xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3"><ReceiptText size={24} className="text-[#94A3B8]" /></div>

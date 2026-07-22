@@ -6,6 +6,7 @@ import ModuleShell from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList } from "@/hooks/useCustomer";
 import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
+import { trpc } from "@/providers/trpc";
 
 type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
 type Gallery = { id: number; name: string; filename: string };
@@ -21,6 +22,7 @@ export default function CustomerViewCard() {
   const videos = useLocalList<Vid>("dc_videos", [], contentSeeder("videos"));
   const offers = useLocalList<Offer>("dc_offers", [], contentSeeder("offers"));
   const qrcodes = useLocalList<Qr>("dc_qrcode", [], contentSeeder("qrcodes"));
+  const { data: program } = trpc.referral.myProgram.useQuery();
   const [copied, setCopied] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -32,13 +34,13 @@ export default function CustomerViewCard() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  const slug = String(data.slug || "pacewalk");
+  const slug = String(data.slug || "acme-digital");
   const url = `https://digitalcarda.in/${slug}`;
 
   const html = useMemo(
-    () => buildCardHtml(data, products.items, gallery.items, videos.items, offers.items, qrcodes.items),
+    () => buildCardHtml({ ...data, referral_code: program?.code || "" }, products.items, gallery.items, videos.items, offers.items, qrcodes.items),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, products.items, gallery.items, videos.items, offers.items, qrcodes.items, nonce]
+    [data, program?.code, products.items, gallery.items, videos.items, offers.items, qrcodes.items, nonce]
   );
 
   const copy = async () => {

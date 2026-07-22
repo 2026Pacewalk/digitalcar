@@ -27,7 +27,7 @@ export default function CustomerAnalytics() {
 
   return (
     <ResponsiveDashboardLayout>
-      <TopBar title="Analytics" subtitle="Track your card performance" />
+      <div className="hidden md:block"><TopBar title="Analytics" subtitle="Track your card performance" /></div>
       <div className="p-6 space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,8 +1,8 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { useNavigate } from "react-router";
-import { Plus, CreditCard, ExternalLink, BarChart3, Pencil, Trash2, Eye, MousePointer } from "lucide-react";
+import { Plus, CreditCard, ExternalLink, Pencil, Trash2, Eye, MousePointer, Layers } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CustomerCards() {
@@ -15,20 +15,28 @@ export default function CustomerCards() {
   const cards = cardsData?.cards || [];
 
   return (
-    <DashboardLayout>
-      <TopBar title="My Cards" subtitle="Manage your digital cards" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="My Cards" subtitle="Manage your digital cards" /></div>
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-[#0F172A]">Your Cards</h2>
             <p className="text-xs text-[#64748B] mt-0.5">{cards.length} card{cards.length !== 1 ? "s" : ""} created</p>
           </div>
-          <button
-            onClick={() => navigate("/dashboard/builder")}
-            className="flex items-center gap-2 h-11 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"
-          >
-            <Plus size={16} /> Create Card
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => navigate("/dashboard/bulk")}
+              className="flex items-center gap-2 h-11 px-5 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] hover:text-[#F7B31C] transition-all active:scale-[0.98]"
+            >
+              <Layers size={16} /> Bulk Create
+            </button>
+            <button
+              onClick={() => navigate("/dashboard/builder")}
+              className="flex items-center gap-2 h-11 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"
+            >
+              <Plus size={16} /> Create Card
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -84,6 +92,6 @@ export default function CustomerCards() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

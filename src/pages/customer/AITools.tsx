@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useState } from "react";
 import { Sparkles, Wand2, FileText, Image, MessageSquare, Send, Copy, Check, Loader2 } from "lucide-react";
@@ -44,8 +44,8 @@ export default function AITools() {
   };
 
   return (
-    <DashboardLayout>
-      <TopBar title="AI Tools" subtitle="Generate content with AI" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="AI Tools" subtitle="Generate content with AI" /></div>
       <div className="p-6 space-y-6">
         {/* Tool Selection */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -111,6 +111,6 @@ export default function AITools() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

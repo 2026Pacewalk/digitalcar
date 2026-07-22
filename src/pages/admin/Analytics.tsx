@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import { TrendingUp, Eye, MousePointer, Users, CreditCard, ArrowUpRight } from "lucide-react";
@@ -32,8 +32,8 @@ const stats = [
 
 export default function AdminAnalytics() {
   return (
-    <DashboardLayout>
-      <TopBar title="Analytics" subtitle="Platform-wide performance metrics" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="Analytics" subtitle="Platform-wide performance metrics" /></div>
       <div className="p-6 space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -127,6 +127,6 @@ export default function AdminAnalytics() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

@@ -114,7 +114,7 @@ export default function CustomerEnquiry() {
       {/* Intro banner */}
       <div className="flex items-start gap-3 rounded-2xl bg-[#FEF3C7]/60 border border-[#FDE68A] px-4 py-3">
         <Info size={16} className="text-[#B45309] mt-0.5 shrink-0" />
-        <p className="text-xs sm:text-sm text-[#92400E]"><span className="font-semibold">Dear Customer,</span> enquiries from your customers appear here automatically. New leads are tagged so you can follow up fast.</p>
+        <p className="text-xs sm:text-sm text-[#92400E]">Every enquiry from your digital card arrives here in real time, with new leads flagged. Reply quickly — prospects contacted within the first hour convert far more often.</p>
       </div>
 
       {/* Lead cards */}

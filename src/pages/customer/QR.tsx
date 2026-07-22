@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { useState, useRef } from "react";
@@ -52,8 +52,8 @@ export default function CustomerQR() {
   const qrSize = 25 * cellSize;
 
   return (
-    <DashboardLayout>
-      <TopBar title="QR Codes" subtitle="Generate and download QR codes" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="QR Codes" subtitle="Generate and download QR codes" /></div>
       <div className="p-6 space-y-6">
         {!primaryCard ? (
           <div className="bg-white rounded-2xl p-12 shadow-premium border border-[#F1F5F9] text-center">
@@ -152,6 +152,6 @@ export default function CustomerQR() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

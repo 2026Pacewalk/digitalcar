@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { TEMPLATES, renderTemplate } from "@/data/templates";
 import type { TemplateColors, CardData } from "@/data/templates";
@@ -163,8 +163,8 @@ export default function CustomerTemplates() {
   };
 
   return (
-    <DashboardLayout>
-      <TopBar title="Select Theme" subtitle="Choose a template design for your digital card" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="Select Theme" subtitle="Choose a template design for your digital card" /></div>
 
       <div className="p-6 space-y-6">
         {/* Top Bar — Search + Category + Save */}
@@ -198,7 +198,7 @@ export default function CustomerTemplates() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar — Color Picker + Current Selection */}
           <div className="lg:col-span-1 space-y-4">
-            <ColorPicker colors={colors} onChange={setColors} />
+            <ColorPicker colors={colors} onChange={(c) => setColors((prev) => ({ ...prev, ...c }))} />
 
             {/* Current Selection Card */}
             <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-4">
@@ -277,6 +277,6 @@ export default function CustomerTemplates() {
         onClose={() => setIsPreviewOpen(false)}
         onSelect={handleSelect}
       />
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

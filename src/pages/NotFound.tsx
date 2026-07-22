@@ -8,7 +8,7 @@ const QUICK_LINKS = [
   { label: "Features", to: "/features" },
   { label: "Templates", to: "/templates" },
   { label: "Pricing", to: "/pricing" },
-  { label: "Sample Cards", to: "/sample-cards" },
+  { label: "Refer & Earn", to: "/refer-earn" },
   { label: "Contact", to: "/contact" },
 ];
 
@@ -81,8 +81,8 @@ export default function NotFound() {
           <Link to="/" className="btn-gold h-12 px-7 inline-flex items-center justify-center gap-2 text-base">
             <Home size={18} /> Back to Home
           </Link>
-          <Link to="/sample-cards" className="h-12 px-7 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">
-            <Compass size={18} /> Explore Sample Cards
+          <Link to="/templates" className="h-12 px-7 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">
+            <Compass size={18} /> Explore Templates
           </Link>
         </div>
 

@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import { useState } from "react";
 import {
   Search, Plus, Pencil, Trash2, Eye, ChevronLeft, ChevronRight,
@@ -71,7 +71,7 @@ export default function AdminResellers() {
   };
 
   return (
-    <DashboardLayout title="Resellers" subtitle="Manage reseller partners">
+    <ResponsiveDashboardLayout title="Resellers" subtitle="Manage reseller partners">
       <div className="p-6 space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -114,7 +114,7 @@ export default function AdminResellers() {
               </tr></thead>
               <tbody className="divide-y divide-[#F1F5F9]">
                 {paginated.length === 0 ? (
-                  <tr><td colSpan={8} className="px-6 py-12 text-center text-sm text-[#94A3B8]">No resellers found</td></tr>
+                  <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-[#94A3B8]">No resellers found</td></tr>
                 ) : (
                   paginated.map((r) => (
                     <tr key={r.id} className="hover:bg-[#F8FAFC] transition-colors">
@@ -140,7 +140,7 @@ export default function AdminResellers() {
             </table>
           </div>
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#F1F5F9]">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[#F1F5F9]">
               <p className="text-xs text-[#94A3B8]">Page {page} of {totalPages} ({filtered.length} total)</p>
               <div className="flex gap-2">
                 <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="p-2 rounded-lg border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-30"><ChevronLeft size={14} /></button>
@@ -214,6 +214,6 @@ export default function AdminResellers() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

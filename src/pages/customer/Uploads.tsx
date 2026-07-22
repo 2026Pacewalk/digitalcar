@@ -1,6 +1,6 @@
 import { Upload, Trash2, FileText, Download, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { LimitBar } from "@/components/customer/ModuleShell";
+import ModuleShell, { LimitBar, Tip } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
 import { contentSeeder } from "@/lib/cardContent";
 
@@ -27,6 +27,7 @@ export default function CustomerUploads() {
   return (
     <ModuleShell title="Uploads" subtitle="Attach brochures, catalogues, PDFs & images" icon={Upload}>
       <LimitBar used={items.length} limit={limit} unit="uploads" />
+      <Tip>Upload your brochure, catalogue or price list as a PDF — customers can view and download it in one tap, even offline.</Tip>
       <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5">
         <label className="block rounded-2xl border-2 border-dashed border-[#E2E8F0] hover:border-[#F7B31C] bg-[#F8FAFC] py-10 text-center cursor-pointer transition-colors">
           <UploadCloud size={30} className="mx-auto text-[#94A3B8] mb-2" />

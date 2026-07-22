@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
-import { useAuth } from "@/hooks/useAuth";
+import { trpc } from "@/providers/trpc";
 import { toast } from "sonner";
 import {
   Mail, Lock, Eye, EyeOff, LogIn, User, Shield, Briefcase,
@@ -25,47 +25,44 @@ const iconCls = "absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const loginMut = trpc.auth.login.useMutation();
   const [tab, setTab] = useState<"customer" | "reseller" | "admin">("customer");
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const routeFor = (mail: string) => {
-    const m = mail.toLowerCase().trim();
-    if (m === "admin@digitalcarda.com") return "/admin";
-    if (m === "reseller@digitalcarda.com") return "/reseller";
+  const routeFor = (role: string) => {
+    if (role === "super_admin") return "/admin";
+    if (role === "reseller") return "/reseller";
     return "/dashboard";
+  };
+
+  // Real backend login: stores a genuine JWT the server accepts.
+  const doLogin = async (mail: string, pass: string) => {
+    setLoading(true);
+    try {
+      const res = await loginMut.mutateAsync({ email: mail.trim(), password: pass });
+      localStorage.setItem("auth_token", res.token);
+      localStorage.setItem("digitalcarda_user", JSON.stringify(res.user));
+      toast.success("Welcome back!");
+      navigate(routeFor(res.user.role));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Invalid email or password");
+      setLoading(false);
+    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { toast.error("Please fill in all fields"); return; }
-    setLoading(true);
-    setTimeout(() => {
-      if (login(email, password)) {
-        toast.success("Welcome back!");
-        navigate(routeFor(email));
-      } else {
-        toast.error("Invalid email or password");
-        setLoading(false);
-      }
-    }, 500);
+    doLogin(email, password);
   };
 
   const handleQuickLogin = (demoEmail: string, demoPassword: string) => {
     setEmail(demoEmail);
     setPassword(demoPassword);
-    setLoading(true);
-    setTimeout(() => {
-      if (login(demoEmail, demoPassword)) {
-        toast.success("Welcome back!");
-        navigate(routeFor(demoEmail));
-      } else {
-        setLoading(false);
-      }
-    }, 300);
+    doLogin(demoEmail, demoPassword);
   };
 
   const tabs = [

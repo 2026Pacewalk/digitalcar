@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import { useState } from "react";
 import {
   Search, Plus, Pencil, Trash2, Shield, UserCheck, X, Check,
@@ -20,8 +20,8 @@ export default function AdminUsers() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [viewUser, setViewUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<UserData | null>(null);
+  const [viewUser, setViewUser] = useState<UserData | null>(null);
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", role: "customer", status: "active", password: "" });
   const limit = 8;
 
@@ -36,7 +36,7 @@ export default function AdminUsers() {
   const paginated = filtered.slice((page - 1) * limit, page * limit);
 
   const openAdd = () => { setEditingUser(null); setForm({ fullName: "", email: "", phone: "", role: "customer", status: "active", password: "" }); setShowForm(true); };
-  const openEdit = (u: User) => { setEditingUser(u); setForm({ fullName: u.fullName, email: u.email, phone: u.phone, role: u.role, status: u.status, password: "" }); setShowForm(true); };
+  const openEdit = (u: UserData) => { setEditingUser(u); setForm({ fullName: u.fullName, email: u.email, phone: u.phone, role: u.role, status: u.status, password: "" }); setShowForm(true); };
 
   const handleSave = () => {
     if (!form.fullName || !form.email) { toast.error("Name and email are required"); return; }
@@ -44,7 +44,7 @@ export default function AdminUsers() {
       setUsers(users.map((u) => u.id === editingUser.id ? { ...u, ...form } : u));
       toast.success("User updated");
     } else {
-      const newUser: User = { id: Date.now(), ...form, createdAt: new Date().toISOString().split("T")[0], lastLogin: "Never", cards: 0, plan: "Starter" };
+      const newUser: UserData = { id: Date.now(), ...form, createdAt: new Date().toISOString().split("T")[0], lastLogin: "Never", cards: 0, plan: "Starter" };
       setUsers([newUser, ...users]);
       toast.success("User created");
     }
@@ -69,20 +69,20 @@ export default function AdminUsers() {
   };
 
   return (
-    <DashboardLayout title="User Management" subtitle="Manage all platform users">
-      <div className="p-6 space-y-6">
+    <ResponsiveDashboardLayout title="User Management" subtitle="Manage all platform users">
+      <div className="p-4 sm:p-6 space-y-4 max-w-6xl mx-auto">
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: "Total Users", value: users.length, icon: Users, color: "bg-[#FEF3C7] text-[#92400E]" },
             { label: "Admins", value: users.filter((u) => u.role === "super_admin").length, icon: Shield, color: "bg-[#FEF3C7] text-[#92400E]" },
             { label: "Resellers", value: users.filter((u) => u.role === "reseller").length, icon: Store, color: "bg-[#DBEAFE] text-[#1E40AF]" },
             { label: "Customers", value: users.filter((u) => u.role === "customer").length, icon: UserCircle, color: "bg-[#D1FAE5] text-[#065F46]" },
           ].map((s, i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
-              <div className={`w-10 h-10 rounded-xl ${s.color} flex items-center justify-center mb-3`}><s.icon size={18} /></div>
-              <p className="text-2xl font-bold text-[#0F172A]">{s.value}</p>
-              <p className="text-xs text-[#64748B] mt-0.5">{s.label}</p>
+            <div key={i} className="bg-white rounded-2xl p-3.5 shadow-premium border border-[#F1F5F9]">
+              <span className={`w-8 h-8 rounded-lg ${s.color} flex items-center justify-center`}><s.icon size={16} /></span>
+              <p className="text-2xl font-bold text-[#0F172A] mt-2.5 leading-none tabular-nums">{s.value}</p>
+              <p className="text-[11px] text-[#64748B] mt-1">{s.label}</p>
             </div>
           ))}
         </div>
@@ -112,25 +112,25 @@ export default function AdminUsers() {
             <table className="w-full">
               <thead><tr className="bg-[#F8FAFC]">
                 {["User", "Role", "Status", "Phone", "Cards", "Last Login", "Actions"].map((h) => (
-                  <th key={h} className="text-left text-[11px] font-semibold text-[#64748B] uppercase tracking-wider px-6 py-3.5">{h}</th>
+                  <th key={h} className="text-left text-[11px] font-semibold text-[#64748B] uppercase tracking-wider px-4 py-3">{h}</th>
                 ))}
               </tr></thead>
               <tbody className="divide-y divide-[#F1F5F9]">
                 {paginated.length === 0 ? (
-                  <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-[#94A3B8]">No users found</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-[#94A3B8]">No users found</td></tr>
                 ) : (
                   paginated.map((u) => (
                     <tr key={u.id} className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="px-6 py-4"><div className="flex items-center gap-3">
+                      <td className="px-4 py-3"><div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full gradient-gold flex items-center justify-center"><span className="text-[#0F172A] text-xs font-bold">{u.fullName.charAt(0)}</span></div>
                         <div><p className="text-sm font-medium text-[#0F172A]">{u.fullName}</p><p className="text-xs text-[#94A3B8]">{u.email}</p></div>
                       </div></td>
-                      <td className="px-6 py-4"><span className={`${roleBadge(u.role)} capitalize`}>{u.role.replace("_", " ")}</span></td>
-                      <td className="px-6 py-4"><button onClick={() => toggleStatus(u.id)} className={`${statusBadge(u.status)} capitalize cursor-pointer hover:opacity-80 transition-opacity`}>{u.status}</button></td>
-                      <td className="px-6 py-4 text-sm text-[#64748B]">{u.phone}</td>
-                      <td className="px-6 py-4 text-sm text-[#64748B]">{u.cards}</td>
-                      <td className="px-6 py-4 text-xs text-[#94A3B8]">{u.lastLogin}</td>
-                      <td className="px-6 py-4"><div className="flex items-center gap-1">
+                      <td className="px-4 py-3"><span className={`${roleBadge(u.role)} capitalize`}>{u.role.replace("_", " ")}</span></td>
+                      <td className="px-4 py-3"><button onClick={() => toggleStatus(u.id)} className={`${statusBadge(u.status)} capitalize cursor-pointer hover:opacity-80 transition-opacity`}>{u.status}</button></td>
+                      <td className="px-4 py-3 text-sm text-[#64748B]">{u.phone}</td>
+                      <td className="px-4 py-3 text-sm text-[#64748B]">{u.cards}</td>
+                      <td className="px-4 py-3 text-xs text-[#94A3B8]">{u.lastLogin}</td>
+                      <td className="px-4 py-3"><div className="flex items-center gap-1">
                         <button onClick={() => setViewUser(u)} className="p-2 rounded-lg hover:bg-[#F1F5F9] text-[#64748B] hover:text-[#F7B31C] transition-colors" title="View"><Eye size={14} /></button>
                         <button onClick={() => openEdit(u)} className="p-2 rounded-lg hover:bg-[#F1F5F9] text-[#64748B] hover:text-[#F7B31C] transition-colors" title="Edit"><Pencil size={14} /></button>
                         <button onClick={() => handleDelete(u.id)} className="p-2 rounded-lg hover:bg-red-50 text-[#64748B] hover:text-red-500 transition-colors" title="Delete"><Trash2 size={14} /></button>
@@ -142,7 +142,7 @@ export default function AdminUsers() {
             </table>
           </div>
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#F1F5F9]">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[#F1F5F9]">
               <p className="text-xs text-[#94A3B8]">Page {page} of {totalPages} ({filtered.length} total)</p>
               <div className="flex gap-2">
                 <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="p-2 rounded-lg border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-30 transition-colors"><ChevronLeft size={14} /></button>
@@ -224,6 +224,6 @@ export default function AdminUsers() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
@@ -49,8 +49,8 @@ export default function AdminProfile() {
   ];
 
   return (
-    <DashboardLayout>
-      <TopBar title="My Profile" subtitle="Super Admin profile and security settings" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="My Profile" subtitle="Super Admin profile and security settings" /></div>
       <div className="p-6">
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="lg:w-64 shrink-0">
@@ -179,6 +179,6 @@ export default function AdminProfile() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

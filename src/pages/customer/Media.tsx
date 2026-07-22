@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Image as ImageIcon, Video, Trash2, Plus, Play, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { fieldCls, LimitBar } from "@/components/customer/ModuleShell";
+import ModuleShell, { fieldCls, LimitBar, Tip } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
 import { contentSeeder } from "@/lib/cardContent";
 
@@ -45,7 +45,7 @@ export default function CustomerMedia() {
   ];
 
   return (
-    <ModuleShell title="Media" subtitle="Gallery images and YouTube videos" icon={ImageIcon}
+    <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube videos" icon={ImageIcon}
       actions={
         <div className="relative flex rounded-xl bg-[#F1F5F9] p-1">
           <span className="absolute top-1 bottom-1 rounded-lg bg-white shadow-sm transition-all duration-300" style={{ width: "calc((100% - 0.5rem) / 2)", left: `calc(0.25rem + ${tab === "video" ? 1 : 0} * ((100% - 0.5rem) / 2))` }} />
@@ -57,6 +57,7 @@ export default function CustomerMedia() {
         </div>
       }>
       <LimitBar used={tab === "gallery" ? gallery.items.length : videos.items.length} limit={tab === "gallery" ? gLimit : vLimit} unit={tab === "gallery" ? "gallery images" : "videos"} />
+      <Tip>A short intro or product video keeps visitors on your card far longer — and the longer they stay, the more they enquire.</Tip>
       {tab === "gallery" ? (
         <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

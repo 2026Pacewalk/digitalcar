@@ -280,8 +280,8 @@ function HeroSection() {
               <Link to="/signup" className="btn-gold h-12 px-7 flex items-center justify-center gap-2 text-base">
                 Start Free 7-Day Trial <ArrowRight size={18} />
               </Link>
-              <Link to="/sample-cards" className="btn-navy h-12 px-7 flex items-center justify-center gap-2 text-base">
-                <Eye size={18} /> View Sample Cards
+              <Link to="/templates" className="btn-navy h-12 px-7 flex items-center justify-center gap-2 text-base">
+                <Eye size={18} /> View Templates
               </Link>
             </div>
 
@@ -975,7 +975,7 @@ function FinalCTA() {
             <p className="text-base text-[#94A3B8] mb-8">Join thousands of businesses using DigitalCarda to create, share, and track professional digital cards.</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2 text-base">Start Free Trial <ArrowRight size={18} /></Link>
-              <Link to="/sample-cards" className="h-12 px-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">View Sample Cards</Link>
+              <Link to="/templates" className="h-12 px-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">View Templates</Link>
             </div>
           </div>
         </Reveal>

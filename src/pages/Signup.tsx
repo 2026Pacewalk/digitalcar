@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router";
+import { useNavigate, Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { trpc } from "@/providers/trpc";
 import {
   User, Building2, Mail, Phone, Lock, Eye, EyeOff, UserPlus,
-  Check, ShieldCheck, ArrowLeft, Loader2, AtSign,
+  Check, ShieldCheck, ArrowLeft, Loader2, AtSign, Gift,
 } from "lucide-react";
 import AuthBrandPanel from "@/components/AuthBrandPanel";
 
@@ -32,6 +33,11 @@ const iconCls = "absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer
 
 export default function Signup() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get("ref") || "";
+  const registerMut = trpc.auth.register.useMutation();
+  const { data: refInfo } = trpc.referral.validate.useQuery({ code: referralCode }, { enabled: !!referralCode });
+  const refDiscount = refInfo?.valid ? refInfo.discountPercent : 0;
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [form, setForm] = useState({
@@ -56,7 +62,7 @@ export default function Signup() {
 
   const matches = form.confirmPassword.length > 0 && form.password === form.confirmPassword;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.fullName || !form.email || !form.password) {
       toast.error("Please fill in all required fields"); return;
@@ -68,13 +74,24 @@ export default function Signup() {
       toast.error("Password must be at least 6 characters"); return;
     }
     setLoading(true);
-    setTimeout(() => {
-      const mockUser = { id: Date.now(), email: form.email, fullName: form.fullName, role: "customer" as const };
-      localStorage.setItem("digitalcarda_user", JSON.stringify(mockUser));
-      localStorage.setItem("auth_token", "demo_token_" + mockUser.id);
+    try {
+      const res = await registerMut.mutateAsync({
+        email: form.email.trim(),
+        password: form.password,
+        fullName: form.fullName.trim(),
+        phone: form.mobile.trim() || undefined,
+        role: "customer",
+        companyName: form.businessName.trim() || undefined,
+        referralCode: referralCode || undefined,
+      });
+      localStorage.setItem("auth_token", res.token);
+      localStorage.setItem("digitalcarda_user", JSON.stringify(res.user));
       toast.success("Account created! Welcome to DigitalCarda.");
       navigate("/dashboard");
-    }, 800);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create account");
+      setLoading(false);
+    }
   };
 
   const socialSoon = () => toast.info("Social sign-up is coming soon — use email for now.");
@@ -119,6 +136,16 @@ export default function Signup() {
             <h1 className="text-2xl sm:text-[1.7rem] font-extrabold text-[#0F172A] tracking-tight">Create Your Account</h1>
             <p className="text-sm text-[#64748B] mt-1">No credit card required · Cancel anytime</p>
           </div>
+
+          {referralCode && (
+            <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#FEF3C7] to-[#FFF7E6] border border-[#FDE68A] px-4 py-3 mb-5">
+              <span className="w-9 h-9 rounded-xl gradient-gold flex items-center justify-center shrink-0"><Gift size={17} className="text-[#0F172A]" /></span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-[#92400E]">{refDiscount > 0 ? `You've been referred — get ${refDiscount}% off!` : "You were invited by a friend 🎉"}</p>
+                <p className="text-[11px] text-[#B45309]">Referral <b className="uppercase">{referralCode}</b> applied{refDiscount > 0 ? ` — ${refDiscount}% off your first paid plan.` : " — welcome to DigitalCarda."}</p>
+              </div>
+            </div>
+          )}
 
           {/* Social */}
           <button onClick={socialSoon} type="button" className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white flex items-center justify-center gap-2.5 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors">

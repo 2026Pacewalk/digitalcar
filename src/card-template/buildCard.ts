@@ -319,7 +319,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
     <div class="copyright-wrapper"><p>Powered by <a href="https://digitalcarda.in" target="_blank">DigitalCarda</a></p></div>
     <div class="dc-bottom-bar">
       <a href="/login" target="_top">Customer Login</a>
-      <a href="/signup" target="_top">Create Your Free Card</a>
+      <a href="/signup${(s(c.referral_code) || slug) ? `?ref=${encodeURIComponent(s(c.referral_code) || slug)}` : ""}" target="_top">Create Your Free Card</a>
     </div>
   </div>
 </main>

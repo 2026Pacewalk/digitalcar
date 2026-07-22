@@ -1,9 +1,20 @@
 import { z } from "zod";
+import { nanoid } from "nanoid";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { cards, cardBlocks, analyticsEvents } from "@db/schema";
+import { cards, cardBlocks, analyticsEvents, subscriptions, users } from "@db/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+
+/** Turn a person's name into a URL-safe slug fragment. */
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "card";
+}
 
 export const cardRouter = createRouter({
   list: authedQuery
@@ -61,10 +72,18 @@ export const cardRouter = createRouter({
     .input(z.object({ slug: z.string() }))
     .query(async ({ input }) => {
       const db = getDb();
-      return db.query.cards.findFirst({
+      const card = await db.query.cards.findFirst({
         where: eq(cards.slug, input.slug),
         with: { blocks: { orderBy: cardBlocks.position } },
       });
+      if (!card) return null;
+      // Attach the owner's referral code so the public card's
+      // "Create Your Free Card" CTA can credit them for the referral.
+      const owner = await db.query.users.findFirst({
+        where: eq(users.id, card.userId),
+        columns: { referralCode: true },
+      });
+      return { ...card, ownerReferralCode: owner?.referralCode ?? null };
     }),
 
   create: authedQuery
@@ -95,6 +114,115 @@ export const cardRouter = createRouter({
         where: eq(cards.id, result[0].id),
         with: { blocks: true },
       });
+    }),
+
+  /**
+   * Bulk-create digital cards for a whole team under the current user's account
+   * (Model A: one company account owns all the cards). Each member gets their own
+   * card plus a starter Profile Header + Contact Info block, personalized with their
+   * details. Enforces the subscription's maxCards quota when a package is active.
+   */
+  bulkCreate: authedQuery
+    .input(
+      z.object({
+        companyName: z.string().max(255).optional(),
+        templateId: z.number().optional(),
+        publish: z.boolean().optional(),
+        members: z
+          .array(
+            z.object({
+              name: z.string().trim().min(1, "Name is required").max(255),
+              designation: z.string().max(255).optional(),
+              phone: z.string().max(50).optional(),
+              email: z.string().max(255).optional(),
+            })
+          )
+          .min(1, "Add at least one member")
+          .max(500, "Bulk orders are limited to 500 cards at a time"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+
+      // ── 1) Quota check against the active subscription's package ──
+      const [usedRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(cards)
+        .where(eq(cards.userId, ctx.user.id));
+      const used = Number(usedRow?.count || 0);
+
+      const activeSub = await db.query.subscriptions.findFirst({
+        where: and(
+          eq(subscriptions.userId, ctx.user.id),
+          sql`${subscriptions.status} in ('trial','active')`
+        ),
+        with: { package: true },
+        orderBy: [desc(subscriptions.createdAt)],
+      });
+
+      const maxCards = activeSub?.package?.maxCards ?? 0;
+      // maxCards <= 0 is treated as "unlimited / not enforced" (e.g. no plan yet).
+      if (maxCards > 0 && used + input.members.length > maxCards) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Your plan allows ${maxCards} cards. You have ${used}, so you can add ${Math.max(
+            0,
+            maxCards - used
+          )} more. Upgrade your plan to create ${input.members.length} cards.`,
+        });
+      }
+
+      // ── 2) Create one card (+ starter blocks) per member ──
+      const status = input.publish ? "published" : "draft";
+      const created: { id: number; slug: string; title: string }[] = [];
+
+      for (const m of input.members) {
+        const slug = `${slugify(m.name)}-${nanoid(6).toLowerCase()}`;
+
+        const [row] = await db
+          .insert(cards)
+          .values({
+            userId: ctx.user.id,
+            title: m.name,
+            slug,
+            templateId: input.templateId ?? null,
+            status,
+            language: "en",
+            publishedAt: input.publish ? new Date() : null,
+          })
+          .$returningId();
+
+        await db.insert(cardBlocks).values([
+          {
+            cardId: row.id,
+            type: "profile_header",
+            position: 0,
+            config: {},
+            content: {
+              name: m.name,
+              title: m.designation ?? "",
+              company: input.companyName ?? "",
+              bio: "",
+            },
+          },
+          {
+            cardId: row.id,
+            type: "contact_info",
+            position: 1,
+            config: {},
+            content: {
+              phone: m.phone ?? "",
+              email: m.email ?? "",
+              address: "",
+              website: "",
+            },
+          },
+        ]);
+
+        created.push({ id: row.id, slug, title: m.name });
+      }
+
+      return { created, count: created.length };
     }),
 
   update: authedQuery

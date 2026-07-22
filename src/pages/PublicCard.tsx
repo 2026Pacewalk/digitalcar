@@ -320,8 +320,23 @@ export default function PublicCard() {
           </div>
         )}
 
+        {/* Create your own card — carries the owner's referral code */}
+        <div className="px-6 pt-8 mt-8 border-t border-[#F1F5F9]">
+          <div className="rounded-2xl bg-gradient-to-br from-[#0F172A] via-[#172033] to-[#1E293B] p-5 text-center relative overflow-hidden">
+            <div className="absolute -right-8 -top-10 w-32 h-32 rounded-full bg-[#F7B31C]/20 blur-2xl pointer-events-none" />
+            <p className="relative text-sm font-bold text-white">Want a card like this?</p>
+            <p className="relative text-[11px] text-white/60 mt-1">Create your own free digital card in minutes.</p>
+            <a
+              href={`/signup${card.ownerReferralCode ? `?ref=${encodeURIComponent(card.ownerReferralCode)}` : ""}`}
+              className="relative inline-flex items-center justify-center gap-1.5 mt-3 h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"
+            >
+              Create Your Free Card
+            </a>
+          </div>
+        </div>
+
         {/* Footer */}
-        <div className="px-6 py-8 text-center border-t border-[#F1F5F9] mt-8">
+        <div className="px-6 py-8 text-center">
           <p className="text-xs text-[#94A3B8]">Powered by <span className="text-[#F7B31C] font-semibold">DigitalCarda</span></p>
         </div>
       </div>

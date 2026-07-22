@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import {
   Menu, X, CreditCard, ChevronRight, Phone, Mail,
   Twitter, Linkedin, Instagram, Facebook,
-  Sparkles, LayoutGrid, Tag, Wand2, Users, MessageCircle, LogIn, ArrowRight, Headphones,
+  Sparkles, LayoutGrid, Tag, Wand2, Users, MessageCircle, LogIn, ArrowRight, Headphones, Layers, Gift,
 } from "lucide-react";
 
 const defaultSEO = {
@@ -21,10 +21,6 @@ const seoMap: Record<string, { title: string; description: string }> = {
     title: "Templates - DigitalCarda | Beautiful Ready-to-Use Card Designs",
     description: "Choose from professional card templates for corporate, freelancer, doctor, real estate, restaurant, salon, and more industries.",
   },
-  "/sample-cards": {
-    title: "Sample Cards - DigitalCarda | Explore Digital Card Examples",
-    description: "View ready-made digital card examples for agencies, doctors, real estate, restaurants, freelancers, retail stores, and more.",
-  },
   "/industries": {
     title: "Industries - DigitalCarda | Made for Every Business Type",
     description: "DigitalCarda serves digital agencies, doctors, real estate agents, lawyers, consultants, restaurants, salons, coaches, photographers, and more.",
@@ -37,9 +33,17 @@ const seoMap: Record<string, { title: string; description: string }> = {
     title: "AI Card Generator - DigitalCarda | Build Cards with AI",
     description: "Enter your business details and let DigitalCarda AI generate a professional digital card structure, content, CTA, SEO title, and design.",
   },
+  "/bulk-cards": {
+    title: "Bulk Digital Cards - DigitalCarda | Cards for Your Whole Team",
+    description: "Create digital business cards in bulk for your staff, partners, or resellers. Volume pricing that gets cheaper the more you add, with consistent branding.",
+  },
   "/resellers": {
     title: "Reseller Program - DigitalCarda | Start Your Own Card Business",
     description: "White-label digital card platform for agencies. Add customers, assign packages, manage leads, and earn commissions.",
+  },
+  "/refer-earn": {
+    title: "Refer & Earn - DigitalCarda | Give 15%, Get 15% Cash",
+    description: "Refer friends to DigitalCarda. They get 15% off their first paid plan, and you earn a flat 15% cash commission — paid to your wallet and withdrawable to bank or UPI.",
   },
   "/custom-domain": {
     title: "Custom Domain - DigitalCarda | Use Your Own Domain",
@@ -135,10 +139,11 @@ export default function PublicLayout() {
   const navLinks = [
     { label: "Features", href: "/features", icon: Sparkles },
     { label: "Templates", href: "/templates", icon: LayoutGrid },
-    { label: "Sample Cards", href: "/sample-cards", icon: CreditCard },
     { label: "Pricing", href: "/pricing", icon: Tag },
+    { label: "Bulk Cards", href: "/bulk-cards", icon: Layers },
     { label: "AI Generator", href: "/ai-card-generator", icon: Wand2 },
     { label: "Resellers", href: "/resellers", icon: Users },
+    { label: "Refer & Earn", href: "/refer-earn", icon: Gift },
     { label: "Contact", href: "/contact", icon: MessageCircle },
   ];
 
@@ -323,7 +328,7 @@ export default function PublicLayout() {
 
       {/* Footer */}
       <footer className="bg-[#0F172A] text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-28 lg:pb-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {/* Company */}
             <div>
@@ -354,6 +359,7 @@ export default function PublicLayout() {
               <h4 className="font-semibold text-sm mb-4 text-white">For Business</h4>
               <div className="space-y-2.5">
                 <Link to="/resellers" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Reseller Program</Link>
+                <Link to="/refer-earn" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Refer &amp; Earn</Link>
                 <Link to="/industries" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Agencies</Link>
                 <Link to="/industries" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Freelancers</Link>
                 <Link to="/industries" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Local Businesses</Link>
@@ -403,6 +409,18 @@ export default function PublicLayout() {
           </div>
         </div>
       </footer>
+
+      {/* Sticky mobile CTA bar — native-app style persistent action */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-[#E2E8F0] px-4 pt-3 pb-safe shadow-[0_-4px_16px_-8px_rgba(15,23,42,0.15)]">
+        <div className="flex items-center gap-2.5 pb-3">
+          <a href="https://wa.me/919876543210?text=Hi%20DigitalCarda" target="_blank" rel="noreferrer" aria-label="WhatsApp" className="w-12 h-12 shrink-0 rounded-xl bg-[#DCFCE7] text-[#166534] flex items-center justify-center active:scale-95 transition-transform">
+            <MessageCircle size={20} />
+          </a>
+          <Link to="/signup" className="btn-gold flex-1 h-12 flex items-center justify-center gap-2 text-base">
+            Start Free 7-Day Trial <ArrowRight size={18} />
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

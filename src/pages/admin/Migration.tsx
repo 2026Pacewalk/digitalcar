@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
@@ -212,8 +212,8 @@ export default function AdminMigration() {
   };
 
   return (
-    <DashboardLayout>
-      <TopBar title="Data Migration" subtitle="Migrate members from old DigitalCarda to new platform" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="Data Migration" subtitle="Migrate members from old DigitalCarda to new platform" /></div>
       <div className="p-6 space-y-6">
 
         {/* Safety Banner */}
@@ -388,6 +388,6 @@ export default function AdminMigration() {
           )}
         </div>
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

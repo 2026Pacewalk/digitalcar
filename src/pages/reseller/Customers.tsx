@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useState } from "react";
 import { Search, Plus, Users, CreditCard, Eye, ArrowUpRight, Pencil, Trash2 } from "lucide-react";
@@ -21,8 +21,8 @@ export default function ResellerCustomers() {
   );
 
   return (
-    <DashboardLayout>
-      <TopBar title="My Customers" subtitle="Manage your customer accounts" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="My Customers" subtitle="Manage your customer accounts" /></div>
       <div className="p-6 space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="relative w-full sm:w-80">
@@ -61,17 +61,17 @@ export default function ResellerCustomers() {
               <thead>
                 <tr className="bg-[#F8FAFC]">
                   {["Customer", "Plan", "Cards", "Views", "Status", "Joined", ""].map((h) => (
-                    <th key={h} className="text-left text-[11px] font-semibold text-[#64748B] uppercase tracking-wider px-6 py-3.5">{h}</th>
+                    <th key={h} className="text-left text-[11px] font-semibold text-[#64748B] uppercase tracking-wider px-4 py-3">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-[#94A3B8]">No customers found</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-[#94A3B8]">No customers found</td></tr>
                 ) : (
                   filtered.map((c) => (
                     <tr key={c.id} className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full gradient-gold flex items-center justify-center">
                             <span className="text-[#0F172A] text-xs font-bold">{c.name.charAt(0)}</span>
@@ -82,12 +82,12 @@ export default function ResellerCustomers() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4"><span className="badge-gold">{c.plan}</span></td>
-                      <td className="px-6 py-4 text-sm text-[#64748B]">{c.cards}</td>
-                      <td className="px-6 py-4 text-sm text-[#64748B]">{c.views.toLocaleString()}</td>
-                      <td className="px-6 py-4"><span className={`badge-${c.status === "active" ? "green" : "red"}`}>{c.status}</span></td>
-                      <td className="px-6 py-4 text-sm text-[#94A3B8]">{c.joined}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3"><span className="badge-gold">{c.plan}</span></td>
+                      <td className="px-4 py-3 text-sm text-[#64748B]">{c.cards}</td>
+                      <td className="px-4 py-3 text-sm text-[#64748B]">{c.views.toLocaleString()}</td>
+                      <td className="px-4 py-3"><span className={`badge-${c.status === "active" ? "green" : "red"}`}>{c.status}</span></td>
+                      <td className="px-4 py-3 text-sm text-[#94A3B8]">{c.joined}</td>
+                      <td className="px-4 py-3">
                         <div className="flex gap-1">
                           <button className="p-2 rounded-lg hover:bg-[#F1F5F9] text-[#64748B] hover:text-[#F7B31C] transition-colors"><Pencil size={14} /></button>
                           <button className="p-2 rounded-lg hover:bg-red-50 text-[#64748B] hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
@@ -101,6 +101,6 @@ export default function ResellerCustomers() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

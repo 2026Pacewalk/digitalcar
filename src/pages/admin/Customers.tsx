@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
+import { scopedKey } from "@/hooks/useCustomer";
 
 /* Retailer (admin_id) → name, from superadmin table */
 const RETAILERS: Record<number, string> = {
@@ -112,17 +113,18 @@ export default function AdminCustomers() {
 
   const loginAsClient = async (c: Customer) => {
     const rec = { ...c, specialities: decodeSpecialities((c as Record<string, unknown>).specialities), logo: imgUrl("home", (c as Record<string, unknown>).logo) };
+    // Set the impersonated identity first so scopedKey() targets the client's namespace.
     localStorage.setItem("digitalcarda_user", JSON.stringify({ id: c.id, email: c.email, fullName: c.name, role: "customer" }));
     localStorage.setItem("auth_token", "impersonate_" + c.id);
-    localStorage.setItem("dc_customer", JSON.stringify(rec));
+    localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(rec));
     try {
       const content = await loadCustomerContent(String(c.slug));
-      localStorage.setItem("dc_products", JSON.stringify(content.products));
-      localStorage.setItem("dc_gallery", JSON.stringify(content.gallery));
-      localStorage.setItem("dc_videos", JSON.stringify(content.videos));
-      localStorage.setItem("dc_offers", JSON.stringify(content.offers));
-      localStorage.setItem("dc_qrcode", JSON.stringify(content.qrcodes));
-      localStorage.setItem("dc_uploads", JSON.stringify(content.uploads));
+      localStorage.setItem(scopedKey("dc_products"), JSON.stringify(content.products));
+      localStorage.setItem(scopedKey("dc_gallery"), JSON.stringify(content.gallery));
+      localStorage.setItem(scopedKey("dc_videos"), JSON.stringify(content.videos));
+      localStorage.setItem(scopedKey("dc_offers"), JSON.stringify(content.offers));
+      localStorage.setItem(scopedKey("dc_qrcode"), JSON.stringify(content.qrcodes));
+      localStorage.setItem(scopedKey("dc_uploads"), JSON.stringify(content.uploads));
     } catch { /* content optional */ }
     toast.success(`Logged in as ${c.name}`);
     navigate("/dashboard");
@@ -166,7 +168,7 @@ export default function AdminCustomers() {
   ];
 
   return (
-    <DashboardLayout title="Customer List" subtitle="Manage all customer cards & subscriptions">
+    <ResponsiveDashboardLayout title="Customer List" subtitle="Manage all customer cards & subscriptions">
       <div className="p-6 space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -341,7 +343,7 @@ export default function AdminCustomers() {
           <button onClick={addCustomer} className="flex-1 h-11 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold hover:shadow-gold">Add Customer</button>
         </div>
       </Modal>}
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }
 

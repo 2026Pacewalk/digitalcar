@@ -24,6 +24,9 @@ export const users = mysqlTable("users", {
   role: mysqlEnum("role", ["super_admin", "reseller", "customer"]).notNull().default("customer"),
   status: mysqlEnum("status", ["active", "inactive", "suspended"]).notNull().default("active"),
   resellerId: bigint("reseller_id", { mode: "number", unsigned: true }),
+  referralCode: varchar("referral_code", { length: 50 }),
+  referredById: bigint("referred_by_id", { mode: "number", unsigned: true }),
+  walletBalance: decimal("wallet_balance", { precision: 12, scale: 2 }).notNull().default("0.00"),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
@@ -334,3 +337,76 @@ export const notifications = mysqlTable("notifications", {
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
+
+// ─── Referrals (Refer & Earn) ───────────────────────────────────
+// status flow:
+//   pending  → someone opened the link but no account yet (rarely used)
+//   joined   → the referee created an account (no reward yet)
+//   rewarded → the referee bought a paid plan and admin credited the reward
+export const referrals = mysqlTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerId: bigint("referrer_id", { mode: "number", unsigned: true }).notNull(),
+  refereeId: bigint("referee_id", { mode: "number", unsigned: true }),
+  refereeEmail: varchar("referee_email", { length: 255 }),
+  code: varchar("code", { length: 50 }).notNull(),
+  status: mysqlEnum("status", ["pending", "joined", "rewarded"]).notNull().default("pending"),
+  rewardAmount: decimal("reward_amount", { precision: 12, scale: 2 }).notNull().default("0.00"),
+  rewardedAt: timestamp("rewarded_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ref_referrer_idx").on(table.referrerId),
+  index("ref_code_idx").on(table.code),
+]);
+
+export type Referral = typeof referrals.$inferSelect;
+
+// ─── Wallet Transactions (referral earnings statement) ──────────
+export const walletTransactions = mysqlTable("wallet_transactions", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  type: mysqlEnum("type", ["reward", "withdrawal", "adjustment"]).notNull(),
+  // positive = credit into wallet, negative = debit out of wallet
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  balanceAfter: decimal("balance_after", { precision: 12, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["pending", "completed", "reversed"]).notNull().default("completed"),
+  referralId: bigint("referral_id", { mode: "number", unsigned: true }),
+  withdrawalId: bigint("withdrawal_id", { mode: "number", unsigned: true }),
+  note: varchar("note", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("wtx_user_idx").on(table.userId),
+  index("wtx_type_idx").on(table.type),
+]);
+
+export type WalletTransaction = typeof walletTransactions.$inferSelect;
+
+// ─── Withdrawal Requests (payout to bank / UPI) ─────────────────
+export const withdrawalRequests = mysqlTable("withdrawal_requests", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  method: mysqlEnum("method", ["bank", "upi"]).notNull(),
+  destination: varchar("destination", { length: 500 }).notNull(), // UPI id or bank account snapshot
+  accountName: varchar("account_name", { length: 255 }),
+  ifsc: varchar("ifsc", { length: 20 }),
+  status: mysqlEnum("status", ["pending", "paid", "rejected"]).notNull().default("pending"),
+  adminNote: varchar("admin_note", { length: 500 }),
+  reference: varchar("reference", { length: 255 }), // admin's payout txn reference
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("wr_user_idx").on(table.userId),
+  index("wr_status_idx").on(table.status),
+]);
+
+export type WithdrawalRequest = typeof withdrawalRequests.$inferSelect;
+
+// ─── App Settings (key/value config, e.g. referral commission %) ─
+export const appSettings = mysqlTable("app_settings", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: varchar("value", { length: 500 }).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AppSetting = typeof appSettings.$inferSelect;

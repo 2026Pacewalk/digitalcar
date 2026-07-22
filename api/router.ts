@@ -8,6 +8,7 @@ import { templateRouter } from "./template-router";
 import { leadRouter } from "./lead-router";
 import { analyticsRouter } from "./analytics-router";
 import { settingsRouter } from "./settings-router";
+import { referralRouter } from "./referral-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -22,6 +23,7 @@ export const appRouter = createRouter({
   lead: leadRouter,
   analytics: analyticsRouter,
   settings: settingsRouter,
+  referral: referralRouter,
 });
 
 export type AppRouter = typeof appRouter;

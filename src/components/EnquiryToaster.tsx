@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Mail } from "lucide-react";
 import { NEW_ENQ_KEY, ENQ_PING_KEY, ENQ_EVENT, loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
+import { scopedKey } from "@/hooks/useCustomer";
 
 /* Mount once (in App). Watches localStorage for freshly-submitted card enquiries
    and raises a toast alert. Reacts across tabs (storage event) and within the
@@ -10,7 +11,7 @@ export default function EnquiryToaster() {
   const known = useRef<Set<string> | null>(null);
 
   useEffect(() => {
-    const currentSlug = () => { try { return JSON.parse(localStorage.getItem("dc_customer") || "{}").slug || ""; } catch { return ""; } };
+    const currentSlug = () => { try { return JSON.parse(localStorage.getItem(scopedKey("dc_customer")) || "{}").slug || ""; } catch { return ""; } };
 
     // Baseline: everything already stored is "known" (no toast on first load)
     known.current = new Set(loadNewEnquiries().map((e) => e.id));

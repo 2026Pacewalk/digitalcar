@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -118,8 +118,8 @@ export default function AdminLeads() {
   ];
 
   return (
-    <DashboardLayout>
-      <TopBar title="Enquiries" subtitle="Leads captured from cards & the website" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="Enquiries" subtitle="Leads captured from cards & the website" /></div>
       <div className="p-6 space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -300,6 +300,6 @@ export default function AdminLeads() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

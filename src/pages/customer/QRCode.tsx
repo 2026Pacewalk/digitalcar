@@ -33,7 +33,7 @@ export default function CustomerQRCode() {
       <LimitBar used={items.length} limit={limit} unit="QR codes" />
 
       <div className="rounded-xl bg-[#FEF3C7]/50 border border-[#FDE68A] px-4 py-3 text-sm text-[#92400E]">
-        Add your payment QR code details so customers can scan and pay directly to your bank/wallets.
+        Add your UPI or payment QR so customers can scan and pay you instantly — no app-switching, no typing account numbers. Faster checkout means fewer drop-offs.
       </div>
 
       {items.length === 0 ? (

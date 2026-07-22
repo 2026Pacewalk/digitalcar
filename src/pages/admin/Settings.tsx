@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useState } from "react";
 import { Save, Globe, Mail, Palette, Shield, Bell, CreditCard } from "lucide-react";
@@ -23,8 +23,8 @@ export default function AdminSettings() {
   };
 
   return (
-    <DashboardLayout>
-      <TopBar title="Settings" subtitle="Platform configuration" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="Settings" subtitle="Platform configuration" /></div>
       <div className="p-6">
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Sidebar Tabs */}
@@ -212,6 +212,6 @@ export default function AdminSettings() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }

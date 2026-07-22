@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useMemo } from "react";
@@ -68,8 +68,8 @@ export default function ResellerProfile() {
   ];
 
   return (
-    <DashboardLayout>
-      <TopBar title="My Profile" subtitle="Reseller profile and settings" />
+    <ResponsiveDashboardLayout>
+      <div className="hidden md:block"><TopBar title="My Profile" subtitle="Reseller profile and settings" /></div>
       <div className="p-6">
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="lg:w-64 shrink-0">
@@ -208,6 +208,6 @@ export default function ResellerProfile() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </ResponsiveDashboardLayout>
   );
 }
