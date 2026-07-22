@@ -28,6 +28,7 @@ import AdminCards from "./pages/admin/Cards";
 import AdminAnalytics from "./pages/admin/Analytics";
 import AdminLeads from "./pages/admin/Leads";
 import AdminReferrals from "./pages/admin/Referrals";
+import AdminPayments from "./pages/admin/Payments";
 import AdminSettings from "./pages/admin/Settings";
 import AdminProfile from "./pages/admin/Profile";
 import ResellerDashboard from "./pages/reseller/Dashboard";
@@ -120,6 +121,7 @@ export default function App() {
         <Route path="/admin/analytics" element={<RoleRoute allowedRoles={["super_admin"]}><AdminAnalytics /></RoleRoute>} />
         <Route path="/admin/leads" element={<RoleRoute allowedRoles={["super_admin"]}><AdminLeads /></RoleRoute>} />
         <Route path="/admin/referrals" element={<RoleRoute allowedRoles={["super_admin"]}><AdminReferrals /></RoleRoute>} />
+        <Route path="/admin/payments" element={<RoleRoute allowedRoles={["super_admin"]}><AdminPayments /></RoleRoute>} />
         <Route path="/admin/settings" element={<RoleRoute allowedRoles={["super_admin"]}><AdminSettings /></RoleRoute>} />
         <Route path="/admin/profile" element={<RoleRoute allowedRoles={["super_admin"]}><AdminProfile /></RoleRoute>} />
 

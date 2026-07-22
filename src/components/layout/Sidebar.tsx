@@ -65,6 +65,7 @@ const superAdminGroups: NavGroup[] = [
     { label: "Templates", icon: Palette, path: "/admin/templates" },
   ] },
   { title: "Growth", items: [
+    { label: "Payments", icon: Wallet, path: "/admin/payments" },
     { label: "Referrals & Payouts", icon: Gift, path: "/admin/referrals" },
   ] },
   { title: "System", items: [

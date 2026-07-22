@@ -401,6 +401,27 @@ export const withdrawalRequests = mysqlTable("withdrawal_requests", {
 
 export type WithdrawalRequest = typeof withdrawalRequests.$inferSelect;
 
+// ─── Payment Orders (manual UPI/bank payment, admin-verified) ───
+export const paymentOrders = mysqlTable("payment_orders", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  packageId: bigint("package_id", { mode: "number", unsigned: true }).notNull(),
+  planName: varchar("plan_name", { length: 100 }),
+  billingCycle: mysqlEnum("billing_cycle", ["monthly", "yearly"]).notNull().default("monthly"),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  method: mysqlEnum("method", ["upi", "bank"]).notNull(),
+  reference: varchar("reference", { length: 255 }).notNull(), // UTR / txn id
+  status: mysqlEnum("status", ["pending", "verified", "rejected"]).notNull().default("pending"),
+  adminNote: varchar("admin_note", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  verifiedAt: timestamp("verified_at"),
+}, (table) => [
+  index("po_user_idx").on(table.userId),
+  index("po_status_idx").on(table.status),
+]);
+
+export type PaymentOrder = typeof paymentOrders.$inferSelect;
+
 // ─── App Settings (key/value config, e.g. referral commission %) ─
 export const appSettings = mysqlTable("app_settings", {
   id: serial("id").primaryKey(),

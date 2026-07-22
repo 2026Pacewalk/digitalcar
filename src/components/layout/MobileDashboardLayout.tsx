@@ -77,6 +77,7 @@ const NAV: Record<string, NavConfig> = {
         { icon: Palette, label: "Templates", path: "/admin/templates" },
       ] },
       { title: "Growth", items: [
+        { icon: Wallet, label: "Payments", path: "/admin/payments" },
         { icon: Gift, label: "Referrals & Payouts", path: "/admin/referrals" },
       ] },
       { title: "System", items: [
@@ -187,6 +188,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/analytics": "Analytics",
   "/admin/leads": "Leads",
   "/admin/referrals": "Referrals & Payouts",
+  "/admin/payments": "Payments",
   "/admin/settings": "Settings",
   "/admin/profile": "Profile",
   // Reseller

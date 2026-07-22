@@ -1,7 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
-import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2, BadgePercent } from "lucide-react";
+import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2, BadgePercent, Copy, X, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
@@ -31,10 +31,10 @@ export default function CustomerSubscription() {
   const { data: subscription } = trpc.subscription.mySubscription.useQuery();
   const { data: packages } = trpc.package.list.useQuery();
   const { data: discount } = trpc.referral.myDiscount.useQuery();
-  const subscribeMut = trpc.subscription.subscribe.useMutation();
+  const { data: orders } = trpc.payment.myOrders.useQuery();
+  const pendingOrder = (orders || []).find((o) => o.status === "pending");
 
   const [isYearly, setIsYearly] = useState(false);
-  const [busyId, setBusyId] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [offerExp, setOfferExp] = useState<number>(0);
   useEffect(() => { setOfferExp(getOfferExpiry()); const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
@@ -51,25 +51,9 @@ export default function CustomerSubscription() {
   const offerH = Math.floor(offerMs / 3_600_000), offerM = Math.floor((offerMs % 3_600_000) / 60_000);
   const applyOffer = (v: number) => (offerPct ? Math.round(v * (1 - offerPct / 100) * 100) / 100 : v);
 
-  const choose = async (packageId: number, name: string) => {
-    setBusyId(packageId);
-    try {
-      const res = await subscribeMut.mutateAsync({ packageId, billingCycle: isYearly ? "yearly" : "monthly", paymentMethod: "razorpay", offerPercent: offerPct || undefined });
-      if (res.isUpgrade) {
-        toast.success(`Upgraded to ${name} — ${inr(res.adjustment)} adjusted, you pay ${inr(res.charged)}`);
-      } else if (res.discountPercent > 0) {
-        toast.success(`${name} activated with ${res.discountPercent}% referral discount — you pay ${inr(res.charged)}`);
-      } else {
-        toast.success(`${name} plan activated!`);
-      }
-      utils.subscription.mySubscription.invalidate();
-      utils.referral.myDiscount.invalidate();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not complete upgrade");
-    } finally {
-      setBusyId(null);
-    }
-  };
+  // Manual payment: pick a plan → open the pay modal (QR / bank + submit reference)
+  const [payFor, setPayFor] = useState<{ id: number; name: string; amount: number } | null>(null);
+  const choose = (packageId: number, name: string, amount: number) => setPayFor({ id: packageId, name, amount });
 
   return (
     <ResponsiveDashboardLayout>
@@ -96,6 +80,17 @@ export default function CustomerSubscription() {
             <div>
               <p className="text-sm font-bold text-[#92400E]">Your {dPct}% referral discount is ready</p>
               <p className="text-[12px] text-[#B45309]">It's applied automatically to your first paid plan below.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Pending payment verification */}
+        {pendingOrder && (
+          <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#FFFBEB] to-[#FFF7E6] border border-[#FDE68A] px-4 py-3.5">
+            <span className="w-10 h-10 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0"><Clock size={19} /></span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-[#92400E]">Payment awaiting verification</p>
+              <p className="text-[12px] text-[#B45309]">{pendingOrder.planName} · {inr(Number(pendingOrder.amount))} · ref {pendingOrder.reference}. Your plan activates once our team verifies it.</p>
             </div>
           </div>
         )}
@@ -134,7 +129,6 @@ export default function CustomerSubscription() {
             const payable = isUpgrade ? Math.max(0, Math.round((base - currentPaid) * 100) / 100) : discounted;
             const finalPrice = isPaid ? applyOffer(payable) : base; // limited-time offer on top
             const popular = idx === 1;
-            const busy = busyId === plan.id;
 
             return (
               <div key={plan.id} className={`bg-white rounded-2xl p-6 shadow-premium border-2 transition-all ${isCurrent ? "border-[#F7B31C]" : popular ? "border-[#F7B31C]/50" : "border-[#F1F5F9]"} card-hover relative`}>
@@ -165,17 +159,105 @@ export default function CustomerSubscription() {
                   ))}
                 </div>
                 <button
-                  onClick={() => choose(plan.id, plan.name)}
-                  disabled={isCurrent || busy}
-                  className={`w-full h-11 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isCurrent ? "bg-[#F1F5F9] text-[#94A3B8] cursor-default" : "gradient-gold text-[#0F172A] hover:shadow-gold active:scale-[0.98] disabled:opacity-60"}`}
+                  onClick={() => choose(plan.id, plan.name, finalPrice)}
+                  disabled={isCurrent || !!pendingOrder}
+                  className={`w-full h-11 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isCurrent ? "bg-[#F1F5F9] text-[#94A3B8] cursor-default" : "gradient-gold text-[#0F172A] hover:shadow-gold active:scale-[0.98] disabled:opacity-50"}`}
                 >
-                  {busy ? <><Loader2 size={16} className="animate-spin" /> Processing…</> : isCurrent ? "Current Plan" : isPaid ? "Upgrade" : "Choose"}
+                  {isCurrent ? "Current Plan" : isPaid ? "Upgrade" : "Choose"}
                 </button>
               </div>
             );
           })}
         </div>
       </div>
+
+      {payFor && (
+        <PayModal
+          plan={payFor} offerPct={offerPct} isYearly={isYearly}
+          onClose={() => setPayFor(null)}
+          onDone={() => { setPayFor(null); utils.payment.myOrders.invalidate(); }}
+        />
+      )}
     </ResponsiveDashboardLayout>
+  );
+}
+
+/* ─── Manual payment modal (UPI QR / bank transfer + submit reference) ─── */
+function PayModal({ plan, offerPct, isYearly, onClose, onDone }: {
+  plan: { id: number; name: string; amount: number }; offerPct: number; isYearly: boolean;
+  onClose: () => void; onDone: () => void;
+}) {
+  const { data: pay } = trpc.payment.instructions.useQuery();
+  const createOrder = trpc.payment.createOrder.useMutation();
+  const [method, setMethod] = useState<"upi" | "bank">("upi");
+  const [reference, setReference] = useState("");
+  const [copied, setCopied] = useState("");
+  const copy = (t: string, k: string) => { navigator.clipboard.writeText(t).then(() => { setCopied(k); setTimeout(() => setCopied(""), 1400); }); };
+  const upiLink = pay?.upiId ? `upi://pay?pa=${encodeURIComponent(pay.upiId)}&pn=${encodeURIComponent(pay.upiName || "DigitalCarda")}&am=${plan.amount}&cu=INR` : "";
+  const qrSrc = pay?.upiQr || (upiLink ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiLink)}` : "");
+
+  const submit = async () => {
+    if (reference.trim().length < 3) return toast.error("Enter your UPI/transaction reference (UTR)");
+    try {
+      await createOrder.mutateAsync({ packageId: plan.id, billingCycle: isYearly ? "yearly" : "monthly", method, reference: reference.trim(), offerPercent: offerPct || undefined });
+      toast.success("Payment submitted — we'll verify and activate your plan shortly");
+      onDone();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
+  };
+
+  const Row = ({ label, value, k }: { label: string; value: string; k: string }) => (
+    <div className="flex items-center justify-between gap-2 py-2 border-b border-[#F1F5F9] last:border-0">
+      <div className="min-w-0"><p className="text-[10px] text-[#94A3B8] uppercase tracking-wide">{label}</p><p className="text-[13px] font-semibold text-[#0F172A] truncate">{value || "—"}</p></div>
+      {value && <button onClick={() => copy(value, k)} className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] flex items-center justify-center shrink-0">{copied === k ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} className="text-[#64748B]" />}</button>}
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-xl w-full max-w-md relative z-10 max-h-[94vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#F1F5F9] shrink-0">
+          <div><p className="text-base font-bold text-[#0F172A]">Pay {inr(plan.amount)}</p><p className="text-[11px] text-[#94A3B8]">{plan.name} · {isYearly ? "Yearly" : "Monthly"}</p></div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#F1F5F9] text-[#64748B]"><X size={18} /></button>
+        </div>
+
+        <div className="flex rounded-xl bg-[#F1F5F9] p-1 m-4 mb-0">
+          {(["upi", "bank"] as const).map((m) => (
+            <button key={m} onClick={() => setMethod(m)} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${method === m ? "bg-white text-[#0F172A] shadow-sm" : "text-[#64748B]"}`}>{m === "upi" ? "UPI / QR" : "Bank Transfer"}</button>
+          ))}
+        </div>
+
+        <div className="p-4 overflow-y-auto">
+          {method === "upi" ? (
+            <div className="text-center">
+              {qrSrc ? <img src={qrSrc} alt="UPI QR" className="w-44 h-44 mx-auto rounded-xl border border-[#F1F5F9] p-1.5" /> : <div className="w-44 h-44 mx-auto rounded-xl bg-[#F8FAFC] flex items-center justify-center text-[#94A3B8] text-xs">QR unavailable</div>}
+              <p className="text-[11px] text-[#94A3B8] mt-2">Scan with any UPI app, or use the ID below</p>
+              <div className="mt-3 rounded-xl border border-[#E2E8F0] px-3"><Row label="UPI ID" value={pay?.upiId || ""} k="upi" /></div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-[#E2E8F0] px-3">
+              <Row label="Account holder" value={pay?.bankHolder || ""} k="h" />
+              <Row label="Account number" value={pay?.bankAccount || ""} k="a" />
+              <Row label="IFSC" value={pay?.bankIfsc || ""} k="i" />
+              <Row label="Bank" value={pay?.bankName || ""} k="b" />
+            </div>
+          )}
+
+          {pay?.note && <p className="text-[11px] text-[#92400E] bg-[#FEF3C7]/60 border border-[#FDE68A] rounded-lg p-2.5 mt-3 leading-relaxed">{pay.note}</p>}
+
+          <div className="mt-4">
+            <label className="block text-[11px] font-semibold text-[#64748B] mb-1">After paying, enter your reference</label>
+            <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UPI ref / UTR / txn ID" className="h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]" />
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-[#F1F5F9] shrink-0">
+          <button onClick={submit} disabled={createOrder.isPending} className="w-full h-12 gradient-gold text-[#0F172A] rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-gold disabled:opacity-60">
+            {createOrder.isPending ? <><Loader2 size={18} className="animate-spin" /> Submitting…</> : <><Check size={18} /> I've paid — submit for verification</>}
+          </button>
+          <p className="text-[11px] text-[#94A3B8] text-center mt-2">Your plan activates once our team verifies the payment.</p>
+        </div>
+      </div>
+    </div>
   );
 }
