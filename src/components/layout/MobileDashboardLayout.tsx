@@ -122,6 +122,7 @@ const NAV: Record<string, NavConfig> = {
       ] },
       { title: "My Card", items: [
         { icon: Home, label: "Profile", path: "/dashboard/home" },
+        { icon: Palette, label: "Templates", path: "/dashboard/templates" },
         { icon: Info, label: "About Us", path: "/dashboard/about" },
         { icon: ShoppingBag, label: "Products / Services", path: "/dashboard/products?tab=products" },
         { icon: Wallet, label: "Payments", path: "/dashboard/payments" },
@@ -137,7 +138,6 @@ const NAV: Record<string, NavConfig> = {
       ] },
       { title: "Settings", items: [
         { icon: ToggleRight, label: "Modules", path: "/dashboard/settings?tab=module" },
-        { icon: Palette, label: "Select Theme", path: "/dashboard/settings?tab=theme" },
         { icon: Search, label: "SEO", path: "/dashboard/settings?tab=seo" },
         { icon: Package, label: "Package", path: "/dashboard/settings?tab=package" },
         { icon: ReceiptText, label: "Invoice", path: "/dashboard/settings?tab=invoice" },

@@ -25,6 +25,7 @@ const customerGroups: NavGroup[] = [
   ] },
   { title: "My Card", items: [
     { label: "Profile", icon: HomeIcon, path: "/dashboard/home" },
+    { label: "Templates", icon: Palette, path: "/dashboard/templates" },
     { label: "About Us", icon: Info, path: "/dashboard/about" },
     { label: "Products / Services", icon: ShoppingBag, path: "/dashboard/products?tab=products" },
     { label: "Payments", icon: Wallet, path: "/dashboard/payments" },
@@ -40,7 +41,6 @@ const customerGroups: NavGroup[] = [
   ] },
   { title: "Settings", items: [
     { label: "Modules", icon: ToggleRight, path: "/dashboard/settings?tab=module" },
-    { label: "Select Theme", icon: Palette, path: "/dashboard/settings?tab=theme" },
     { label: "SEO", icon: Search, path: "/dashboard/settings?tab=seo" },
     { label: "Package", icon: Package, path: "/dashboard/settings?tab=package" },
     { label: "Invoice", icon: ReceiptText, path: "/dashboard/settings?tab=invoice" },
