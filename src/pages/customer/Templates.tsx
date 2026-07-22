@@ -7,11 +7,13 @@ import { useCustomer } from "@/hooks/useCustomer";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
 
 const SWATCHES = ["#F7B31C", "#14243E", "#3B82F6", "#A21CAF", "#06B6D4", "#EF4444", "#0F172A", "#EAB308", "#16A34A", "#DB2777"];
+const SECONDARY_SWATCHES = ["#0F172A", "#1E293B", "#0f2b2e", "#3f1d2e", "#1e1b4b", "#422006", "#0c4a6e", "#14532d", "#3b0764", "#414141"];
 
 export default function CustomerTemplates() {
   const { data, update } = useCustomer();
   const [sel, setSel] = useState<number>(Number(data.theme) || 1);
   const [color, setColor] = useState<string>(String(data.color || "#F7B31C"));
+  const [secondary, setSecondary] = useState<string>(String(data.color2 || ""));
   const [query, setQuery] = useState("");
   const [dirty, setDirty] = useState(false);
 
@@ -19,17 +21,19 @@ export default function CustomerTemplates() {
   useEffect(() => {
     setSel(Number(data.theme) || 1);
     setColor(String(data.color || "#F7B31C"));
-  }, [data.theme, data.color]);
+    setSecondary(String(data.color2 || ""));
+  }, [data.theme, data.color, data.color2]);
 
   // Real thumbnails: the user's own card data rendered in each of the 31 templates
   const thumbs = useMemo(() => {
-    const pc = { ...data, color };
+    const pc = { ...data, color, color2: secondary };
     return Array.from({ length: TEMPLATE_COUNT }, (_, i) => buildCardThumb(pc, i + 1));
-  }, [data, color]);
+  }, [data, color, secondary]);
 
   const pick = (n: number) => { setSel(n); setDirty(true); };
   const pickColor = (c: string) => { setColor(c); setDirty(true); };
-  const save = () => { update({ theme: String(sel), color }); setDirty(false); toast.success(`Template ${sel} applied to your card`); };
+  const pickSecondary = (c: string) => { setSecondary(c); setDirty(true); };
+  const save = () => { update({ theme: String(sel), color, color2: secondary }); setDirty(false); toast.success(`Template ${sel} applied to your card`); };
 
   const list = Array.from({ length: TEMPLATE_COUNT }, (_, i) => i + 1)
     .filter((n) => !query || `template ${n}`.includes(query.toLowerCase().trim()) || String(n) === query.trim());
@@ -43,8 +47,10 @@ export default function CustomerTemplates() {
         </button>
       }>
 
-      {/* ── Colour ── */}
-      <Panel title="Card colour" subtitle="Sets the accent colour across your chosen template">
+      {/* ── Colours ── */}
+      <Panel title="Colour combination" subtitle="Fully customise your card — primary accent + secondary (dark sections)">
+        {/* Primary */}
+        <p className="text-[11px] font-semibold text-[#64748B] mb-2">Primary <span className="font-normal text-[#94A3B8]">· buttons, highlights & icons</span></p>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-2 py-1.5">
             <input type="color" value={color} onChange={(e) => pickColor(e.target.value)} className="w-8 h-8 rounded-lg border border-[#E2E8F0] cursor-pointer bg-transparent" />
@@ -58,6 +64,26 @@ export default function CustomerTemplates() {
             ))}
           </div>
         </div>
+
+        {/* Secondary */}
+        <div className="flex items-center justify-between mt-5 mb-2">
+          <p className="text-[11px] font-semibold text-[#64748B]">Secondary <span className="font-normal text-[#94A3B8]">· dark section backgrounds</span></p>
+          {secondary && <button onClick={() => pickSecondary("")} className="text-[10px] font-semibold text-[#F7B31C] hover:text-[#D97706]">Reset to template default</button>}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-2 py-1.5">
+            <input type="color" value={secondary || "#0F172A"} onChange={(e) => pickSecondary(e.target.value)} className="w-8 h-8 rounded-lg border border-[#E2E8F0] cursor-pointer bg-transparent" />
+            <input value={secondary} onChange={(e) => pickSecondary(e.target.value)} placeholder="default" className="w-24 h-8 bg-transparent text-sm font-mono outline-none placeholder:text-[#CBD5E1]" />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {SECONDARY_SWATCHES.map((c) => (
+              <button key={c} onClick={() => pickSecondary(c)} aria-label={c}
+                className={`w-9 h-9 rounded-lg ring-2 transition-all ${secondary.toLowerCase() === c.toLowerCase() ? "ring-[#F7B31C] scale-110" : "ring-transparent hover:scale-105"}`}
+                style={{ background: c }} />
+            ))}
+          </div>
+        </div>
+        <p className="text-[11px] text-[#94A3B8] mt-2">Leave secondary empty to keep each template's original dark colour.</p>
       </Panel>
 
       {/* ── Gallery ── */}

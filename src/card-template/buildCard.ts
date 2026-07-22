@@ -10,6 +10,25 @@ for (const [path, css] of Object.entries(STYLE_MODULES)) {
   if (n) STYLES[n] = css;
 }
 export const TEMPLATE_COUNT = 31;
+
+/* Perceived brightness of a #rrggbb colour (0 dark … 1 light). */
+const lumOf = (hex: string) => {
+  const h = hex.replace("#", "");
+  if (h.length < 6) return 1;
+  const r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+/* Make each template's dark *background* colours user-customisable: swap them for
+   var(--theme-secondary, #original). With no secondary set the fallback keeps the
+   template's original look, so this is a zero-risk change until the user opts in.
+   Text colours (color:) are untouched, so contrast is preserved. */
+const themeableSecondary = (css: string) =>
+  css.replace(/(background(?:-color|-image)?)\s*:\s*([^;{}]+)/gi, (_m, prop: string, val: string) => {
+    const nv = val.replace(/#([0-9a-fA-F]{6})\b/g, (hx, h: string) => (lumOf("#" + h) < 0.5 ? `var(--theme-secondary, #${h})` : hx));
+    return `${prop}: ${nv}`;
+  });
+for (const n of Object.keys(STYLES)) STYLES[n] = themeableSecondary(STYLES[n]);
+
 const styleFor = (theme: number) => STYLES[String(Math.min(TEMPLATE_COUNT, Math.max(1, Number(theme) || 1)))] || STYLES["1"] || "";
 
 type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
@@ -39,6 +58,7 @@ const SOCIAL_FA: Record<string, string> = {
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
   const accent = s(c.color) || "#F7B31C";
   const accentDark = darken(accent, 0.16);
+  const secondary = s(c.color2);
   const theme = String(Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1)));
   const slug = s(c.slug);
   const cardUrl = `https://digitalcarda.in/${slug}`;
@@ -279,7 +299,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 <style>
 ${mainCss}
 ${styleFor(Number(theme))}
-:root{--theme-color:${accent};}
+:root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 html{scroll-behavior:smooth;}
 body{background:#f1f1f1;}
 main{padding-bottom:78px;box-shadow:none;}
@@ -442,6 +462,7 @@ function saveVCard(){
    used for the template picker thumbnails. No scripts, no other sections. */
 export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
   const accent = s(c.color) || "#F7B31C";
+  const secondary = s(c.color2);
   const theme = Math.min(TEMPLATE_COUNT, Math.max(1, Number(themeNum) || 1));
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
   const initial = (s(c.name)[0] || "D").toUpperCase();
@@ -463,7 +484,7 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
 <style>
 ${mainCss}
 ${styleFor(theme)}
-:root{--theme-color:${accent};}
+:root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 html,body{margin:0;background:#fff;overflow:hidden;}
 main{box-shadow:none;padding:0;}
 #home-card-share,.view,.footer{display:none !important;}
