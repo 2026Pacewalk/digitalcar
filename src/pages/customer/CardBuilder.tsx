@@ -67,7 +67,7 @@ export default function CardBuilder() {
   const createCardMutation = trpc.card.create.useMutation({
     onSuccess: (data) => {
       toast.success("Card created!");
-      navigate(`/dashboard/builder/${data.id}`);
+      if (data) navigate(`/dashboard/builder/${data.id}`);
     },
   });
 
@@ -255,7 +255,7 @@ export default function CardBuilder() {
                   </div>
                 ) : (
                   <div className="p-4 space-y-3">
-                    {card.blocks.map((block: { id: number; type: string; content: Record<string, unknown>; config: Record<string, unknown>; isActive: boolean }) => (
+                    {card.blocks.map((block: { id: number; type: string; content: unknown; config: unknown; isActive: boolean }) => (
                       <div
                         key={block.id}
                         onClick={() => {
@@ -266,7 +266,7 @@ export default function CardBuilder() {
                           selectedBlock === block.id ? "ring-2 ring-[#D4AF37]" : "hover:ring-1 hover:ring-[#E5E5E5]"
                         } ${!block.isActive ? "opacity-50" : ""}`}
                       >
-                        <BlockPreview type={block.type} content={block.content} />
+                        <BlockPreview type={block.type} content={block.content as Record<string, unknown>} />
                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
@@ -299,7 +299,7 @@ export default function CardBuilder() {
             <div className="flex-1 overflow-y-auto p-4">
               <BlockSettings
                 type={selectedBlockData.type}
-                content={selectedBlockData.content}
+                content={selectedBlockData.content as Record<string, unknown>}
                 onChange={(content) => handleUpdateBlockContent(selectedBlockData.id, content)}
               />
             </div>
@@ -328,8 +328,8 @@ function BlockPreview({ type, content }: { type: string; content: Record<string,
       return (
         <div className="p-4 space-y-2">
           <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">Contact</h4>
-          {content.phone && <p className="text-xs text-[#666666] flex items-center gap-2"><Phone size={12} /> {content.phone as string}</p>}
-          {content.email && <p className="text-xs text-[#666666] flex items-center gap-2"><MessageSquare size={12} /> {content.email as string}</p>}
+          {!!content.phone && <p className="text-xs text-[#666666] flex items-center gap-2"><Phone size={12} /> {content.phone as string}</p>}
+          {!!content.email && <p className="text-xs text-[#666666] flex items-center gap-2"><MessageSquare size={12} /> {content.email as string}</p>}
           {!content.phone && !content.email && <p className="text-xs text-[#999999]">Add your contact details</p>}
         </div>
       );

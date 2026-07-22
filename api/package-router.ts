@@ -24,9 +24,10 @@ export const packageRouter = createRouter({
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
-      return db.query.subscriptionPackages.findFirst({
+      const pkg = await db.query.subscriptionPackages.findFirst({
         where: eq(subscriptionPackages.id, input.id),
       });
+      return pkg ?? null;
     }),
 
   create: adminQuery

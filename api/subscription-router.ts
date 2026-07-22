@@ -20,11 +20,13 @@ async function referralDiscountFor(db: ReturnType<typeof getDb>, user: { id: num
 export const subscriptionRouter = createRouter({
   mySubscription: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
-    return db.query.subscriptions.findFirst({
+    // Coalesce to null — tRPC/react-query reject an `undefined` query result.
+    const sub = await db.query.subscriptions.findFirst({
       where: eq(subscriptions.userId, ctx.user.id),
       with: { package: true },
       orderBy: [desc(subscriptions.createdAt)],
     });
+    return sub ?? null;
   }),
 
   subscribe: authedQuery

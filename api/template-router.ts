@@ -39,9 +39,10 @@ export const templateRouter = createRouter({
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
-      return db.query.templates.findFirst({
+      const tpl = await db.query.templates.findFirst({
         where: eq(templates.id, input.id),
       });
+      return tpl ?? null;
     }),
 
   create: adminQuery
