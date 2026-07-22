@@ -39,3 +39,18 @@ build/
 # Test coverage
 coverage/
 .nyc_output/
+
+# Customer data export (PII/credentials) — never commit
+/migration/
+
+# Enquiry export (PII) served locally — never commit
+public/enquiries.json
+
+# Customer export (PII) served locally — never commit
+public/customers.json
+public/product.json
+public/gallery.json
+public/video.json
+public/offer.json
+public/uploads.json
+public/qrcode.json

@@ -1,344 +1,118 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import TopBar from "@/components/layout/TopBar";
-import { useAuth } from "@/hooks/useAuth";
-import { useState, useMemo } from "react";
-import {
-  Save, User, Lock, Bell, CreditCard, Camera,
-  Palette, Eye, Check, Sparkles,
-} from "lucide-react";
-import { TEMPLATES, renderTemplate } from "@/data/templates";
-import type { TemplateColors, CardData } from "@/data/templates";
-import ColorPicker from "@/components/template/ColorPicker";
-import TemplatePreviewModal from "@/components/template/TemplatePreviewModal";
+import { useState } from "react";
+import { Settings as SettingsIcon, Save, Search, Palette, ToggleRight, KeyRound } from "lucide-react";
 import { toast } from "sonner";
+import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/customer/ModuleShell";
+import { useCustomer } from "@/hooks/useCustomer";
 
-const demoCardData: CardData = {
-  businessName: "Your Business",
-  ownerName: "Your Name",
-  designation: "Your Designation",
-  phone: "+91 98765 43210",
-  whatsapp: "+919876543210",
-  email: "you@business.com",
-  website: "www.yourbusiness.com",
-  address: "Your Business Address",
-  socialLinks: [
-    { platform: "facebook", url: "#" },
-    { platform: "instagram", url: "#" },
-  ],
-};
+const MODULES = [
+  { on: "about_on", key: "about", name: "About Us", def: "About Us" },
+  { on: "product_on", key: "product", name: "Products", def: "Products" },
+  { on: "payment_on", key: "payment", name: "Payment", def: "Payment" },
+  { on: "gallery_on", key: "gallery", name: "Gallery", def: "Our Gallery" },
+  { on: "video_on", key: "video", name: "Video", def: "Video Gallery" },
+  { on: "offer_on", key: "offer", name: "Offers", def: "Offers" },
+  { on: "enquiry_on", key: "enquiry", name: "Enquiry Form", def: "Enquiry Form" },
+  { on: "feedback_on", key: "feedback", name: "Feedback", def: "Feedbacks" },
+  { on: "qrcode_on", key: "qrcode", name: "QR Code", def: "QR Code" },
+  { on: "uploads_on", key: "uploads", name: "Uploads", def: "Uploads" },
+];
+const THEME_COLORS = ["#F7B31C", "#14B8A6", "#3B82F6", "#8B5CF6", "#EC4899", "#EF4444", "#0F172A", "#22C55E"];
 
 export default function CustomerSettings() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("profile");
-  const [saving, setSaving] = useState(false);
+  const { data, update } = useCustomer();
+  const [tab, setTab] = useState<"seo" | "design" | "modules" | "account">("seo");
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [pwd, setPwd] = useState("");
+  const val = (k: string, dflt = "") => (form[k] !== undefined ? form[k] : String(data[k] ?? dflt));
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const isOn = (k: string) => (form[k] !== undefined ? form[k] === "1" : Number(data[k] ?? 1) === 1);
+  const toggle = (k: string) => set(k, isOn(k) ? "0" : "1");
 
-  // Theme state
-  const [themeColors, setThemeColors] = useState<TemplateColors>({ primary: "#F7B31C", secondary: "#0F172A", accent: "#14B8A6" });
-  const [selectedTemplateId, setSelectedTemplateId] = useState(1);
-  const [previewId, setPreviewId] = useState<number | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const save = () => { update(form); toast.success("Settings saved"); setForm({}); };
+  const savePassword = () => { if (pwd.length < 6) { toast.error("Min 6 characters"); return; } update({ password: pwd }); toast.success("Password updated"); setPwd(""); };
 
   const tabs = [
-    { id: "profile", label: "Profile", icon: User },
-    { id: "theme", label: "Select Theme", icon: Palette },
-    { id: "security", label: "Security", icon: Lock },
-    { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "billing", label: "Billing", icon: CreditCard },
+    { id: "seo" as const, label: "SEO", icon: Search },
+    { id: "design" as const, label: "Design", icon: Palette },
+    { id: "modules" as const, label: "Modules", icon: ToggleRight },
+    { id: "account" as const, label: "Account", icon: KeyRound },
   ];
 
-  const handleSave = () => {
-    setSaving(true);
-    setTimeout(() => { setSaving(false); toast.success("Settings saved"); }, 600);
-  };
-
-  const handleSaveTheme = () => {
-    localStorage.setItem("digitalcarda_template_id", String(selectedTemplateId));
-    localStorage.setItem("digitalcarda_template_colors", JSON.stringify(themeColors));
-    toast.success("Theme saved! Your card will now use the selected template.");
-  };
-
-  const handleSelectTemplate = (id: number) => {
-    setSelectedTemplateId(id);
-    toast.success("Template selected! Click Save Theme to apply.");
-  };
-
-  const filteredTemplates = TEMPLATES.filter((t) => t.isActive);
-
   return (
-    <DashboardLayout>
-      <TopBar title="Settings" subtitle="Manage your account and theme" />
-      <div className="p-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar */}
-          <div className="lg:w-64 shrink-0">
-            <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-2 space-y-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                    activeTab === tab.id ? "bg-[#0F172A] text-white" : "text-[#64748B] hover:bg-[#F8FAFC]"
-                  }`}
-                >
-                  <tab.icon size={17} /> {tab.label}
-                </button>
+    <ModuleShell title="Settings" subtitle="SEO, design, sections & account" icon={SettingsIcon}
+      actions={tab !== "account" ? <button onClick={save} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save</button> : undefined}>
+      {/* Tabs */}
+      <div className="flex gap-1.5 flex-wrap">
+        {tabs.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`inline-flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-semibold transition-colors ${tab === t.id ? "bg-[#0F172A] text-white" : "bg-white border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"}`}>
+            <t.icon size={15} /> {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "seo" && (
+        <Panel title="SEO Settings" subtitle="Help your card rank on Google">
+          <div className="grid grid-cols-1 gap-4">
+            <Field label="Meta Title"><input value={val("seo_title")} onChange={(e) => set("seo_title", e.target.value)} className={fieldCls} placeholder="Your Business — Digital Card" /></Field>
+            <Field label="Meta Description"><textarea value={val("seo_description")} onChange={(e) => set("seo_description", e.target.value)} className={areaCls} placeholder="A short description of your business for search engines" /></Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Field key={n} label={`Keyword ${n}`}><input value={val(`keyword${n}`)} onChange={(e) => set(`keyword${n}`, e.target.value)} className={fieldCls} placeholder={`keyword ${n}`} /></Field>
               ))}
             </div>
           </div>
+        </Panel>
+      )}
 
-          {/* Content */}
-          <div className="flex-1 bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-6">
-
-            {/* ─── THEME TAB ─── */}
-            {activeTab === "theme" && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-[#0F172A] flex items-center gap-2">
-                    <Palette size={18} className="text-[#F7B31C]" /> Select Theme
-                  </h3>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">Choose a template and customize colors for your digital card</p>
-                </div>
-
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                  {/* Color Picker */}
-                  <div className="xl:col-span-1">
-                    <ColorPicker colors={themeColors} onChange={setThemeColors} />
-
-                    {/* Current Selection */}
-                    <div className="mt-4 bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-4">
-                      <p className="text-xs font-semibold text-[#0F172A] mb-2 flex items-center gap-2">
-                        <Sparkles size={14} className="text-[#F7B31C]" /> Selected Template
-                      </p>
-                      {(() => {
-                        const tmpl = TEMPLATES.find((t) => t.id === selectedTemplateId);
-                        if (!tmpl) return null;
-                        return (
-                          <div>
-                            <div className="w-full h-48 rounded-xl overflow-hidden bg-[#F8FAFC] mb-2 relative">
-                              <div dangerouslySetInnerHTML={{ __html: renderTemplate(selectedTemplateId, demoCardData, themeColors) }} />
-                            </div>
-                            <p className="text-sm font-semibold text-[#0F172A]">{tmpl.name}</p>
-                            <p className="text-[10px] text-[#94A3B8] capitalize">{tmpl.category} &middot; {tmpl.layoutType}</p>
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <button
-                      onClick={handleSaveTheme}
-                      className="w-full mt-4 h-11 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                    >
-                      <Save size={16} /> Save Theme
-                    </button>
-                  </div>
-
-                  {/* Template Grid */}
-                  <div className="xl:col-span-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {filteredTemplates.map((tmpl) => {
-                        const html = renderTemplate(tmpl.id, demoCardData, themeColors);
-                        const isSelected = selectedTemplateId === tmpl.id;
-                        return (
-                          <div
-                            key={tmpl.id}
-                            className={`bg-white rounded-2xl shadow-premium border-2 overflow-hidden transition-all ${
-                              isSelected ? "border-[#F7B31C] shadow-gold" : "border-[#F1F5F9] hover:border-[#CBD5E1]"
-                            }`}
-                          >
-                            <div className="relative bg-[#F8FAFC] p-3 flex justify-center">
-                              <div
-                                className="w-[160px] h-[220px] rounded-[14px] overflow-hidden shadow-md bg-white"
-                                style={{ transform: "scale(0.8)", transformOrigin: "top center", height: "280px", marginBottom: "-60px" }}
-                                dangerouslySetInnerHTML={{ __html: html }}
-                              />
-                              {isSelected && (
-                                <div className="absolute top-2 left-2 z-10 flex items-center gap-1 bg-emerald-500 px-2 py-1 rounded-lg">
-                                  <Check size={10} className="text-white" />
-                                  <span className="text-[9px] font-semibold text-white">Active</span>
-                                </div>
-                              )}
-                              {tmpl.isPremium && (
-                                <div className="absolute top-2 right-2 z-10 badge-gold text-[9px]">Premium</div>
-                              )}
-                            </div>
-                            <div className="p-3 pt-2">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-xs font-semibold text-[#0F172A]">{tmpl.name}</h3>
-                                <div className="flex gap-1">
-                                  <div className="w-3 h-3 rounded-full border border-[#E2E8F0]" style={{ background: themeColors.primary }} />
-                                  <div className="w-3 h-3 rounded-full border border-[#E2E8F0]" style={{ background: themeColors.secondary }} />
-                                  <div className="w-3 h-3 rounded-full border border-[#E2E8F0]" style={{ background: themeColors.accent }} />
-                                </div>
-                              </div>
-                              <div className="flex gap-2 mt-2">
-                                <button
-                                  onClick={() => { setPreviewId(tmpl.id); setIsPreviewOpen(true); }}
-                                  className="flex-1 h-7 rounded-lg border border-[#E2E8F0] text-[#64748B] text-[10px] font-medium flex items-center justify-center gap-1 hover:bg-[#F8FAFC]"
-                                >
-                                  <Eye size={10} /> View
-                                </button>
-                                <button
-                                  onClick={() => handleSelectTemplate(tmpl.id)}
-                                  className={`flex-1 h-7 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition-all ${
-                                    isSelected ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "gradient-gold text-[#0F172A]"
-                                  }`}
-                                >
-                                  {isSelected ? <><Check size={10} /> Active</> : <><Check size={10} /> Select</>}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ─── PROFILE TAB ─── */}
-            {activeTab === "profile" && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-[#0F172A]">Profile Settings</h3>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">Update your personal information</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-2xl gradient-gold flex items-center justify-center relative">
-                    <span className="text-[#0F172A] text-2xl font-bold">{(user?.fullName || "U").charAt(0).toUpperCase()}</span>
-                    <button className="absolute -bottom-1 -right-1 w-7 h-7 rounded-lg bg-[#0F172A] flex items-center justify-center border-2 border-white">
-                      <Camera size={12} className="text-white" />
-                    </button>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-[#0F172A]">{user?.fullName || "User"}</p>
-                    <p className="text-xs text-[#94A3B8]">{user?.email || ""}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Full Name</label><input defaultValue={user?.fullName || ""} className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Email</label><input defaultValue={user?.email || ""} className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Phone</label><input placeholder="+1 234 567 890" className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Company</label><input placeholder="Your company" className="input-premium w-full" /></div>
-                </div>
-                <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Bio</label><textarea rows={3} placeholder="Short bio..." className="input-premium w-full resize-none" /></div>
-              </div>
-            )}
-
-            {/* ─── SECURITY TAB ─── */}
-            {activeTab === "security" && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-[#0F172A]">Security</h3>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">Update your password and security settings</p>
-                </div>
-                <div className="space-y-4">
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Current Password</label><input type="password" className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">New Password</label><input type="password" className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Confirm New Password</label><input type="password" className="input-premium w-full" /></div>
-                </div>
-                <div className="pt-4 border-t border-[#F1F5F9]">
-                  <label className="flex items-center gap-3 p-4 rounded-xl bg-[#F8FAFC] cursor-pointer">
-                    <input type="checkbox" className="rounded border-[#E2E8F0]" />
-                    <div>
-                      <p className="text-sm font-medium text-[#0F172A]">Two-Factor Authentication</p>
-                      <p className="text-xs text-[#94A3B8]">Add an extra layer of security</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* ─── NOTIFICATIONS TAB ─── */}
-            {activeTab === "notifications" && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-[#0F172A]">Notifications</h3>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">Choose what notifications you receive</p>
-                </div>
-                <div className="space-y-3">
-                  {[
-                    { label: "New lead captured", desc: "Get notified when someone fills your form", defaultOn: true },
-                    { label: "Card viewed", desc: "Daily summary of card views", defaultOn: true },
-                    { label: "Subscription updates", desc: "Payment and plan changes", defaultOn: true },
-                    { label: "Product updates", desc: "New features and improvements", defaultOn: false },
-                    { label: "Marketing emails", desc: "Tips, offers, and promotions", defaultOn: false },
-                  ].map((item, i) => (
-                    <label key={i} className="flex items-center gap-4 p-4 rounded-xl hover:bg-[#F8FAFC] transition-colors cursor-pointer">
-                      <input type="checkbox" defaultChecked={item.defaultOn} className="rounded border-[#E2E8F0] shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-[#0F172A]">{item.label}</p>
-                        <p className="text-xs text-[#94A3B8]">{item.desc}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ─── BILLING TAB ─── */}
-            {activeTab === "billing" && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-[#0F172A]">Billing</h3>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">Manage your payment methods</p>
-                </div>
-                <div className="p-4 rounded-xl bg-[#F8FAFC] flex items-center gap-4">
-                  <div className="w-12 h-8 bg-gradient-to-r from-[#1A1A1A] to-[#333] rounded-md flex items-center justify-center">
-                    <CreditCard size={16} className="text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-[#0F172A]">Visa ending in 4242</p>
-                    <p className="text-xs text-[#94A3B8]">Expires 12/25</p>
-                  </div>
-                  <button className="text-xs text-[#F7B31C] hover:text-[#D97706] font-medium">Edit</button>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-[#0F172A] mb-3">Billing History</h4>
-                  <div className="space-y-2">
-                    {[
-                      { date: "May 1, 2026", amount: "$19.99", status: "Paid" },
-                      { date: "Apr 1, 2026", amount: "$19.99", status: "Paid" },
-                      { date: "Mar 1, 2026", amount: "$19.99", status: "Paid" },
-                    ].map((inv, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-[#F8FAFC] transition-colors">
-                        <span className="text-sm text-[#64748B]">{inv.date}</span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-medium text-[#0F172A]">{inv.amount}</span>
-                          <span className="badge-green">{inv.status}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab !== "theme" && (
-              <div className="mt-6 pt-6 border-t border-[#F1F5F9] flex justify-end">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-2 h-11 px-6 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-50"
-                >
-                  <Save size={16} /> {saving ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-            )}
+      {tab === "design" && (
+        <Panel title="Design & Theme" subtitle="Personalise your card's look">
+          <Field label="Theme">
+            <select value={val("theme", "1")} onChange={(e) => set("theme", e.target.value)} className={fieldCls}>
+              {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>Theme {n}</option>)}
+            </select>
+          </Field>
+          <div className="mt-5">
+            <label className="block text-xs font-semibold text-[#334155] mb-2">Primary Color</label>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {THEME_COLORS.map((c) => (
+                <button key={c} onClick={() => set("color", c)} className={`w-9 h-9 rounded-full ring-2 transition-all ${val("color", "#F7B31C").toLowerCase() === c.toLowerCase() ? "ring-[#0F172A] scale-110" : "ring-transparent hover:scale-105"}`} style={{ background: c }} aria-label={c} />
+              ))}
+              <input type="color" value={val("color", "#F7B31C")} onChange={(e) => set("color", e.target.value)} className="w-9 h-9 rounded-full border border-[#E2E8F0] cursor-pointer bg-transparent" />
+            </div>
           </div>
-        </div>
-      </div>
+        </Panel>
+      )}
 
-      {/* Preview Modal */}
-      <TemplatePreviewModal
-        isOpen={isPreviewOpen}
-        templateId={previewId}
-        colors={themeColors}
-        cardData={demoCardData}
-        selectedId={selectedTemplateId}
-        onClose={() => setIsPreviewOpen(false)}
-        onSelect={handleSelectTemplate}
-      />
-    </DashboardLayout>
+      {tab === "modules" && (
+        <Panel title="Card Sections" subtitle="Turn sections on/off and rename them">
+          <div className="divide-y divide-[#F1F5F9]">
+            {MODULES.map((m) => (
+              <div key={m.on} className="flex items-center gap-3 py-3">
+                <button onClick={() => toggle(m.on)} className={`w-11 h-6 rounded-full transition-colors shrink-0 relative ${isOn(m.on) ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`} aria-label={`Toggle ${m.name}`}>
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${isOn(m.on) ? "left-[22px]" : "left-0.5"}`} />
+                </button>
+                <span className="text-sm font-medium text-[#0F172A] w-28 shrink-0">{m.name}</span>
+                <input value={val(m.key, m.def)} onChange={(e) => set(m.key, e.target.value)} disabled={!isOn(m.on)} className={`${fieldCls} h-9 flex-1 disabled:opacity-50`} placeholder={`Display title (${m.def})`} />
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {tab === "account" && (
+        <Panel title="Account & Password" subtitle="Login credentials for your card">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Username"><input value={val("username")} onChange={(e) => set("username", e.target.value)} className={fieldCls} /></Field>
+            <Field label="Email"><input value={val("email")} onChange={(e) => set("email", e.target.value)} className={fieldCls} type="email" /></Field>
+          </div>
+          <div className="flex justify-end mt-4"><button onClick={save} className="flex items-center gap-2 h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold"><Save size={15} /> Save Account</button></div>
+          <hr className="my-5 border-[#F1F5F9]" />
+          <div className="flex flex-col sm:flex-row items-end gap-3">
+            <Field label="New Password"><input value={pwd} onChange={(e) => setPwd(e.target.value)} type="password" className={fieldCls} placeholder="Min 6 characters" /></Field>
+            <button onClick={savePassword} className="h-11 px-5 rounded-xl bg-[#0F172A] text-white text-sm font-semibold hover:bg-[#1E293B] shrink-0 flex items-center gap-2"><KeyRound size={15} /> Update Password</button>
+          </div>
+        </Panel>
+      )}
+    </ModuleShell>
   );
 }

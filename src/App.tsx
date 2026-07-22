@@ -42,6 +42,18 @@ import CustomerSettings from "./pages/customer/Settings";
 import CustomerProfile from "./pages/customer/Profile";
 import CustomerQR from "./pages/customer/QR";
 import AITools from "./pages/customer/AITools";
+import CustomerHome from "./pages/customer/Home";
+import CustomerAbout from "./pages/customer/About";
+import CustomerProducts from "./pages/customer/Products";
+import CustomerPayments from "./pages/customer/Payments";
+import CustomerMedia from "./pages/customer/Media";
+import CustomerSocial from "./pages/customer/Social";
+import CustomerUploads from "./pages/customer/Uploads";
+import CustomerEnquiry from "./pages/customer/Enquiry";
+import CustomerViewCard from "./pages/customer/ViewCard";
+import CustomerQRCode from "./pages/customer/QRCode";
+import CustomerOffers from "./pages/customer/Offers";
+import CustomerReviews from "./pages/customer/Reviews";
 import PublicCard from "./pages/PublicCard";
 import NotFound from "./pages/NotFound";
 import { Toaster } from "@/components/ui/sonner";
@@ -123,6 +135,18 @@ export default function App() {
         <Route path="/dashboard/profile" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerProfile /></RoleRoute>} />
         <Route path="/dashboard/qr" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerQR /></RoleRoute>} />
         <Route path="/dashboard/ai" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><AITools /></RoleRoute>} />
+        <Route path="/dashboard/home" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerHome /></RoleRoute>} />
+        <Route path="/dashboard/about" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerAbout /></RoleRoute>} />
+        <Route path="/dashboard/products" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerProducts /></RoleRoute>} />
+        <Route path="/dashboard/payments" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerPayments /></RoleRoute>} />
+        <Route path="/dashboard/media" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerMedia /></RoleRoute>} />
+        <Route path="/dashboard/social" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSocial /></RoleRoute>} />
+        <Route path="/dashboard/uploads" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerUploads /></RoleRoute>} />
+        <Route path="/dashboard/enquiry" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerEnquiry /></RoleRoute>} />
+        <Route path="/dashboard/view" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerViewCard /></RoleRoute>} />
+        <Route path="/dashboard/qrcode" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerQRCode /></RoleRoute>} />
+        <Route path="/dashboard/offers" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerOffers /></RoleRoute>} />
+        <Route path="/dashboard/reviews" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerReviews /></RoleRoute>} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

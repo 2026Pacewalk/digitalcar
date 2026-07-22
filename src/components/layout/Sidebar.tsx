@@ -3,7 +3,9 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   LayoutDashboard, CreditCard, Palette, Users, UserCircle, Package,
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
-  ChevronRight, Store, Zap, QrCode, Sparkles, X, Menu,
+  ChevronRight, Store, X,
+  Home as HomeIcon, Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
+  Tag, QrCode, Star,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -28,15 +30,19 @@ const superAdminNav = [
 
 const customerNav = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Card Builder", icon: Zap, path: "/dashboard/builder" },
-  { label: "Templates", icon: Palette, path: "/dashboard/templates" },
-  { label: "My Cards", icon: CreditCard, path: "/dashboard/cards" },
-  { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
-  { label: "Leads", icon: MessageSquare, path: "/dashboard/leads" },
-  { label: "Subscription", icon: Package, path: "/dashboard/subscription" },
-  { label: "QR Codes", icon: QrCode, path: "/dashboard/qr" },
-  { label: "AI Tools", icon: Sparkles, path: "/dashboard/ai" },
+  { label: "Home", icon: HomeIcon, path: "/dashboard/home" },
+  { label: "About Us", icon: Info, path: "/dashboard/about" },
+  { label: "Products", icon: ShoppingBag, path: "/dashboard/products" },
+  { label: "Offers / Deals", icon: Tag, path: "/dashboard/offers" },
+  { label: "Payments", icon: Wallet, path: "/dashboard/payments" },
+  { label: "QR Code", icon: QrCode, path: "/dashboard/qrcode" },
+  { label: "Media", icon: ImageIcon, path: "/dashboard/media" },
+  { label: "Social", icon: Share2, path: "/dashboard/social" },
+  { label: "Google Reviews", icon: Star, path: "/dashboard/reviews" },
+  { label: "Uploads", icon: Upload, path: "/dashboard/uploads" },
   { label: "Settings", icon: Settings, path: "/dashboard/settings" },
+  { label: "View Card", icon: Eye, path: "/dashboard/view" },
+  { label: "Enquiry", icon: Mail, path: "/dashboard/enquiry" },
 ];
 
 const resellerNav = [
