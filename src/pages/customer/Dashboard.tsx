@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
 import { readCustomer, scopedKey } from "@/hooks/useCustomer";
 import { trpc } from "@/providers/trpc";
+import TrialBanner from "@/components/customer/TrialBanner";
 
 /* Glass action button for the dark hero card (icon + tiny label) */
 function GlassAction({ icon: Icon, label, onClick, tone = "default", active = false }: {
@@ -249,6 +250,9 @@ export default function CustomerDashboard() {
             </div>
           </div>
         </div>
+
+        {/* ─── Trial / expiry FOMO ─── */}
+        <TrialBanner isTrial={customer.package_id === 7} expiredOn={customer.expired_on} days={daysPending} views={customer.views} leads={enquiries ?? 0} />
 
         {/* ─── Smart completion ─── */}
         {pct < 100 ? (
