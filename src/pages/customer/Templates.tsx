@@ -1,71 +1,48 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { LayoutGrid, Check, Eye, Save, Palette, Search, Pipette, RotateCcw } from "lucide-react";
+import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
-import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
+import { buildCardThumb } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
 
-const SWATCHES = ["#F7B31C", "#14243E", "#3B82F6", "#A21CAF", "#06B6D4", "#EF4444", "#0F172A", "#EAB308", "#16A34A", "#DB2777"];
-const SECONDARY_SWATCHES = ["#0F172A", "#1E293B", "#0f2b2e", "#3f1d2e", "#1e1b4b", "#422006", "#0c4a6e", "#14532d", "#3b0764", "#414141"];
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const PRIMARY_SW = ["#F7B31C", "#3B82F6", "#16A34A", "#A21CAF", "#EF4444", "#06B6D4", "#F97316", "#EC4899", "#6366F1", "#0F172A"];
+const SECONDARY_SW = ["#0F172A", "#1E293B", "#0f2b2e", "#3f1d2e", "#1e1b4b", "#422006", "#0c4a6e", "#14532d", "#3b0764", "#414141"];
 
-/* Reusable colour control: big live swatch + "any colour" wheel + hex + presets */
-function ColorRow({
-  label, hint, value, placeholder, swatches, allowClear, onChange, ring = "#0F172A",
-}: {
-  label: string; hint: string; value: string; placeholder?: string; swatches: string[];
-  allowClear?: boolean; onChange: (v: string) => void; ring?: string;
+type Preset = { id: number; name: string; style: number; primary: string; secondary: string; active: boolean };
+
+/* Reusable "any colour" control (swatch → OS picker, hex, presets) */
+function ColorRow({ label, hint, value, placeholder, swatches, allowClear, onChange }: {
+  label: string; hint: string; value: string; placeholder?: string; swatches: string[]; allowClear?: boolean; onChange: (v: string) => void;
 }) {
   const nativeRef = useRef<HTMLInputElement>(null);
   const [hex, setHex] = useState(value);
   useEffect(() => setHex(value), [value]);
-  const current = value || placeholder || "#0F172A";
-  const commitHex = (v: string) => {
-    let h = v.trim(); if (h && !h.startsWith("#")) h = "#" + h;
-    setHex(h);
-    if (h === "" && allowClear) onChange("");
-    else if (HEX_RE.test(h)) onChange(h.toLowerCase());
-  };
-
+  const commit = (v: string) => { let h = v.trim(); if (h && !h.startsWith("#")) h = "#" + h; setHex(h); if (h === "" && allowClear) onChange(""); else if (HEX_RE.test(h)) onChange(h.toLowerCase()); };
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <p className="text-[11px] font-semibold text-[#64748B]">{label} <span className="font-normal text-[#94A3B8]">· {hint}</span></p>
-        {allowClear && value && <button onClick={() => onChange("")} className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#F7B31C] hover:text-[#D97706]"><RotateCcw size={11} /> Default</button>}
+        {allowClear && value && <button onClick={() => onChange("")} className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#F7B31C]"><RotateCcw size={11} /> Default</button>}
       </div>
       <div className="flex items-center gap-2.5 flex-wrap">
-        {/* Live current swatch → opens the OS colour picker */}
         <button type="button" onClick={() => nativeRef.current?.click()} title="Choose any colour"
-          className="relative w-11 h-11 rounded-xl border-2 border-white shadow-premium ring-1 ring-[#E2E8F0] overflow-hidden shrink-0 active:scale-95 transition-transform"
-          style={{ background: current }}>
-          <input ref={nativeRef} type="color" value={value || "#0F172A"} onChange={(e) => onChange(e.target.value)}
-            className="absolute inset-0 opacity-0 cursor-pointer" tabIndex={-1} />
+          className="relative w-11 h-11 rounded-xl border-2 border-white shadow-premium ring-1 ring-[#E2E8F0] overflow-hidden shrink-0" style={{ background: value || placeholder || "#0F172A" }}>
+          <input ref={nativeRef} type="color" value={value || "#0F172A"} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" tabIndex={-1} />
         </button>
-
-        {/* "Any colour" wheel button */}
-        <button type="button" onClick={() => nativeRef.current?.click()}
-          className="inline-flex items-center gap-1.5 h-11 px-3 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] transition-colors shrink-0">
-          <span className="w-5 h-5 rounded-full shrink-0" style={{ background: "conic-gradient(from 0deg,#ef4444,#f59e0b,#eab308,#22c55e,#06b6d4,#3b82f6,#a855f7,#ec4899,#ef4444)" }} />
+        <button type="button" onClick={() => nativeRef.current?.click()} className="inline-flex items-center gap-1.5 h-11 px-3 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] shrink-0">
+          <span className="w-5 h-5 rounded-full" style={{ background: "conic-gradient(from 0deg,#ef4444,#f59e0b,#eab308,#22c55e,#06b6d4,#3b82f6,#a855f7,#ec4899,#ef4444)" }} />
           <span className="text-xs font-semibold text-[#334155]"><Pipette size={12} className="inline -mt-0.5 mr-0.5" />Any colour</span>
         </button>
-
-        {/* Hex input */}
         <div className="flex items-center h-11 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3">
           <span className="text-[#94A3B8] text-sm">#</span>
-          <input value={hex.replace(/^#/, "")} onChange={(e) => commitHex(e.target.value.replace(/[^0-9a-fA-F]/g, "").slice(0, 6))}
-            placeholder={placeholder ? placeholder.replace(/^#/, "") : "hex"} className="w-16 h-full bg-transparent text-sm font-mono outline-none placeholder:text-[#CBD5E1]" />
+          <input value={hex.replace(/^#/, "")} onChange={(e) => commit(e.target.value.replace(/[^0-9a-fA-F]/g, "").slice(0, 6))} placeholder={placeholder?.replace(/^#/, "") || "hex"} className="w-16 h-full bg-transparent text-sm font-mono outline-none placeholder:text-[#CBD5E1]" />
         </div>
       </div>
-
-      {/* Presets */}
       <div className="flex items-center gap-2 flex-wrap mt-2.5">
-        {swatches.map((c) => (
-          <button key={c} onClick={() => onChange(c)} aria-label={c}
-            className={`w-8 h-8 rounded-lg ring-2 transition-all ${value.toLowerCase() === c.toLowerCase() ? "scale-110" : "ring-transparent hover:scale-105"}`}
-            style={{ background: c, ...(value.toLowerCase() === c.toLowerCase() ? { boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${ring}` } : {}) }} />
-        ))}
+        {swatches.map((c) => <button key={c} onClick={() => onChange(c)} className={`w-8 h-8 rounded-lg ring-2 ${value.toLowerCase() === c.toLowerCase() ? "ring-[#0F172A] scale-110" : "ring-transparent hover:scale-105"} transition-all`} style={{ background: c }} />)}
       </div>
     </div>
   );
@@ -73,93 +50,100 @@ function ColorRow({
 
 export default function CustomerTemplates() {
   const { data, update } = useCustomer();
-  const { data: siteConfig } = trpc.template.siteConfig.useQuery();
-  const chose = !!String(data.theme || "");
-  const [sel, setSel] = useState<number>(Number(data.theme) || 1);
-  const [color, setColor] = useState<string>(String(data.color || "#F7B31C"));
-  const [secondary, setSecondary] = useState<string>(String(data.color2 || ""));
-  const [query, setQuery] = useState("");
+  const { data: presetData } = trpc.template.presets.useQuery();
+  const presets = useMemo(() => (presetData?.list ?? []).filter((p) => p.active), [presetData]);
+  const defaultId = presetData?.defaultId ?? 1;
+
+  const [selId, setSelId] = useState<number | null>(null);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [primary, setPrimary] = useState<string>("");
+  const [secondary, setSecondary] = useState<string>("");
   const [dirty, setDirty] = useState(false);
 
-  // Seed from the customer record — or the super-admin default if the user hasn't chosen yet
+  const chose = !!String(data.theme || "");
+
+  // Initial selection: match the user's saved template, else the site default
   useEffect(() => {
-    setSel(Number(data.theme) || Number(siteConfig?.defaultId) || 1);
-    setColor(String(data.color || siteConfig?.defaultColor || "#F7B31C"));
-    setSecondary(String(data.color2 || (chose ? "" : siteConfig?.defaultSecondary) || ""));
-  }, [data.theme, data.color, data.color2, siteConfig?.defaultId, siteConfig?.defaultColor, siteConfig?.defaultSecondary, chose]);
+    if (!presets.length) return;
+    let match: Preset | undefined;
+    if (chose) {
+      match = presets.find((p) => p.style === Number(data.theme) && p.primary.toLowerCase() === String(data.color || "").toLowerCase());
+    }
+    const initial = match ?? presets.find((p) => p.id === defaultId) ?? presets[0];
+    setSelId((cur) => cur ?? initial.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presets.length]);
 
-  // Real thumbnails: the user's own card data rendered in each of the 31 templates
-  const thumbs = useMemo(() => {
-    const pc = { ...data, color, color2: secondary };
-    return Array.from({ length: TEMPLATE_COUNT }, (_, i) => buildCardThumb(pc, i + 1));
-  }, [data, color, secondary]);
+  const selected = presets.find((p) => p.id === selId) || null;
+  // Effective colours = custom override (if set) else the preset's own colours
+  const effPrimary = primary || selected?.primary || "#F7B31C";
+  const effSecondary = customOpen ? secondary : (selected?.secondary || "");
 
-  const pick = (n: number) => { setSel(n); setDirty(true); };
-  const pickColor = (c: string) => { setColor(c); setDirty(true); };
-  const pickSecondary = (c: string) => { setSecondary(c); setDirty(true); };
-  const save = () => { update({ theme: String(sel), color, color2: secondary }); setDirty(false); toast.success(`Template ${sel} applied to your card`); };
+  const thumbs = useMemo(() =>
+    presets.map((p) => buildCardThumb({ ...data, color: p.primary, color2: p.secondary }, p.style)),
+    [presets, data]);
 
-  const disabled = new Set(siteConfig?.disabled ?? []);
-  const list = Array.from({ length: TEMPLATE_COUNT }, (_, i) => i + 1)
-    .filter((n) => !disabled.has(n)) // hidden by admin
-    .filter((n) => !query || `template ${n}`.includes(query.toLowerCase().trim()) || String(n) === query.trim());
+  const pick = (id: number) => {
+    setSelId(id); setDirty(true);
+    const p = presets.find((x) => x.id === id);
+    if (p) { setPrimary(""); setSecondary(p.secondary); } // reset custom to preset
+  };
+  const apply = () => {
+    if (!selected) return;
+    update({ theme: String(selected.style), color: effPrimary, color2: customOpen ? secondary : selected.secondary });
+    setDirty(false);
+    toast.success(`"${selected.name}" applied to your card`);
+  };
 
   return (
-    <ModuleShell title="Templates" subtitle={`Choose from ${TEMPLATE_COUNT} one-page card designs — previewed with your own details`} icon={LayoutGrid}
-      actions={
-        <button onClick={save} disabled={!dirty}
-          className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-50">
-          <Save size={16} /> {dirty ? "Apply" : "Applied"}
-        </button>
-      }>
+    <ModuleShell title="Templates" subtitle="Pick a ready-made design — each with its own colour combination" icon={LayoutGrid}
+      actions={<button onClick={apply} disabled={!dirty || !selected} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-50"><Save size={16} /> {dirty ? "Apply" : "Applied"}</button>}>
 
-      {/* ── Colours ── */}
-      <Panel title="Colour combination" subtitle="Choose any colour — primary accent + secondary (dark sections)">
-        <div className="space-y-5">
-          <ColorRow label="Primary" hint="buttons, highlights & icons" value={color}
-            swatches={SWATCHES} onChange={pickColor} ring="#0F172A" />
-          <div className="h-px bg-[#F1F5F9]" />
-          <ColorRow label="Secondary" hint="dark section backgrounds" value={secondary} placeholder="#0F172A"
-            swatches={SECONDARY_SWATCHES} allowClear onChange={pickSecondary} ring="#F7B31C" />
-        </div>
-        <p className="text-[11px] text-[#94A3B8] mt-4">Tip: tap the colour circle or “Any colour” to open the full colour picker. Leave secondary on Default to keep each template's original dark shade.</p>
-      </Panel>
-
-      {/* ── Gallery ── */}
-      <Panel title="All templates" subtitle={`${TEMPLATE_COUNT} designs — tap one to select, then Apply`}
-        right={
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find #" className="h-9 w-24 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] pl-7 pr-2 text-xs outline-none focus:border-[#F7B31C]" />
-            </div>
-            <Link to="/dashboard/view" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#14243E] hover:bg-[#F8FAFC]"><Eye size={13} /> Preview</Link>
-          </div>
-        }>
-        {list.length === 0 ? (
-          <div className="text-center py-10"><Palette size={26} className="mx-auto text-[#CBD5E1] mb-2" /><p className="text-xs text-[#94A3B8]">No template #{query}</p></div>
+      {/* Gallery of prebuilt templates — each shown in its OWN colours */}
+      <Panel title="Choose a template" subtitle={`${presets.length} ready-made designs, previewed with your details`}
+        right={<Link to="/dashboard/view" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#14243E] hover:bg-[#F8FAFC]"><Eye size={13} /> Preview</Link>}>
+        {presets.length === 0 ? (
+          <div className="text-center py-10"><Palette size={26} className="mx-auto text-[#CBD5E1] mb-2" /><p className="text-xs text-[#94A3B8]">No templates available yet.</p></div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {list.map((n) => {
-              const selected = sel === n;
+            {presets.map((p, i) => {
+              const isSel = selId === p.id;
               return (
-                <button key={n} onClick={() => pick(n)}
-                  className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all group ${selected ? "border-[#F7B31C] shadow-gold ring-2 ring-[#F7B31C]/20" : "border-[#F1F5F9] hover:border-[#F7B31C]/50 hover:-translate-y-0.5 hover:shadow-premium"}`}>
-                  {selected && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F7B31C] flex items-center justify-center z-10 shadow"><Check size={13} className="text-[#0F172A]" /></span>}
-                  {siteConfig?.defaultId === n && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
+                <button key={p.id} onClick={() => pick(p.id)}
+                  className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all group ${isSel ? "border-[#F7B31C] shadow-gold ring-2 ring-[#F7B31C]/20" : "border-[#F1F5F9] hover:border-[#F7B31C]/50 hover:-translate-y-0.5 hover:shadow-premium"}`}>
+                  {isSel && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F7B31C] flex items-center justify-center z-10 shadow"><Check size={13} className="text-[#0F172A]" /></span>}
+                  {defaultId === p.id && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
                   <div className="relative w-full overflow-hidden bg-[#F8FAFC] pointer-events-none" style={{ aspectRatio: "3 / 4.4" }}>
-                    <iframe title={`Template ${n}`} srcDoc={thumbs[n - 1]} scrolling="no" tabIndex={-1} loading="lazy"
+                    <iframe title={p.name} srcDoc={thumbs[i]} scrolling="no" tabIndex={-1} loading="lazy"
                       style={{ width: "375px", height: "560px", border: 0, transform: "scale(0.5)", transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
                   </div>
-                  <p className={`text-[11px] font-semibold py-2 text-center transition-colors ${selected ? "text-[#B45309] bg-[#FEF3C7]" : "text-[#334155] group-hover:text-[#0F172A]"}`}>
-                    {selected ? "✓ Selected" : `Template ${n}`}
-                  </p>
+                  <div className="px-2 py-2 flex items-center gap-1.5 justify-center">
+                    <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: p.primary }} />
+                    <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: p.secondary }} />
+                    <p className={`text-[11px] font-semibold truncate ${isSel ? "text-[#B45309]" : "text-[#334155]"}`}>{p.name}</p>
+                  </div>
                 </button>
               );
             })}
           </div>
         )}
       </Panel>
+
+      {/* Optional colour fine-tune for the selected template only */}
+      {selected && (
+        <Panel title="Fine-tune colours" subtitle={`Optional — tweak "${selected.name}" to any colour you like`}
+          right={<button onClick={() => { setCustomOpen((o) => !o); setDirty(true); if (!customOpen) { setPrimary(selected.primary); setSecondary(selected.secondary); } }} className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold transition-colors ${customOpen ? "bg-[#0F172A] text-white" : "border border-[#E2E8F0] text-[#334155] hover:bg-[#F8FAFC]"}`}><SlidersHorizontal size={13} /> {customOpen ? "On" : "Customise"}</button>}>
+          {customOpen ? (
+            <div className="space-y-5">
+              <ColorRow label="Primary" hint="buttons, highlights & icons" value={primary || selected.primary} swatches={PRIMARY_SW} onChange={(v) => { setPrimary(v); setDirty(true); }} />
+              <div className="h-px bg-[#F1F5F9]" />
+              <ColorRow label="Secondary" hint="dark section backgrounds" value={secondary} placeholder="#0F172A" swatches={SECONDARY_SW} allowClear onChange={(v) => { setSecondary(v); setDirty(true); }} />
+            </div>
+          ) : (
+            <p className="text-[12px] text-[#94A3B8]">This template uses its own colours. Tap <b>Customise</b> to override them with any colour.</p>
+          )}
+        </Panel>
+      )}
     </ModuleShell>
   );
 }

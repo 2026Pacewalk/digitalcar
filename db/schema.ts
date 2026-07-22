@@ -405,7 +405,7 @@ export type WithdrawalRequest = typeof withdrawalRequests.$inferSelect;
 export const appSettings = mysqlTable("app_settings", {
   id: serial("id").primaryKey(),
   key: varchar("key", { length: 100 }).notNull().unique(),
-  value: varchar("value", { length: 500 }).notNull(),
+  value: text("value").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
 });
 
