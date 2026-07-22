@@ -118,11 +118,17 @@ export default function Templates() {
               {/* Phone mockup */}
               <div className="bg-gradient-to-br from-[#0F172A] via-[#172033] to-[#1E293B] p-6 sm:p-8 flex justify-center relative overflow-hidden">
                 <div className="absolute -right-8 -top-10 w-40 h-40 rounded-full bg-[#F7B31C]/20 blur-3xl pointer-events-none" />
-                {/* device */}
-                <div className="relative w-[240px] shrink-0" style={{ height: "500px" }}>
-                  <div className="absolute inset-0 rounded-[2.4rem] bg-[#0b1120] p-2.5 shadow-2xl ring-1 ring-white/10">
-                    <div className="relative w-full h-full rounded-[1.9rem] overflow-hidden bg-white">
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-[#0b1120] rounded-b-2xl z-10" />
+                {/* Samsung Galaxy Note mockup */}
+                <div className="relative w-[236px] shrink-0" style={{ height: "500px" }}>
+                  {/* side buttons */}
+                  <div className="absolute -right-[2px] top-28 w-[3px] h-9 rounded-r-sm bg-[#2a2f3a]" />
+                  <div className="absolute -right-[2px] top-44 w-[3px] h-14 rounded-r-sm bg-[#2a2f3a]" />
+                  <div className="absolute -left-[2px] top-40 w-[3px] h-11 rounded-l-sm bg-[#2a2f3a]" />
+                  {/* body — slim symmetric bezel, softly squared corners */}
+                  <div className="absolute inset-0 rounded-[2rem] bg-gradient-to-b from-[#20242e] to-[#0a0c11] p-[5px] shadow-2xl ring-1 ring-white/10">
+                    <div className="relative w-full h-full rounded-[1.7rem] overflow-hidden bg-white ring-1 ring-black/50">
+                      {/* Infinity-O centre punch-hole camera */}
+                      <div className="absolute top-[7px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#05070b] z-20 ring-[1.5px] ring-[#11141b] shadow-inner" />
                       <iframe title={preview.name} srcDoc={previewHtml} style={{ width: "375px", height: "780px", border: 0, transform: "scale(0.6)", transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
                     </div>
                   </div>
