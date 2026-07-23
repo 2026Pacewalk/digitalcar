@@ -1,0 +1,27 @@
+name: Deploy to VPS
+
+# "push + publish": every push to these branches auto-deploys to the server.
+on:
+  push:
+    branches: [main, feature/refer-earn-wallet]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            set -e
+            bash /var/www/digitalcarda/deploy.sh "${{ github.ref_name }}"
