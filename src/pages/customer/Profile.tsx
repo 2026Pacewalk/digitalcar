@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, Navigate } from "react-router";
 import { toast } from "sonner";
 import {
   User, Eye, EyeOff, Copy, Check, Mail, AtSign, Lock, Link2, Phone,
@@ -47,7 +47,9 @@ export default function CustomerProfile() {
   })();
   const active = daysLeft > 0;
   const pctLeft = Math.min(100, Math.round((daysLeft / pkg.days) * 100));
-  // Staff accounts (super-admin / reseller) aren't trial customers — show full access, no upgrade nudge.
+  // Staff accounts (super-admin / reseller) aren't card customers — send them to
+  // their own area instead of the customer card profile. (Impersonated clients
+  // have role "customer", so they're unaffected.)
   const role = getAuthUser()?.role || "customer";
   const isStaff = role === "super_admin" || role === "reseller";
   const staffLabel = role === "super_admin" ? "Admin" : "Reseller";
@@ -70,6 +72,11 @@ export default function CustomerProfile() {
     { icon: ShieldCheck, label: "SEO & theme settings", onClick: () => navigate("/dashboard/settings") },
     { icon: Eye, label: "View live card", onClick: () => navigate("/dashboard/view") },
   ];
+
+  // A real admin/reseller has no public card — bounce them to their own profile
+  // rather than showing the customer card-builder view (card link, edit card, etc.).
+  if (role === "super_admin") return <Navigate to="/admin/profile" replace />;
+  if (role === "reseller") return <Navigate to="/reseller/profile" replace />;
 
   return (
     <ModuleShell title="Profile" subtitle="Account & subscription" icon={User}
