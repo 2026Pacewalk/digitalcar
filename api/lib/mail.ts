@@ -27,7 +27,8 @@ function transport(): Transporter | null {
     host: SMTP_HOST,
     port,
     secure: port === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    // Gmail displays App Passwords with spaces — strip them so either form works.
+    auth: { user: SMTP_USER, pass: SMTP_PASS.replace(/\s+/g, "") },
   });
   return cached;
 }
