@@ -293,6 +293,79 @@ export function payoutRequestAdminEmail(o: { name?: string; email?: string; amou
   };
 }
 
+/* ── Reseller / partner application ──────────────────────────────────── */
+
+export function resellerApplicationAdminEmail(o: { name?: string; email?: string; phone?: string | null; companyName?: string | null; message?: string | null }): Email {
+  const rows: [string, string][] = [
+    ["Name", esc(o.name || "—")],
+    ["Email", esc(o.email || "—")],
+    ["Phone", esc(o.phone || "—")],
+    ["Company", esc(o.companyName || "—")],
+    ["Message", esc(o.message || "—")],
+  ];
+  const bodyHtml =
+    p("Someone applied to become a reseller partner. Review and approve or reject them in the admin panel.") +
+    detailTable(rows) +
+    button("Review application", `${SITE}/admin/reseller-applications`);
+  return {
+    subject: `Reseller application: ${o.name || o.email || "New partner"}`,
+    html: layout({ preheader: `${o.name} wants to become a reseller.`, badge: "Action needed", heading: "New reseller application 🤝", bodyHtml, accent: "#8B5CF6" }),
+    text: `New reseller application.\n\nName: ${o.name}\nEmail: ${o.email}\nPhone: ${o.phone || "—"}\nCompany: ${o.companyName || "—"}\nMessage: ${o.message || "—"}\n\nReview: ${SITE}/admin/reseller-applications`,
+  };
+}
+
+export function resellerApplicationReceivedEmail(o: { name?: string }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p("Thanks for applying to become a <strong>DigitalCarda reseller partner</strong>! 🤝") +
+    p("Our team is reviewing your application. We'll email you as soon as it's approved — usually within 1–2 business days.") +
+    p(`<span style="color:${BRAND.sub};font-size:13px">Questions? Just reply to this email.</span>`);
+  return {
+    subject: "We received your reseller application 🤝",
+    html: layout({ preheader: "Thanks for applying — we're reviewing your application.", badge: "Application received", heading: "Application received 🤝", bodyHtml, accent: "#8B5CF6" }),
+    text: `Hi ${o.name || "there"},\n\nThanks for applying to become a DigitalCarda reseller. We're reviewing your application and will email you once it's approved.`,
+  };
+}
+
+export function resellerApprovedEmail(o: { name?: string; link: string }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p("Great news — your <strong>reseller partner</strong> application is <strong>approved</strong>! 🎉") +
+    p("Set your password to activate your reseller account, then you can start onboarding customers and earning commissions.") +
+    button("Set your password", o.link) +
+    p(`<span style="color:${BRAND.sub};font-size:13px">This link expires in 60 minutes. If it expires, use “Forgot password” on the login page.</span>`);
+  return {
+    subject: "You're approved — welcome, partner! 🎉",
+    html: layout({ preheader: "Your reseller application is approved — set your password.", badge: "Approved", heading: "You're a reseller now 🎉", bodyHtml, accent: "#22C55E" }),
+    text: `Hi ${o.name || "there"},\n\nYour reseller application is approved! Set your password to activate your account: ${o.link}`,
+  };
+}
+
+export function resellerApprovedExistingEmail(o: { name?: string }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p("Great news — your <strong>reseller partner</strong> application is <strong>approved</strong>! 🎉") +
+    p("Your existing account has been upgraded to a reseller account. Just sign in with your usual password to access your reseller dashboard.") +
+    button("Go to reseller dashboard", `${SITE}/reseller`);
+  return {
+    subject: "You're approved — welcome, partner! 🎉",
+    html: layout({ preheader: "Your reseller application is approved.", badge: "Approved", heading: "You're a reseller now 🎉", bodyHtml, accent: "#22C55E" }),
+    text: `Hi ${o.name || "there"},\n\nYour reseller application is approved and your account is upgraded. Sign in to access your reseller dashboard: ${SITE}/reseller`,
+  };
+}
+
+export function resellerRejectedEmail(o: { name?: string; note?: string }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p(`Thank you for your interest in becoming a DigitalCarda reseller. After review, we're unable to approve your application at this time.${o.note ? `<br><br><em style="color:${BRAND.sub}">${esc(o.note)}</em>` : ""}`) +
+    p("You're welcome to use DigitalCarda as a customer, and you can reach out to us if your circumstances change.");
+  return {
+    subject: "Update on your reseller application",
+    html: layout({ preheader: "An update on your reseller application.", badge: "Application", heading: "Reseller application update", bodyHtml, accent: "#64748B" }),
+    text: `Hi ${o.name || "there"},\n\nThank you for applying. We're unable to approve your reseller application at this time.${o.note ? ` ${o.note}` : ""}`,
+  };
+}
+
 export function trialEndedEmail(o: { name?: string }): Email {
   const bodyHtml =
     hi(o.name) +

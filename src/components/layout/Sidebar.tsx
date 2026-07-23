@@ -5,7 +5,7 @@ import {
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
   ChevronRight, Store, X, Search, ToggleRight, ReceiptText, KeyRound,
   Home as HomeIcon, Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
-  Tag, QrCode, Star, Layers, Gift,
+  Tag, QrCode, Star, Layers, Gift, ClipboardList,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -55,6 +55,7 @@ const superAdminGroups: NavGroup[] = [
   ] },
   { title: "Manage", items: [
     { label: "Resellers", icon: Store, path: "/admin/resellers" },
+    { label: "Applications", icon: ClipboardList, path: "/admin/reseller-applications" },
     { label: "Customers", icon: UserCircle, path: "/admin/customers" },
     { label: "Leads", icon: MessageSquare, path: "/admin/leads" },
   ] },

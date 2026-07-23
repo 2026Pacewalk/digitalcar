@@ -431,3 +431,23 @@ export const appSettings = mysqlTable("app_settings", {
 });
 
 export type AppSetting = typeof appSettings.$inferSelect;
+
+// ─── Reseller Applications (partner requests → admin approval) ───
+export const resellerApplications = mysqlTable("reseller_applications", {
+  id: serial("id").primaryKey(),
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  companyName: varchar("company_name", { length: 255 }),
+  message: text("message"),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).notNull().default("pending"),
+  userId: bigint("user_id", { mode: "number", unsigned: true }),
+  adminNote: text("admin_note"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ra_status_idx").on(table.status),
+  index("ra_email_idx").on(table.email),
+]);
+
+export type ResellerApplication = typeof resellerApplications.$inferSelect;

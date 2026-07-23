@@ -5,6 +5,8 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import BecomeReseller from "./pages/BecomeReseller";
+import AdminResellerApplications from "./pages/admin/ResellerApplications";
 import Home from "./pages/public/Home";
 import Features from "./pages/public/Features";
 import Templates from "./pages/public/Templates";
@@ -109,6 +111,7 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/become-reseller" element={<BecomeReseller />} />
 
         {/* Public card */}
         <Route path="/c/:slug" element={<PublicCard />} />
@@ -116,6 +119,7 @@ export default function App() {
         {/* Admin */}
         <Route path="/admin" element={<RoleRoute allowedRoles={["super_admin"]}><AdminDashboard /></RoleRoute>} />
         <Route path="/admin/resellers" element={<RoleRoute allowedRoles={["super_admin"]}><AdminResellers /></RoleRoute>} />
+        <Route path="/admin/reseller-applications" element={<RoleRoute allowedRoles={["super_admin"]}><AdminResellerApplications /></RoleRoute>} />
         <Route path="/admin/customers" element={<RoleRoute allowedRoles={["super_admin"]}><AdminCustomers /></RoleRoute>} />
         <Route path="/admin/packages" element={<RoleRoute allowedRoles={["super_admin"]}><AdminPackages /></RoleRoute>} />
         <Route path="/admin/templates" element={<RoleRoute allowedRoles={["super_admin"]}><AdminTemplates /></RoleRoute>} />

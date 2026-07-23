@@ -46,7 +46,7 @@ export default function Resellers() {
             DigitalCarda gives agencies and resellers a complete white-label system to create and manage cards for their customers. Build a recurring revenue stream with minimal effort.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">
+            <Link to="/become-reseller" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">
               Apply as Reseller <ArrowRight size={16} />
             </Link>
             <Link to="/contact" className="btn-ghost h-12 px-8 inline-flex items-center justify-center gap-2 border border-[#E2E8F0]">
@@ -119,7 +119,7 @@ export default function Resellers() {
         <div className="text-center bg-gradient-to-br from-[#0F172A] to-[#1E293B] rounded-3xl p-10 sm:p-14">
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Ready to Become a Reseller?</h2>
           <p className="text-sm text-[#94A3B8] mb-6 max-w-lg mx-auto">Apply today and start building your digital card business with our white-label platform.</p>
-          <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">
+          <Link to="/become-reseller" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">
             Apply Now <ArrowRight size={16} />
           </Link>
         </div>

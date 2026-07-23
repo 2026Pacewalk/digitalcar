@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router";
 import {
-  Home, Palette, Users, BarChart3, User, LayoutDashboard, Store, UserCircle, Package,
+  Home, Palette, Users, BarChart3, User, LayoutDashboard, Store, UserCircle, Package, ClipboardList,
   Plus, Eye, Share2, CreditCard, Menu, MessageSquare,
   Settings, LogOut, HelpCircle, Bell, ChevronLeft,
   Info, ShoppingBag, Tag, Wallet, QrCode, Image as ImageIcon, Star, Upload, Mail, Layers,
@@ -66,6 +66,7 @@ const NAV: Record<string, NavConfig> = {
       ] },
       { title: "Manage", items: [
         { icon: Store, label: "Resellers", path: "/admin/resellers" },
+        { icon: ClipboardList, label: "Applications", path: "/admin/reseller-applications" },
         { icon: UserCircle, label: "Customers", path: "/admin/customers" },
         { icon: MessageSquare, label: "Leads", path: "/admin/leads" },
       ] },
@@ -176,6 +177,7 @@ const ROUTE_TITLES: Record<string, string> = {
   // Admin
   "/admin": "Dashboard",
   "/admin/resellers": "Resellers",
+  "/admin/reseller-applications": "Reseller Applications",
   "/admin/customers": "Customers",
   "/admin/packages": "Packages",
   "/admin/templates": "Templates",
