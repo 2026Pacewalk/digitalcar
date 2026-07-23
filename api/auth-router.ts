@@ -236,4 +236,20 @@ export const authRouter = createRouter({
 
       return { success: true };
     }),
+
+  updateProfile: authedQuery
+    .input(
+      z.object({
+        fullName: z.string().min(2).max(120),
+        phone: z.string().max(30).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      await db
+        .update(users)
+        .set({ fullName: input.fullName, phone: input.phone || null })
+        .where(eq(users.id, ctx.user.id));
+      return { success: true, fullName: input.fullName, phone: input.phone || "" };
+    }),
 });

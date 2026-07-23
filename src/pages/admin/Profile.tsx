@@ -1,6 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useAuth } from "@/hooks/useAuth";
+import { trpc } from "@/providers/trpc";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -16,9 +17,8 @@ const LOGIN_ACTIVITY = [
 ];
 
 export default function AdminProfile() {
-  const { user } = useAuth();
+  const { user, refetch } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
-  const [saving, setSaving] = useState(false);
   const [showOldPass, setShowOldPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
@@ -27,10 +27,34 @@ export default function AdminProfile() {
   const [profile, setProfile] = useState({
     fullName: user?.fullName || "Super Admin",
     email: user?.email || "admin@digitalcarda.com",
-    mobile: "+91 98765 43211",
+    mobile: (user as { phone?: string } | null)?.phone || "",
   });
 
   const [passwordForm, setPasswordForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
+
+  const updateProfile = trpc.auth.updateProfile.useMutation({
+    onSuccess: (res) => {
+      // Keep the locally-stored session in sync so the UI reflects the change.
+      try {
+        const raw = localStorage.getItem("digitalcarda_user");
+        if (raw) {
+          const u = JSON.parse(raw);
+          localStorage.setItem("digitalcarda_user", JSON.stringify({ ...u, fullName: res.fullName }));
+        }
+      } catch {}
+      refetch();
+      toast.success("Profile saved!");
+    },
+    onError: (e) => toast.error(e.message || "Could not save profile"),
+  });
+
+  const changePassword = trpc.auth.changePassword.useMutation({
+    onSuccess: () => {
+      setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+      toast.success("Password updated!");
+    },
+    onError: (e) => toast.error(e.message || "Could not update password"),
+  });
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -93,13 +117,13 @@ export default function AdminProfile() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
                   <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Full Name *</label><input value={profile.fullName} onChange={(e) => setProfile({ ...profile, fullName: e.target.value })} className="input-premium w-full" /></div>
                   <div>
-                    <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Email * <span className="text-[#94A3B8] font-normal">(Requires verification)</span></label>
-                    <div className="flex gap-2"><input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} className="input-premium w-full" type="email" /><button onClick={() => toast.success("Verification email sent!")} className="h-10 px-3 text-[10px] font-semibold gradient-gold text-[#0F172A] rounded-xl shrink-0">Verify</button></div>
+                    <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Email <span className="text-[#94A3B8] font-normal">(sign-in address)</span></label>
+                    <input value={profile.email} readOnly disabled className="input-premium w-full bg-[#F8FAFC] text-[#64748B] cursor-not-allowed" type="email" />
                   </div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Mobile Number</label><input value={profile.mobile} onChange={(e) => setProfile({ ...profile, mobile: e.target.value })} className="input-premium w-full" /></div>
+                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Mobile Number</label><input value={profile.mobile} onChange={(e) => setProfile({ ...profile, mobile: e.target.value })} className="input-premium w-full" placeholder="+91 …" /></div>
                 </div>
                 <div className="flex justify-end">
-                  <button onClick={() => { setSaving(true); setTimeout(() => { setSaving(false); toast.success("Profile saved!"); }, 600); }} disabled={saving} className="h-11 px-8 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-50"><Save size={16} /> {saving ? "Saving..." : "Save Changes"}</button>
+                  <button onClick={() => { const name = profile.fullName.trim(); if (name.length < 2) { toast.error("Full name is required"); return; } updateProfile.mutate({ fullName: name, phone: profile.mobile.trim() }); }} disabled={updateProfile.isPending} className="h-11 px-8 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-50"><Save size={16} /> {updateProfile.isPending ? "Saving..." : "Save Changes"}</button>
                 </div>
               </div>
             )}
@@ -119,7 +143,7 @@ export default function AdminProfile() {
                     <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Confirm New Password *</label>
                       <div className="relative"><input type={showConfirmPass ? "text" : "password"} value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} className="input-premium w-full pr-10" placeholder="Re-enter password" /><button onClick={() => setShowConfirmPass(!showConfirmPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8]">{showConfirmPass ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>
                     </div>
-                    <button onClick={() => { if (passwordForm.newPassword !== passwordForm.confirmPassword) { toast.error("Passwords do not match"); return; } toast.success("Password updated!"); }} className="h-11 px-8 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2"><Lock size={16} /> Update Password</button>
+                    <button onClick={() => { if (!passwordForm.oldPassword) { toast.error("Enter your current password"); return; } if (passwordForm.newPassword.length < 8) { toast.error("New password must be at least 8 characters"); return; } if (passwordForm.newPassword !== passwordForm.confirmPassword) { toast.error("Passwords do not match"); return; } changePassword.mutate({ currentPassword: passwordForm.oldPassword, newPassword: passwordForm.newPassword }); }} disabled={changePassword.isPending} className="h-11 px-8 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-50"><Lock size={16} /> {changePassword.isPending ? "Updating..." : "Update Password"}</button>
                   </div>
                 </div>
                 <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-6">
