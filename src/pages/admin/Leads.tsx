@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { classifyLead, type LeadCategory } from "@/lib/leadIntel";
+import { cleanText } from "@/lib/cleanText";
 
 type Enquiry = {
   id: string; name: string; contact: string; email: string; description: string;
@@ -243,7 +244,7 @@ export default function AdminLeads() {
                   pageRows.map((e, i) => {
                     const card = isCardLead(e);
                     const isOpen = expanded.has(e.id);
-                    const desc = e.description || "";
+                    const desc = cleanText(e.description);
                     const long = desc.length > 90;
                     const checked = selected.has(e.id);
                     return (
@@ -257,7 +258,7 @@ export default function AdminLeads() {
                           <div className="flex items-center gap-2">
                             <span className="w-7 h-7 rounded-full bg-[#F1F5F9] flex items-center justify-center shrink-0"><User size={13} className="text-[#64748B]" /></span>
                             <div className="min-w-0">
-                              <span className="block text-sm font-medium text-[#0F172A] truncate">{e.name || "—"}</span>
+                              <span className="block text-sm font-medium text-[#0F172A] truncate">{cleanText(e.name) || "—"}</span>
                               <span className="mt-0.5 inline-block"><CatBadge c={cat(e)} /></span>
                             </div>
                           </div>
@@ -313,7 +314,7 @@ export default function AdminLeads() {
                 {pageRows.map((e) => {
                   const card = isCardLead(e);
                   const isOpen = expanded.has(e.id);
-                  const desc = e.description || "";
+                  const desc = cleanText(e.description);
                   const long = desc.length > 120;
                   const checked = selected.has(e.id);
                   return (
@@ -323,7 +324,7 @@ export default function AdminLeads() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold text-[#0F172A] truncate">{e.name || "—"}</p>
+                              <p className="text-sm font-semibold text-[#0F172A] truncate">{cleanText(e.name) || "—"}</p>
                               <p className="text-[11px] text-[#94A3B8] flex items-center gap-1 mt-0.5"><Calendar size={10} /> {fmtDate(e.created_on)}</p>
                             </div>
                             <div className="flex flex-col items-end gap-1 shrink-0">
