@@ -6,6 +6,8 @@ import { getDb } from "./queries/connection";
 import { users, resellerProfiles, referrals, notifications } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { createToken } from "./lib/jwt";
+import { sendEmail } from "./lib/mail";
+import { welcomeEmail, passwordChangedEmail } from "./lib/email-templates";
 
 export const authRouter = createRouter({
   register: publicQuery
@@ -57,6 +59,9 @@ export const authRouter = createRouter({
           message: "Failed to create user",
         });
       }
+
+      // Welcome email (non-blocking).
+      void sendEmail(insertedUser.email, welcomeEmail({ name: insertedUser.fullName, role: insertedUser.role }));
 
       // Create reseller profile if registering as reseller
       if (input.role === "reseller" && input.companyName) {
@@ -233,6 +238,9 @@ export const authRouter = createRouter({
         .update(users)
         .set({ password: hashedPassword })
         .where(eq(users.id, ctx.user.id));
+
+      // Security notice (non-blocking).
+      void sendEmail(user.email, passwordChangedEmail({ name: user.fullName }));
 
       return { success: true };
     }),

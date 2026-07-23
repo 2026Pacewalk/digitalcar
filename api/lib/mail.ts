@@ -33,8 +33,24 @@ function transport(): Transporter | null {
   return cached;
 }
 
-const esc = (s: string) =>
-  String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] || c));
+import type { Email } from "./email-templates";
+import { leadNotificationEmail } from "./email-templates";
+
+export const ownerAddress = () => process.env.LEAD_NOTIFY_TO || "hellopacewalk@gmail.com";
+
+/** Send a rendered Email template to a recipient. Never throws. */
+export async function sendEmail(to: string | undefined | null, email: Email, replyTo?: string | null): Promise<void> {
+  try {
+    if (!to) return;
+    const t = transport();
+    if (!t) return;
+    const from = process.env.MAIL_FROM || process.env.SMTP_USER;
+    await t.sendMail({ from, to, replyTo: replyTo || undefined, subject: email.subject, text: email.text, html: email.html });
+    console.log(`[mail] "${email.subject}" sent to ${to}`);
+  } catch (e) {
+    console.error(`[mail] failed to send "${email.subject}":`, (e as Error).message);
+  }
+}
 
 export interface LeadEmail {
   name: string;
@@ -47,38 +63,5 @@ export interface LeadEmail {
 
 /** Email the site owner about a new lead. Never throws. */
 export async function sendLeadNotification(lead: LeadEmail): Promise<void> {
-  try {
-    const t = transport();
-    if (!t) return;
-    const to = process.env.LEAD_NOTIFY_TO || "hellopacewalk@gmail.com";
-    const from = process.env.MAIL_FROM || process.env.SMTP_USER;
-    const cardLabel = lead.cardName || lead.slug || "your card";
-    const rows: [string, string][] = [
-      ["Name", lead.name || "—"],
-      ["Email", lead.email || "—"],
-      ["Phone", lead.contact || "—"],
-      ["Message", lead.message || "—"],
-      ["Card", lead.slug ? `digitalcarda.in/c/${lead.slug}` : "—"],
-    ];
-    const html = `
-      <div style="font-family:Arial,sans-serif;max-width:520px">
-        <h2 style="color:#0F172A;margin:0 0 4px">New lead from ${esc(String(cardLabel))}</h2>
-        <p style="color:#64748B;margin:0 0 16px">Someone submitted an enquiry on your digital card.</p>
-        <table style="border-collapse:collapse;width:100%">
-          ${rows.map(([k, v]) => `<tr><td style="padding:8px 12px;background:#F8FAFC;font-weight:bold;color:#334155;width:120px">${k}</td><td style="padding:8px 12px;border-bottom:1px solid #F1F5F9;color:#0F172A">${esc(String(v))}</td></tr>`).join("")}
-        </table>
-      </div>`;
-    const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n");
-    await t.sendMail({
-      from,
-      to,
-      replyTo: lead.email || undefined,
-      subject: `New lead: ${lead.name || "Enquiry"} — ${cardLabel}`,
-      text,
-      html,
-    });
-    console.log(`[mail] lead notification sent to ${to}`);
-  } catch (e) {
-    console.error("[mail] failed to send lead notification:", (e as Error).message);
-  }
+  await sendEmail(ownerAddress(), leadNotificationEmail(lead), lead.email);
 }

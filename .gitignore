@@ -64,3 +64,6 @@ backups/
 
 # Customer PII export — keep local only
 customers-export.csv
+
+# Local scratch / email previews
+scratchpad/

@@ -6,6 +6,8 @@ import {
 } from "@db/schema";
 import { eq, desc, and, gt, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { sendEmail, ownerAddress } from "./lib/mail";
+import { paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail } from "./lib/email-templates";
 
 const n = (v: unknown) => Number(v ?? 0);
 const money = (v: number) => v.toFixed(2);
@@ -109,6 +111,12 @@ export const paymentRouter = createRouter({
         message: `We received your ${pkg.name} payment reference. Your plan activates once our team verifies it.`,
         link: "/dashboard/subscription",
       });
+
+      // Email the buyer (receipt) and the owner (to verify). Non-blocking.
+      const pay = { planName: pkg.name, amount: charged, reference: input.reference.trim(), method: input.method };
+      void sendEmail(ctx.user.email, paymentSubmittedEmail({ name: ctx.user.fullName, ...pay }));
+      void sendEmail(ownerAddress(), paymentToVerifyAdminEmail({ name: ctx.user.fullName, email: ctx.user.email, ...pay }));
+
       return { ok: true, id: ins.insertId, amount: charged };
     }),
 
@@ -176,6 +184,17 @@ export const paymentRouter = createRouter({
         link: "/dashboard",
       });
 
+      // Email the buyer a confirmation + invoice (non-blocking).
+      try {
+        const buyerUser = await db.query.users.findFirst({ where: eq(users.id, order.userId), columns: { email: true, fullName: true } });
+        const invoiceNo = `DC-${String(order.id).padStart(5, "0")}-${periodEnd.getFullYear()}`;
+        const validTill = periodEnd.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+        void sendEmail(buyerUser?.email, paymentVerifiedEmail({
+          name: buyerUser?.fullName, planName: order.planName || pkg?.name || "Plan",
+          amount: n(order.amount), billingCycle: order.billingCycle, invoiceNo, validTill,
+        }));
+      } catch { /* non-critical */ }
+
       // If this is their first paid plan, flag the referrer's reward opportunity
       try {
         const buyer = await db.query.users.findFirst({ where: eq(users.id, order.userId), columns: { referredById: true, fullName: true } });
@@ -209,6 +228,13 @@ export const paymentRouter = createRouter({
         message: `We couldn't verify your ${order.planName || "plan"} payment${input.note ? `: ${input.note}` : ""}. Please check the reference and try again.`,
         link: "/dashboard/subscription",
       });
+
+      // Email the buyer (non-blocking).
+      try {
+        const buyerUser = await db.query.users.findFirst({ where: eq(users.id, order.userId), columns: { email: true, fullName: true } });
+        void sendEmail(buyerUser?.email, paymentRejectedEmail({ name: buyerUser?.fullName, planName: order.planName || "plan", note: input.note?.trim() }));
+      } catch { /* non-critical */ }
+
       return { ok: true };
     }),
 
