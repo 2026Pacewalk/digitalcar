@@ -55,6 +55,19 @@ app.post("/api/enquiry", async (c) => {
   }
 });
 
+// Daily trial FOMO emailer — trigger from a cron: POST with ?key=CRON_SECRET
+app.post("/api/cron/trial-emails", async (c) => {
+  const key = c.req.query("key") || c.req.header("x-cron-key");
+  if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) return c.json({ error: "Unauthorized" }, 401);
+  try {
+    const { runTrialEmails } = await import("./cron/trial-emails");
+    return c.json({ ok: true, ...(await runTrialEmails()) });
+  } catch (e) {
+    console.error("[cron] trial-emails error:", (e as Error).message);
+    return c.json({ ok: false }, 500);
+  }
+});
+
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;

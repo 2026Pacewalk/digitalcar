@@ -228,11 +228,68 @@ export function trialEndingEmail(o: { name?: string; daysLeft: number; cardUrl?:
     hi(o.name) +
     p(`Your free trial ends in <strong style="color:${BRAND.goldDark}">${o.daysLeft} day${o.daysLeft === 1 ? "" : "s"}</strong>. After that your card is paused and won't be visible to visitors.`) +
     p("Upgrade now to keep your card live, keep capturing leads, and unlock every feature — plus a limited-time discount waiting on your dashboard.") +
-    button("Upgrade &amp; keep my card live", `${SITE}/dashboard/subscription`);
+    button("Upgrade & keep my card live", `${SITE}/dashboard/subscription`);
   return {
     subject: `⏳ Your card goes offline in ${o.daysLeft} day${o.daysLeft === 1 ? "" : "s"}`,
     html: layout({ preheader: `Only ${o.daysLeft} day(s) left on your trial — upgrade to stay live.`, badge: "Trial ending", heading: `${o.daysLeft} day${o.daysLeft === 1 ? "" : "s"} left on your trial ⏳`, bodyHtml, accent: BRAND.gold }),
     text: `Hi ${o.name || "there"},\n\nYour trial ends in ${o.daysLeft} day(s) — after that your card is paused. Upgrade to stay live: ${SITE}/dashboard/subscription`,
+  };
+}
+
+/* ── Owner / admin alerts ────────────────────────────────────────────── */
+
+export function newSignupAdminEmail(o: { name?: string; email?: string; role?: string; phone?: string | null }): Email {
+  const bodyHtml =
+    p(`A new ${esc(o.role || "customer")} just created a free-trial account on DigitalCarda.`) +
+    detailTable([
+      ["Name", esc(o.name || "—")],
+      ["Email", esc(o.email || "—")],
+      ["Phone", esc(o.phone || "—")],
+      ["Role", esc(o.role || "customer")],
+    ]) +
+    button("View in admin", `${SITE}/admin/customers`);
+  return {
+    subject: `New signup: ${o.name || o.email || "New user"}`,
+    html: layout({ preheader: `${o.name || o.email} started a free trial.`, badge: "New Signup", heading: "New account created 🎉", bodyHtml, accent: "#22C55E" }),
+    text: `New signup on DigitalCarda.\n\nName: ${o.name}\nEmail: ${o.email}\nRole: ${o.role}`,
+  };
+}
+
+export function referralSignupAdminEmail(o: { newUserName?: string; newUserEmail?: string; referrerName?: string; code?: string }): Email {
+  const bodyHtml =
+    p(`Someone joined through the <strong>Refer &amp; Earn</strong> program.`) +
+    detailTable([
+      ["New user", esc(o.newUserName || "—")],
+      ["Email", esc(o.newUserEmail || "—")],
+      ["Referred by", esc(o.referrerName || "—")],
+      ["Referral code", esc(o.code || "—")],
+    ]) +
+    p(`<span style="color:${BRAND.sub};font-size:13px">The referrer earns a reward once this user upgrades to a paid plan.</span>`);
+  return {
+    subject: `Referral signup: ${o.newUserName || "New user"} (via ${o.referrerName || o.code || "referral"})`,
+    html: layout({ preheader: `${o.newUserName} joined via ${o.referrerName}'s referral.`, badge: "Referral", heading: "New referral signup 🔗", bodyHtml, accent: "#8B5CF6" }),
+    text: `Referral signup.\n\nNew user: ${o.newUserName} (${o.newUserEmail})\nReferred by: ${o.referrerName}\nCode: ${o.code}`,
+  };
+}
+
+export function payoutRequestAdminEmail(o: { name?: string; email?: string; amount: number; method: string; destination: string; accountName?: string | null; ifsc?: string | null }): Email {
+  const rows: [string, string][] = [
+    ["Requested by", esc(o.name || "—")],
+    ["Email", esc(o.email || "—")],
+    ["Method", esc((o.method || "").toUpperCase())],
+    ["Destination", esc(o.destination)],
+  ];
+  if (o.accountName) rows.push(["Account name", esc(o.accountName)]);
+  if (o.ifsc) rows.push(["IFSC", esc(o.ifsc)]);
+  rows.push(["Amount", inr(o.amount)]);
+  const bodyHtml =
+    p(`A user requested a payout from their Refer &amp; Earn wallet. The funds are on hold until you process it.`) +
+    detailTable(rows, { accentLast: true }) +
+    button("Review payouts", `${SITE}/admin/referrals`);
+  return {
+    subject: `Payout request: ${inr(o.amount)} — ${o.name || o.email || "user"}`,
+    html: layout({ preheader: `${o.name} requested a ${inr(o.amount)} payout.`, badge: "Action needed", heading: "New payout request 💸", bodyHtml, accent: "#3B82F6" }),
+    text: `Payout request.\n\nUser: ${o.name} (${o.email})\nMethod: ${o.method}\nDestination: ${o.destination}\nAmount: ${inr(o.amount)}`,
   };
 }
 

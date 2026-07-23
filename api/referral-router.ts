@@ -8,6 +8,8 @@ import {
 } from "@db/schema";
 import { eq, desc, and, gt, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { sendEmail, ownerAddress } from "./lib/mail";
+import { payoutRequestAdminEmail } from "./lib/email-templates";
 
 const COMMISSION_KEY = "referral_commission_percent";
 const DISCOUNT_KEY = "referral_discount_percent";
@@ -168,6 +170,13 @@ export const referralRouter = createRouter({
         withdrawalId: ins.insertId,
         note: `Payout request via ${input.method.toUpperCase()}`,
       });
+
+      // Alert the owner about the payout request (non-blocking).
+      void sendEmail(ownerAddress(), payoutRequestAdminEmail({
+        name: ctx.user.fullName, email: ctx.user.email, amount: input.amount, method: input.method,
+        destination: input.destination.trim(), accountName: input.accountName?.trim() || null, ifsc: input.ifsc?.trim() || null,
+      }));
+
       return { ok: true, id: ins.insertId };
     }),
 

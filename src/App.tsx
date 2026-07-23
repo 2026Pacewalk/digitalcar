@@ -3,6 +3,8 @@ import { useAuth } from "@/hooks/useAuth";
 import PublicLayout from "@/components/layout/PublicLayout";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Home from "./pages/public/Home";
 import Features from "./pages/public/Features";
 import Templates from "./pages/public/Templates";
@@ -105,6 +107,8 @@ export default function App() {
         {/* Unadvertised admin login — set VITE_ADMIN_LOGIN_SLUG in .env to your own secret slug */}
         <Route path={`/${import.meta.env.VITE_ADMIN_LOGIN_SLUG || "control-signin"}`} element={<Login adminMode />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Public card */}
         <Route path="/c/:slug" element={<PublicCard />} />

@@ -5,9 +5,11 @@ import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { users, resellerProfiles, referrals, notifications } from "@db/schema";
 import { eq } from "drizzle-orm";
-import { createToken } from "./lib/jwt";
-import { sendEmail } from "./lib/mail";
-import { welcomeEmail, passwordChangedEmail } from "./lib/email-templates";
+import { createToken, createResetToken, verifyResetToken } from "./lib/jwt";
+import { sendEmail, ownerAddress } from "./lib/mail";
+import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail } from "./lib/email-templates";
+
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
 
 export const authRouter = createRouter({
   register: publicQuery
@@ -60,8 +62,9 @@ export const authRouter = createRouter({
         });
       }
 
-      // Welcome email (non-blocking).
+      // Welcome email to the new user + new-signup alert to the owner (non-blocking).
       void sendEmail(insertedUser.email, welcomeEmail({ name: insertedUser.fullName, role: insertedUser.role }));
+      void sendEmail(ownerAddress(), newSignupAdminEmail({ name: insertedUser.fullName, email: insertedUser.email, role: insertedUser.role, phone: insertedUser.phone }));
 
       // Create reseller profile if registering as reseller
       if (input.role === "reseller" && input.companyName) {
@@ -96,6 +99,8 @@ export const authRouter = createRouter({
               message: `${insertedUser.fullName} just joined with your referral link. You'll earn cash when they upgrade to a paid plan.`,
               link: "/dashboard/refer",
             });
+            // Alert the owner about the referral signup (non-blocking).
+            void sendEmail(ownerAddress(), referralSignupAdminEmail({ newUserName: insertedUser.fullName, newUserEmail: insertedUser.email, referrerName: referrer.fullName, code: input.referralCode.toUpperCase() }));
           }
         } catch { /* referral linking is best-effort */ }
       }
@@ -285,5 +290,39 @@ export const authRouter = createRouter({
         phone: input.phone || "",
         email: email || ctx.user.email,
       };
+    }),
+
+  // ── Forgot password: email a reset link ──
+  requestPasswordReset: publicQuery
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase().trim();
+      const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+      if (user) {
+        const token = await createResetToken(user.id, user.password.slice(-12));
+        const link = `${PUBLIC_BASE_URL}/reset-password?token=${encodeURIComponent(token)}`;
+        void sendEmail(user.email, passwordResetEmail({ name: user.fullName, link }));
+      }
+      // Always succeed — never reveal whether an email is registered.
+      return { ok: true };
+    }),
+
+  // ── Forgot password: set a new password with the emailed token ──
+  resetPassword: publicQuery
+    .input(z.object({ token: z.string().min(10), newPassword: z.string().min(8) }))
+    .mutation(async ({ input }) => {
+      const data = await verifyResetToken(input.token);
+      if (!data) throw new TRPCError({ code: "BAD_REQUEST", message: "This reset link is invalid or has expired." });
+      const db = getDb();
+      const user = await db.query.users.findFirst({ where: eq(users.id, data.userId) });
+      // Hash snippet must still match — a used/old link is rejected.
+      if (!user || user.password.slice(-12) !== data.ph) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This reset link has already been used. Please request a new one." });
+      }
+      const hashedPassword = await bcrypt.hash(input.newPassword, 12);
+      await db.update(users).set({ password: hashedPassword }).where(eq(users.id, user.id));
+      void sendEmail(user.email, passwordChangedEmail({ name: user.fullName }));
+      return { ok: true };
     }),
 });

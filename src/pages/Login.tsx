@@ -169,7 +169,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
                 <input type="checkbox" className="rounded border-[#E2E8F0] accent-[#F7B31C]" />
                 <span className="text-xs text-[#64748B]">Remember me</span>
               </label>
-              <button type="button" onClick={() => toast.info("Password reset link will be sent to your email.")} className="text-xs text-[#F7B31C] hover:text-[#D97706] font-semibold">Forgot Password?</button>
+              <Link to="/forgot-password" className="text-xs text-[#F7B31C] hover:text-[#D97706] font-semibold">Forgot Password?</Link>
             </div>
             <button type="submit" disabled={loading} className="w-full h-12 gradient-gold text-[#0F172A] rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-60">
               {loading ? <><Loader2 size={18} className="animate-spin" /> Signing in…</> : <><LogIn size={18} /> Sign In</>}
