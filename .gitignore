@@ -58,3 +58,6 @@ public/offer.json
 public/uploads.json
 public/qrcode.json
 public/seo.json
+
+# Local data backups (contain customer PII / passwords — never commit)
+backups/

@@ -49,7 +49,7 @@ export default function CardRenderer({ c, products, gallery, videos }: {
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d]/g, "");
   const specs = s(c.specialities).split(",").map((x) => x.trim()).filter(Boolean);
   const hasSocial = SOCIALS.some((x) => s(c[x.k]));
-  const cardUrl = `https://digitalcarda.in/${s(c.slug)}`;
+  const cardUrl = `https://digitalcarda.in/c/${s(c.slug)}`;
   const upis = [s(c.upi), s(c.paytm_number), s(c.phone_pe), s(c.google_pay)].filter(Boolean);
   const hasBank = s(c.account_number) || s(c.bank_name);
 

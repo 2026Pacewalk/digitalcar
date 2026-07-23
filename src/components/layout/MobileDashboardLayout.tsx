@@ -55,9 +55,8 @@ const NAV: Record<string, NavConfig> = {
     roots: ["/admin"],
     tabs: [
       { icon: LayoutDashboard, label: "Home", path: "/admin" },
-      { icon: Users, label: "Users", path: "/admin/users" },
+      { icon: Store, label: "Resellers", path: "/admin/resellers" },
       { icon: UserCircle, label: "Customers", path: "/admin/customers" },
-      { icon: CreditCard, label: "Cards", path: "/admin/cards" },
       { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
     ],
     drawer: [
@@ -66,10 +65,8 @@ const NAV: Record<string, NavConfig> = {
         { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
       ] },
       { title: "Manage", items: [
-        { icon: Users, label: "Users", path: "/admin/users" },
         { icon: Store, label: "Resellers", path: "/admin/resellers" },
         { icon: UserCircle, label: "Customers", path: "/admin/customers" },
-        { icon: CreditCard, label: "Cards", path: "/admin/cards" },
         { icon: MessageSquare, label: "Leads", path: "/admin/leads" },
       ] },
       { title: "Catalog", items: [
@@ -178,13 +175,11 @@ const ROUTE_TITLES: Record<string, string> = {
   "/dashboard/ai": "AI Tools",
   // Admin
   "/admin": "Dashboard",
-  "/admin/users": "Users",
   "/admin/resellers": "Resellers",
   "/admin/customers": "Customers",
   "/admin/packages": "Packages",
   "/admin/templates": "Templates",
   "/admin/migration": "Migration",
-  "/admin/cards": "Cards",
   "/admin/analytics": "Analytics",
   "/admin/leads": "Leads",
   "/admin/referrals": "Referrals & Payouts",

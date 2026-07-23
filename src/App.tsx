@@ -18,13 +18,11 @@ import Privacy from "./pages/public/Privacy";
 import RefundPolicy from "./pages/public/RefundPolicy";
 import TermsOfService from "./pages/public/TermsOfService";
 import AdminDashboard from "./pages/admin/Dashboard";
-import AdminUsers from "./pages/admin/Users";
 import AdminResellers from "./pages/admin/Resellers";
 import AdminCustomers from "./pages/admin/Customers";
 import AdminPackages from "./pages/admin/Packages";
 import AdminTemplates from "./pages/admin/Templates";
 import AdminMigration from "./pages/admin/Migration";
-import AdminCards from "./pages/admin/Cards";
 import AdminAnalytics from "./pages/admin/Analytics";
 import AdminLeads from "./pages/admin/Leads";
 import AdminReferrals from "./pages/admin/Referrals";
@@ -113,13 +111,11 @@ export default function App() {
 
         {/* Admin */}
         <Route path="/admin" element={<RoleRoute allowedRoles={["super_admin"]}><AdminDashboard /></RoleRoute>} />
-        <Route path="/admin/users" element={<RoleRoute allowedRoles={["super_admin"]}><AdminUsers /></RoleRoute>} />
         <Route path="/admin/resellers" element={<RoleRoute allowedRoles={["super_admin"]}><AdminResellers /></RoleRoute>} />
         <Route path="/admin/customers" element={<RoleRoute allowedRoles={["super_admin"]}><AdminCustomers /></RoleRoute>} />
         <Route path="/admin/packages" element={<RoleRoute allowedRoles={["super_admin"]}><AdminPackages /></RoleRoute>} />
         <Route path="/admin/templates" element={<RoleRoute allowedRoles={["super_admin"]}><AdminTemplates /></RoleRoute>} />
         <Route path="/admin/migration" element={<RoleRoute allowedRoles={["super_admin"]}><AdminMigration /></RoleRoute>} />
-        <Route path="/admin/cards" element={<RoleRoute allowedRoles={["super_admin"]}><AdminCards /></RoleRoute>} />
         <Route path="/admin/analytics" element={<RoleRoute allowedRoles={["super_admin"]}><AdminAnalytics /></RoleRoute>} />
         <Route path="/admin/leads" element={<RoleRoute allowedRoles={["super_admin"]}><AdminLeads /></RoleRoute>} />
         <Route path="/admin/referrals" element={<RoleRoute allowedRoles={["super_admin"]}><AdminReferrals /></RoleRoute>} />

@@ -288,11 +288,11 @@ export default function AdminCustomers() {
                 <p className="text-[11px] text-[#94A3B8] truncate">/{cardModal.slug}</p>
               </div>
               <div className="flex items-center gap-1.5">
-                <a href={`https://digitalcarda.in/${cardModal.slug}`} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg bg-[#F1F5F9] text-[#64748B] hover:text-[#F7B31C] flex items-center justify-center transition-colors" title="Open in new tab"><ExternalLink size={15} /></a>
+                <a href={`https://digitalcarda.in/c/${cardModal.slug}`} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg bg-[#F1F5F9] text-[#64748B] hover:text-[#F7B31C] flex items-center justify-center transition-colors" title="Open in new tab"><ExternalLink size={15} /></a>
                 <button onClick={() => setCardModal(null)} className="w-8 h-8 rounded-lg bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0] flex items-center justify-center transition-colors"><X size={16} /></button>
               </div>
             </div>
-            <iframe src={`https://digitalcarda.in/${cardModal.slug}`} title="Card preview" className="flex-1 w-full bg-[#F8FAFC]" />
+            <iframe src={`https://digitalcarda.in/c/${cardModal.slug}`} title="Card preview" className="flex-1 w-full bg-[#F8FAFC]" />
           </div>
         </div>
       )}
