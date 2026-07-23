@@ -36,7 +36,11 @@ export default function AdminLeads() {
   useEffect(() => {
     fetch("/enquiries.json")
       .then((r) => r.json())
-      .then((d: Enquiry[]) => setRows(d))
+      // Newest enquiries first (by created_on, id as tiebreaker).
+      .then((d: Enquiry[]) => {
+        const t = (s: string) => new Date(String(s || "").replace(" ", "T")).getTime() || 0;
+        setRows([...d].sort((a, b) => t(b.created_on) - t(a.created_on) || Number(b.id) - Number(a.id)));
+      })
       .catch(() => toast.error("Could not load enquiries"))
       .finally(() => setLoading(false));
   }, []);
