@@ -2,7 +2,11 @@
    and decode the quirks of the legacy schema. */
 import { scopedKey } from "@/hooks/useCustomer";
 
-const IMG_BASE = "https://digitalcarda.in/otdo-panel/uploads";
+// Where the legacy card images (logos, product/gallery/qr images) are served from.
+// These files came from the old PHP site's /otdo-panel/uploads/ folder. Set
+// VITE_IMG_BASE in .env to wherever they are actually hosted now (e.g. an old
+// server, a CDN, or /otdo-panel/uploads on this server once the folder is served).
+const IMG_BASE = import.meta.env.VITE_IMG_BASE || "https://digitalcarda.in/otdo-panel/uploads";
 
 export function imgUrl(folder: string, f: unknown): string {
   const name = String(f ?? "").trim();
