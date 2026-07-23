@@ -3,7 +3,7 @@ import { useNavigate, Link, useSearchParams } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { toast } from "sonner";
 import {
-  Mail, Lock, Eye, EyeOff, LogIn, User, Shield, Briefcase,
+  Mail, Lock, Eye, EyeOff, LogIn,
   Loader2, ArrowLeft,
 } from "lucide-react";
 import AuthBrandPanel from "@/components/AuthBrandPanel";
@@ -36,7 +36,6 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     if (next && localStorage.getItem("auth_token") && localStorage.getItem("digitalcarda_user")) navigate(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [tab, setTab] = useState<"customer" | "reseller" | "admin">(adminMode ? "admin" : "customer");
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -85,14 +84,6 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     doLogin(email, password);
   };
 
-  // Admin is only offered on the dedicated (unadvertised) admin route — never on public /login.
-  const tabs: { id: "customer" | "reseller" | "admin"; label: string; icon: typeof User }[] = adminMode
-    ? [{ id: "admin", label: "Admin", icon: Shield }]
-    : [
-        { id: "customer", label: "Customer", icon: User },
-        { id: "reseller", label: "Reseller", icon: Briefcase },
-      ];
-
   const socialSoon = () => toast.info("Social sign-in is coming soon — use email for now.");
 
   return (
@@ -134,19 +125,6 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
               </div>
             </>
           )}
-
-          {/* Tabs */}
-          <div className="relative flex rounded-xl bg-[#F1F5F9] p-1 mb-5">
-            <span
-              className="absolute top-1 bottom-1 rounded-lg bg-white shadow-sm transition-all duration-300"
-              style={{ width: `calc((100% - 0.5rem) / ${tabs.length})`, left: `calc(0.25rem + ${tabs.findIndex((t) => t.id === tab)} * ((100% - 0.5rem) / ${tabs.length}))` }}
-            />
-            {tabs.map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id)} className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${tab === t.id ? "text-[#0F172A]" : "text-[#64748B] hover:text-[#0F172A]"}`}>
-                <t.icon size={14} /> {t.label}
-              </button>
-            ))}
-          </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
