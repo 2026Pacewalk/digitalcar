@@ -7,15 +7,18 @@ async function seed() {
   console.log("Seeding database...");
 
   // ─── Seed Super Admin ───
-  const adminPass = await bcrypt.hash("admin123", 12);
+  // Password comes from ADMIN_PASSWORD (set it in production!). Falls back to
+  // "admin123" only for local dev convenience. Re-seeding updates the password.
+  const adminPlain = process.env.ADMIN_PASSWORD || "admin123";
+  const adminPass = await bcrypt.hash(adminPlain, 12);
   const [adminResult] = await db.insert(users).values({
     email: "admin@digitalcarda.com",
     password: adminPass,
     fullName: "Super Admin",
     role: "super_admin",
     status: "active",
-  }).onDuplicateKeyUpdate({ set: { email: "admin@digitalcarda.com" } });
-  console.log("Super admin seeded: admin@digitalcarda.com / admin123");
+  }).onDuplicateKeyUpdate({ set: { password: adminPass } });
+  console.log(`Super admin seeded: admin@digitalcarda.com (password ${process.env.ADMIN_PASSWORD ? "from ADMIN_PASSWORD" : "= admin123 [dev default]"})`);
 
   // ─── Seed Customer Demo ───
   const customerPass = await bcrypt.hash("demo123", 12);
@@ -132,7 +135,7 @@ async function seed() {
   console.log("Templates seeded");
 
   console.log("\n===== DEMO CREDENTIALS =====");
-  console.log("Admin:    admin@digitalcarda.com    / admin123");
+  console.log("Admin:    admin@digitalcarda.com    (see ADMIN_PASSWORD)");
   console.log("Customer: demo@digitalcarda.com     / demo123");
   console.log("Reseller: reseller@digitalcarda.com / reseller123");
   console.log("===========================\n");
