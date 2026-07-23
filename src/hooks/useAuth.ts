@@ -8,16 +8,9 @@ interface AuthUser {
   avatar?: string;
 }
 
+// Local-dev fallback only (gated to import.meta.env.DEV). No admin here on purpose —
+// the super-admin must authenticate against the real backend, never a hardcoded value.
 export const DEMO_USERS: Record<string, { password: string; user: AuthUser }> = {
-  "admin@digitalcarda.com": {
-    password: "admin123",
-    user: {
-      id: 1,
-      email: "admin@digitalcarda.com",
-      fullName: "Super Admin",
-      role: "super_admin",
-    },
-  },
   "demo@digitalcarda.com": {
     password: "demo123",
     user: {

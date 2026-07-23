@@ -9,7 +9,7 @@
 import bcrypt from "bcryptjs";
 import mysql from "mysql2/promise";
 
-const email = (process.env.ADMIN_EMAIL || "admin@digitalcarda.com").toLowerCase().trim();
+const email = (process.env.ADMIN_EMAIL || "hellopacewalk@gmail.com").toLowerCase().trim();
 const password = process.env.ADMIN_PASSWORD;
 const url = process.env.DATABASE_URL || "mysql://root@127.0.0.1:3307/digitalcarda";
 
