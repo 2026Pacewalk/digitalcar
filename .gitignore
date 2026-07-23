@@ -61,3 +61,6 @@ public/seo.json
 
 # Local data backups (contain customer PII / passwords — never commit)
 backups/
+
+# Customer PII export — keep local only
+customers-export.csv
