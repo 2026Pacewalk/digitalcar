@@ -10,7 +10,7 @@ import {
 import type { ComponentType } from "react";
 import { toast } from "sonner";
 import { loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
-import { readCustomer, scopedKey } from "@/hooks/useCustomer";
+import { readCustomer, scopedKey, getAuthUser } from "@/hooks/useCustomer";
 import { trpc } from "@/providers/trpc";
 import TrialBanner from "@/components/customer/TrialBanner";
 
@@ -252,7 +252,7 @@ export default function CustomerDashboard() {
         </div>
 
         {/* ─── Trial / expiry FOMO ─── */}
-        <TrialBanner isTrial={customer.package_id === 7} expiredOn={customer.expired_on} days={daysPending} views={customer.views} leads={enquiries ?? 0} />
+        <TrialBanner isTrial={customer.package_id === 7 && getAuthUser()?.role === "customer"} expiredOn={customer.expired_on} days={daysPending} views={customer.views} leads={enquiries ?? 0} />
 
         {/* ─── Smart completion ─── */}
         {pct < 100 ? (

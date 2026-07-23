@@ -6,7 +6,7 @@ import {
   Package as PackageIcon, Pencil, KeyRound, ChevronRight, CheckCircle2, XCircle, ShieldCheck, Sparkles,
 } from "lucide-react";
 import ModuleShell from "@/components/customer/ModuleShell";
-import { useCustomer } from "@/hooks/useCustomer";
+import { useCustomer, getAuthUser } from "@/hooks/useCustomer";
 
 const PKG: Record<number, { name: string; amount: number; days: number }> = {
   7: { name: "Trial", amount: 0, days: 7 },
@@ -47,6 +47,10 @@ export default function CustomerProfile() {
   })();
   const active = daysLeft > 0;
   const pctLeft = Math.min(100, Math.round((daysLeft / pkg.days) * 100));
+  // Staff accounts (super-admin / reseller) aren't trial customers — show full access, no upgrade nudge.
+  const role = getAuthUser()?.role || "customer";
+  const isStaff = role === "super_admin" || role === "reseller";
+  const staffLabel = role === "super_admin" ? "Admin" : "Reseller";
   const initial = (String(data.name)[0] || "U").toUpperCase();
   const pwd = String(data.password || "");
 
@@ -84,8 +88,8 @@ export default function CustomerProfile() {
           <p className="text-[11px] text-[#64748B] truncate">{String(data.designation) || "—"}{data.company_name ? ` · ${data.company_name}` : ""}</p>
           <div className="flex items-center justify-center gap-1.5 mt-3 flex-wrap">
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-[#FEF3C7] text-[#92400E]"><AtSign size={10} /> {String(data.username || slug)}</span>
-            <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-[#EEF2F7] text-[#334155]">{pkg.name}</span>
-            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full ${active ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>{active ? <CheckCircle2 size={10} /> : <XCircle size={10} />} {active ? "Active" : "Expired"}</span>
+            <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${isStaff ? "bg-[#14243E] text-white" : "bg-[#EEF2F7] text-[#334155]"}`}>{isStaff ? staffLabel : pkg.name}</span>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full ${(isStaff || active) ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>{(isStaff || active) ? <CheckCircle2 size={10} /> : <XCircle size={10} />} {isStaff ? "Full access" : active ? "Active" : "Expired"}</span>
           </div>
           <button onClick={() => copy(cardUrl, "hero")} className="mt-4 inline-flex items-center gap-1.5 h-9 px-4 rounded-xl border border-[#E2E8F0] text-xs font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors">
             {copied === "hero" ? <Check size={14} className="text-emerald-500" /> : <Link2 size={14} />} Copy card link
@@ -93,20 +97,30 @@ export default function CustomerProfile() {
         </div>
       </div>
 
-      {/* ─── Subscription (compact) ─── */}
-      <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-4">
-        <div className="flex items-center gap-3">
-          <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${active ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}><PackageIcon size={18} /></span>
+      {/* ─── Subscription / staff access (compact) ─── */}
+      {isStaff ? (
+        <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-4 flex items-center gap-3">
+          <span className="w-10 h-10 rounded-xl bg-[#14243E] text-white flex items-center justify-center shrink-0"><ShieldCheck size={18} /></span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-[#0F172A]">{pkg.name} Plan</p>
-            <p className="text-[11px] text-[#64748B]">{active ? "Active" : "Expired"} · {daysLeft.toLocaleString("en-IN")} days left</p>
+            <p className="text-sm font-bold text-[#0F172A]">{staffLabel} account</p>
+            <p className="text-[11px] text-[#64748B]">Full platform access — no plan or trial needed.</p>
           </div>
-          <button onClick={() => navigate("/dashboard/subscription")} className="h-9 px-3.5 rounded-xl gradient-gold text-[#0F172A] text-xs font-bold hover:shadow-gold transition-all shrink-0 inline-flex items-center gap-1.5"><Sparkles size={13} /> Upgrade</button>
         </div>
-        <div className="mt-3 h-1.5 rounded-full bg-[#F1F5F9] overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctLeft}%`, background: active ? "linear-gradient(90deg,#F7B31C,#D97706)" : "#EF4444" }} />
+      ) : (
+        <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-4">
+          <div className="flex items-center gap-3">
+            <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${active ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}><PackageIcon size={18} /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-[#0F172A]">{pkg.name} Plan</p>
+              <p className="text-[11px] text-[#64748B]">{active ? "Active" : "Expired"} · {daysLeft.toLocaleString("en-IN")} days left</p>
+            </div>
+            <button onClick={() => navigate("/dashboard/subscription")} className="h-9 px-3.5 rounded-xl gradient-gold text-[#0F172A] text-xs font-bold hover:shadow-gold transition-all shrink-0 inline-flex items-center gap-1.5"><Sparkles size={13} /> Upgrade</button>
+          </div>
+          <div className="mt-3 h-1.5 rounded-full bg-[#F1F5F9] overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctLeft}%`, background: active ? "linear-gradient(90deg,#F7B31C,#D97706)" : "#EF4444" }} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ─── Account details (settings list) ─── */}
       <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
