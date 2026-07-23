@@ -10,9 +10,9 @@ module.exports = {
       instances: 1,
       exec_mode: "fork",
       max_memory_restart: "512M",
+      // PORT comes from the server's .env (this box already runs other apps on 3000).
       env: {
         NODE_ENV: "production",
-        PORT: "3000",
       },
       out_file: "/var/log/digitalcarda/out.log",
       error_file: "/var/log/digitalcarda/error.log",
