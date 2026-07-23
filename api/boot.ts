@@ -20,6 +20,44 @@ app.use("/api/trpc/*", async (c) => {
     createContext,
   });
 });
+
+// Public enquiry capture for the legacy (customers.json) cards — stores the lead
+// when the slug maps to a known card, and always emails the owner.
+app.post("/api/enquiry", async (c) => {
+  try {
+    const body = await c.req.json<{ slug?: string; name?: string; contact?: string; email?: string; description?: string }>();
+    const name = String(body.name || "").trim();
+    const slug = String(body.slug || "").trim().toLowerCase();
+    if (!name) return c.json({ ok: false, error: "Name required" }, 400);
+
+    // Best-effort DB storage (only if the slug maps to a card).
+    try {
+      const { getDb } = await import("./queries/connection");
+      const { cards, leads } = await import("@db/schema");
+      const { eq, sql } = await import("drizzle-orm");
+      const db = getDb();
+      const card = await db.query.cards.findFirst({ where: eq(cards.slug, slug) });
+      if (card) {
+        await db.insert(leads).values({
+          cardId: card.id, userId: card.userId, fullName: name,
+          email: body.email || null, phone: body.contact || null,
+          message: body.description || null, source: "card",
+        });
+        await db.update(cards).set({ leadCount: sql`${cards.leadCount} + 1` }).where(eq(cards.id, card.id));
+      }
+    } catch (e) {
+      console.error("[enquiry] DB store skipped:", (e as Error).message);
+    }
+
+    const { sendLeadNotification } = await import("./lib/mail");
+    await sendLeadNotification({ name, email: body.email, contact: body.contact, message: body.description, slug });
+    return c.json({ ok: true });
+  } catch (e) {
+    console.error("[enquiry] error:", (e as Error).message);
+    return c.json({ ok: false }, 500);
+  }
+});
+
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;

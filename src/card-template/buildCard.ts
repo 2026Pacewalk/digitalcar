@@ -441,6 +441,8 @@ function dcSendEnquiry(form){
     localStorage.setItem('dc_enquiry_ping', String(d.getTime())); /* wake cross-tab listeners */
     try{ window.dispatchEvent(new CustomEvent('dc:new-enquiry',{detail:e})); }catch(_){}
     try{ if(window.parent && window.parent!==window) window.parent.dispatchEvent(new CustomEvent('dc:new-enquiry',{detail:e})); }catch(_){}
+    /* Send to the server so the owner is stored + emailed. Fire-and-forget. */
+    try{ fetch('/api/enquiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:e.uname,name:e.name,contact:e.contact,email:e.email,description:e.description})}).catch(function(){}); }catch(_){}
   }catch(err){}
   form.innerHTML='<p class="dc-sent">✓ Thank you! We will get back to you shortly.</p>';
   return false;

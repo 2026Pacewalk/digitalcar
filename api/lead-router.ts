@@ -4,6 +4,7 @@ import { getDb } from "./queries/connection";
 import { leads, cards } from "@db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { sendLeadNotification } from "./lib/mail";
 
 export const leadRouter = createRouter({
   list: authedQuery
@@ -119,6 +120,12 @@ export const leadRouter = createRouter({
       await db.update(cards)
         .set({ leadCount: sql`${cards.leadCount} + 1` })
         .where(eq(cards.id, input.cardId));
+
+      // Notify the owner by email (non-blocking, never throws).
+      void sendLeadNotification({
+        name: input.fullName, email: input.email, contact: input.phone,
+        message: input.message, slug: card.slug, cardName: card.title,
+      });
 
       return db.query.leads.findFirst({ where: eq(leads.id, result[0].id) });
     }),
