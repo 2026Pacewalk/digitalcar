@@ -179,9 +179,9 @@ export default function AdminLeads() {
           </div>
         )}
 
-        {/* Table */}
+        {/* Table (desktop) + cards (mobile) */}
         <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full min-w-[940px]">
               <thead>
                 <tr className="bg-[#F8FAFC]">
@@ -255,6 +255,74 @@ export default function AdminLeads() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Cards (mobile) */}
+          <div className="md:hidden">
+            {!loading && pageRows.length > 0 && (
+              <label className="flex items-center gap-2 px-4 py-2.5 border-b border-[#F1F5F9] bg-[#F8FAFC] cursor-pointer">
+                <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllPage} className="rounded border-[#CBD5E1] accent-[#F7B31C] w-4 h-4" />
+                <span className="text-xs font-medium text-[#64748B]">Select all on this page</span>
+              </label>
+            )}
+            {loading ? (
+              <div className="p-4 space-y-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-24 bg-[#F1F5F9] rounded-xl animate-pulse" />)}</div>
+            ) : pageRows.length === 0 ? (
+              <div className="px-4 py-16 text-center"><Inbox size={28} className="mx-auto text-[#CBD5E1] mb-2" /><p className="text-sm text-[#94A3B8]">No enquiries found</p></div>
+            ) : (
+              <div className="divide-y divide-[#F1F5F9]">
+                {pageRows.map((e) => {
+                  const card = isCardLead(e);
+                  const isOpen = expanded.has(e.id);
+                  const desc = e.description || "";
+                  const long = desc.length > 120;
+                  const checked = selected.has(e.id);
+                  return (
+                    <div key={e.id} className={`p-4 transition-colors ${checked ? "bg-[#FEF3C7]/40" : ""}`}>
+                      <div className="flex items-start gap-3">
+                        <input type="checkbox" checked={checked} onChange={() => toggleSelect(e.id)} className="mt-1 rounded border-[#CBD5E1] accent-[#F7B31C] w-4 h-4 shrink-0" aria-label={`Select ${e.name}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-[#0F172A] truncate">{e.name || "—"}</p>
+                              <p className="text-[11px] text-[#94A3B8] flex items-center gap-1 mt-0.5"><Calendar size={10} /> {fmtDate(e.created_on)}</p>
+                            </div>
+                            {e.status === "converted"
+                              ? <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] text-[10px] font-semibold"><CheckCircle2 size={10} /> Converted</span>
+                              : <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full bg-[#DBEAFE] text-[#1E40AF] text-[10px] font-semibold capitalize">{e.status}</span>}
+                          </div>
+
+                          {/* contact chips */}
+                          <div className="flex flex-wrap gap-1.5 mt-2.5">
+                            {e.email && <a href={`mailto:${e.email}`} className="inline-flex items-center gap-1 max-w-full px-2 py-1 rounded-lg bg-[#F1F5F9] text-[11px] text-[#334155] hover:text-[#F7B31C]"><Mail size={11} className="shrink-0" /> <span className="truncate">{e.email}</span></a>}
+                            {e.contact && <a href={`tel:${e.contact}`} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F1F5F9] text-[11px] text-[#334155] hover:text-[#F7B31C]"><Phone size={11} /> {e.contact}</a>}
+                            {card
+                              ? <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#CCFBF1] text-[#115E59] text-[11px] font-semibold"><CreditCard size={11} /> /{e.uname}</span>
+                              : <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#DBEAFE] text-[#1E40AF] text-[11px] font-semibold"><Globe size={11} /> Website</span>}
+                          </div>
+
+                          {/* requirement */}
+                          {desc && (
+                            <p className="text-xs text-[#475569] mt-2.5 leading-relaxed whitespace-pre-wrap break-words">
+                              {long && !isOpen ? desc.slice(0, 120).trim() + "… " : desc + " "}
+                              {long && <button onClick={() => toggleExpand(e.id)} className="text-[#F7B31C] font-medium">{isOpen ? "less" : "more"}</button>}
+                            </p>
+                          )}
+
+                          {/* actions */}
+                          <div className="flex items-center gap-2 mt-3">
+                            {e.status !== "converted" && (
+                              <button onClick={() => convert(e.id)} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[#0F172A] text-white text-xs font-semibold hover:bg-[#1E293B] transition-colors active:scale-[0.98]"><CheckCircle2 size={14} /> Convert</button>
+                            )}
+                            <button onClick={() => askDelete([e.id])} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-red-200 text-red-500 text-xs font-semibold hover:bg-red-50 transition-colors active:scale-[0.98]"><Trash2 size={14} /> Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Pagination */}
