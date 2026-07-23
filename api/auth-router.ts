@@ -242,14 +242,40 @@ export const authRouter = createRouter({
       z.object({
         fullName: z.string().min(2).max(120),
         phone: z.string().max(30).optional(),
+        email: z.string().email().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      const email = input.email?.toLowerCase().trim();
+
+      // Email is the sign-in identity — must stay unique across accounts.
+      if (email) {
+        const clash = await db.query.users.findFirst({
+          where: eq(users.email, email),
+        });
+        if (clash && clash.id !== ctx.user.id) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "That email is already used by another account.",
+          });
+        }
+      }
+
       await db
         .update(users)
-        .set({ fullName: input.fullName, phone: input.phone || null })
+        .set({
+          fullName: input.fullName,
+          phone: input.phone || null,
+          ...(email ? { email } : {}),
+        })
         .where(eq(users.id, ctx.user.id));
-      return { success: true, fullName: input.fullName, phone: input.phone || "" };
+
+      return {
+        success: true,
+        fullName: input.fullName,
+        phone: input.phone || "",
+        email: email || ctx.user.email,
+      };
     }),
 });

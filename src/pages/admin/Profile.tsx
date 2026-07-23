@@ -2,7 +2,7 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import TopBar from "@/components/layout/TopBar";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   User, Camera, Save, Lock, Shield, Eye, EyeOff, Smartphone, Mail, Clock, Monitor, Chrome, CheckCircle2, ShieldCheck, ShieldAlert
@@ -26,9 +26,22 @@ export default function AdminProfile() {
 
   const [profile, setProfile] = useState({
     fullName: user?.fullName || "Super Admin",
-    email: user?.email || "admin@digitalcarda.com",
-    mobile: (user as { phone?: string } | null)?.phone || "",
+    email: user?.email || "",
+    mobile: "",
   });
+
+  // Source of truth is the database, not localStorage (which never stores the
+  // phone) — otherwise a saved mobile number looks empty again on reload.
+  const me = trpc.auth.me.useQuery();
+  useEffect(() => {
+    if (me.data) {
+      setProfile({
+        fullName: me.data.fullName || "Super Admin",
+        email: me.data.email || "",
+        mobile: me.data.phone || "",
+      });
+    }
+  }, [me.data]);
 
   const [passwordForm, setPasswordForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
 
@@ -39,9 +52,10 @@ export default function AdminProfile() {
         const raw = localStorage.getItem("digitalcarda_user");
         if (raw) {
           const u = JSON.parse(raw);
-          localStorage.setItem("digitalcarda_user", JSON.stringify({ ...u, fullName: res.fullName }));
+          localStorage.setItem("digitalcarda_user", JSON.stringify({ ...u, fullName: res.fullName, email: res.email }));
         }
       } catch {}
+      me.refetch();
       refetch();
       toast.success("Profile saved!");
     },
@@ -118,12 +132,21 @@ export default function AdminProfile() {
                   <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Full Name *</label><input value={profile.fullName} onChange={(e) => setProfile({ ...profile, fullName: e.target.value })} className="input-premium w-full" /></div>
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Email <span className="text-[#94A3B8] font-normal">(sign-in address)</span></label>
-                    <input value={profile.email} readOnly disabled className="input-premium w-full bg-[#F8FAFC] text-[#64748B] cursor-not-allowed" type="email" />
+                    <input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} className="input-premium w-full" type="email" placeholder="you@example.com" />
                   </div>
                   <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Mobile Number</label><input value={profile.mobile} onChange={(e) => setProfile({ ...profile, mobile: e.target.value })} className="input-premium w-full" placeholder="+91 …" /></div>
                 </div>
+                <p className="text-[11px] text-[#94A3B8] -mt-2">Changing the email changes the address you sign in with. It must not already belong to another account.</p>
                 <div className="flex justify-end">
-                  <button onClick={() => { const name = profile.fullName.trim(); if (name.length < 2) { toast.error("Full name is required"); return; } updateProfile.mutate({ fullName: name, phone: profile.mobile.trim() }); }} disabled={updateProfile.isPending} className="h-11 px-8 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-50"><Save size={16} /> {updateProfile.isPending ? "Saving..." : "Save Changes"}</button>
+                  <button onClick={() => {
+                    const name = profile.fullName.trim();
+                    const email = profile.email.trim().toLowerCase();
+                    if (name.length < 2) { toast.error("Full name is required"); return; }
+                    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast.error("Enter a valid email"); return; }
+                    const emailChanged = email !== (me.data?.email || "").toLowerCase();
+                    if (emailChanged && !window.confirm(`Change your sign-in email to ${email}? You'll use this to log in from now on.`)) return;
+                    updateProfile.mutate({ fullName: name, phone: profile.mobile.trim(), email });
+                  }} disabled={updateProfile.isPending} className="h-11 px-8 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-50"><Save size={16} /> {updateProfile.isPending ? "Saving..." : "Save Changes"}</button>
                 </div>
               </div>
             )}
