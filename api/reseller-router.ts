@@ -17,7 +17,7 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in"
 
 export const resellerRouter = createRouter({
   // ── Public: apply to become a reseller ──
-  apply: publicQuery
+  submitApplication: publicQuery
     .input(z.object({
       fullName: z.string().min(2).max(120),
       email: z.string().email(),

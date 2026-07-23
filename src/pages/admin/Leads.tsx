@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Search, Mail, Phone, Calendar, CheckCircle2, Trash2,
   ChevronLeft, ChevronRight, Inbox, CreditCard, Globe, Loader2, User,
-  AlertTriangle, X,
+  AlertTriangle, X, Flame, Ban, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { classifyLead, type LeadCategory } from "@/lib/leadIntel";
 
 type Enquiry = {
   id: string; name: string; contact: string; email: string; description: string;
@@ -23,11 +24,17 @@ const fmtDate = (s: string) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+function CatBadge({ c }: { c: LeadCategory }) {
+  if (c === "important") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FFEDD5] text-[#C2410C] text-[10px] font-bold"><Flame size={10} /> Important</span>;
+  if (c === "spam") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FEE2E2] text-[#DC2626] text-[10px] font-bold"><Ban size={10} /> Spam</span>;
+  return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#64748B] text-[10px] font-semibold">Normal</span>;
+}
+
 export default function AdminLeads() {
   const [rows, setRows] = useState<Enquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "card" | "website" | "converted">("all");
+  const [filter, setFilter] = useState<"all" | "important" | "normal" | "spam" | "converted">("all");
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -45,18 +52,27 @@ export default function AdminLeads() {
       .finally(() => setLoading(false));
   }, []);
 
-  const stats = useMemo(() => {
-    const card = rows.filter(isCardLead).length;
-    const converted = rows.filter((e) => e.status === "converted").length;
-    return { total: rows.length, card, website: rows.length - card, converted };
+  // AI/heuristic intelligence: classify every lead as important / normal / spam.
+  const verdicts = useMemo(() => {
+    const m = new Map<string, LeadCategory>();
+    for (const e of rows) m.set(e.id, classifyLead({ name: e.name, email: e.email, contact: e.contact, description: e.description, uname: e.uname }).category);
+    return m;
   }, [rows]);
+  const cat = (e: Enquiry): LeadCategory => verdicts.get(e.id) || "normal";
+
+  const stats = useMemo(() => {
+    const important = rows.filter((e) => cat(e) === "important").length;
+    const spam = rows.filter((e) => cat(e) === "spam").length;
+    const converted = rows.filter((e) => e.status === "converted").length;
+    return { total: rows.length, important, normal: rows.length - important - spam, spam, converted };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, verdicts]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return rows.filter((e) => {
-      if (filter === "card" && !isCardLead(e)) return false;
-      if (filter === "website" && isCardLead(e)) return false;
       if (filter === "converted" && e.status !== "converted") return false;
+      if ((filter === "important" || filter === "normal" || filter === "spam") && cat(e) !== filter) return false;
       if (!q) return true;
       return (
         e.name?.toLowerCase().includes(q) ||
@@ -65,8 +81,13 @@ export default function AdminLeads() {
         e.description?.toLowerCase().includes(q) ||
         e.uname?.toLowerCase().includes(q)
       );
+    }).sort((a, b) => {
+      // Important first, then normal, then spam (date order preserved within each).
+      const rank: Record<LeadCategory, number> = { important: 0, normal: 1, spam: 2 };
+      return rank[cat(a)] - rank[cat(b)];
     });
-  }, [rows, search, filter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, search, filter, verdicts]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -110,16 +131,23 @@ export default function AdminLeads() {
 
   const statCards = [
     { label: "Total Enquiries", value: stats.total, icon: Inbox, tint: "#F7B31C", bg: "#FEF3C7" },
-    { label: "Card Leads", value: stats.card, icon: CreditCard, tint: "#14B8A6", bg: "#CCFBF1" },
-    { label: "Website", value: stats.website, icon: Globe, tint: "#3B82F6", bg: "#DBEAFE" },
+    { label: "Important", value: stats.important, icon: Flame, tint: "#EA580C", bg: "#FFEDD5" },
+    { label: "Spam", value: stats.spam, icon: Ban, tint: "#EF4444", bg: "#FEE2E2" },
     { label: "Converted", value: stats.converted, icon: CheckCircle2, tint: "#22C55E", bg: "#DCFCE7" },
   ];
   const filters = [
     { id: "all" as const, label: "All", count: stats.total },
-    { id: "card" as const, label: "Card Leads", count: stats.card },
-    { id: "website" as const, label: "Website", count: stats.website },
+    { id: "important" as const, label: "🔥 Important", count: stats.important },
+    { id: "normal" as const, label: "Normal", count: stats.normal },
+    { id: "spam" as const, label: "🚫 Spam", count: stats.spam },
     { id: "converted" as const, label: "Converted", count: stats.converted },
   ];
+
+  const clearAllSpam = () => {
+    const ids = rows.filter((e) => cat(e) === "spam").map((e) => e.id);
+    if (!ids.length) { toast.info("No spam leads to clear"); return; }
+    setConfirmIds(ids);
+  };
 
   return (
     <ResponsiveDashboardLayout>
@@ -150,7 +178,7 @@ export default function AdminLeads() {
               className="w-full h-11 bg-white rounded-xl pl-10 pr-4 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/20 shadow-premium transition-all placeholder:text-[#94A3B8]"
             />
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             {filters.map((f) => (
               <button key={f.id} onClick={() => setFilter(f.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${filter === f.id ? "bg-[#0F172A] text-white" : "bg-white border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"}`}>
@@ -158,8 +186,16 @@ export default function AdminLeads() {
                 <span className={`text-[10px] px-1.5 rounded-full ${filter === f.id ? "bg-white/20" : "bg-[#F1F5F9]"}`}>{f.count}</span>
               </button>
             ))}
+            {stats.spam > 0 && (
+              <button onClick={clearAllSpam} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-500 border border-red-200 hover:bg-red-100 transition-all flex items-center gap-1.5">
+                <Trash2 size={13} /> Clear {stats.spam.toLocaleString("en-IN")} spam
+              </button>
+            )}
           </div>
         </div>
+        {!loading && (
+          <p className="-mt-2 text-[11px] text-[#94A3B8] flex items-center gap-1"><Sparkles size={11} className="text-[#F7B31C]" /> Auto-sorted by smart lead scoring — Important leads first-priority, Spam filtered for one-tap cleanup.</p>
+        )}
 
         {/* Bulk action bar */}
         {selected.size > 0 && (
@@ -218,10 +254,13 @@ export default function AdminLeads() {
                         <td className="px-4 py-3 text-xs text-[#94A3B8]">{(safePage - 1) * PAGE_SIZE + i + 1}</td>
                         <td className="px-4 py-3 text-xs text-[#64748B] whitespace-nowrap"><span className="flex items-center gap-1"><Calendar size={11} /> {fmtDate(e.created_on)}</span></td>
                         <td className="px-4 py-3">
-                          <span className="flex items-center gap-2 text-sm font-medium text-[#0F172A]">
+                          <div className="flex items-center gap-2">
                             <span className="w-7 h-7 rounded-full bg-[#F1F5F9] flex items-center justify-center shrink-0"><User size={13} className="text-[#64748B]" /></span>
-                            {e.name || "—"}
-                          </span>
+                            <div className="min-w-0">
+                              <span className="block text-sm font-medium text-[#0F172A] truncate">{e.name || "—"}</span>
+                              <span className="mt-0.5 inline-block"><CatBadge c={cat(e)} /></span>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-xs text-[#64748B]">{e.email ? <a href={`mailto:${e.email}`} className="flex items-center gap-1 hover:text-[#F7B31C]"><Mail size={11} /> {e.email}</a> : "—"}</td>
                         <td className="px-4 py-3 text-xs text-[#64748B] whitespace-nowrap">{e.contact ? <a href={`tel:${e.contact}`} className="flex items-center gap-1 hover:text-[#F7B31C]"><Phone size={11} /> {e.contact}</a> : "—"}</td>
@@ -287,9 +326,10 @@ export default function AdminLeads() {
                               <p className="text-sm font-semibold text-[#0F172A] truncate">{e.name || "—"}</p>
                               <p className="text-[11px] text-[#94A3B8] flex items-center gap-1 mt-0.5"><Calendar size={10} /> {fmtDate(e.created_on)}</p>
                             </div>
-                            {e.status === "converted"
-                              ? <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] text-[10px] font-semibold"><CheckCircle2 size={10} /> Converted</span>
-                              : <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full bg-[#DBEAFE] text-[#1E40AF] text-[10px] font-semibold capitalize">{e.status}</span>}
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <CatBadge c={cat(e)} />
+                              {e.status === "converted" && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] text-[10px] font-semibold"><CheckCircle2 size={10} /> Converted</span>}
+                            </div>
                           </div>
 
                           {/* contact chips */}

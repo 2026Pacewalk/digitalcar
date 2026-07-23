@@ -6,7 +6,7 @@ import { Store, ArrowLeft, CheckCircle2, Loader2, TrendingUp, Users, Wallet } fr
 export default function BecomeReseller() {
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", companyName: "", message: "" });
   const [done, setDone] = useState(false);
-  const apply = trpc.reseller.apply.useMutation({ onSuccess: () => setDone(true) });
+  const apply = trpc.reseller.submitApplication.useMutation({ onSuccess: () => setDone(true) });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const perks = [
