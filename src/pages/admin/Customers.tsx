@@ -75,7 +75,8 @@ export default function AdminCustomers() {
   useEffect(() => {
     fetch("/customers.json")
       .then((r) => r.json())
-      .then((d: Customer[]) => setRows(d))
+      // Newest members first (id DESC) — matches the old site's members-list.php order
+      .then((d: Customer[]) => setRows([...d].sort((a, b) => Number(b.id) - Number(a.id))))
       .catch(() => toast.error("Could not load customers"))
       .finally(() => setLoading(false));
   }, []);

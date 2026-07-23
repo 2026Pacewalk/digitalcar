@@ -7,6 +7,7 @@ import {
   Loader2, ArrowLeft,
 } from "lucide-react";
 import AuthBrandPanel from "@/components/AuthBrandPanel";
+import { DEMO_USERS } from "@/hooks/useAuth";
 
 function GoogleIcon({ size = 18 }: { size?: number }) {
   return (
@@ -47,7 +48,18 @@ export default function Login() {
     return "/dashboard";
   };
 
-  // Real backend login: stores a genuine JWT the server accepts.
+  // Try the real backend; if the DB/server is unavailable, fall back to the
+  // built-in demo accounts so the app is fully usable in local dev without MySQL.
+  const demoLogin = (mail: string, pass: string) => {
+    const entry = DEMO_USERS[mail.toLowerCase().trim()];
+    if (!entry || entry.password !== pass) return false;
+    localStorage.setItem("auth_token", "demo_token_" + entry.user.id);
+    localStorage.setItem("digitalcarda_user", JSON.stringify(entry.user));
+    toast.success("Welcome back! (demo mode)");
+    navigate(next || routeFor(entry.user.role));
+    return true;
+  };
+
   const doLogin = async (mail: string, pass: string) => {
     setLoading(true);
     try {
@@ -57,7 +69,10 @@ export default function Login() {
       toast.success("Welcome back!");
       navigate(next || routeFor(res.user.role));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Invalid email or password");
+      if (demoLogin(mail, pass)) return;
+      const msg = err instanceof Error ? err.message : "";
+      const backendDown = /Failed query|fetch|ECONNREFUSED|NetworkError|Failed to fetch|users/i.test(msg);
+      toast.error(backendDown ? "Server offline — sign in with a demo account (Quick Login)." : (msg || "Invalid email or password"));
       setLoading(false);
     }
   };

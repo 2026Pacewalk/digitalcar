@@ -8,7 +8,7 @@ interface AuthUser {
   avatar?: string;
 }
 
-const DEMO_USERS: Record<string, { password: string; user: AuthUser }> = {
+export const DEMO_USERS: Record<string, { password: string; user: AuthUser }> = {
   "admin@digitalcarda.com": {
     password: "admin123",
     user: {

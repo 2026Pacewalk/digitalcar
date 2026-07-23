@@ -1,6 +1,6 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Plus, Star, Crown, Pencil, Trash2, X, Save, Check, LayoutGrid, ChevronLeft, ChevronRight,
@@ -18,12 +18,27 @@ const NEW: Draft = { name: "", style: 1, primary: "#F7B31C", secondary: "#0F172A
 const thumbHtml = (style: number, primary: string, secondary: string) =>
   buildCardThumb({ ...DEFAULT_CUSTOMER, color: primary, color2: secondary }, style);
 
+// Card front is rendered at this design width; the frame scales it to fit its own width.
+const THUMB_W = 375;
+const THUMB_H = 560;
+
 function Thumb({ style, primary, secondary }: { style: number; primary: string; secondary: string }) {
   const html = useMemo(() => thumbHtml(style, primary, secondary), [style, primary, secondary]);
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setScale(el.clientWidth / THUMB_W);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <div className="relative w-full overflow-hidden bg-[#F8FAFC] pointer-events-none" style={{ aspectRatio: "3 / 4.4" }}>
+    <div ref={ref} className="relative w-full overflow-hidden bg-white pointer-events-none" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }}>
       <iframe title={`Style ${style}`} srcDoc={html} scrolling="no" tabIndex={-1} loading="lazy"
-        style={{ width: "375px", height: "560px", border: 0, transform: "scale(0.5)", transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
+        style={{ width: `${THUMB_W}px`, height: `${THUMB_H}px`, border: 0, transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
     </div>
   );
 }

@@ -48,6 +48,27 @@ function ColorRow({ label, hint, value, placeholder, swatches, allowClear, onCha
   );
 }
 
+// Card front (375×560) scaled responsively to fill its frame — no empty gap.
+const THUMB_W = 375, THUMB_H = 560;
+function ThumbFrame({ html, title }: { html: string; title: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const measure = () => setScale(el.clientWidth / THUMB_W);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="relative w-full overflow-hidden bg-white pointer-events-none" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }}>
+      <iframe title={title} srcDoc={html} scrolling="no" tabIndex={-1} loading="lazy"
+        style={{ width: `${THUMB_W}px`, height: `${THUMB_H}px`, border: 0, transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
+    </div>
+  );
+}
+
 export default function CustomerTemplates() {
   const { data, update } = useCustomer();
   const { data: presetData } = trpc.template.presets.useQuery();
@@ -113,10 +134,7 @@ export default function CustomerTemplates() {
                   className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all group ${isSel ? "border-[#F7B31C] shadow-gold ring-2 ring-[#F7B31C]/20" : "border-[#F1F5F9] hover:border-[#F7B31C]/50 hover:-translate-y-0.5 hover:shadow-premium"}`}>
                   {isSel && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F7B31C] flex items-center justify-center z-10 shadow"><Check size={13} className="text-[#0F172A]" /></span>}
                   {defaultId === p.id && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
-                  <div className="relative w-full overflow-hidden bg-[#F8FAFC] pointer-events-none" style={{ aspectRatio: "3 / 4.4" }}>
-                    <iframe title={p.name} srcDoc={thumbs[i]} scrolling="no" tabIndex={-1} loading="lazy"
-                      style={{ width: "375px", height: "560px", border: 0, transform: "scale(0.5)", transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
-                  </div>
+                  <ThumbFrame html={thumbs[i]} title={p.name} />
                   <div className="px-2 py-2 flex items-center gap-1.5 justify-center">
                     <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: p.primary }} />
                     <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: p.secondary }} />
