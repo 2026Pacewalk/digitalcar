@@ -104,6 +104,8 @@ export default function App() {
 
         {/* Auth */}
         <Route path="/login" element={<Login />} />
+        {/* Unadvertised admin login — set VITE_ADMIN_LOGIN_SLUG in .env to your own secret slug */}
+        <Route path={`/${import.meta.env.VITE_ADMIN_LOGIN_SLUG || "control-signin"}`} element={<Login adminMode />} />
         <Route path="/signup" element={<Signup />} />
 
         {/* Public card */}

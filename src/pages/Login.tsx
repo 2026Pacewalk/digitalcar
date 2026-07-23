@@ -24,7 +24,7 @@ const inputCls =
   "h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] pl-10 pr-3 text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#94A3B8]";
 const iconCls = "absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none";
 
-export default function Login() {
+export default function Login({ adminMode = false }: { adminMode?: boolean }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get("next");
@@ -36,7 +36,7 @@ export default function Login() {
     if (next && localStorage.getItem("auth_token") && localStorage.getItem("digitalcarda_user")) navigate(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [tab, setTab] = useState<"customer" | "reseller" | "admin">("customer");
+  const [tab, setTab] = useState<"customer" | "reseller" | "admin">(adminMode ? "admin" : "customer");
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,6 +51,8 @@ export default function Login() {
   // Try the real backend; if the DB/server is unavailable, fall back to the
   // built-in demo accounts so the app is fully usable in local dev without MySQL.
   const demoLogin = (mail: string, pass: string) => {
+    // Only in local dev — never allow the built-in demo credentials in production.
+    if (!import.meta.env.DEV) return false;
     const entry = DEMO_USERS[mail.toLowerCase().trim()];
     if (!entry || entry.password !== pass) return false;
     localStorage.setItem("auth_token", "demo_token_" + entry.user.id);
@@ -72,7 +74,7 @@ export default function Login() {
       if (demoLogin(mail, pass)) return;
       const msg = err instanceof Error ? err.message : "";
       const backendDown = /Failed query|fetch|ECONNREFUSED|NetworkError|Failed to fetch|users/i.test(msg);
-      toast.error(backendDown ? "Server offline — sign in with a demo account (Quick Login)." : (msg || "Invalid email or password"));
+      toast.error(backendDown ? "Server is temporarily unavailable. Please try again shortly." : (msg || "Invalid email or password"));
       setLoading(false);
     }
   };
@@ -83,23 +85,13 @@ export default function Login() {
     doLogin(email, password);
   };
 
-  const handleQuickLogin = (demoEmail: string, demoPassword: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    doLogin(demoEmail, demoPassword);
-  };
-
-  const tabs = [
-    { id: "customer" as const, label: "Customer", icon: User },
-    { id: "reseller" as const, label: "Reseller", icon: Briefcase },
-    { id: "admin" as const, label: "Admin", icon: Shield },
-  ];
-
-  const quickLogins = [
-    { label: "Admin", email: "admin@digitalcarda.com", password: "admin123", icon: Shield, color: "#F7B31C" },
-    { label: "Customer", email: "demo@digitalcarda.com", password: "demo123", icon: User, color: "#14B8A6" },
-    { label: "Reseller", email: "reseller@digitalcarda.com", password: "reseller123", icon: Briefcase, color: "#8B5CF6" },
-  ];
+  // Admin is only offered on the dedicated (unadvertised) admin route — never on public /login.
+  const tabs: { id: "customer" | "reseller" | "admin"; label: string; icon: typeof User }[] = adminMode
+    ? [{ id: "admin", label: "Admin", icon: Shield }]
+    : [
+        { id: "customer", label: "Customer", icon: User },
+        { id: "reseller", label: "Reseller", icon: Briefcase },
+      ];
 
   const socialSoon = () => toast.info("Social sign-in is coming soon — use email for now.");
 
@@ -108,26 +100,6 @@ export default function Login() {
       <AuthBrandPanel
         heading="Welcome back to DigitalCarda"
         subtitle="Sign in to manage your cards, track leads, view analytics, and grow your business — all in one place."
-        footer={
-          <div>
-            <p className="text-[11px] text-[#94A3B8] uppercase tracking-widest mb-3">Quick login (demo)</p>
-            <div className="space-y-2">
-              {quickLogins.map((ql) => (
-                <button
-                  key={ql.email}
-                  onClick={() => handleQuickLogin(ql.email, ql.password)}
-                  className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-[#F7B31C]/30 transition-all text-left group"
-                >
-                  <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${ql.color}22`, color: ql.color }}><ql.icon size={15} /></span>
-                  <div className="min-w-0">
-                    <p className="text-sm text-white font-medium leading-none">{ql.label}</p>
-                    <p className="text-[11px] text-[#94A3B8] mt-0.5 truncate">{ql.email}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        }
       />
 
       {/* Form side */}
@@ -145,38 +117,29 @@ export default function Login() {
           </div>
 
           <div className="text-center mb-6">
-            <h1 className="text-2xl sm:text-[1.7rem] font-extrabold text-[#0F172A] tracking-tight">Sign in to your account</h1>
-            <p className="text-sm text-[#64748B] mt-1">Access your dashboard and digital cards</p>
+            <h1 className="text-2xl sm:text-[1.7rem] font-extrabold text-[#0F172A] tracking-tight">{adminMode ? "Admin sign in" : "Sign in to your account"}</h1>
+            <p className="text-sm text-[#64748B] mt-1">{adminMode ? "Restricted area — authorised staff only" : "Access your dashboard and digital cards"}</p>
           </div>
 
-          {/* Social */}
-          <button onClick={socialSoon} type="button" className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white flex items-center justify-center gap-2.5 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors">
-            <GoogleIcon /> Continue with Google
-          </button>
-          <div className="flex items-center gap-3 my-5">
-            <span className="h-px flex-1 bg-[#E2E8F0]" />
-            <span className="text-xs text-[#94A3B8]">or sign in with email</span>
-            <span className="h-px flex-1 bg-[#E2E8F0]" />
-          </div>
-
-          {/* Mobile quick login */}
-          <div className="lg:hidden mb-5">
-            <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider text-center mb-2">Quick demo login</p>
-            <div className="grid grid-cols-3 gap-2">
-              {quickLogins.map((ql) => (
-                <button key={ql.email} onClick={() => handleQuickLogin(ql.email, ql.password)} className="p-2.5 rounded-xl bg-white border border-[#E2E8F0] hover:border-[#F7B31C] transition-all text-center">
-                  <ql.icon size={16} className="mx-auto mb-1" style={{ color: ql.color }} />
-                  <p className="text-[10px] font-medium text-[#0F172A]">{ql.label}</p>
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Social — hidden on the admin portal */}
+          {!adminMode && (
+            <>
+              <button onClick={socialSoon} type="button" className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white flex items-center justify-center gap-2.5 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors">
+                <GoogleIcon /> Continue with Google
+              </button>
+              <div className="flex items-center gap-3 my-5">
+                <span className="h-px flex-1 bg-[#E2E8F0]" />
+                <span className="text-xs text-[#94A3B8]">or sign in with email</span>
+                <span className="h-px flex-1 bg-[#E2E8F0]" />
+              </div>
+            </>
+          )}
 
           {/* Tabs */}
           <div className="relative flex rounded-xl bg-[#F1F5F9] p-1 mb-5">
             <span
               className="absolute top-1 bottom-1 rounded-lg bg-white shadow-sm transition-all duration-300"
-              style={{ width: "calc((100% - 0.5rem) / 3)", left: `calc(0.25rem + ${tabs.findIndex((t) => t.id === tab)} * ((100% - 0.5rem) / 3))` }}
+              style={{ width: `calc((100% - 0.5rem) / ${tabs.length})`, left: `calc(0.25rem + ${tabs.findIndex((t) => t.id === tab)} * ((100% - 0.5rem) / ${tabs.length}))` }}
             />
             {tabs.map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)} className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${tab === t.id ? "text-[#0F172A]" : "text-[#64748B] hover:text-[#0F172A]"}`}>
@@ -190,7 +153,7 @@ export default function Login() {
               <label className="block text-xs font-semibold text-[#334155] mb-1.5">Email / Username</label>
               <div className="relative">
                 <Mail size={16} className={iconCls} />
-                <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={tab === "admin" ? "admin@digitalcarda.com" : tab === "reseller" ? "reseller@digitalcarda.com" : "demo@digitalcarda.com"} className={inputCls} />
+                <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email or username" className={inputCls} />
               </div>
             </div>
             <div>
@@ -213,9 +176,11 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-[#64748B]">
-            Don&apos;t have an account? <Link to="/signup" className="text-[#F7B31C] hover:text-[#D97706] font-semibold">Sign Up Free</Link>
-          </p>
+          {!adminMode && (
+            <p className="mt-6 text-center text-sm text-[#64748B]">
+              Don&apos;t have an account? <Link to="/signup" className="text-[#F7B31C] hover:text-[#D97706] font-semibold">Sign Up Free</Link>
+            </p>
+          )}
         </div>
       </div>
     </div>
