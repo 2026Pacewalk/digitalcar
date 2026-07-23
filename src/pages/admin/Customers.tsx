@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
+import { buildCardHtml } from "@/card-template/buildCard";
 import { scopedKey } from "@/hooks/useCustomer";
 
 /* Retailer (admin_id) → name, from superadmin table */
@@ -65,6 +66,7 @@ export default function AdminCustomers() {
 
   // modals
   const [cardModal, setCardModal] = useState<Customer | null>(null);
+  const [cardHtml, setCardHtml] = useState<string | null>(null);
   const [pwdModal, setPwdModal] = useState<Customer | null>(null);
   const [pkgModal, setPkgModal] = useState<Customer | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -80,6 +82,23 @@ export default function AdminCustomers() {
       .catch(() => toast.error("Could not load customers"))
       .finally(() => setLoading(false));
   }, []);
+
+  // Build the real card preview from customers.json (the public /c/:slug route
+  // reads the DB, which has no content for these imported cards).
+  useEffect(() => {
+    if (!cardModal) { setCardHtml(null); return; }
+    let cancelled = false;
+    setCardHtml(null);
+    const c = cardModal;
+    const rec = { ...c, specialities: decodeSpecialities((c as Record<string, unknown>).specialities), logo: imgUrl("home", (c as Record<string, unknown>).logo) } as unknown as Parameters<typeof buildCardHtml>[0];
+    (async () => {
+      let content;
+      try { content = await loadCustomerContent(String(c.slug)); } catch { content = null; }
+      if (cancelled) return;
+      setCardHtml(buildCardHtml(rec, content?.products ?? [], content?.gallery ?? [], content?.videos ?? [], content?.offers ?? [], content?.qrcodes ?? [], []));
+    })();
+    return () => { cancelled = true; };
+  }, [cardModal]);
 
   const retailerOptions = useMemo(() => {
     const ids = [...new Set(rows.map((r) => r.admin_id))].sort((a, b) => a - b);
@@ -288,11 +307,13 @@ export default function AdminCustomers() {
                 <p className="text-[11px] text-[#94A3B8] truncate">/{cardModal.slug}</p>
               </div>
               <div className="flex items-center gap-1.5">
-                <a href={`https://digitalcarda.in/c/${cardModal.slug}`} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg bg-[#F1F5F9] text-[#64748B] hover:text-[#F7B31C] flex items-center justify-center transition-colors" title="Open in new tab"><ExternalLink size={15} /></a>
+                <button onClick={() => { if (cardHtml) window.open(URL.createObjectURL(new Blob([cardHtml], { type: "text/html" })), "_blank"); }} disabled={!cardHtml} className="w-8 h-8 rounded-lg bg-[#F1F5F9] text-[#64748B] hover:text-[#F7B31C] flex items-center justify-center transition-colors disabled:opacity-40" title="Open in new tab"><ExternalLink size={15} /></button>
                 <button onClick={() => setCardModal(null)} className="w-8 h-8 rounded-lg bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0] flex items-center justify-center transition-colors"><X size={16} /></button>
               </div>
             </div>
-            <iframe src={`https://digitalcarda.in/c/${cardModal.slug}`} title="Card preview" className="flex-1 w-full bg-[#F8FAFC]" />
+            {cardHtml
+              ? <iframe srcDoc={cardHtml} title="Card preview" className="flex-1 w-full bg-white border-0" />
+              : <div className="flex-1 flex items-center justify-center text-sm text-[#94A3B8]">Loading card…</div>}
           </div>
         </div>
       )}
