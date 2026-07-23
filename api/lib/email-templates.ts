@@ -127,6 +127,24 @@ export function leadNotificationEmail(o: { name: string; email?: string | null; 
   };
 }
 
+export function hotLeadEmail(o: { name: string; email?: string | null; contact?: string | null; message?: string | null; slug?: string | null; cardName?: string | null }): Email {
+  const label = o.cardName || o.slug || "your card";
+  const bodyHtml =
+    p(`<strong style="color:#EA580C">This looks like a high-intent lead</strong> — reach out fast. Enquiry on <strong>${esc(label)}</strong>:`) +
+    detailTable([
+      ["Name", esc(o.name || "—")],
+      ["Email", o.email ? `<a href="mailto:${esc(o.email)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.email)}</a>` : "—"],
+      ["Phone", o.contact ? `<a href="tel:${esc(o.contact)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.contact)}</a>` : "—"],
+      ["Message", esc(o.message || "—")],
+    ]) +
+    (o.contact ? button("Call now", `tel:${esc(o.contact)}`) : o.slug ? button("View card", `${SITE}/c/${esc(o.slug)}`) : "");
+  return {
+    subject: `🔥 Hot lead: ${o.name || "Enquiry"} — ${label}`,
+    html: layout({ preheader: `High-intent enquiry from ${o.name} — respond fast`, badge: "🔥 Hot Lead", heading: "🔥 Hot lead — respond fast", bodyHtml, accent: "#EA580C" }),
+    text: `HOT LEAD on ${label}\n\nName: ${o.name}\nEmail: ${o.email || "—"}\nPhone: ${o.contact || "—"}\nMessage: ${o.message || "—"}`,
+  };
+}
+
 export function paymentSubmittedEmail(o: { name?: string; planName: string; amount: number; reference: string; method?: string }): Email {
   const bodyHtml =
     hi(o.name) +

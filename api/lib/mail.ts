@@ -34,7 +34,8 @@ function transport(): Transporter | null {
 }
 
 import type { Email } from "./email-templates";
-import { leadNotificationEmail } from "./email-templates";
+import { leadNotificationEmail, hotLeadEmail } from "./email-templates";
+import { classifyLeadSmart } from "./lead-intel";
 
 export const ownerAddress = () => process.env.LEAD_NOTIFY_TO || "hellopacewalk@gmail.com";
 
@@ -61,7 +62,27 @@ export interface LeadEmail {
   cardName?: string | null;
 }
 
-/** Email the site owner about a new lead. Never throws. */
-export async function sendLeadNotification(lead: LeadEmail): Promise<void> {
-  await sendEmail(ownerAddress(), leadNotificationEmail(lead), lead.email);
+/**
+ * Smartly notify the owner about a new lead:
+ *   important → 🔥 Hot lead email (immediate priority)
+ *   normal    → standard lead email
+ *   spam      → suppressed (no email)
+ * Uses AI when ANTHROPIC_API_KEY is set, else deterministic rules. Never throws.
+ * Returns the category so callers can store it.
+ */
+export async function sendLeadNotification(lead: LeadEmail): Promise<"important" | "normal" | "spam"> {
+  try {
+    const v = await classifyLeadSmart({ name: lead.name, email: lead.email, contact: lead.contact, description: lead.message, uname: lead.slug });
+    if (v.category === "spam") {
+      console.log(`[mail] lead from "${lead.name}" classified spam (${v.via}) — owner alert suppressed`);
+      return "spam";
+    }
+    await sendEmail(ownerAddress(), v.category === "important" ? hotLeadEmail({ ...lead, name: lead.name }) : leadNotificationEmail(lead), lead.email);
+    return v.category;
+  } catch (e) {
+    // On any classification error, fall back to a normal alert.
+    console.error("[mail] lead classify failed, sending normal alert:", (e as Error).message);
+    await sendEmail(ownerAddress(), leadNotificationEmail(lead), lead.email);
+    return "normal";
+  }
 }
