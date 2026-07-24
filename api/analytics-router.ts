@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { analyticsEvents, cards, users, subscriptions, invoices, leads } from "@db/schema";
-import { eq, and, sql, gte, desc } from "drizzle-orm";
+import { eq, and, sql, gte, desc, inArray } from "drizzle-orm";
 
 export const analyticsRouter = createRouter({
   cardOverview: authedQuery
@@ -83,11 +83,27 @@ export const analyticsRouter = createRouter({
       const totalViews = userCards.reduce((sum, c) => sum + Number(c.viewCount), 0);
       const totalLeads = userCards.reduce((sum, c) => sum + c.leadCount, 0);
 
+      const mine = inArray(analyticsEvents.cardId, cardIds);
+      const viewsWhere = and(mine, eq(analyticsEvents.eventType, "view"), dateFilter);
+      const [uniqueRes, dailyRes, deviceRes, sourceRes, clickRes] = await Promise.all([
+        db.select({ n: sql<number>`count(distinct visitor_id)` }).from(analyticsEvents).where(viewsWhere),
+        db.select({ date: sql<string>`DATE(created_at)`, count: sql<number>`count(*)` })
+          .from(analyticsEvents).where(viewsWhere).groupBy(sql`DATE(created_at)`).orderBy(sql`DATE(created_at)`).limit(30),
+        db.select({ device: analyticsEvents.device, count: sql<number>`count(*)` })
+          .from(analyticsEvents).where(viewsWhere).groupBy(analyticsEvents.device),
+        db.select({ referrer: analyticsEvents.referrer, count: sql<number>`count(*)` })
+          .from(analyticsEvents).where(viewsWhere).groupBy(analyticsEvents.referrer),
+        db.select({ n: sql<number>`count(*)` }).from(analyticsEvents).where(and(mine, eq(analyticsEvents.eventType, "click"), dateFilter)),
+      ]);
+
       return {
         totalViews,
-        totalVisitors: totalViews,
+        totalVisitors: Number(uniqueRes[0]?.n || 0),
         totalLeads,
-        totalClicks: 0,
+        totalClicks: Number(clickRes[0]?.n || 0),
+        dailyViews: dailyRes.map((d) => ({ date: d.date, views: Number(d.count) })),
+        deviceBreakdown: deviceRes.map((d) => ({ device: d.device || "Unknown", count: Number(d.count) })),
+        sources: sourceRes.map((s) => ({ source: s.referrer || "Direct", count: Number(s.count) })),
         cards: userCards.map((c) => ({
           id: c.id,
           title: c.title,
