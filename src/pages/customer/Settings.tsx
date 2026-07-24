@@ -6,6 +6,8 @@ import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/custo
 import InvoicePanel from "@/components/customer/InvoicePanel";
 import { useCustomer, scopedKey } from "@/hooks/useCustomer";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
+import { passwordProblems, PASSWORD_HINT } from "@/lib/password";
+import { slugifyUsername, usernameNextChangeDate, fmtDate } from "@/lib/username";
 
 /* Card sections — labels match the legacy user-module.php */
 const MODULES = [
@@ -81,9 +83,29 @@ export default function CustomerSettings() {
 
   const save = (msg = "Settings saved") => { update(form); toast.success(msg); setForm({}); };
   const savePassword = () => {
-    if (pwd.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+    const probs = passwordProblems(pwd);
+    if (probs.length) { toast.error(`Password needs ${probs.join(", ")}.`); return; }
     if (pwd !== pwd2) { toast.error("Passwords do not match"); return; }
     update({ password: pwd }); toast.success("Password updated"); setPwd(""); setPwd2("");
+  };
+
+  // Username can be changed once every 45 days. When was it last changed, and
+  // when can it change again?
+  const usernameLockedUntil = usernameNextChangeDate(data.username_changed_at);
+  const saveAccount = () => {
+    const current = String(data.username || data.slug || "").toLowerCase();
+    const typed = form.username;
+    // Username untouched → save the rest (e.g. email) normally.
+    if (typed === undefined || slugifyUsername(typed) === current) { save("Account updated"); return; }
+    const next = slugifyUsername(typed);
+    if (next.length < 3) { toast.error("Username must be at least 3 characters (letters, numbers and hyphens only)."); return; }
+    if (usernameLockedUntil) {
+      toast.error(`Username can be changed once every 45 days. You can change it again on ${fmtDate(usernameLockedUntil)}.`);
+      return;
+    }
+    update({ ...form, username: next, slug: next, username_changed_at: new Date().toISOString() });
+    toast.success("Username updated");
+    setForm({});
   };
 
   // Package details
@@ -205,16 +227,22 @@ export default function CustomerSettings() {
       {tab === "password" && (
         <Panel title="Reset Password" subtitle="Change your login password">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
-            <Field label="New Password"><input value={pwd} onChange={(e) => setPwd(e.target.value)} type="password" className={fieldCls} placeholder="Min 6 characters" /></Field>
+            <Field label="New Password"><input value={pwd} onChange={(e) => setPwd(e.target.value)} type="password" className={fieldCls} placeholder="Min 8 characters" /></Field>
             <Field label="Confirm Password"><input value={pwd2} onChange={(e) => setPwd2(e.target.value)} type="password" className={fieldCls} placeholder="Re-enter password" /></Field>
           </div>
+          <p className="text-[11px] text-[#94A3B8] mt-1.5">Use {PASSWORD_HINT}.</p>
           <div className="flex justify-start mt-4"><button onClick={savePassword} className="h-11 px-5 rounded-xl bg-[#0F172A] text-white text-sm font-semibold hover:bg-[#1E293B] flex items-center gap-2"><KeyRound size={15} /> Update Password</button></div>
           <hr className="my-6 border-[#F1F5F9]" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
-            <Field label="Username"><input value={val("username")} onChange={(e) => set("username", e.target.value)} className={fieldCls} /></Field>
+            <Field label="Username">
+              <input value={val("username")} onChange={(e) => set("username", e.target.value)} disabled={!!usernameLockedUntil} className={`${fieldCls} disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] disabled:cursor-not-allowed`} />
+              {usernameLockedUntil
+                ? <p className="text-[11px] text-[#B45309] mt-1">Locked — you can change your username again on {fmtDate(usernameLockedUntil)}.</p>
+                : <p className="text-[11px] text-[#94A3B8] mt-1">This is your card link. You can change it once every 45 days.</p>}
+            </Field>
             <Field label="Email"><input value={val("email")} onChange={(e) => set("email", e.target.value)} className={fieldCls} type="email" /></Field>
           </div>
-          <div className="flex justify-start mt-4"><button onClick={() => save("Account updated")} className="h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold flex items-center gap-2"><Pencil size={15} /> Save Account</button></div>
+          <div className="flex justify-start mt-4"><button onClick={saveAccount} className="h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold flex items-center gap-2"><Pencil size={15} /> Save Account</button></div>
         </Panel>
       )}
     </ModuleShell>

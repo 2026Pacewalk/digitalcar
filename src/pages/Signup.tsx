@@ -4,9 +4,12 @@ import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import {
   User, Building2, Mail, Phone, Lock, Eye, EyeOff, UserPlus,
-  Check, ShieldCheck, ArrowLeft, Loader2, AtSign, Gift,
+  Check, ShieldCheck, ArrowLeft, Loader2, Gift, X,
 } from "lucide-react";
 import AuthBrandPanel from "@/components/AuthBrandPanel";
+import { passwordProblems, passwordChecks } from "@/lib/password";
+import { slugifyUsername } from "@/lib/username";
+import { scopedKey } from "@/hooks/useCustomer";
 
 function GoogleIcon({ size = 18 }: { size?: number }) {
   return (
@@ -70,8 +73,9 @@ export default function Signup() {
     if (form.password !== form.confirmPassword) {
       toast.error("Passwords do not match"); return;
     }
-    if (form.password.length < 6) {
-      toast.error("Password must be at least 6 characters"); return;
+    const pwProblems = passwordProblems(form.password);
+    if (pwProblems.length) {
+      toast.error(`Password needs ${pwProblems.join(", ")}.`); return;
     }
     setLoading(true);
     try {
@@ -86,6 +90,16 @@ export default function Signup() {
       });
       localStorage.setItem("auth_token", res.token);
       localStorage.setItem("digitalcarda_user", JSON.stringify(res.user));
+      // Auto-derive the card username from the business name (fall back to full
+      // name, then email). The user can change it later from their dashboard.
+      const handle = slugifyUsername(form.businessName || form.fullName || form.email.split("@")[0]);
+      if (handle && res.user?.id) {
+        try {
+          const key = scopedKey("dc_customer");
+          const existing = JSON.parse(localStorage.getItem(key) || "{}");
+          localStorage.setItem(key, JSON.stringify({ ...existing, username: handle, slug: handle }));
+        } catch { /* non-critical — dashboard will seed a default */ }
+      }
       toast.success("Account created! Welcome to DigitalCarda.");
       navigate("/dashboard");
     } catch (err) {
@@ -174,15 +188,10 @@ export default function Signup() {
               <div className="relative"><Mail size={16} className={iconCls} /><input value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="you@example.com" type="email" className={inputCls} /></div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-[#334155] mb-1.5">Mobile Number</label>
-                <div className="relative"><Phone size={16} className={iconCls} /><input value={form.mobile} onChange={(e) => update("mobile", e.target.value)} placeholder="+91 XXXXX XXXXX" className={inputCls} /></div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-[#334155] mb-1.5">Username</label>
-                <div className="relative"><AtSign size={16} className={iconCls} /><input value={form.email.split("@")[0]} placeholder="Auto from email" className={`${inputCls} bg-[#F1F5F9] text-[#64748B]`} readOnly /></div>
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#334155] mb-1.5">Mobile Number</label>
+              <div className="relative"><Phone size={16} className={iconCls} /><input value={form.mobile} onChange={(e) => update("mobile", e.target.value)} placeholder="+91 XXXXX XXXXX" className={inputCls} /></div>
+              <p className="text-[11px] text-[#94A3B8] mt-1.5">Your card link is created automatically from your business name — you can customise it later in your dashboard.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -190,7 +199,7 @@ export default function Signup() {
                 <label className="block text-xs font-semibold text-[#334155] mb-1.5">Password *</label>
                 <div className="relative">
                   <Lock size={16} className={iconCls} />
-                  <input type={showPassword ? "text" : "password"} value={form.password} onChange={(e) => update("password", e.target.value)} placeholder="Min 6 characters" className={`${inputCls} pr-10`} />
+                  <input type={showPassword ? "text" : "password"} value={form.password} onChange={(e) => update("password", e.target.value)} placeholder="Min 8 characters" className={`${inputCls} pr-10`} />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#64748B]">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                 </div>
               </div>
@@ -218,6 +227,13 @@ export default function Signup() {
                   {strength > 0 ? `${STRENGTH[strength].label} password` : "Too short"}
                   {form.confirmPassword && !matches && <span className="text-[#EF4444]"> · passwords don't match</span>}
                 </p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                  {passwordChecks(form.password).map((c) => (
+                    <span key={c.label} className={`inline-flex items-center gap-1 text-[10px] font-medium ${c.ok ? "text-emerald-600" : "text-[#94A3B8]"}`}>
+                      {c.ok ? <Check size={11} /> : <X size={11} />} {c.label}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
 

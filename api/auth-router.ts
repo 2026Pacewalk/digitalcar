@@ -11,6 +11,15 @@ import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminE
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
 
+// Strong-password rule for new/changed passwords (signup, reset, change).
+// Login is deliberately NOT gated by this so legacy accounts still work.
+const strongPassword = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(/[A-Z]/, "Password must include an uppercase letter")
+  .regex(/\d/, "Password must include a number")
+  .regex(/[^A-Za-z0-9]/, "Password must include a special character");
+
 /* Legacy-auth bridge: the old site stored plaintext passwords (some with stray
    trailing/leading spaces), and the DB import either hashed them verbatim or fell
    back to a default. So a customer typing their real password can fail the bcrypt
@@ -85,7 +94,7 @@ export const authRouter = createRouter({
     .input(
       z.object({
         email: z.string().email(),
-        password: z.string().min(6),
+        password: strongPassword,
         fullName: z.string().min(2),
         phone: z.string().optional(),
         role: z.enum(["reseller", "customer"]).default("customer"),
@@ -302,7 +311,7 @@ export const authRouter = createRouter({
     .input(
       z.object({
         currentPassword: z.string(),
-        newPassword: z.string().min(6),
+        newPassword: strongPassword,
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -415,7 +424,7 @@ export const authRouter = createRouter({
 
   // ── Forgot password: set a new password with the emailed token ──
   resetPassword: publicQuery
-    .input(z.object({ token: z.string().min(10), newPassword: z.string().min(8) }))
+    .input(z.object({ token: z.string().min(10), newPassword: strongPassword }))
     .mutation(async ({ input }) => {
       const data = await verifyResetToken(input.token);
       if (!data) throw new TRPCError({ code: "BAD_REQUEST", message: "This reset link is invalid or has expired." });
