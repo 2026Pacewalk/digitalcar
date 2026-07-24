@@ -25,5 +25,21 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        // Split heavy vendor libs into separate chunks. Lowers peak build
+        // memory (helps constrained servers avoid an OOM-killed build) and
+        // improves first-load performance via smaller, cacheable chunks.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("recharts") || id.includes("/d3-") || id.includes("victory")) return "charts";
+          if (id.includes("react-dom") || id.includes("/react/") || id.includes("react-router") || id.includes("scheduler")) return "react";
+          if (id.includes("@trpc") || id.includes("@tanstack")) return "data";
+          if (id.includes("lucide-react")) return "icons";
+          return "vendor";
+        },
+      },
+    },
   },
 });
