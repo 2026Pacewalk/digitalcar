@@ -7,13 +7,33 @@ set -euo pipefail
 BRANCH="${1:-main}"
 APP_DIR="${APP_DIR:-/var/www/digitalcarda}"
 
+# Report exactly where a failure happened (shows up clearly in the Actions log).
+trap 'echo "✗ Deploy FAILED at line $LINENO — last command: [$BASH_COMMAND]" >&2' ERR
+
+# ── Make node/npm/pm2 reachable even in a non-interactive SSH shell ──────────
+# GitHub Actions runs this over SSH, which does NOT load nvm (it's guarded to
+# interactive shells), so without this the script can die at `npm ci`.
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 || true; fi
+if ! command -v node >/dev/null 2>&1 && [ -d "$NVM_DIR/versions/node" ]; then
+  NODE_BIN="$(ls -d "$NVM_DIR"/versions/node/*/bin 2>/dev/null | sort -V | tail -1 || true)"
+  [ -n "${NODE_BIN:-}" ] && export PATH="$NODE_BIN:$PATH"
+fi
+export PATH="$PATH:/usr/local/bin:/usr/bin:$HOME/.local/bin"
+
 echo "▶ DigitalCarda deploy — branch: $BRANCH"
+for cmd in git node npm pm2; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "✗ '$cmd' not found on PATH — cannot deploy. PATH=$PATH" >&2; exit 1; }
+done
+echo "▶ Toolchain: node $(node -v), npm $(npm -v), pm2 $(pm2 -v)"
+
 cd "$APP_DIR"
 
 echo "▶ Fetching latest code…"
 git fetch --all --prune
 git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"
+echo "▶ Now at: $(git log --oneline -1)"
 
 echo "▶ Installing dependencies…"
 npm ci --no-audit --no-fund
@@ -34,4 +54,4 @@ else
 fi
 pm2 save
 
-echo "✓ Deploy complete — https://digitalcarda.in/"
+echo "✓ Deploy complete — https://digitalcarda.in/  ($(git rev-parse --short HEAD))"
