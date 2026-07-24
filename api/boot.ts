@@ -117,6 +117,21 @@ app.get("/api/my/leads", async (c) => {
   return c.json(enquiries.filter((e) => slugs.has(String(e.uname || "").toLowerCase())));
 });
 
+// Public single-card data by slug — returns ONLY what the card publicly
+// displays (credentials stripped). Replaces the old bulk customers.json read
+// so a public card can render without exposing everyone's data.
+app.get("/api/card/:slug", async (c) => {
+  const slug = String(c.req.param("slug") || "").toLowerCase();
+  if (!slug) return c.json({ error: "Not found" }, 404);
+  const customers = (await readPublicJson("customers")) as Record<string, unknown>[];
+  const row = customers.find((x) => String(x.slug || "").toLowerCase() === slug);
+  if (!row) return c.json({ error: "Not found" }, 404);
+  // Strip login/internal fields; the rest (contact, socials, payment display)
+  // is exactly what the owner chose to show on their public card.
+  const { password: _p, email_verify: _v, email_verify_on: _vo, ...pub } = row;
+  return c.json(pub);
+});
+
 // Block the raw public files outright (defence-in-depth alongside the CDN rule).
 app.get("/customers.json", (c) => c.json({ error: "Forbidden" }, 403));
 app.get("/enquiries.json", (c) => c.json({ error: "Forbidden" }, 403));

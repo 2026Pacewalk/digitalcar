@@ -166,6 +166,9 @@ export default function App() {
         <Route path="/dashboard/offers" element={<Navigate to="/dashboard/products?tab=offers" replace />} />
         <Route path="/dashboard/reviews" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerReviews /></RoleRoute>} />
 
+        {/* Backward-compat: old printed cards used digitalcarda.in/<slug> (no /c/).
+            Kept last so every named route above wins first. */}
+        <Route path="/:slug" element={<PublicCard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

@@ -8,10 +8,15 @@ import {
   Clock, Star, Hourglass, Zap, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { buildCardHtml } from "@/card-template/buildCard";
+import { loadCustomerContent, decodeSpecialities, imgUrl } from "@/lib/cardContent";
 
 export default function PublicCard() {
-  const { slug } = useParams();
-  const { data: card } = trpc.card.getBySlug.useQuery({ slug: slug || "" });
+  const { slug = "" } = useParams();
+  // retry:false so a missing/errored DB card settles immediately and we fall
+  // back to the legacy (customers.json) renderer instead of retry-storming.
+  const { data: card, isLoading: cardLoading } = trpc.card.getBySlug.useQuery({ slug }, { retry: false });
+  const [legacyHtml, setLegacyHtml] = useState<string | null | undefined>(undefined);
   const trackView = trpc.card.trackView.useMutation();
   const createLead = trpc.lead.create.useMutation();
 
@@ -30,6 +35,26 @@ export default function PublicCard() {
     }
   }, [slug]);
 
+  // Real customers live in customers.json (the DB has no card for them yet), so
+  // when the DB has nothing, render their actual card via the legacy renderer.
+  useEffect(() => {
+    if (cardLoading || card) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/card/${encodeURIComponent(slug)}`);
+        if (!res.ok) { if (!cancelled) setLegacyHtml(null); return; }
+        const rec = await res.json();
+        const c = { ...rec, specialities: decodeSpecialities(rec.specialities), logo: imgUrl("home", rec.logo) } as unknown as Parameters<typeof buildCardHtml>[0];
+        if (rec.name) document.title = `${rec.name}${rec.company_name ? " · " + rec.company_name : ""} — DigitalCarda`;
+        const content = await loadCustomerContent(slug).catch(() => null);
+        const html = buildCardHtml(c, content?.products ?? [], content?.gallery ?? [], content?.videos ?? [], content?.offers ?? [], content?.qrcodes ?? []);
+        if (!cancelled) setLegacyHtml(html);
+      } catch { if (!cancelled) setLegacyHtml(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [cardLoading, card, slug]);
+
   const handleLeadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!card) return;
@@ -47,6 +72,21 @@ export default function PublicCard() {
     });
   };
 
+  // Still resolving (DB query, then legacy lookup).
+  if (cardLoading || (!card && legacyHtml === undefined)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <RefreshCw size={22} className="animate-spin text-[#94A3B8]" />
+      </div>
+    );
+  }
+
+  // Real customer card rendered from customers.json (the common case today).
+  if (!card && legacyHtml) {
+    return <iframe srcDoc={legacyHtml} title={slug} className="w-full min-h-screen border-0 bg-white" />;
+  }
+
+  // Not in the DB and not in the legacy data → genuinely not found.
   if (!card) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
