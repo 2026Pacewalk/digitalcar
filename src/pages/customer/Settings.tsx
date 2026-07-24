@@ -8,6 +8,7 @@ import { useCustomer, scopedKey } from "@/hooks/useCustomer";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
 import { passwordProblems, PASSWORD_HINT } from "@/lib/password";
 import { slugifyUsername, usernameNextChangeDate, fmtDate } from "@/lib/username";
+import { trpc } from "@/providers/trpc";
 
 /* Card sections — labels match the legacy user-module.php */
 const MODULES = [
@@ -92,7 +93,8 @@ export default function CustomerSettings() {
   // Username can be changed once every 45 days. When was it last changed, and
   // when can it change again?
   const usernameLockedUntil = usernameNextChangeDate(data.username_changed_at);
-  const saveAccount = () => {
+  const utils = trpc.useUtils();
+  const saveAccount = async () => {
     const current = String(data.username || data.slug || "").toLowerCase();
     const typed = form.username;
     // Username untouched → save the rest (e.g. email) normally.
@@ -103,6 +105,11 @@ export default function CustomerSettings() {
       toast.error(`Username can be changed once every 45 days. You can change it again on ${fmtDate(usernameLockedUntil)}.`);
       return;
     }
+    // Must be unique across every profile.
+    try {
+      const avail = await utils.auth.checkAvailability.fetch({ username: next });
+      if (avail.username) { toast.error("That username is already taken — please choose another."); return; }
+    } catch { /* if the check is unreachable, allow the local save to proceed */ }
     update({ ...form, username: next, slug: next, username_changed_at: new Date().toISOString() });
     toast.success("Username updated");
     setForm({});

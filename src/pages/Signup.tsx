@@ -39,6 +39,7 @@ export default function Signup() {
   const [searchParams] = useSearchParams();
   const referralCode = searchParams.get("ref") || "";
   const registerMut = trpc.auth.register.useMutation();
+  const utils = trpc.useUtils();
   const { data: refInfo } = trpc.referral.validate.useQuery({ code: referralCode }, { enabled: !!referralCode });
   const refDiscount = refInfo?.valid ? refInfo.discountPercent : 0;
   const [showPassword, setShowPassword] = useState(false);
@@ -79,6 +80,14 @@ export default function Signup() {
     }
     setLoading(true);
     try {
+      // Block duplicate email / mobile before creating the account.
+      const avail = await utils.auth.checkAvailability.fetch({
+        email: form.email.trim(),
+        phone: form.mobile.trim() || undefined,
+      });
+      if (avail.email) { toast.error("This email is already registered — please sign in instead."); setLoading(false); return; }
+      if (avail.phone) { toast.error("This mobile number is already registered to another account."); setLoading(false); return; }
+
       const res = await registerMut.mutateAsync({
         email: form.email.trim(),
         password: form.password,

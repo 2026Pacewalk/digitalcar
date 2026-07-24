@@ -39,6 +39,51 @@ async function legacyPasswordsFor(email: string): Promise<string[]> {
   return [];
 }
 
+async function readLegacyCustomers(): Promise<Record<string, unknown>[]> {
+  const { readFile } = await import("node:fs/promises");
+  for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
+    try { return JSON.parse(await readFile(p, "utf8")); } catch { /* try next */ }
+  }
+  return [];
+}
+
+/* Which of email / phone / username are already taken by ANY profile — checking
+   the live DB users AND the legacy customers export. Used to keep signups (and
+   profile edits) unique so two accounts can never share an identifier. */
+async function findTaken(fields: { email?: string; phone?: string; username?: string }) {
+  const db = getDb();
+  const email = fields.email?.toLowerCase().trim() || "";
+  const digits = fields.phone ? fields.phone.replace(/\D/g, "") : "";
+  const last10 = digits.length >= 10 ? digits.slice(-10) : "";
+  const uname = fields.username?.toLowerCase().trim() || "";
+  const taken = { email: false, phone: false, username: false };
+
+  if (email) {
+    const u = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (u) taken.email = true;
+  }
+  if (last10) {
+    const u = await db.query.users.findFirst({ where: like(users.phone, `%${last10}`) });
+    if (u) taken.phone = true;
+  }
+
+  if ((email && !taken.email) || (last10 && !taken.phone) || uname) {
+    for (const r of await readLegacyCustomers()) {
+      if (email && !taken.email && String(r.email || "").toLowerCase().trim() === email) taken.email = true;
+      if (last10 && !taken.phone) {
+        const m1 = String(r.mobile1 || "").replace(/\D/g, "");
+        const m2 = String(r.mobile2 || "").replace(/\D/g, "");
+        if ((m1 && m1.endsWith(last10)) || (m2 && m2.endsWith(last10))) taken.phone = true;
+      }
+      if (uname && !taken.username &&
+        (String(r.username || "").toLowerCase().trim() === uname || String(r.slug || "").toLowerCase().trim() === uname)) {
+        taken.username = true;
+      }
+    }
+  }
+  return taken;
+}
+
 /* Resolve a login identifier (email, username, card slug, or mobile) to the
    account's canonical email via the legacy export, so customers can sign in with
    any of them. The DB `users` table only has email + phone, so username/slug and
@@ -104,16 +149,15 @@ export const authRouter = createRouter({
     )
     .mutation(async ({ input }) => {
       const db = getDb();
+      const email = input.email.toLowerCase().trim();
 
-      const existing = await db.query.users.findFirst({
-        where: eq(users.email, input.email),
-      });
-
-      if (existing) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "Email already registered",
-        });
+      // Email and mobile must be unique across every profile (DB + legacy data).
+      const taken = await findTaken({ email, phone: input.phone });
+      if (taken.email) {
+        throw new TRPCError({ code: "CONFLICT", message: "This email is already registered. Try signing in instead." });
+      }
+      if (taken.phone) {
+        throw new TRPCError({ code: "CONFLICT", message: "This mobile number is already registered to another account." });
       }
 
       const hashedPassword = await bcrypt.hash(input.password, 12);
@@ -121,7 +165,7 @@ export const authRouter = createRouter({
       const [user] = await db
         .insert(users)
         .values({
-          email: input.email,
+          email,
           password: hashedPassword,
           fullName: input.fullName,
           phone: input.phone || null,
@@ -212,6 +256,16 @@ export const authRouter = createRouter({
         token,
       };
     }),
+
+  // Live uniqueness check for the signup / edit forms — is this email / mobile /
+  // username already taken by another profile?
+  checkAvailability: publicQuery
+    .input(z.object({
+      email: z.string().optional(),
+      phone: z.string().optional(),
+      username: z.string().optional(),
+    }))
+    .query(async ({ input }) => findTaken(input)),
 
   login: publicQuery
     .input(
