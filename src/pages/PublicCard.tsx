@@ -16,6 +16,10 @@ export default function PublicCard() {
   // retry:false so a missing/errored DB card settles immediately and we fall
   // back to the legacy (customers.json) renderer instead of retry-storming.
   const { data: card, isLoading: cardLoading } = trpc.card.getBySlug.useQuery({ slug }, { retry: false });
+  // Only treat the DB card as usable if it actually has content blocks. Imported
+  // (recovery) cards are slug-only with no blocks — those must fall back to the
+  // legacy customers.json renderer, not render as an empty card.
+  const dbHasContent = !!(card && Array.isArray((card as { blocks?: unknown[] }).blocks) && (card as { blocks: unknown[] }).blocks.length > 0);
   const [legacyHtml, setLegacyHtml] = useState<string | null | undefined>(undefined);
   const trackView = trpc.card.trackView.useMutation();
   const createLead = trpc.lead.create.useMutation();
@@ -38,7 +42,7 @@ export default function PublicCard() {
   // Real customers live in customers.json (the DB has no card for them yet), so
   // when the DB has nothing, render their actual card via the legacy renderer.
   useEffect(() => {
-    if (cardLoading || card) return;
+    if (cardLoading || dbHasContent) return;
     let cancelled = false;
     (async () => {
       try {
@@ -53,7 +57,7 @@ export default function PublicCard() {
       } catch { if (!cancelled) setLegacyHtml(null); }
     })();
     return () => { cancelled = true; };
-  }, [cardLoading, card, slug]);
+  }, [cardLoading, dbHasContent, slug]);
 
   const handleLeadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +77,7 @@ export default function PublicCard() {
   };
 
   // Still resolving (DB query, then legacy lookup).
-  if (cardLoading || (!card && legacyHtml === undefined)) {
+  if (cardLoading || (!dbHasContent && legacyHtml === undefined)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <RefreshCw size={22} className="animate-spin text-[#94A3B8]" />
@@ -82,12 +86,12 @@ export default function PublicCard() {
   }
 
   // Real customer card rendered from customers.json (the common case today).
-  if (!card && legacyHtml) {
+  if (!dbHasContent && legacyHtml) {
     return <iframe srcDoc={legacyHtml} title={slug} className="w-full min-h-screen border-0 bg-white" />;
   }
 
-  // Not in the DB and not in the legacy data → genuinely not found.
-  if (!card) {
+  // No usable DB card and not in the legacy data → genuinely not found.
+  if (!dbHasContent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <div className="text-center">
