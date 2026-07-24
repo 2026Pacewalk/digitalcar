@@ -4,7 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { users, resellerProfiles, referrals, notifications, cards } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { createToken, createResetToken, verifyResetToken } from "./lib/jwt";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail } from "./lib/email-templates";
@@ -28,6 +28,56 @@ async function legacyPasswordsFor(email: string): Promise<string[]> {
     } catch { /* file not at this path — try the next */ }
   }
   return [];
+}
+
+/* Resolve a login identifier (email, username, card slug, or mobile) to the
+   account's canonical email via the legacy export, so customers can sign in with
+   any of them. The DB `users` table only has email + phone, so username/slug and
+   most phone variants are matched here. */
+async function legacyEmailFor(idLc: string, digits: string): Promise<string | null> {
+  const last10 = digits.length >= 10 ? digits.slice(-10) : "";
+  const { readFile } = await import("node:fs/promises");
+  for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
+    try {
+      const rows = JSON.parse(await readFile(p, "utf8")) as Record<string, unknown>[];
+      const match = rows.find((r) => {
+        const email = String(r.email || "").toLowerCase().trim();
+        const uname = String(r.username || "").toLowerCase().trim();
+        const slug = String(r.slug || "").toLowerCase().trim();
+        if (idLc && (email === idLc || uname === idLc || slug === idLc)) return true;
+        if (last10) {
+          const m1 = String(r.mobile1 || "").replace(/\D/g, "");
+          const m2 = String(r.mobile2 || "").replace(/\D/g, "");
+          if ((m1 && m1.endsWith(last10)) || (m2 && m2.endsWith(last10))) return true;
+        }
+        return false;
+      });
+      return match ? String(match.email || "").toLowerCase().trim() || null : null;
+    } catch { /* file not at this path — try the next */ }
+  }
+  return null;
+}
+
+/* Find the DB user for a typed identifier: email, then phone (last 10 digits),
+   then the legacy username/slug/mobile → email lookup. */
+async function resolveLoginUser(db: ReturnType<typeof getDb>, identifier: string) {
+  const idLc = identifier.toLowerCase().trim();
+  const digits = identifier.replace(/\D/g, "");
+
+  let user = await db.query.users.findFirst({ where: eq(users.email, idLc) });
+  if (user) return user;
+
+  if (digits.length >= 10) {
+    user = await db.query.users.findFirst({ where: like(users.phone, `%${digits.slice(-10)}`) });
+    if (user) return user;
+  }
+
+  const email = await legacyEmailFor(idLc, digits);
+  if (email) {
+    user = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (user) return user;
+  }
+  return null;
 }
 
 export const authRouter = createRouter({
@@ -157,17 +207,15 @@ export const authRouter = createRouter({
   login: publicQuery
     .input(
       z.object({
-        email: z.string().email(),
+        // Email, username, card slug, or mobile — resolved to the account below.
+        email: z.string().min(1),
         password: z.string(),
       })
     )
     .mutation(async ({ input }) => {
       const db = getDb();
-      const email = input.email.toLowerCase().trim();
 
-      const user = await db.query.users.findFirst({
-        where: eq(users.email, email),
-      });
+      const user = await resolveLoginUser(db, input.email);
 
       if (!user) {
         throw new TRPCError({
@@ -184,7 +232,7 @@ export const authRouter = createRouter({
       if (!isValid) {
         const typed = input.password.trim();
         if (typed.length > 0) {
-          const legacy = await legacyPasswordsFor(email);
+          const legacy = await legacyPasswordsFor(user.email);
           if (legacy.some((pw) => pw.trim() === typed)) {
             isValid = true;
             try {
