@@ -1,7 +1,7 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
-import { createRouter, publicQuery, authedQuery } from "./middleware";
+import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { users, resellerProfiles, referrals, notifications } from "@db/schema";
 import { eq } from "drizzle-orm";
@@ -290,6 +290,18 @@ export const authRouter = createRouter({
         phone: input.phone || "",
         email: email || ctx.user.email,
       };
+    }),
+
+  // ── Admin: impersonate a customer ("login as client") with a REAL token, so
+  //    authed features (Refer & Earn, analytics, leads…) work during preview ──
+  impersonate: adminQuery
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const user = await db.query.users.findFirst({ where: eq(users.email, input.email.toLowerCase().trim()) });
+      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "No account found for that email" });
+      const token = await createToken({ userId: user.id, email: user.email, role: user.role });
+      return { token, user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role } };
     }),
 
   // ── Forgot password: email a reset link ──

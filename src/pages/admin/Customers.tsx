@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { fetchAdminData } from "@/lib/adminData";
+import { trpc } from "@/providers/trpc";
 import { scopedKey } from "@/hooks/useCustomer";
 
 /* Retailer (admin_id) → name, from superadmin table */
@@ -131,11 +132,22 @@ export default function AdminCustomers() {
     retailers: new Set(rows.map((r) => r.admin_id).filter((id) => id !== 0 && id !== 1)).size,
   }), [rows]);
 
+  const impersonate = trpc.auth.impersonate.useMutation();
   const loginAsClient = async (c: Customer) => {
     const rec = { ...c, specialities: decodeSpecialities((c as Record<string, unknown>).specialities), logo: imgUrl("home", (c as Record<string, unknown>).logo) };
+    // Mint a REAL token for the customer (if they have a DB account) so authed
+    // features — Refer & Earn, analytics, leads — work during the preview.
+    // Falls back to a preview-only token if there's no matching account.
+    let authUser: { id: number; email: string; fullName: string; role: string } = { id: c.id, email: c.email, fullName: c.name, role: "customer" };
+    let token = "impersonate_" + c.id;
+    try {
+      const res = await impersonate.mutateAsync({ email: c.email });
+      authUser = res.user;
+      token = res.token;
+    } catch { /* no DB account — preview-only */ }
     // Set the impersonated identity first so scopedKey() targets the client's namespace.
-    localStorage.setItem("digitalcarda_user", JSON.stringify({ id: c.id, email: c.email, fullName: c.name, role: "customer" }));
-    localStorage.setItem("auth_token", "impersonate_" + c.id);
+    localStorage.setItem("digitalcarda_user", JSON.stringify(authUser));
+    localStorage.setItem("auth_token", token);
     localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(rec));
     try {
       const content = await loadCustomerContent(String(c.slug));
