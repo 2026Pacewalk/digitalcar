@@ -35,7 +35,7 @@ export default function RefundPolicy() {
           <section>
             <h2 className="text-lg font-semibold text-[#0F172A] mb-3">4. How to Request a Refund</h2>
             <p className="text-sm text-[#64748B] leading-relaxed">
-              To request a refund, contact our support team at support@digitalcarda.com with your account email and purchase details. Refunds are processed within 5-7 business days to the original payment method.
+              To request a refund, contact our support team at support@digitalcarda.in with your account email and purchase details. Refunds are processed within 5-7 business days to the original payment method.
             </p>
           </section>
 
@@ -49,7 +49,7 @@ export default function RefundPolicy() {
           <section>
             <h2 className="text-lg font-semibold text-[#0F172A] mb-3">6. Contact Us</h2>
             <p className="text-sm text-[#64748B] leading-relaxed">
-              For any refund-related queries, please contact us at support@digitalcarda.com or call +91 98765 43210.
+              For any refund-related queries, please contact us at support@digitalcarda.in or call +91 95177 22444.
             </p>
           </section>
         </div>

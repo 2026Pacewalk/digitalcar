@@ -37,7 +37,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <p className="text-xs text-[#94A3B8]">Phone</p>
-                  <p className="text-sm font-semibold text-[#0F172A]">+91 98765 43210</p>
+                  <a href="tel:+919517722444" className="text-sm font-semibold text-[#0F172A] hover:text-[#F7B31C] transition-colors">+91 95177 22444</a>
                 </div>
               </div>
             </div>
@@ -48,7 +48,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <p className="text-xs text-[#94A3B8]">Email</p>
-                  <p className="text-sm font-semibold text-[#0F172A]">support@digitalcarda.com</p>
+                  <a href="mailto:support@digitalcarda.in" className="text-sm font-semibold text-[#0F172A] hover:text-[#14B8A6] transition-colors">support@digitalcarda.in</a>
                 </div>
               </div>
             </div>
@@ -66,7 +66,7 @@ export default function Contact() {
             <div className="bg-gradient-to-br from-[#0F172A] to-[#1E293B] rounded-2xl p-6">
               <h3 className="text-sm font-semibold text-white mb-2">Need Urgent Help?</h3>
               <p className="text-xs text-[#94A3B8] mb-4">Chat with our support team on WhatsApp for quick assistance.</p>
-              <a href="https://wa.me/919876543210?text=Hi%20DigitalCarda%20Support" target="_blank" className="flex items-center gap-2 h-10 px-4 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-all">
+              <a href="https://wa.me/919517722444?text=Hi%20DigitalCarda%20Support" target="_blank" className="flex items-center gap-2 h-10 px-4 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-all">
                 <MessageSquare size={16} /> Chat on WhatsApp
               </a>
             </div>

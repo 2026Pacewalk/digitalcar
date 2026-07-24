@@ -5,7 +5,7 @@ const settingsStore: Record<string, Record<string, unknown>> = {
   general: {
     platformName: "DigitalCarda",
     platformUrl: "https://digitalcarda.com",
-    supportEmail: "support@digitalcarda.com",
+    supportEmail: "support@digitalcarda.in",
     defaultLanguage: "en",
     defaultCurrency: "USD",
     timezone: "UTC",

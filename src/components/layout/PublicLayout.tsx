@@ -292,10 +292,10 @@ export default function PublicLayout() {
               {/* Quick contact */}
               <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-widest px-2 mt-5 mb-2">Quick contact</p>
               <div className="grid grid-cols-2 gap-2.5">
-                <a href="tel:+919876543210" className="flex items-center justify-center gap-2 h-11 rounded-xl bg-[#F1F5F9] text-[#0F172A] text-sm font-semibold hover:bg-[#E2E8F0] transition-colors active:scale-[0.98]">
+                <a href="tel:+919517722444" className="flex items-center justify-center gap-2 h-11 rounded-xl bg-[#F1F5F9] text-[#0F172A] text-sm font-semibold hover:bg-[#E2E8F0] transition-colors active:scale-[0.98]">
                   <Phone size={15} className="text-[#F7B31C]" /> Call Us
                 </a>
-                <a href="https://wa.me/919876543210" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 h-11 rounded-xl bg-[#DCFCE7] text-[#166534] text-sm font-semibold hover:bg-[#BBF7D0] transition-colors active:scale-[0.98]">
+                <a href="https://wa.me/919517722444" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 h-11 rounded-xl bg-[#DCFCE7] text-[#166534] text-sm font-semibold hover:bg-[#BBF7D0] transition-colors active:scale-[0.98]">
                   <MessageCircle size={15} /> WhatsApp
                 </a>
               </div>
@@ -377,10 +377,10 @@ export default function PublicLayout() {
               </div>
               <div className="mt-6 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-[#94A3B8]">
-                  <Mail size={14} className="text-[#64748B]" /> support@digitalcarda.com
+                  <Mail size={14} className="text-[#64748B]" /> support@digitalcarda.in
                 </div>
                 <div className="flex items-center gap-2 text-sm text-[#94A3B8]">
-                  <Phone size={14} className="text-[#64748B]" /> +91 98765 43210
+                  <Phone size={14} className="text-[#64748B]" /> +91 95177 22444
                 </div>
               </div>
             </div>
@@ -413,7 +413,7 @@ export default function PublicLayout() {
       {/* Sticky mobile CTA bar — native-app style persistent action */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-[#E2E8F0] px-4 pt-3 pb-safe shadow-[0_-4px_16px_-8px_rgba(15,23,42,0.15)]">
         <div className="flex items-center gap-2.5 pb-3">
-          <a href="https://wa.me/919876543210?text=Hi%20DigitalCarda" target="_blank" rel="noreferrer" aria-label="WhatsApp" className="w-12 h-12 shrink-0 rounded-xl bg-[#DCFCE7] text-[#166534] flex items-center justify-center active:scale-95 transition-transform">
+          <a href="https://wa.me/919517722444?text=Hi%20DigitalCarda" target="_blank" rel="noreferrer" aria-label="WhatsApp" className="w-12 h-12 shrink-0 rounded-xl bg-[#DCFCE7] text-[#166534] flex items-center justify-center active:scale-95 transition-transform">
             <MessageCircle size={20} />
           </a>
           <Link to="/signup" className="btn-gold flex-1 h-12 flex items-center justify-center gap-2 text-base">

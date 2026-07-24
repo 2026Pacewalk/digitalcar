@@ -80,7 +80,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-lg font-semibold text-[#0F172A] mb-3">10. Contact Information</h2>
             <p className="text-sm text-[#64748B] leading-relaxed">
-              For any questions about these Terms &amp; Conditions, contact us at support@digitalcarda.com or +91 98765 43210.
+              For any questions about these Terms &amp; Conditions, contact us at support@digitalcarda.in or +91 95177 22444.
             </p>
           </section>
         </div>

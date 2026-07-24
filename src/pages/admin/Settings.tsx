@@ -59,7 +59,7 @@ export default function AdminSettings() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Support Email</label>
-                    <input defaultValue="support@digitalcarda.com" className="input-premium w-full" />
+                    <input defaultValue="support@digitalcarda.in" className="input-premium w-full" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Default Language</label>

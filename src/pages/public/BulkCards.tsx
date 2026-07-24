@@ -598,7 +598,7 @@ export default function BulkCards() {
                       <>Request Bulk Quote <ArrowRight size={16} /></>
                     )}
                   </button>
-                  <a href={`https://wa.me/919876543210?text=${waMessage}`} target="_blank" rel="noreferrer" className="mt-3 w-full h-11 rounded-2xl bg-emerald-500 text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all active:scale-[0.98]">
+                  <a href={`https://wa.me/919517722444?text=${waMessage}`} target="_blank" rel="noreferrer" className="mt-3 w-full h-11 rounded-2xl bg-emerald-500 text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all active:scale-[0.98]">
                     <MessageSquare size={16} /> Discuss on WhatsApp
                   </a>
                   {isAuthenticated ? (
