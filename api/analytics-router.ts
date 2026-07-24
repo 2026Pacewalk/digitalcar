@@ -125,33 +125,46 @@ export const analyticsRouter = createRouter({
     .query(async () => {
       const db = getDb();
 
-      const [cardCount, totalViewsResult, dailyViews, deviceBreakdown] = await Promise.all([
+      const [cardCount, totalViewsResult, dailyViews, deviceBreakdown, clickRes, userCount, leadTotal, planRows, topCardRows] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(cards),
         db.select({ count: sql<number>`sum(view_count)` }).from(cards),
-        db.select({
-          date: sql<string>`DATE(created_at)`,
-          count: sql<number>`count(*)`,
-        })
-          .from(analyticsEvents)
-          .where(eq(analyticsEvents.eventType, "view"))
-          .groupBy(sql`DATE(created_at)`)
-          .orderBy(sql`DATE(created_at)`)
-          .limit(30),
-        db.select({
-          device: analyticsEvents.device,
-          count: sql<number>`count(*)`,
-        })
-          .from(analyticsEvents)
-          .groupBy(analyticsEvents.device),
+        db.select({ date: sql<string>`DATE(created_at)`, count: sql<number>`count(*)` })
+          .from(analyticsEvents).where(eq(analyticsEvents.eventType, "view"))
+          .groupBy(sql`DATE(created_at)`).orderBy(sql`DATE(created_at)`).limit(30),
+        db.select({ device: analyticsEvents.device, count: sql<number>`count(*)` })
+          .from(analyticsEvents).groupBy(analyticsEvents.device),
+        db.select({ count: sql<number>`count(*)` }).from(analyticsEvents).where(eq(analyticsEvents.eventType, "click")),
+        db.select({ count: sql<number>`count(*)` }).from(users),
+        db.select({ count: sql<number>`coalesce(sum(lead_count), 0)` }).from(cards),
+        db.select({ packageId: subscriptions.packageId, count: sql<number>`count(*)` })
+          .from(subscriptions).where(eq(subscriptions.status, "active")).groupBy(subscriptions.packageId),
+        db.select({ id: cards.id, title: cards.title, slug: cards.slug, views: cards.viewCount, leads: cards.leadCount, userId: cards.userId })
+          .from(cards).orderBy(desc(cards.viewCount)).limit(8),
       ]);
 
+      const ownerIds = [...new Set(topCardRows.map((c) => c.userId))];
+      const owners = ownerIds.length
+        ? await db.query.users.findMany({ where: inArray(users.id, ownerIds), columns: { id: true, fullName: true } })
+        : [];
+      const ownerMap = new Map(owners.map((u) => [u.id, u.fullName]));
+      const PLAN_NAMES: Record<number, string> = { 1: "Starter", 2: "Professional", 3: "Business", 4: "Agency", 5: "Starter", 6: "Standard", 7: "Trial" };
+      const planAgg: Record<string, number> = {};
+      for (const p of planRows) {
+        const nm = PLAN_NAMES[Number(p.packageId)] || `Plan ${p.packageId}`;
+        planAgg[nm] = (planAgg[nm] || 0) + Number(p.count);
+      }
+
       return {
-        totalCards: cardCount[0]?.count || 0,
+        totalCards: Number(cardCount[0]?.count || 0),
         totalViews: Number(totalViewsResult[0]?.count || 0),
-        totalLeads: 0,
+        totalClicks: Number(clickRes[0]?.count || 0),
+        totalUsers: Number(userCount[0]?.count || 0),
+        totalLeads: Number(leadTotal[0]?.count || 0),
         totalRevenue: 0,
-        dailyViews: dailyViews.map((d) => ({ date: d.date, views: d.count })),
-        deviceBreakdown: deviceBreakdown.map((d) => ({ device: d.device || "unknown", count: d.count })),
+        dailyViews: dailyViews.map((d) => ({ date: d.date, views: Number(d.count) })),
+        deviceBreakdown: deviceBreakdown.map((d) => ({ device: d.device || "unknown", count: Number(d.count) })),
+        planDistribution: Object.entries(planAgg).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
+        topCards: topCardRows.map((c) => ({ id: c.id, title: c.title, slug: c.slug, owner: ownerMap.get(c.userId) || "—", views: Number(c.views), leads: Number(c.leads) })),
       };
     }),
 
