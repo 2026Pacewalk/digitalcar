@@ -3,6 +3,7 @@ import type { HttpBindings } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import fs from "fs";
 import path from "path";
+import { cardMetaFor, injectCardMeta } from "./card-og";
 
 type App = Hono<{ Bindings: HttpBindings }>;
 
@@ -17,7 +18,13 @@ export function serveStaticFiles(app: App) {
       return c.json({ error: "Not Found" }, 404);
     }
     const indexPath = path.resolve(distPath, "index.html");
-    const content = fs.readFileSync(indexPath, "utf-8");
+    let content = fs.readFileSync(indexPath, "utf-8");
+    // For public card URLs, inject per-card OG/meta so social shares get a rich
+    // preview (name, role, logo). Non-card paths are served unchanged.
+    try {
+      const meta = cardMetaFor(new URL(c.req.url).pathname, distPath);
+      if (meta) content = injectCardMeta(content, meta);
+    } catch { /* fall back to plain index.html */ }
     return c.html(content);
   });
 }
