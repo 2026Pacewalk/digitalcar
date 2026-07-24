@@ -30,6 +30,31 @@ function customers(distPath: string): Row[] {
 
 export interface CardMeta { title: string; description: string; image: string; url: string }
 
+const OG_IMAGE = `${SITE}/why-businessman.png`;
+
+// Per-page SEO/OG for the marketing site.
+const MARKETING: Record<string, { title: string; description: string }> = {
+  "/": { title: "DigitalCarda — AI-Powered Digital Business Cards", description: "Create a stunning digital business card with QR sharing, lead capture, payment links and analytics. Start your free 7-day trial." },
+  "/features": { title: "Features — DigitalCarda", description: "QR & WhatsApp sharing, lead capture, mini-CRM, analytics, payments and custom branding — everything to turn a shared card into a customer." },
+  "/pricing": { title: "Pricing — DigitalCarda", description: "Simple plans for individuals, professionals, teams and resellers. Start free, upgrade anytime." },
+  "/templates": { title: "Card Templates — DigitalCarda", description: "Beautiful, professional digital card templates for every industry." },
+  "/industries": { title: "Solutions by Industry — DigitalCarda", description: "Digital cards built for real estate, finance, healthcare, consultants and more." },
+  "/bulk-cards": { title: "Bulk Cards for Teams — DigitalCarda", description: "Create and manage digital business cards for your whole team from one dashboard." },
+  "/ai-card-generator": { title: "AI Card Generator — DigitalCarda", description: "Let AI write your headline, about and services and build your card in minutes." },
+  "/resellers": { title: "Become a Reseller — DigitalCarda", description: "Partner with DigitalCarda: manage customers, earn commissions and grow your agency." },
+  "/refer-earn": { title: "Refer & Earn — DigitalCarda", description: "Invite others to DigitalCarda and earn rewards to your wallet." },
+  "/custom-domain": { title: "Custom Domain — DigitalCarda", description: "Put your digital card on your own branded domain." },
+  "/contact": { title: "Contact — DigitalCarda", description: "Get in touch with the DigitalCarda team." },
+};
+
+/** Meta for any public page — marketing routes or a customer card. */
+export function metaFor(pathname: string, distPath: string): CardMeta | null {
+  const clean = pathname.replace(/\/+$/, "") || "/";
+  const mk = MARKETING[clean];
+  if (mk) return { ...mk, image: OG_IMAGE, url: `${SITE}${clean === "/" ? "" : clean}` };
+  return cardMetaFor(pathname, distPath);
+}
+
 /** Returns OG meta for a card path, or null if the path isn't a known card. */
 export function cardMetaFor(pathname: string, distPath: string): CardMeta | null {
   const m = pathname.match(/^\/(?:c\/)?([^/]+)\/?$/);

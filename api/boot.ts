@@ -132,6 +132,25 @@ app.get("/api/card/:slug", async (c) => {
   return c.json(pub);
 });
 
+// Dynamic sitemap: marketing pages + every public card, so Google can discover
+// all 500+ card profiles.
+app.get("/sitemap.xml", async (c) => {
+  const base = "https://digitalcarda.in";
+  const pages = ["", "/features", "/pricing", "/templates", "/industries", "/bulk-cards",
+    "/ai-card-generator", "/resellers", "/refer-earn", "/custom-domain", "/contact",
+    "/privacy", "/refund-policy", "/terms-of-service"];
+  const customers = (await readPublicJson("customers")) as { slug?: string }[];
+  const slugs = [...new Set(customers.map((x) => String(x.slug || "").trim()).filter(Boolean))];
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const url = (loc: string, pri: string) => `  <url><loc>${esc(loc)}</loc><priority>${pri}</priority></url>`;
+  const body =
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7")).join("\n") + "\n" +
+    slugs.map((s) => url(`${base}/c/${encodeURIComponent(s)}`, "0.5")).join("\n") +
+    `\n</urlset>`;
+  return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
+});
+
 // Block the raw public files outright (defence-in-depth alongside the CDN rule).
 app.get("/customers.json", (c) => c.json({ error: "Forbidden" }, 403));
 app.get("/enquiries.json", (c) => c.json({ error: "Forbidden" }, 403));

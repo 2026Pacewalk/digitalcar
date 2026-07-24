@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Private app areas — no need to crawl.
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /reseller
+Disallow: /api/
+
+Sitemap: https://digitalcarda.in/sitemap.xml
