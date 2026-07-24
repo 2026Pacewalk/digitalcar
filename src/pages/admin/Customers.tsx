@@ -141,7 +141,7 @@ export default function AdminCustomers() {
     let authUser: { id: number; email: string; fullName: string; role: string } = { id: c.id, email: c.email, fullName: c.name, role: "customer" };
     let token = "impersonate_" + c.id;
     try {
-      const res = await impersonate.mutateAsync({ email: c.email });
+      const res = await impersonate.mutateAsync({ email: c.email, slug: c.slug });
       authUser = res.user;
       token = res.token;
     } catch { /* no DB account — preview-only */ }

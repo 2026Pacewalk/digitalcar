@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, resellerProfiles, referrals, notifications } from "@db/schema";
+import { users, resellerProfiles, referrals, notifications, cards } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { createToken, createResetToken, verifyResetToken } from "./lib/jwt";
 import { sendEmail, ownerAddress } from "./lib/mail";
@@ -295,11 +295,19 @@ export const authRouter = createRouter({
   // ── Admin: impersonate a customer ("login as client") with a REAL token, so
   //    authed features (Refer & Earn, analytics, leads…) work during preview ──
   impersonate: adminQuery
-    .input(z.object({ email: z.string().email() }))
+    .input(z.object({ email: z.string().email().optional(), slug: z.string().optional() }))
     .mutation(async ({ input }) => {
       const db = getDb();
-      const user = await db.query.users.findFirst({ where: eq(users.email, input.email.toLowerCase().trim()) });
-      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "No account found for that email" });
+      // Match by email first; if that misses (the legacy card data and the
+      // imported user rows don't always share an email), resolve via the card's slug.
+      let user = input.email
+        ? await db.query.users.findFirst({ where: eq(users.email, input.email.toLowerCase().trim()) })
+        : undefined;
+      if (!user && input.slug) {
+        const card = await db.query.cards.findFirst({ where: eq(cards.slug, input.slug.toLowerCase().trim()) });
+        if (card) user = await db.query.users.findFirst({ where: eq(users.id, card.userId) });
+      }
+      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "No matching account" });
       const token = await createToken({ userId: user.id, email: user.email, role: user.role });
       return { token, user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role } };
     }),
