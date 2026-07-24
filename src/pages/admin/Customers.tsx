@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
+import { fetchAdminData } from "@/lib/adminData";
 import { scopedKey } from "@/hooks/useCustomer";
 
 /* Retailer (admin_id) → name, from superadmin table */
@@ -75,10 +76,9 @@ export default function AdminCustomers() {
   const [addForm, setAddForm] = useState({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", admin_id: 0 });
 
   useEffect(() => {
-    fetch("/customers.json")
-      .then((r) => r.json())
+    fetchAdminData<Customer[]>("customers")
       // Newest members first (id DESC) — matches the old site's members-list.php order
-      .then((d: Customer[]) => setRows([...d].sort((a, b) => Number(b.id) - Number(a.id))))
+      .then((d) => setRows([...d].sort((a, b) => Number(b.id) - Number(a.id))))
       .catch(() => toast.error("Could not load customers"))
       .finally(() => setLoading(false));
   }, []);

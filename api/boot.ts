@@ -5,8 +5,15 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
+import { verifyToken } from "./lib/jwt";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
+
+async function requireSuperAdmin(c: { req: { header: (k: string) => string | undefined } }) {
+  const token = c.req.header("x-auth-token") || c.req.header("authorization")?.replace("Bearer ", "");
+  const payload = token ? await verifyToken(token) : null;
+  return payload?.role === "super_admin" ? payload : null;
+}
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 app.use("/api/trpc/*", async (c) => {
@@ -67,6 +74,26 @@ app.post("/api/cron/trial-emails", async (c) => {
     return c.json({ ok: false }, 500);
   }
 });
+
+// ─── Sensitive data files: block public access, serve only to super-admins ───
+// customers.json contains plaintext passwords + bank/UPI details — it must
+// never be publicly downloadable. (enquiries.json is handled in the next step,
+// together with a per-user leads endpoint for the customer dashboard.)
+const SENSITIVE = new Set(["customers"]);
+
+app.get("/api/admin/data/:file", async (c) => {
+  const file = c.req.param("file");
+  if (!SENSITIVE.has(file)) return c.json({ error: "Not found" }, 404);
+  if (!(await requireSuperAdmin(c))) return c.json({ error: "Unauthorized" }, 401);
+  const { readFile } = await import("node:fs/promises");
+  for (const p of [`./dist/public/${file}.json`, `./public/${file}.json`]) {
+    try { return c.body(await readFile(p, "utf8"), 200, { "content-type": "application/json" }); } catch { /* try next */ }
+  }
+  return c.json({ error: "Not found" }, 404);
+});
+
+// Block the raw public file outright (defence-in-depth alongside the CDN rule).
+app.get("/customers.json", (c) => c.json({ error: "Forbidden" }, 403));
 
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 

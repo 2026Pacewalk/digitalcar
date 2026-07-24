@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { Store, Users, UserCheck, Search, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { fetchAdminData } from "@/lib/adminData";
 
 /* Retailer (admin_id) → name, from the old superadmin table. Mirrors the map on
    the Customers page so both pages label resellers identically. */
@@ -24,9 +25,8 @@ export default function AdminResellers() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    fetch("/customers.json")
-      .then((r) => r.json())
-      .then((d: Cust[]) => setRows(d))
+    fetchAdminData<Cust[]>("customers")
+      .then((d) => setRows(d))
       .catch(() => toast.error("Could not load resellers"))
       .finally(() => setLoading(false));
   }, []);
