@@ -76,10 +76,17 @@ app.post("/api/cron/trial-emails", async (c) => {
 });
 
 // ─── Sensitive data files: block public access, serve only to super-admins ───
-// customers.json contains plaintext passwords + bank/UPI details — it must
-// never be publicly downloadable. (enquiries.json is handled in the next step,
-// together with a per-user leads endpoint for the customer dashboard.)
-const SENSITIVE = new Set(["customers"]);
+// customers.json has passwords + bank/UPI details; enquiries.json is lead PII.
+// Neither may be publicly downloadable.
+const SENSITIVE = new Set(["customers", "enquiries"]);
+
+const readPublicJson = async (file: string): Promise<unknown[]> => {
+  const { readFile } = await import("node:fs/promises");
+  for (const p of [`./dist/public/${file}.json`, `./public/${file}.json`]) {
+    try { return JSON.parse(await readFile(p, "utf8")); } catch { /* try next */ }
+  }
+  return [];
+};
 
 app.get("/api/admin/data/:file", async (c) => {
   const file = c.req.param("file");
@@ -92,8 +99,27 @@ app.get("/api/admin/data/:file", async (c) => {
   return c.json({ error: "Not found" }, 404);
 });
 
-// Block the raw public file outright (defence-in-depth alongside the CDN rule).
+// A customer's OWN leads only — scoped server-side by their card slug(s), so one
+// customer can never read another's enquiries (unlike the old public file).
+app.get("/api/my/leads", async (c) => {
+  const token = c.req.header("x-auth-token") || c.req.header("authorization")?.replace("Bearer ", "");
+  const user = token ? await verifyToken(token) : null;
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  const email = String(user.email || "").toLowerCase();
+  if (!email) return c.json([]);
+  const customers = (await readPublicJson("customers")) as { email?: string; slug?: string }[];
+  const slugs = new Set(
+    customers.filter((x) => String(x.email || "").toLowerCase() === email)
+      .map((x) => String(x.slug || "").toLowerCase()).filter(Boolean),
+  );
+  if (!slugs.size) return c.json([]);
+  const enquiries = (await readPublicJson("enquiries")) as { uname?: string }[];
+  return c.json(enquiries.filter((e) => slugs.has(String(e.uname || "").toLowerCase())));
+});
+
+// Block the raw public files outright (defence-in-depth alongside the CDN rule).
 app.get("/customers.json", (c) => c.json({ error: "Forbidden" }, 403));
+app.get("/enquiries.json", (c) => c.json({ error: "Forbidden" }, 403));
 
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 

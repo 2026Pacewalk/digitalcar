@@ -4,6 +4,7 @@ const MailIcon = Mail;
 import { toast } from "sonner";
 import ModuleShell from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
+import { fetchMyLeads } from "@/lib/adminData";
 import { useEnquiryNotifications, loadNewEnquiries, NEW_ENQ_KEY } from "@/hooks/useEnquiryNotifications";
 
 type Enquiry = { id: string; name: string; contact: string; email: string; description: string; uname: string; created_on: string; status: string };
@@ -41,8 +42,8 @@ export default function CustomerEnquiry() {
   }, []);
 
   useEffect(() => {
-    fetch("/enquiries.json").then((r) => r.json())
-      .then((d: Enquiry[]) => setBaseRows(d.filter((e) => e.uname === slug)))
+    fetchMyLeads<Enquiry[]>()
+      .then((d) => setBaseRows(d.filter((e) => e.uname === slug)))
       .catch(() => setBaseRows([]))
       .finally(() => setLoading(false));
   }, [slug]);

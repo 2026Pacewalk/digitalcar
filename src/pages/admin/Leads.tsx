@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 import { classifyLead, type LeadCategory } from "@/lib/leadIntel";
 import { cleanText } from "@/lib/cleanText";
+import { fetchAdminData } from "@/lib/adminData";
 
 type Enquiry = {
   id: string; name: string; contact: string; email: string; description: string;
@@ -42,10 +43,9 @@ export default function AdminLeads() {
   const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
 
   useEffect(() => {
-    fetch("/enquiries.json")
-      .then((r) => r.json())
+    fetchAdminData<Enquiry[]>("enquiries")
       // Newest enquiries first (by created_on, id as tiebreaker).
-      .then((d: Enquiry[]) => {
+      .then((d) => {
         const t = (s: string) => new Date(String(s || "").replace(" ", "T")).getTime() || 0;
         setRows([...d].sort((a, b) => t(b.created_on) - t(a.created_on) || Number(b.id) - Number(a.id)));
       })

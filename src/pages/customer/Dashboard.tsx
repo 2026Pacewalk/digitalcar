@@ -11,6 +11,7 @@ import type { ComponentType } from "react";
 import { toast } from "sonner";
 import { loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
 import { readCustomer, scopedKey, getAuthUser } from "@/hooks/useCustomer";
+import { fetchMyLeads } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import TrialBanner from "@/components/customer/TrialBanner";
 
@@ -154,9 +155,8 @@ export default function CustomerDashboard() {
       setEnquiries([...all].filter((id) => !del.has(id)).length);
       setRecentEnqs(fresh.filter((e) => !del.has(e.id)).slice(-3).reverse());
     };
-    fetch("/enquiries.json")
-      .then((r) => r.json())
-      .then((d: { id: string; uname: string }[]) => { baseIds = d.filter((e) => e.uname === slug).map((e) => String(e.id)); recount(); })
+    fetchMyLeads<{ id: string; uname: string }[]>()
+      .then((d) => { baseIds = d.filter((e) => e.uname === slug).map((e) => String(e.id)); recount(); })
       .catch(() => recount());
     const onStorage = () => recount();
     window.addEventListener("storage", onStorage);
