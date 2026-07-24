@@ -117,6 +117,25 @@ app.get("/api/my/leads", async (c) => {
   return c.json(enquiries.filter((e) => slugs.has(String(e.uname || "").toLowerCase())));
 });
 
+// The signed-in user's OWN card profile, matched by email (server-side, so the
+// sensitive customers.json is never exposed). Used to hydrate the dashboard with
+// the real card the user already owns instead of a blank seed. Read-only —
+// changes nothing, and keeps the card's real slug (no slug reconciliation here).
+app.get("/api/my/card", async (c) => {
+  const token = c.req.header("x-auth-token") || c.req.header("authorization")?.replace("Bearer ", "");
+  const user = token ? await verifyToken(token) : null;
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  const email = String(user.email || "").toLowerCase().trim();
+  if (!email) return c.json({ error: "Not found" }, 404);
+  const customers = (await readPublicJson("customers")) as Record<string, unknown>[];
+  const rows = customers.filter((x) => String(x.email || "").toLowerCase().trim() === email);
+  if (!rows.length) return c.json({ error: "Not found" }, 404);
+  // If one email owns several cards (rare bulk accounts), pick the most-viewed one.
+  const row = rows.sort((a, b) => Number(b.views || 0) - Number(a.views || 0))[0];
+  const { password: _p, email_verify_on: _vo, ...pub } = row;
+  return c.json(pub);
+});
+
 // Public single-card data by slug — returns ONLY what the card publicly
 // displays (credentials stripped). Replaces the old bulk customers.json read
 // so a public card can render without exposing everyone's data.

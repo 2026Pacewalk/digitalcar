@@ -92,6 +92,18 @@ export function contentSeeder<K extends keyof Awaited<ReturnType<typeof loadCust
   };
 }
 
+/* Fetch the signed-in user's real legacy card profile (matched by email,
+   server-side). Returns the raw legacy customer row (credentials stripped)
+   or null if the user has no legacy card / isn't signed in. */
+export async function loadMyLegacyProfile(): Promise<Record<string, unknown> | null> {
+  try {
+    const token = localStorage.getItem("auth_token") || "";
+    const r = await fetch("/api/my/card", { headers: { "x-auth-token": token } });
+    if (!r.ok) return null;
+    return (await r.json()) as Record<string, unknown>;
+  } catch { return null; }
+}
+
 export async function loadCustomerContent(slug: string) {
   const j = (u: string) => fetch(u).then((r) => r.json()).catch(() => [] as Raw[]);
   const [prods, gals, vids, offs, qrs, ups] = await Promise.all([
