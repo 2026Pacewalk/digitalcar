@@ -15,7 +15,8 @@ export function loadNewEnquiries(slug?: string): Enq[] {
   try {
     const a = JSON.parse(localStorage.getItem(NEW_ENQ_KEY) || "[]");
     if (!Array.isArray(a)) return [];
-    return slug ? a.filter((e: Enq) => e.uname === slug) : a;
+    const sl = slug ? slug.toLowerCase() : "";
+    return sl ? a.filter((e: Enq) => String(e.uname ?? "").toLowerCase() === sl) : a;
   } catch { return []; }
 }
 function loadReadIds(): string[] {

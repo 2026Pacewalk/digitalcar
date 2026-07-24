@@ -109,7 +109,10 @@ export async function loadCustomerContent(slug: string) {
   const [prods, gals, vids, offs, qrs, ups] = await Promise.all([
     j("/product.json"), j("/gallery.json"), j("/video.json"), j("/offer.json"), j("/qrcode.json"), j("/uploads.json"),
   ]);
-  const mine = (arr: Raw[]) => arr.filter((x) => x.uname === slug);
+  // Legacy `uname` casing is inconsistent (e.g. "Property1313" vs slug
+  // "property1313"), so match case-insensitively.
+  const sl = String(slug).toLowerCase();
+  const mine = (arr: Raw[]) => arr.filter((x) => String(x.uname ?? "").toLowerCase() === sl);
 
   return {
     products: mine(prods).map((p) => ({

@@ -156,7 +156,7 @@ export default function CustomerDashboard() {
       setRecentEnqs(fresh.filter((e) => !del.has(e.id)).slice(-3).reverse());
     };
     fetchMyLeads<{ id: string; uname: string }[]>()
-      .then((d) => { baseIds = d.filter((e) => e.uname === slug).map((e) => String(e.id)); recount(); })
+      .then((d) => { const sl = slug.toLowerCase(); baseIds = d.filter((e) => String(e.uname ?? "").toLowerCase() === sl).map((e) => String(e.id)); recount(); })
       .catch(() => recount());
     const onStorage = () => recount();
     window.addEventListener("storage", onStorage);

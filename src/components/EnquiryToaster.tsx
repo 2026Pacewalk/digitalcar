@@ -22,7 +22,7 @@ export default function EnquiryToaster() {
       for (const e of list as Enq[]) {
         if (known.current!.has(e.id)) continue;
         known.current!.add(e.id);
-        if (slug && e.uname && e.uname !== slug) continue; // only alert the owning customer
+        if (slug && e.uname && e.uname.toLowerCase() !== slug.toLowerCase()) continue; // only alert the owning customer
         toast.custom((t) => (
           <div className="flex items-start gap-3 bg-white rounded-2xl shadow-premium-lg border border-[#F1F5F9] p-4 w-[340px]">
             <div className="w-9 h-9 rounded-xl bg-[#FEF3C7] flex items-center justify-center shrink-0"><Mail size={18} className="text-[#F7B31C]" /></div>

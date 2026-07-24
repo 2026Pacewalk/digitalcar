@@ -42,8 +42,9 @@ export default function CustomerEnquiry() {
   }, []);
 
   useEffect(() => {
+    const sl = slug.toLowerCase();
     fetchMyLeads<Enquiry[]>()
-      .then((d) => setBaseRows(d.filter((e) => e.uname === slug)))
+      .then((d) => setBaseRows(d.filter((e) => String(e.uname ?? "").toLowerCase() === sl)))
       .catch(() => setBaseRows([]))
       .finally(() => setLoading(false));
   }, [slug]);
