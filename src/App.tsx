@@ -1,66 +1,67 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import PublicLayout from "@/components/layout/PublicLayout";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import BecomeReseller from "./pages/BecomeReseller";
-import AdminResellerApplications from "./pages/admin/ResellerApplications";
-import Home from "./pages/public/Home";
-import Features from "./pages/public/Features";
-import Templates from "./pages/public/Templates";
-import Industries from "./pages/public/Industries";
-import Pricing from "./pages/public/Pricing";
-import BulkCards from "./pages/public/BulkCards";
-import AIGenerator from "./pages/public/AIGenerator";
-import Resellers from "./pages/public/Resellers";
-import ReferEarnPublic from "./pages/public/ReferEarn";
-import CustomDomain from "./pages/public/CustomDomain";
-import Contact from "./pages/public/Contact";
-import Privacy from "./pages/public/Privacy";
-import RefundPolicy from "./pages/public/RefundPolicy";
-import TermsOfService from "./pages/public/TermsOfService";
-import AdminDashboard from "./pages/admin/Dashboard";
-import AdminResellers from "./pages/admin/Resellers";
-import AdminCustomers from "./pages/admin/Customers";
-import AdminPackages from "./pages/admin/Packages";
-import AdminTemplates from "./pages/admin/Templates";
-import AdminMigration from "./pages/admin/Migration";
-import AdminAnalytics from "./pages/admin/Analytics";
-import AdminLeads from "./pages/admin/Leads";
-import AdminReferrals from "./pages/admin/Referrals";
-import AdminPayments from "./pages/admin/Payments";
-import AdminSettings from "./pages/admin/Settings";
-import AdminProfile from "./pages/admin/Profile";
-import ResellerDashboard from "./pages/reseller/Dashboard";
-import ResellerCustomers from "./pages/reseller/Customers";
-import ResellerProfile from "./pages/reseller/Profile";
-import CustomerDashboard from "./pages/customer/Dashboard";
-import CardBuilder from "./pages/customer/CardBuilder";
-import CustomerTemplates from "./pages/customer/Templates";
-import CustomerCards from "./pages/customer/Cards";
-import CustomerBulkCreate from "./pages/customer/BulkCreate";
-import CustomerAnalytics from "./pages/customer/Analytics";
-import CustomerLeads from "./pages/customer/Leads";
-import CustomerSubscription from "./pages/customer/Subscription";
-import CustomerSettings from "./pages/customer/Settings";
-import CustomerProfile from "./pages/customer/Profile";
-import CustomerQR from "./pages/customer/QR";
-import AITools from "./pages/customer/AITools";
-import CustomerHome from "./pages/customer/Home";
-import CustomerAbout from "./pages/customer/About";
-import CustomerProducts from "./pages/customer/Products";
-import CustomerPayments from "./pages/customer/Payments";
-import CustomerMedia from "./pages/customer/Media";
-import CustomerSocial from "./pages/customer/Social";
-import CustomerUploads from "./pages/customer/Uploads";
-import CustomerEnquiry from "./pages/customer/Enquiry";
-import CustomerViewCard from "./pages/customer/ViewCard";
-import CustomerReviews from "./pages/customer/Reviews";
-import CustomerReferEarn from "./pages/customer/ReferEarn";
-import PublicCard from "./pages/PublicCard";
-import NotFound from "./pages/NotFound";
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const BecomeReseller = lazy(() => import("./pages/BecomeReseller"));
+const AdminResellerApplications = lazy(() => import("./pages/admin/ResellerApplications"));
+const Home = lazy(() => import("./pages/public/Home"));
+const Features = lazy(() => import("./pages/public/Features"));
+const Templates = lazy(() => import("./pages/public/Templates"));
+const Industries = lazy(() => import("./pages/public/Industries"));
+const Pricing = lazy(() => import("./pages/public/Pricing"));
+const BulkCards = lazy(() => import("./pages/public/BulkCards"));
+const AIGenerator = lazy(() => import("./pages/public/AIGenerator"));
+const Resellers = lazy(() => import("./pages/public/Resellers"));
+const ReferEarnPublic = lazy(() => import("./pages/public/ReferEarn"));
+const CustomDomain = lazy(() => import("./pages/public/CustomDomain"));
+const Contact = lazy(() => import("./pages/public/Contact"));
+const Privacy = lazy(() => import("./pages/public/Privacy"));
+const RefundPolicy = lazy(() => import("./pages/public/RefundPolicy"));
+const TermsOfService = lazy(() => import("./pages/public/TermsOfService"));
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const AdminResellers = lazy(() => import("./pages/admin/Resellers"));
+const AdminCustomers = lazy(() => import("./pages/admin/Customers"));
+const AdminPackages = lazy(() => import("./pages/admin/Packages"));
+const AdminTemplates = lazy(() => import("./pages/admin/Templates"));
+const AdminMigration = lazy(() => import("./pages/admin/Migration"));
+const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
+const AdminLeads = lazy(() => import("./pages/admin/Leads"));
+const AdminReferrals = lazy(() => import("./pages/admin/Referrals"));
+const AdminPayments = lazy(() => import("./pages/admin/Payments"));
+const AdminSettings = lazy(() => import("./pages/admin/Settings"));
+const AdminProfile = lazy(() => import("./pages/admin/Profile"));
+const ResellerDashboard = lazy(() => import("./pages/reseller/Dashboard"));
+const ResellerCustomers = lazy(() => import("./pages/reseller/Customers"));
+const ResellerProfile = lazy(() => import("./pages/reseller/Profile"));
+const CustomerDashboard = lazy(() => import("./pages/customer/Dashboard"));
+const CardBuilder = lazy(() => import("./pages/customer/CardBuilder"));
+const CustomerTemplates = lazy(() => import("./pages/customer/Templates"));
+const CustomerCards = lazy(() => import("./pages/customer/Cards"));
+const CustomerBulkCreate = lazy(() => import("./pages/customer/BulkCreate"));
+const CustomerAnalytics = lazy(() => import("./pages/customer/Analytics"));
+const CustomerLeads = lazy(() => import("./pages/customer/Leads"));
+const CustomerSubscription = lazy(() => import("./pages/customer/Subscription"));
+const CustomerSettings = lazy(() => import("./pages/customer/Settings"));
+const CustomerProfile = lazy(() => import("./pages/customer/Profile"));
+const CustomerQR = lazy(() => import("./pages/customer/QR"));
+const AITools = lazy(() => import("./pages/customer/AITools"));
+const CustomerHome = lazy(() => import("./pages/customer/Home"));
+const CustomerAbout = lazy(() => import("./pages/customer/About"));
+const CustomerProducts = lazy(() => import("./pages/customer/Products"));
+const CustomerPayments = lazy(() => import("./pages/customer/Payments"));
+const CustomerMedia = lazy(() => import("./pages/customer/Media"));
+const CustomerSocial = lazy(() => import("./pages/customer/Social"));
+const CustomerUploads = lazy(() => import("./pages/customer/Uploads"));
+const CustomerEnquiry = lazy(() => import("./pages/customer/Enquiry"));
+const CustomerViewCard = lazy(() => import("./pages/customer/ViewCard"));
+const CustomerReviews = lazy(() => import("./pages/customer/Reviews"));
+const CustomerReferEarn = lazy(() => import("./pages/customer/ReferEarn"));
+const PublicCard = lazy(() => import("./pages/PublicCard"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 import { Toaster } from "@/components/ui/sonner";
 import EnquiryToaster from "@/components/EnquiryToaster";
 
@@ -85,6 +86,7 @@ export default function App() {
     <>
       <Toaster position="top-center" />
       <EnquiryToaster />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]"><div className="w-8 h-8 rounded-full border-2 border-[#E2E8F0] border-t-[#F7B31C] animate-spin" /></div>}>
       <Routes>
         {/* Public website */}
         <Route element={<PublicLayout />}>
@@ -171,6 +173,7 @@ export default function App() {
         <Route path="/:slug" element={<PublicCard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
     </>
   );
 }
