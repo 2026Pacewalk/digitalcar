@@ -47,7 +47,7 @@ function PhoneField({ value, onChange, placeholder }: { value: string; onChange:
         onChange={(e) => setNumber(e.target.value)}
         inputMode="numeric"
         maxLength={10}
-        placeholder={placeholder || "98765 43210"}
+        placeholder={placeholder || "XXXXX XXXXX"}
         className="flex-1 min-w-0 bg-transparent px-3 text-[13px] text-[#0F172A] outline-none placeholder:text-[#94A3B8]"
       />
     </div>
@@ -126,8 +126,8 @@ export default function CustomerHome() {
           </Field>
 
           <Field label="Website" full><WebsiteField value={val("url")} onChange={(v) => set("url", v)} /></Field>
-          <Field label="Call Number"><PhoneField value={val("mobile1")} onChange={(v) => set("mobile1", v)} placeholder="98765 43210" /></Field>
-          <Field label="WhatsApp Number"><PhoneField value={val("mobile2")} onChange={(v) => set("mobile2", v)} placeholder="98765 43210" /></Field>
+          <Field label="Call Number"><PhoneField value={val("mobile1")} onChange={(v) => set("mobile1", v)} placeholder="XXXXX XXXXX" /></Field>
+          <Field label="WhatsApp Number"><PhoneField value={val("mobile2")} onChange={(v) => set("mobile2", v)} placeholder="XXXXX XXXXX" /></Field>
           <Field label="Address" full><textarea value={val("address")} onChange={(e) => set("address", e.target.value)} className={areaCls} placeholder="Full business address" /></Field>
         </div>
       </Panel>

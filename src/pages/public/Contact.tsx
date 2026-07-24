@@ -89,7 +89,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Phone Number</label>
-                    <input value={form.phone} onChange={(e) => update("phone", e.target.value)} placeholder="+91 98765 43210" className="input-premium w-full" />
+                    <input value={form.phone} onChange={(e) => update("phone", e.target.value)} placeholder="+91 XXXXX XXXXX" className="input-premium w-full" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Business Name</label>

@@ -28,7 +28,7 @@ const STRENGTH = [
 ];
 
 const inputCls =
-  "h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] pl-10 pr-3 text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#94A3B8]";
+  "h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] pl-10 pr-3 text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#CBD5E1]";
 const iconCls = "absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none";
 
 export default function Signup() {
@@ -177,7 +177,7 @@ export default function Signup() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-[#334155] mb-1.5">Mobile Number</label>
-                <div className="relative"><Phone size={16} className={iconCls} /><input value={form.mobile} onChange={(e) => update("mobile", e.target.value)} placeholder="+91 98765 43210" className={inputCls} /></div>
+                <div className="relative"><Phone size={16} className={iconCls} /><input value={form.mobile} onChange={(e) => update("mobile", e.target.value)} placeholder="+91 XXXXX XXXXX" className={inputCls} /></div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#334155] mb-1.5">Username</label>

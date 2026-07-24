@@ -507,7 +507,7 @@ export default function BulkCards() {
                       <button onClick={() => setPasteOpen(false)} className="text-[#94A3B8] hover:text-[#0F172A]"><X size={15} /></button>
                     </div>
                     <textarea value={pasteText} onChange={(e) => setPasteText(e.target.value)} rows={4}
-                      placeholder={"Rahul Sharma, Sales Manager, +91 98765 43210, rahul@company.com\nPriya Nair, Designer, +91 91234 56789, priya@company.com"}
+                      placeholder={"Rahul Sharma, Sales Manager, +91 XXXXX XXXXX, rahul@company.com\nPriya Nair, Designer, +91 XXXXX XXXXX, priya@company.com"}
                       className="input-premium w-full resize-none font-mono text-xs" />
                     <div className="flex justify-end mt-3">
                       <button onClick={applyPaste} className="btn-gold h-9 px-4 inline-flex items-center gap-1.5"><Plus size={14} /> Import list</button>
@@ -552,7 +552,7 @@ export default function BulkCards() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Contact Number *</label>
-                    <input value={company.phone} onChange={(e) => setCompany((c) => ({ ...c, phone: e.target.value }))} placeholder="+91 98765 43210" className="input-premium w-full" />
+                    <input value={company.phone} onChange={(e) => setCompany((c) => ({ ...c, phone: e.target.value }))} placeholder="+91 XXXXX XXXXX" className="input-premium w-full" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Work Email</label>
