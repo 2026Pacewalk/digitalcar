@@ -14,6 +14,7 @@ import { readCustomer, scopedKey, getAuthUser } from "@/hooks/useCustomer";
 import { fetchMyLeads } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import TrialBanner from "@/components/customer/TrialBanner";
+import OnboardingGuide, { type GuideStep } from "@/components/customer/OnboardingGuide";
 
 /* Glass action button for the dark hero card (icon + tiny label) */
 function GlassAction({ icon: Icon, label, onClick, tone = "default", active = false }: {
@@ -71,24 +72,6 @@ function listCount(base: string): number {
     const arr = raw ? JSON.parse(raw) : [];
     return Array.isArray(arr) ? arr.length : 0;
   } catch { return 0; }
-}
-
-/* Completion ring (SVG) */
-function ScoreRing({ pct }: { pct: number }) {
-  const R = 26, C = 2 * Math.PI * R;
-  const color = pct >= 80 ? "#16A34A" : pct >= 50 ? "#F7B31C" : "#EF4444";
-  return (
-    <div className="relative w-[72px] h-[72px] shrink-0">
-      <svg width="72" height="72" viewBox="0 0 72 72" className="-rotate-90">
-        <circle cx="36" cy="36" r={R} fill="none" stroke="#F1F5F9" strokeWidth="7" />
-        <circle cx="36" cy="36" r={R} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
-          strokeDasharray={C} strokeDashoffset={C * (1 - pct / 100)} className="transition-all duration-700" />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[15px] font-extrabold text-[#0F172A] leading-none tabular-nums">{pct}%</span>
-      </div>
-    </div>
-  );
 }
 
 export default function CustomerDashboard() {
@@ -167,20 +150,17 @@ export default function CustomerDashboard() {
   /* ─── Smart completion score ─── */
   const hasSocial = !!(customer.facebook || customer.twitter || customer.instagram || customer.youtube || customer.pinterest || customer.linkedin);
   const hasPayments = counts.upi > 0 || counts.banks > 0 || !!customer.upi || !!customer.bank_name || counts.qrcodes > 0;
-  const checks: { done: boolean; label: string; path: string }[] = [
-    { done: !!customer.logo, label: "Add your logo / photo", path: "/dashboard/home" },
-    { done: !!(customer.mobile1 && customer.address), label: "Complete contact details", path: "/dashboard/home" },
-    { done: !!customer.about_us, label: "Write your About Us", path: "/dashboard/about" },
-    { done: counts.products + counts.offers > 0, label: "Add products / services", path: "/dashboard/products?tab=products" },
-    { done: hasPayments, label: "Add payment details", path: "/dashboard/payments" },
-    { done: counts.gallery + counts.videos > 0, label: "Add gallery images", path: "/dashboard/media" },
-    { done: hasSocial, label: "Link social profiles", path: "/dashboard/social" },
-    { done: !!customer.google_review, label: "Add Google review link", path: "/dashboard/reviews" },
-    { done: counts.uploads > 0, label: "Upload your eBrochure", path: "/dashboard/uploads" },
+  const guideSteps: GuideStep[] = [
+    { key: "logo", done: !!customer.logo, icon: HomeIcon, title: "Add your logo / photo", impact: "A logo makes your card instantly recognisable and trusted.", path: "/dashboard/home" },
+    { key: "contact", done: !!(customer.mobile1 && customer.address), icon: MessageCircle, title: "Complete contact details", impact: "One-tap call & directions — never miss an enquiry.", path: "/dashboard/home" },
+    { key: "about", done: !!customer.about_us, icon: Info, title: "Write your About Us", impact: "Tell your story so visitors know why to choose you.", path: "/dashboard/about" },
+    { key: "products", done: counts.products + counts.offers > 0, icon: ShoppingBag, title: "Add products / services", impact: "Cards with a catalogue get far more enquiries.", path: "/dashboard/products?tab=products" },
+    { key: "payments", done: hasPayments, icon: Wallet, title: "Add payment details", impact: "Add UPI/bank so customers can pay you on the spot.", path: "/dashboard/payments" },
+    { key: "gallery", done: counts.gallery + counts.videos > 0, icon: ImageIcon, title: "Add photos & videos", impact: "Visuals build trust and keep visitors on your card longer.", path: "/dashboard/media" },
+    { key: "social", done: hasSocial, icon: Share2, title: "Link social profiles", impact: "Turn every card view into a new follower.", path: "/dashboard/social" },
+    { key: "reviews", done: !!customer.google_review, icon: Star, title: "Add Google review link", impact: "Star reviews are the #1 reason new customers say yes.", path: "/dashboard/reviews" },
+    { key: "uploads", done: counts.uploads > 0, icon: Upload, title: "Upload your eBrochure", impact: "Share a brochure/menu customers can keep for later.", path: "/dashboard/uploads" },
   ];
-  const doneCount = checks.filter((c) => c.done).length;
-  const pct = Math.round((doneCount / checks.length) * 100);
-  const nextSteps = checks.filter((c) => !c.done).slice(0, 3);
 
   const copyLink = async () => {
     try { await navigator.clipboard.writeText(cardUrl); setCopied(true); toast.success("Card link copied"); setTimeout(() => setCopied(false), 1800); }
@@ -254,32 +234,13 @@ export default function CustomerDashboard() {
         {/* ─── Trial / expiry FOMO ─── */}
         <TrialBanner isTrial={customer.package_id === 7 && getAuthUser()?.role === "customer"} expiredOn={customer.expired_on} days={daysPending} views={customer.views} leads={enquiries ?? 0} />
 
-        {/* ─── Smart completion ─── */}
-        {pct < 100 ? (
-          <div className="bg-white rounded-2xl border border-[#F1F5F9] shadow-premium p-4">
-            <div className="flex items-center gap-4">
-              <ScoreRing pct={pct} />
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-[#0F172A]">Card completion</p>
-                <p className="text-[11px] text-[#64748B] mt-0.5">{doneCount} of {checks.length} sections done — complete cards get more enquiries.</p>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {nextSteps.map((s) => (
-                    <button key={s.label} onClick={() => navigate(s.path)}
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-[#FEF3C7] text-[#92400E] hover:bg-[#FDE68A] transition-colors active:scale-95">
-                      {s.label} <ArrowRight size={10} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-gradient-to-r from-[#ECFDF5] to-[#F0FDF4] border border-emerald-100 p-3.5 flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Check size={17} /></span>
-            <p className="text-xs text-emerald-800 flex-1 leading-snug"><b>Your card is 100% complete.</b> Share it everywhere to get more enquiries.</p>
-            <button onClick={shareWhatsApp} className="h-9 px-3.5 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors shrink-0">Share</button>
-          </div>
-        )}
+        {/* ─── Guided onboarding: what to add next & why it wins leads ─── */}
+        <OnboardingGuide
+          steps={guideSteps}
+          firstName={(customer.name || "there").split(" ")[0]}
+          onNavigate={navigate}
+          onShare={shareWhatsApp}
+        />
 
         {/* ─── Stats ─── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
