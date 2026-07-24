@@ -211,10 +211,14 @@ export default function PublicLayout() {
             </button>
           </div>
         </div>
+      </nav>
 
-        {/* Mobile drawer */}
-        <div
-          className={`lg:hidden fixed inset-0 z-[60] ${mobileOpen ? "" : "pointer-events-none"}`}
+      {/* Mobile drawer — kept OUTSIDE <nav> on purpose: the nav gets a
+          backdrop-blur (backdrop-filter) once scrolled, which would otherwise
+          become the containing block for these position:fixed overlays and
+          collapse the drawer into the 64px header on any scrolled page. */}
+      <div
+        className={`lg:hidden fixed inset-0 z-[60] ${mobileOpen ? "" : "pointer-events-none"}`}
           aria-hidden={!mobileOpen}
           role="dialog"
           aria-modal="true"
@@ -322,7 +326,6 @@ export default function PublicLayout() {
             </div>
           </div>
         </div>
-      </nav>
 
       <main><Outlet /></main>
 
