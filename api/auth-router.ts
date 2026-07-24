@@ -11,6 +11,25 @@ import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminE
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
 
+/* Legacy-auth bridge: the old site stored plaintext passwords (some with stray
+   trailing/leading spaces), and the DB import either hashed them verbatim or fell
+   back to a default. So a customer typing their real password can fail the bcrypt
+   check. This returns the plaintext password(s) the old export had for an email,
+   so login can verify against them (trimmed) and self-heal the stored hash. */
+async function legacyPasswordsFor(email: string): Promise<string[]> {
+  const { readFile } = await import("node:fs/promises");
+  for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
+    try {
+      const rows = JSON.parse(await readFile(p, "utf8")) as { email?: string; password?: unknown }[];
+      return rows
+        .filter((x) => String(x.email || "").toLowerCase().trim() === email)
+        .map((x) => String(x.password ?? ""))
+        .filter((s) => s.trim().length > 0);
+    } catch { /* file not at this path — try the next */ }
+  }
+  return [];
+}
+
 export const authRouter = createRouter({
   register: publicQuery
     .input(
@@ -144,9 +163,10 @@ export const authRouter = createRouter({
     )
     .mutation(async ({ input }) => {
       const db = getDb();
+      const email = input.email.toLowerCase().trim();
 
       const user = await db.query.users.findFirst({
-        where: eq(users.email, input.email),
+        where: eq(users.email, email),
       });
 
       if (!user) {
@@ -156,7 +176,24 @@ export const authRouter = createRouter({
         });
       }
 
-      const isValid = await bcrypt.compare(input.password, user.password);
+      let isValid = await bcrypt.compare(input.password, user.password);
+
+      // Legacy-auth bridge: if the hash doesn't match, accept the real password
+      // from the old export (compared trimmed), then re-hash the clean password
+      // so future logins work directly against the DB.
+      if (!isValid) {
+        const typed = input.password.trim();
+        if (typed.length > 0) {
+          const legacy = await legacyPasswordsFor(email);
+          if (legacy.some((pw) => pw.trim() === typed)) {
+            isValid = true;
+            try {
+              const rehash = await bcrypt.hash(typed, 12);
+              await db.update(users).set({ password: rehash }).where(eq(users.id, user.id));
+            } catch { /* self-heal is best-effort; login still succeeds */ }
+          }
+        }
+      }
 
       if (!isValid) {
         throw new TRPCError({
