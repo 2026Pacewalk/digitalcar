@@ -38,7 +38,7 @@ export default function CustomerViewCard() {
   }, []);
 
   const slug = String(data.slug || "acme-digital");
-  const url = `https://digitalcarda.in/c/${slug}`;
+  const url = `https://digitalcarda.in/${slug}`;
 
   // Trial/plan expired → the public card is paused for visitors.
   const isTrial = Number(data.package_id) === 7;

@@ -177,7 +177,7 @@ export default function CardBuilder() {
           <button className="p-2 rounded-lg hover:bg-[#F4F4F4] text-[#666666]"><Monitor size={16} /></button>
           <button className="p-2 rounded-lg bg-[#081828] text-white"><Smartphone size={16} /></button>
           {card?.slug && (
-            <a href={`/c/${card.slug}`} target="_blank" className="flex items-center gap-2 h-9 px-3 border border-[#E5E5E5] rounded-lg text-sm text-[#666666] hover:bg-[#F4F4F4]">
+            <a href={`/${card.slug}`} target="_blank" className="flex items-center gap-2 h-9 px-3 border border-[#E5E5E5] rounded-lg text-sm text-[#666666] hover:bg-[#F4F4F4]">
               <Eye size={14} /> Preview
             </a>
           )}

@@ -76,7 +76,7 @@ export default function CustomerCards() {
                     <button onClick={() => navigate(`/dashboard/builder/${card.id}`)} className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg border border-[#E2E8F0] text-sm text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#F7B31C] transition-colors">
                       <Pencil size={14} /> Edit
                     </button>
-                    <a href={`/c/${card.slug}`} target="_blank" className="flex items-center justify-center gap-2 h-9 px-3 rounded-lg border border-[#E2E8F0] text-sm text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#F7B31C] transition-colors">
+                    <a href={`/${card.slug}`} target="_blank" className="flex items-center justify-center gap-2 h-9 px-3 rounded-lg border border-[#E2E8F0] text-sm text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#F7B31C] transition-colors">
                       <ExternalLink size={14} />
                     </a>
                     <button

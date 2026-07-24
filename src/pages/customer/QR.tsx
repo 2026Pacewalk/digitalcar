@@ -8,7 +8,7 @@ import { toast } from "sonner";
 export default function CustomerQR() {
   const { data: cardsData } = trpc.card.list.useQuery();
   const primaryCard = cardsData?.cards?.[0];
-  const cardUrl = primaryCard ? `${window.location.origin}/c/${primaryCard.slug}` : "";
+  const cardUrl = primaryCard ? `${window.location.origin}/${primaryCard.slug}` : "";
   const [qrColor, setQrColor] = useState("#0F172A");
   const [qrBg, setQrBg] = useState("#FFFFFF");
   const [copied, setCopied] = useState(false);

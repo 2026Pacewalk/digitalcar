@@ -146,7 +146,7 @@ app.get("/sitemap.xml", async (c) => {
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7")).join("\n") + "\n" +
-    slugs.map((s) => url(`${base}/c/${encodeURIComponent(s)}`, "0.5")).join("\n") +
+    slugs.map((s) => url(`${base}/${encodeURIComponent(s)}`, "0.5")).join("\n") +
     `\n</urlset>`;
   return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
 });

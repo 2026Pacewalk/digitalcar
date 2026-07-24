@@ -119,7 +119,7 @@ export function leadNotificationEmail(o: { name: string; email?: string | null; 
       ["Phone", o.contact ? `<a href="tel:${esc(o.contact)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.contact)}</a>` : "—"],
       ["Message", esc(o.message || "—")],
     ]) +
-    (o.slug ? button("View card", `${SITE}/c/${esc(o.slug)}`) : "");
+    (o.slug ? button("View card", `${SITE}/${esc(o.slug)}`) : "");
   return {
     subject: `New lead: ${o.name || "Enquiry"} — ${label}`,
     html: layout({ preheader: `New enquiry from ${o.name} on ${label}`, badge: "New Lead", heading: "You've got a new lead 🎯", bodyHtml, accent: "#22C55E" }),
@@ -137,7 +137,7 @@ export function hotLeadEmail(o: { name: string; email?: string | null; contact?:
       ["Phone", o.contact ? `<a href="tel:${esc(o.contact)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.contact)}</a>` : "—"],
       ["Message", esc(o.message || "—")],
     ]) +
-    (o.contact ? button("Call now", `tel:${esc(o.contact)}`) : o.slug ? button("View card", `${SITE}/c/${esc(o.slug)}`) : "");
+    (o.contact ? button("Call now", `tel:${esc(o.contact)}`) : o.slug ? button("View card", `${SITE}/${esc(o.slug)}`) : "");
   return {
     subject: `🔥 Hot lead: ${o.name || "Enquiry"} — ${label}`,
     html: layout({ preheader: `High-intent enquiry from ${o.name} — respond fast`, badge: "🔥 Hot Lead", heading: "🔥 Hot lead — respond fast", bodyHtml, accent: "#EA580C" }),

@@ -87,7 +87,7 @@ export default function CustomerHome() {
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const save = () => { update(form); toast.success("Details saved"); setForm({}); };
 
-  const cardUrl = `https://digitalcarda.in/c/${String(data.slug || "")}`;
+  const cardUrl = `https://digitalcarda.in/${String(data.slug || "")}`;
   const copyLink = async () => { try { await navigator.clipboard.writeText(cardUrl); setCopied(true); toast.success("Card link copied"); setTimeout(() => setCopied(false), 1600); } catch { toast.error("Copy failed"); } };
 
   const SaveBtn = ({ big }: { big?: boolean }) => (

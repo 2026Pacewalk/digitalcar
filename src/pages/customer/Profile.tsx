@@ -37,7 +37,7 @@ export default function CustomerProfile() {
   const [copied, setCopied] = useState("");
 
   const slug = String(data.slug || "");
-  const cardUrl = `https://digitalcarda.in/c/${slug}`;
+  const cardUrl = `https://digitalcarda.in/${slug}`;
   const pkg = PKG[Number(data.package_id)] || PKG[7];
   const daysLeft = (() => {
     const exp = String(data.expired_on || "");

@@ -61,7 +61,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const secondary = s(c.color2);
   const theme = String(Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1)));
   const slug = s(c.slug);
-  const cardUrl = `https://digitalcarda.in/c/${slug}`;
+  const cardUrl = `https://digitalcarda.in/${slug}`;
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
   const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean);
   const initial = (s(c.name)[0] || "D").toUpperCase();

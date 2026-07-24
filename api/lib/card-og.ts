@@ -71,13 +71,14 @@ export function cardMetaFor(pathname: string, distPath: string): CardMeta | null
     : String(row.about_us || "").replace(/<[^>]*>/g, "").slice(0, 150)) || "View my digital business card.";
   const logo = String(row.logo || "");
   const image = logo ? (/^https?:/.test(logo) ? logo : `${IMG_BASE}/home/${encodeURIComponent(logo)}`) : `${SITE}/why-businessman.png`;
-  return { title, description, image, url: `${SITE}/c/${slug}` };
+  return { title, description, image, url: `${SITE}/${slug}` };
 }
 
 /** Inject the meta into an index.html string. */
 export function injectCardMeta(html: string, meta: CardMeta): string {
   const tags = [
     `<meta name="description" content="${esc(meta.description)}">`,
+    `<link rel="canonical" href="${esc(meta.url)}">`,
     `<meta property="og:type" content="profile">`,
     `<meta property="og:site_name" content="DigitalCarda">`,
     `<meta property="og:title" content="${esc(meta.title)}">`,
