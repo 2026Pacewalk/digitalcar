@@ -1,7 +1,6 @@
-import { Phone, Mail, MapPin, Clock, Send, MessageSquare, HelpCircle, ArrowRight } from "lucide-react";
+import { Phone, Mail, Clock, Send, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Link } from "react-router";
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", businessName: "", requirement: "", message: "" });

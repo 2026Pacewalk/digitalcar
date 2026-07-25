@@ -1,4 +1,4 @@
-import { X, Check, Eye } from "lucide-react";
+import { X, Check } from "lucide-react";
 import { TEMPLATES, renderTemplate } from "@/data/templates";
 import type { TemplateColors, CardData } from "@/data/templates";
 

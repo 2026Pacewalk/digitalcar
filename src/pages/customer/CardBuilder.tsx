@@ -9,10 +9,7 @@ import {
   Smartphone,
   Monitor,
   Plus,
-  GripVertical,
   Trash2,
-  ChevronDown,
-  ChevronUp,
   Settings as SettingsIcon,
   User,
   Image,
@@ -62,7 +59,6 @@ export default function CardBuilder() {
     { enabled: !!currentCardId }
   );
   const { data: blockTypes } = trpc.block.listTypes.useQuery();
-  const utils = trpc.useUtils();
 
   const createCardMutation = trpc.card.create.useMutation({
     onSuccess: (data) => {

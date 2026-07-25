@@ -1,7 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useState } from "react";
-import { Sparkles, Wand2, FileText, Image, MessageSquare, Send, Copy, Check, Loader2 } from "lucide-react";
+import { Sparkles, Wand2, FileText, Copy, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const tools = [

@@ -3,7 +3,7 @@ import TopBar from "@/components/layout/TopBar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  Plus, Star, Crown, Pencil, Trash2, X, Save, Check, LayoutGrid, ChevronLeft, ChevronRight,
+  Plus, Star, Crown, Pencil, Trash2, X, Save, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";

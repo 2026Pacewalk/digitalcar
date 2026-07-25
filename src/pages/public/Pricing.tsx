@@ -1,4 +1,4 @@
-import { Check, ArrowRight, Sparkles, HelpCircle } from "lucide-react";
+import { Check, ArrowRight, HelpCircle } from "lucide-react";
 import { Link } from "react-router";
 import { useState } from "react";
 

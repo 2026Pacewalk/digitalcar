@@ -5,7 +5,7 @@ import {
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
   ChevronRight, Store, X, Search, ToggleRight, ReceiptText, KeyRound,
   Home as HomeIcon, Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
-  Tag, QrCode, Star, Layers, Gift, ClipboardList,
+  Star, Layers, Gift, ClipboardList,
 } from "lucide-react";
 
 interface SidebarProps {

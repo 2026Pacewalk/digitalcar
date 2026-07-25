@@ -5,7 +5,7 @@ import { trpc } from "@/providers/trpc";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  User, Camera, Save, Lock, Shield, Eye, EyeOff, Smartphone, Mail, Clock, Monitor, Chrome, CheckCircle2, ShieldCheck, ShieldAlert
+  User, Camera, Save, Lock, Shield, Eye, EyeOff, Clock, Monitor, Chrome, CheckCircle2, ShieldCheck, ShieldAlert
 } from "lucide-react";
 
 const LOGIN_ACTIVITY = [

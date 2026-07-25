@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import fs from "fs";
@@ -13,7 +13,7 @@ export function serveStaticFiles(app: App) {
 
   // Serve index.html with per-page OG/meta injected (marketing pages + cards),
   // so social shares and crawlers get proper titles/descriptions/previews.
-  const serveHtml = (c: Parameters<Parameters<App["get"]>[1]>[0]) => {
+  const serveHtml = (c: Context<{ Bindings: HttpBindings }>) => {
     let content = fs.readFileSync(indexPath, "utf-8");
     try {
       const meta = metaFor(new URL(c.req.url).pathname, distPath);

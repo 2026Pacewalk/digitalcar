@@ -72,7 +72,7 @@ function renderSocials(links?: Array<{ platform: string; url: string }>) {
   }).join('') + '</div>';
 }
 
-function ctaButtons(c: TemplateColors, phone?: string, whatsapp?: string) {
+function ctaButtons(_c: TemplateColors, phone?: string, whatsapp?: string) {
   const p = phone || '#';
   const w = whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g,'')}` : '#';
   return `
@@ -86,7 +86,7 @@ function ctaButtons(c: TemplateColors, phone?: string, whatsapp?: string) {
     </div>`;
 }
 
-function bottomNav(c: TemplateColors) {
+function bottomNav(_c: TemplateColors) {
   const items = [
     { label: 'HOME', d: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' },
     { label: 'ABOUT', d: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M2 12h20' },
@@ -103,7 +103,7 @@ function bottomNav(c: TemplateColors) {
 }
 
 /* ─── Contact Row Helper ─── */
-function contactRow(icon: string, label: string, value: string, href?: string) {
+function contactRow(icon: string, _label: string, value: string, href?: string) {
   const content = `<div style="display:flex;align-items:center;gap:12px;padding:10px 16px"><div style="width:32px;height:32px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></div><span style="font-size:11px;color:rgba(255,255,255,0.9);font-weight:500">${value}</span></div>`;
   return href ? `<a href="${href}" style="text-decoration:none;display:block">${content}</a>` : content;
 }
@@ -360,7 +360,7 @@ export const TEMPLATES: TemplateData[] = [
       d = { ...defaultData, ...d };
       return `<div style="--primary:${c.primary};--secondary:${c.secondary};--accent:${c.accent};font-family:Inter,sans-serif;max-width:400px;margin:0 auto;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,0.08)">
         <div style="background:var(--primary);padding:20px 16px;text-align:center"><div style="width:56px;height:56px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;box-shadow:0 4px 12px rgba(0,0,0,0.15)"><span style="color:var(--primary);font-size:20px;font-weight:bold">${(d.businessName||'B').charAt(0)}</span></div><h2 style="margin:0;font-size:15px;font-weight:bold;color:#0F172A">${safe(d.ownerName,'Owner Name')}</h2><p style="margin:2px 0 0;font-size:10px;color:rgba(15,23,42,0.7)">${safe(d.designation,'Your Designation')}</p>
-        ${d.socialLinks?.length ? '<div style="display:flex;justify-content:center;gap:8px;margin-top:10px">'+d.socialLinks.map((l,i)=>`<a href="${l.url}" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;text-decoration:none;backdrop-filter:blur(4px);transform:translateY(0);transition:transform 0.2s"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></a>`).join('')+'</div>' : ''}
+        ${d.socialLinks?.length ? '<div style="display:flex;justify-content:center;gap:8px;margin-top:10px">'+d.socialLinks.map((l)=>`<a href="${l.url}" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;text-decoration:none;backdrop-filter:blur(4px);transform:translateY(0);transition:transform 0.2s"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></a>`).join('')+'</div>' : ''}
         </div>
         <div style="margin:12px 16px;border-radius:12px;overflow:hidden;background:#374151">${contactRow('<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>','Phone',safe(d.phone,'Add Phone'),`tel:${d.phone||'#'}`)}<div style="border-top:1px solid rgba(255,255,255,0.1)"></div>${contactRow('<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>','Email',safe(d.email,'Add Email'),`mailto:${d.email||'#'}`)}<div style="border-top:1px solid rgba(255,255,255,0.1)"></div>${contactRow('<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>','Address',safe(d.address,'Add Address'))}</div>
         ${ctaButtons(c,d.phone,d.whatsapp)}

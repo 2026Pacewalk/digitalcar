@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Palette, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import type { TemplateColors } from "@/data/templates";
 
 interface ColorPickerProps {

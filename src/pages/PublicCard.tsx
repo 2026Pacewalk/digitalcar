@@ -3,11 +3,10 @@ import { trpc } from "@/providers/trpc";
 import { useEffect, useState } from "react";
 import {
   Phone, Mail, MapPin, Globe, Share2, Download, MessageCircle,
-  X, Send, Check, FileText, Briefcase, ChevronRight, MessageSquare,
+  X, Send, Check, FileText, Briefcase, ChevronRight,
   Linkedin, Facebook, Instagram, Twitter, Youtube,
-  Clock, Star, Hourglass, Zap, RefreshCw,
+  Star, Hourglass, Zap, RefreshCw,
 } from "lucide-react";
-import { toast } from "sonner";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { loadCustomerContent, decodeSpecialities, imgUrl } from "@/lib/cardContent";
 
@@ -113,7 +112,6 @@ export default function PublicCard() {
   const whatsappBlock = card.blocks?.find((b: { type: string }) => b.type === "whatsapp_button");
   const enquiryBlock = card.blocks?.find((b: { type: string }) => b.type === "enquiry_form");
   const hoursBlock = card.blocks?.find((b: { type: string }) => b.type === "business_hours");
-  const paymentBlock = card.blocks?.find((b: { type: string }) => b.type === "payment_qr");
   const testimonialsBlock = card.blocks?.find((b: { type: string }) => b.type === "testimonials");
   const galleryBlock = card.blocks?.find((b: { type: string }) => b.type === "gallery");
 

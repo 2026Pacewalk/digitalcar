@@ -1,7 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useState } from "react";
-import { Search, Mail, Phone, Calendar, MessageSquare, PhoneCall, ChevronDown } from "lucide-react";
+import { Search, Mail, Phone, Calendar, MessageSquare, PhoneCall } from "lucide-react";
 import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {

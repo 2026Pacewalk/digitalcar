@@ -3,9 +3,9 @@ import TopBar from "@/components/layout/TopBar";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
-  Upload, Download, Database, Users, CheckCircle2, AlertCircle,
+  Upload, Download, Database, Users, CheckCircle2,
   FileSpreadsheet, Trash2, RefreshCw, Search, ChevronLeft, ChevronRight,
-  FileUp, Shield, Globe, Link2, Eye, X, Loader2, Save,
+  FileUp, Shield, Globe, Link2, Eye, Loader2, Save,
 } from "lucide-react";
 
 interface Member {
@@ -22,11 +22,6 @@ const pkgColors: Record<string, string> = {
   Trial: "bg-[#DBEAFE] text-[#1E40AF]",
   STANDARD: "bg-[#FCE7F3] text-[#9D174D]",
   STARTER: "bg-[#CCFBF1] text-[#0F766E]",
-};
-
-const statusColors: Record<string, string> = {
-  active: "badge-green", expired: "badge-gray bg-gray-100 text-gray-500",
-  pending: "badge-gold", migrated: "bg-emerald-50 text-emerald-600",
 };
 
 export default function AdminMigration() {

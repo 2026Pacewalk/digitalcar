@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from "react-router";
 import {
   Home, Palette, Users, BarChart3, User, LayoutDashboard, Store, UserCircle, Package, ClipboardList,
   Plus, Eye, Share2, CreditCard, Menu, MessageSquare,
-  Settings, LogOut, HelpCircle, Bell, ChevronLeft,
-  Info, ShoppingBag, Tag, Wallet, QrCode, Image as ImageIcon, Star, Upload, Mail, Layers,
+  Settings, LogOut, HelpCircle, ChevronLeft,
+  Info, ShoppingBag, Wallet, Image as ImageIcon, Star, Upload, Mail, Layers,
   ToggleRight, Search, ReceiptText, KeyRound, Gift,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";

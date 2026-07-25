@@ -19,7 +19,7 @@ export const userRouter = createRouter({
     )
     .query(async ({ input }) => {
       const db = getDb();
-      const { page = 1, limit = 25, search, role, status } = input || {};
+      const { page = 1, limit = 25, search } = input || {};
       const offset = (page - 1) * limit;
 
       const conditions = [];

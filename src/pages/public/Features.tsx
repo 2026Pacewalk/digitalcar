@@ -1,8 +1,8 @@
 import {
   CreditCard, QrCode, MessageCircle, Download, FileDown, ShoppingBag,
   Image, Play, Wallet, MapPin, Star, Link2, Globe, BarChart3, Sparkles,
-  Phone, Mail, Shield, Layers, Users, MousePointer, Eye, TrendingUp,
-  Share2, Smartphone, Monitor, MessageSquare, Zap, Check,
+  Shield, Layers, Users, Eye,
+  Check,
 } from "lucide-react";
 import { Link } from "react-router";
 

@@ -1,6 +1,6 @@
 import {
-  Users, CreditCard, BarChart3, DollarSign, Shield, Palette,
-  FileText, TrendingUp, Check, ArrowRight, Store, HelpCircle,
+  Users, CreditCard, BarChart3, DollarSign, Palette,
+  FileText, TrendingUp, ArrowRight, HelpCircle,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState } from "react";

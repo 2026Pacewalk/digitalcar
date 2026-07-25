@@ -18,7 +18,7 @@ export const leadRouter = createRouter({
     )
     .query(async ({ ctx, input }) => {
       const db = getDb();
-      const { page = 1, limit = 25, status, cardId } = input || {};
+      const { page = 1, limit = 25 } = input || {};
       const offset = (page - 1) * limit;
 
       let conditions = [eq(leads.userId, ctx.user.id)];

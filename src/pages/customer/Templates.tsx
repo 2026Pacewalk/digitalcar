@@ -98,7 +98,6 @@ export default function CustomerTemplates() {
   const selected = presets.find((p) => p.id === selId) || null;
   // Effective colours = custom override (if set) else the preset's own colours
   const effPrimary = primary || selected?.primary || "#F7B31C";
-  const effSecondary = customOpen ? secondary : (selected?.secondary || "");
 
   const thumbs = useMemo(() =>
     presets.map((p) => buildCardThumb({ ...data, color: p.primary, color2: p.secondary }, p.style)),

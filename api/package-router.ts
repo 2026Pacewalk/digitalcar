@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { subscriptionPackages } from "@db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 export const packageRouter = createRouter({
   list: publicQuery.query(async () => {

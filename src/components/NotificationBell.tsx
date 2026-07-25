@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
-  Bell, Mail, Inbox, Gift, Banknote, CheckCircle2, XCircle, Package,
+  Bell, Mail, Inbox, Banknote, CheckCircle2, XCircle, Package,
   Sparkles, CalendarClock, Users, CheckCheck, Trash2,
 } from "lucide-react";
 import type { ComponentType } from "react";

@@ -1,8 +1,8 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
-import { useState, useRef } from "react";
-import { Download, QrCode, Palette, ExternalLink, Share2, Copy, Check } from "lucide-react";
+import { useState } from "react";
+import { Download, QrCode, ExternalLink, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CustomerQR() {

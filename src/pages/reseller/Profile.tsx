@@ -4,8 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import {
-  User, Camera, Save, Lock, Shield, Eye, EyeOff, Smartphone, Mail,
-  Building2, MapPin, Globe, Phone, Clock, Monitor, Chrome, CheckCircle2, CreditCard, Landmark, Receipt
+  User, Camera, Save, Lock, Shield, Eye, EyeOff,
+  Building2, MapPin, Clock, Monitor, Chrome, CheckCircle2, CreditCard, Receipt
 } from "lucide-react";
 
 const LOGIN_ACTIVITY = [

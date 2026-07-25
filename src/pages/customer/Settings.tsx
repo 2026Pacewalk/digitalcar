@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Settings as SettingsIcon, Save, KeyRound, Package as PackageIcon, ReceiptText, Check, Info, Calendar, IndianRupee, Eye, Pencil } from "lucide-react";
+import { Settings as SettingsIcon, Save, KeyRound, Package as PackageIcon, Check, Info, Calendar, IndianRupee, Eye, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router";
 import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/customer/ModuleShell";

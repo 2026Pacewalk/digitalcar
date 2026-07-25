@@ -25,7 +25,7 @@ export const analyticsRouter = createRouter({
         dateFilter = gte(analyticsEvents.createdAt, input.dateFrom);
       }
 
-      const [views, uniqueVisitors, deviceBreakdown, dailyViews] = await Promise.all([
+      const [, uniqueVisitors, deviceBreakdown, dailyViews] = await Promise.all([
         db.select({ count: sql<number>`count(*)` })
           .from(analyticsEvents)
           .where(and(eq(analyticsEvents.cardId, input.cardId), eq(analyticsEvents.eventType, "view"), dateFilter)),
@@ -175,16 +175,13 @@ export const analyticsRouter = createRouter({
         dateFrom: z.date().optional(),
       }).optional()
     )
-    .query(async ({ ctx, input }) => {
+    .query(async ({ input }) => {
       const db = getDb();
       let conditions = [];
 
       if (input?.cardId) {
         conditions.push(eq(analyticsEvents.cardId, input.cardId));
       } else {
-        const userCards = await db.query.cards.findMany({
-          where: eq(cards.userId, ctx.user.id),
-        });
         // Simple approach - get all for user
       }
 

@@ -1,4 +1,4 @@
-import { Sparkles, Wand2, Loader2, Check, ArrowRight, RefreshCw } from "lucide-react";
+import { Sparkles, Wand2, Check, ArrowRight, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
