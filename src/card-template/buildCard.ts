@@ -447,7 +447,7 @@ function dcSendEnquiry(form){
   form.innerHTML='<p class="dc-sent">✓ Thank you! We will get back to you shortly.</p>';
   return false;
 }
-function openShare(){ document.getElementById('shareModal').style.display='flex'; }
+function openShare(){ try{ if(navigator.share){ navigator.share({title:(document.title||'Digital Card'), url:'${cardUrl}'}).catch(function(){}); return; } }catch(_){} document.getElementById('shareModal').style.display='flex'; }
 function closeShare(){ document.getElementById('shareModal').style.display='none'; }
 function copyShare(){ var u='${cardUrl}'; if(navigator.clipboard){navigator.clipboard.writeText(u).then(function(){alert('Link copied');});}else{alert(u);} }
 document.getElementById('shareModal').addEventListener('click', function(e){ if(e.target.id==='shareModal') closeShare(); });
