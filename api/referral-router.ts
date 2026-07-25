@@ -4,7 +4,7 @@ import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware
 import { getDb } from "./queries/connection";
 import {
   users, referrals, walletTransactions, withdrawalRequests, appSettings,
-  subscriptions, subscriptionPackages, notifications,
+  subscriptions, notifications,
 } from "@db/schema";
 import { eq, desc, and, gt, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
