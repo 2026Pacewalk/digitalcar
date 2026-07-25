@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, authedQuery, resellerQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, resellerProfiles, cards } from "@db/schema";
+import { users, resellerProfiles, cards, subscriptions } from "@db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 
 export const userRouter = createRouter({
@@ -135,6 +135,47 @@ export const userRouter = createRouter({
       }
       await db.delete(users).where(eq(users.id, input.id));
       return { success: true };
+    }),
+
+  // ─── Give a customer extra days of card validity (matched by email) ───
+  // Extends the active subscription's period end — which is what actually keeps
+  // the public card live — so the extra days take real effect.
+  extendValidity: adminQuery
+    .input(z.object({ email: z.string().email(), days: z.number().int().min(1).max(3650) }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase().trim();
+      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } });
+      if (!user) return { ok: false as const, reason: "no_account" as const };
+      const sub = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.userId, user.id),
+        orderBy: [desc(subscriptions.createdAt)],
+      });
+      const now = new Date();
+      const from = sub?.currentPeriodEnd && new Date(sub.currentPeriodEnd) > now ? new Date(sub.currentPeriodEnd) : now;
+      const end = new Date(from.getTime() + input.days * 86_400_000);
+      if (sub) {
+        await db.update(subscriptions).set({ currentPeriodEnd: end, status: "active" }).where(eq(subscriptions.id, sub.id));
+      } else {
+        await db.insert(subscriptions).values({
+          userId: user.id, packageId: 7, status: "active", billingCycle: "monthly",
+          amount: "0.00", currency: "INR", currentPeriodStart: now, currentPeriodEnd: end, paymentGateway: "manual",
+        });
+      }
+      return { ok: true as const, expiredOn: end.toISOString().slice(0, 10) };
+    }),
+
+  // ─── Deactivate a customer (safe soft-delete: pauses their card, reversible) ───
+  deactivateCustomer: adminQuery
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase().trim();
+      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true, role: true } });
+      if (!user) return { ok: false as const, reason: "no_account" as const };
+      if (user.role === "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "A super admin can't be deactivated here." });
+      await db.update(users).set({ status: "suspended" }).where(eq(users.id, user.id));
+      return { ok: true as const };
     }),
 
   updateProfile: authedQuery
