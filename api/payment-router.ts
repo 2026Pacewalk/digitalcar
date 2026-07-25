@@ -8,6 +8,7 @@ import { eq, desc, and, gt, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail } from "./lib/email-templates";
+import { getUpgradeOfferPercent } from "./lib/pricing";
 
 const n = (v: unknown) => Number(v ?? 0);
 const money = (v: number) => v.toFixed(2);
@@ -35,7 +36,7 @@ async function setSetting(db: ReturnType<typeof getDb>, key: string, value: stri
 async function computeAmount(
   db: ReturnType<typeof getDb>,
   user: { id: number; referredById: number | null },
-  packageId: number, cycle: "monthly" | "yearly", offerPercent: number
+  packageId: number, cycle: "monthly" | "yearly", wantsOffer: boolean
 ) {
   const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, packageId) });
   if (!pkg) throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
@@ -55,7 +56,8 @@ async function computeAmount(
   } else {
     charged = Math.max(0, round2(base - n(existingPaid.amount)));
   }
-  const offer = offerPercent > 0 && offerPercent <= 50 ? offerPercent : 0;
+  // The offer percentage is server-controlled; the client may only request it.
+  const offer = wantsOffer ? await getUpgradeOfferPercent(db) : 0;
   if (offer) charged = round2(charged * (1 - offer / 100));
   return { pkg, base, charged, isUpgrade: !!existingPaid };
 }
@@ -69,10 +71,10 @@ export const paymentRouter = createRouter({
 
   // Amount preview for a plan before paying
   quote: authedQuery
-    .input(z.object({ packageId: z.number(), billingCycle: z.enum(["monthly", "yearly"]), offerPercent: z.number().min(0).max(50).optional() }))
+    .input(z.object({ packageId: z.number(), billingCycle: z.enum(["monthly", "yearly"]), wantsOffer: z.boolean().optional() }))
     .query(async ({ ctx, input }) => {
       const db = getDb();
-      const { pkg, base, charged, isUpgrade } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.offerPercent ?? 0);
+      const { pkg, base, charged, isUpgrade } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false);
       return { planName: pkg.name, base, amount: charged, isUpgrade };
     }),
 
@@ -83,7 +85,7 @@ export const paymentRouter = createRouter({
       billingCycle: z.enum(["monthly", "yearly"]),
       method: z.enum(["upi", "bank"]),
       reference: z.string().min(3),
-      offerPercent: z.number().min(0).max(50).optional(),
+      wantsOffer: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -93,7 +95,7 @@ export const paymentRouter = createRouter({
       });
       if (pending) throw new TRPCError({ code: "BAD_REQUEST", message: "You already have a payment awaiting verification." });
 
-      const { pkg, charged } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.offerPercent ?? 0);
+      const { pkg, charged } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false);
       const [ins] = await db.insert(paymentOrders).values({
         userId: ctx.user.id,
         packageId: input.packageId,

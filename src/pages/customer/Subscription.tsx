@@ -199,7 +199,7 @@ function PayModal({ plan, offerPct, isYearly, onClose, onDone }: {
   const submit = async () => {
     if (reference.trim().length < 3) return toast.error("Enter your UPI/transaction reference (UTR)");
     try {
-      await createOrder.mutateAsync({ packageId: plan.id, billingCycle: isYearly ? "yearly" : "monthly", method, reference: reference.trim(), offerPercent: offerPct || undefined });
+      await createOrder.mutateAsync({ packageId: plan.id, billingCycle: isYearly ? "yearly" : "monthly", method, reference: reference.trim(), wantsOffer: offerPct > 0 });
       toast.success("Payment submitted — we'll verify and activate your plan shortly");
       onDone();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }

@@ -3,6 +3,7 @@ import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { subscriptions, subscriptionPackages, invoices, appSettings, notifications } from "@db/schema";
 import { eq, desc, sql, and, gt } from "drizzle-orm";
+import { getUpgradeOfferPercent } from "./lib/pricing";
 
 const DEFAULT_DISCOUNT = 15;
 /** Referral discount % for a referee's first paid plan (0 if not eligible). */
@@ -35,7 +36,7 @@ export const subscriptionRouter = createRouter({
         packageId: z.number(),
         billingCycle: z.enum(["monthly", "yearly"]),
         paymentMethod: z.enum(["stripe", "paypal", "razorpay"]),
-        offerPercent: z.number().min(0).max(50).optional(), // limited-time upgrade offer
+        wantsOffer: z.boolean().optional(), // limited-time upgrade offer (percentage is server-owned)
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -71,7 +72,8 @@ export const subscriptionRouter = createRouter({
         stored = round2(base); // plan value, so the next upgrade credits the full paid-up amount
       }
       // Apply the limited-time upgrade offer on top of whatever they pay now.
-      const offerPct = input.offerPercent && input.offerPercent > 0 ? input.offerPercent : 0;
+      // The percentage is server-owned; the client may only request the offer.
+      const offerPct = input.wantsOffer ? await getUpgradeOfferPercent(db) : 0;
       if (offerPct) charged = round2(charged * (1 - offerPct / 100));
       const amount = stored.toFixed(2);
       const now = new Date();
