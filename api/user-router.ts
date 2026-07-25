@@ -127,7 +127,11 @@ export const userRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
       await db.update(users).set(input).where(eq(users.id, ctx.user.id));
-      return db.query.users.findFirst({ where: eq(users.id, ctx.user.id) });
+      // Never return the password hash (or other secrets) to the client.
+      return db.query.users.findFirst({
+        where: eq(users.id, ctx.user.id),
+        columns: { id: true, email: true, fullName: true, phone: true, avatar: true, role: true, status: true },
+      });
     }),
 
   resellerStats: resellerQuery.query(async ({ ctx }) => {

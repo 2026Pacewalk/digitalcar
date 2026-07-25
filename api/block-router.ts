@@ -150,9 +150,11 @@ export const blockRouter = createRouter({
       if (!card) throw new TRPCError({ code: "NOT_FOUND" });
 
       for (let i = 0; i < input.blockIds.length; i++) {
+        // Scope by cardId too, so a caller can't reorder blocks that belong to
+        // a card they don't own by passing foreign block IDs (IDOR).
         await db.update(cardBlocks)
           .set({ position: i })
-          .where(eq(cardBlocks.id, input.blockIds[i]));
+          .where(and(eq(cardBlocks.id, input.blockIds[i]), eq(cardBlocks.cardId, input.cardId)));
       }
 
       return db.query.cardBlocks.findMany({

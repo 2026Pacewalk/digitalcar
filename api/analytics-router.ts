@@ -175,30 +175,29 @@ export const analyticsRouter = createRouter({
         dateFrom: z.date().optional(),
       }).optional()
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = getDb();
-      let conditions = [];
+      // Only the signed-in user's own cards (never platform-wide data).
+      const userCards = await db.query.cards.findMany({
+        where: eq(cards.userId, ctx.user.id),
+        columns: { id: true },
+      });
+      let cardIds = userCards.map((c) => c.id);
+      // If a specific card is requested, honour it only if they own it.
+      if (input?.cardId) cardIds = cardIds.filter((id) => id === input.cardId);
+      if (cardIds.length === 0) return { sources: [] };
 
-      if (input?.cardId) {
-        conditions.push(eq(analyticsEvents.cardId, input.cardId));
-      } else {
-        // Simple approach - get all for user
-      }
+      const conditions = [inArray(analyticsEvents.cardId, cardIds), eq(analyticsEvents.eventType, "view")];
+      if (input?.dateFrom) conditions.push(gte(analyticsEvents.createdAt, input.dateFrom));
 
       const sources = await db
-        .select({
-          referrer: analyticsEvents.referrer,
-          count: sql<number>`count(*)`,
-        })
+        .select({ referrer: analyticsEvents.referrer, count: sql<number>`count(*)` })
         .from(analyticsEvents)
-        .where(eq(analyticsEvents.eventType, "view"))
+        .where(and(...conditions))
         .groupBy(analyticsEvents.referrer);
 
       return {
-        sources: sources.map((s) => ({
-          source: s.referrer || "Direct",
-          count: s.count,
-        })),
+        sources: sources.map((s) => ({ source: s.referrer || "Direct", count: Number(s.count) })),
       };
     }),
 
