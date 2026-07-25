@@ -1,6 +1,7 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { trpc } from "@/providers/trpc";
 import PublicLayout from "@/components/layout/PublicLayout";
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
@@ -65,17 +66,52 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 import { Toaster } from "@/components/ui/sonner";
 import EnquiryToaster from "@/components/EnquiryToaster";
 
+const Spinner = () => (
+  <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+    <div className="w-8 h-8 border-2 border-[#F7B31C] border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
 function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
   const { user, isLoading } = useAuth();
-  if (isLoading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
-      <div className="w-8 h-8 border-2 border-[#F7B31C] border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("auth_token");
+
+  // Verify the session against the server. The stored role in localStorage is
+  // user-editable, so access is gated on the role the backend reports for the
+  // JWT — a hand-edited role can't unlock an area the account isn't allowed in.
+  const me = trpc.auth.me.useQuery(undefined, { enabled: hasToken, retry: false, staleTime: 60_000 });
+
+  // Reconcile the cached user with the server truth so the whole shell (sidebar,
+  // top bar) reflects the real role. Only reloads when it was actually wrong.
+  useEffect(() => {
+    if (!me.data) return;
+    try {
+      const stored = JSON.parse(localStorage.getItem("digitalcarda_user") || "null");
+      if (!stored || stored.id !== me.data.id || stored.role !== me.data.role) {
+        localStorage.setItem("digitalcarda_user", JSON.stringify({
+          id: me.data.id, email: me.data.email, fullName: me.data.fullName,
+          role: me.data.role, avatar: me.data.avatar ?? undefined,
+        }));
+        window.location.reload();
+      }
+    } catch { /* ignore */ }
+  }, [me.data]);
+
+  // Invalid / expired token → clear the session and send to login.
+  const errData = me.error?.data as { code?: string; httpStatus?: number } | null | undefined;
+  if (hasToken && me.error && (errData?.code === "UNAUTHORIZED" || errData?.httpStatus === 401)) {
+    try { localStorage.removeItem("auth_token"); localStorage.removeItem("digitalcarda_user"); } catch { /* ignore */ }
+    return <Navigate to="/login" replace />;
+  }
+
+  if (isLoading || (hasToken && me.isLoading)) return <Spinner />;
   if (!user) return <Navigate to="/login" replace />;
-  if (!allowedRoles.includes(user.role)) {
-    if (user.role === "super_admin") return <Navigate to="/admin" replace />;
-    if (user.role === "reseller") return <Navigate to="/reseller" replace />;
+
+  // Prefer the server-verified role for the access decision.
+  const role = me.data?.role ?? user.role;
+  if (!allowedRoles.includes(role)) {
+    if (role === "super_admin") return <Navigate to="/admin" replace />;
+    if (role === "reseller") return <Navigate to="/reseller" replace />;
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
