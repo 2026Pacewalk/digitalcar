@@ -68,3 +68,6 @@ customers-export.csv
 
 # Local scratch / email previews
 scratchpad/
+
+# Local-only: contains the VPS SSH endpoint — never commit (public repo)
+connect-live-db.cmd

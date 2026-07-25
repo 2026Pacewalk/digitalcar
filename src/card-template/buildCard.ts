@@ -1,6 +1,7 @@
 import mainCss from "./main.css?raw";
 import type { CustomerRecord } from "@/hooks/useCustomer";
 import { fixMojibake } from "@/lib/cardContent";
+import { buildLinkBioHtml, LINKBIO_START, LINKBIO_COUNT } from "./linkbio";
 
 /* All 31 legacy templates (style1.css … style31.css) loaded as raw strings. */
 const STYLE_MODULES = import.meta.glob("./styles/style*.css", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
@@ -9,7 +10,11 @@ for (const [path, css] of Object.entries(STYLE_MODULES)) {
   const n = path.match(/style(\d+)\.css$/)?.[1];
   if (n) STYLES[n] = css;
 }
-export const TEMPLATE_COUNT = 31;
+/* 31 legacy business-card styles, then the link-in-bio variants (numbers 32+). */
+const CARD_STYLE_COUNT = 31;
+export const TEMPLATE_COUNT = LINKBIO_START - 1 + LINKBIO_COUNT; // 31 + link-bio variants
+/* True when a template number selects the link-in-bio layout instead of a card style. */
+export const isLinkBio = (theme: number | string) => Number(theme) >= LINKBIO_START;
 
 /* Perceived brightness of a #rrggbb colour (0 dark … 1 light). */
 const lumOf = (hex: string) => {
@@ -29,7 +34,7 @@ const themeableSecondary = (css: string) =>
   });
 for (const n of Object.keys(STYLES)) STYLES[n] = themeableSecondary(STYLES[n]);
 
-const styleFor = (theme: number) => STYLES[String(Math.min(TEMPLATE_COUNT, Math.max(1, Number(theme) || 1)))] || STYLES["1"] || "";
+const styleFor = (theme: number) => STYLES[String(Math.min(CARD_STYLE_COUNT, Math.max(1, Number(theme) || 1)))] || STYLES["1"] || "";
 
 type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
 type Gallery = { id: number; name: string; filename: string };
@@ -56,6 +61,10 @@ const SOCIAL_FA: Record<string, string> = {
 };
 
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
+  // Link-in-bio templates (32+) use a completely different, minimal layout.
+  const tNum = Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1));
+  if (isLinkBio(tNum)) return buildLinkBioHtml(c as Record<string, unknown>, products, tNum - LINKBIO_START);
+
   const accent = s(c.color) || "#F7B31C";
   const accentDark = darken(accent, 0.16);
   const secondary = s(c.color2);
@@ -463,9 +472,14 @@ function saveVCard(){
 /* Renders only the FIRST PAGE (home section) of a card with a given template —
    used for the template picker thumbnails. No scripts, no other sections. */
 export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
+  const theme = Math.min(TEMPLATE_COUNT, Math.max(1, Number(themeNum) || 1));
+  // Link-in-bio templates render their own compact preview.
+  if (isLinkBio(theme)) {
+    const sampleProducts = [{ name: "Our Services", button: "", button_title: "View Services" }];
+    return buildLinkBioHtml(c as Record<string, unknown>, sampleProducts, theme - LINKBIO_START, { thumb: true });
+  }
   const accent = s(c.color) || "#F7B31C";
   const secondary = s(c.color2);
-  const theme = Math.min(TEMPLATE_COUNT, Math.max(1, Number(themeNum) || 1));
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
   const initial = (s(c.name)[0] || "D").toUpperCase();
   const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='12' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;

@@ -6,6 +6,7 @@ import {
   Search, Plus, Eye, Lock, LogIn, Database, ChevronLeft, ChevronRight,
   X, ExternalLink, Users, UserCheck, Clock, Building2, KeyRound, Globe,
   CalendarPlus, Trash2, AlertTriangle, Mail, Phone, MoreVertical,
+  LayoutGrid, List, Download, ArrowUpDown, Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
@@ -72,6 +73,8 @@ const rowStatus = (c: { status: number; expired_on: string | null }) => {
   if (c.status === 1) return { label: "Active", cls: "bg-[#DCFCE7] text-[#166534]", dot: "bg-[#22C55E]" };
   return { label: "Inactive", cls: "bg-[#F1F5F9] text-[#475569]", dot: "bg-[#94A3B8]" };
 };
+const statusKey = (c: { status: number; expired_on: string | null }): "active" | "expired" | "inactive" =>
+  isExpired(c.expired_on) ? "expired" : c.status === 1 ? "active" : "inactive";
 
 /* Compact page numbers with ellipsis */
 function pageNumbers(current: number, total: number): (number | "…")[] {
@@ -92,6 +95,9 @@ export default function AdminCustomers() {
   const [search, setSearch] = useState("");
   const [retailer, setRetailer] = useState<number | "all">("all");
   const [pkg, setPkg] = useState("all");
+  const [status, setStatus] = useState<"all" | "active" | "expired" | "inactive">("all");
+  const [sortBy, setSortBy] = useState<"recent" | "oldest" | "name" | "name_desc" | "expiry">("recent");
+  const [view, setView] = useState<"table" | "grid">("table");
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
@@ -140,9 +146,10 @@ export default function AdminCustomers() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return rows.filter((c) => {
+    const out = rows.filter((c) => {
       if (retailer !== "all" && c.admin_id !== retailer) return false;
       if (pkg !== "all" && packageName(c.package_id) !== pkg) return false;
+      if (status !== "all" && statusKey(c) !== status) return false;
       if (!q) return true;
       return (
         c.name?.toLowerCase().includes(q) || c.username?.toLowerCase().includes(q) ||
@@ -150,12 +157,24 @@ export default function AdminCustomers() {
         c.slug?.toLowerCase().includes(q)
       );
     });
-  }, [rows, search, retailer, pkg]);
+    const expTime = (c: Customer) => {
+      const d = new Date(String(c.expired_on || "").replace(" ", "T"));
+      return isNaN(d.getTime()) ? Infinity : d.getTime(); // undated cards sort last
+    };
+    const sorters: Record<typeof sortBy, (a: Customer, b: Customer) => number> = {
+      recent: (a, b) => b.id - a.id,
+      oldest: (a, b) => a.id - b.id,
+      name: (a, b) => (a.name || "").localeCompare(b.name || ""),
+      name_desc: (a, b) => (b.name || "").localeCompare(a.name || ""),
+      expiry: (a, b) => expTime(a) - expTime(b),
+    };
+    return [...out].sort(sorters[sortBy]);
+  }, [rows, search, retailer, pkg, status, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-  useEffect(() => { setPage(1); }, [search, retailer, pkg, pageSize]);
+  useEffect(() => { setPage(1); }, [search, retailer, pkg, status, sortBy, pageSize]);
 
   const stats = useMemo(() => ({
     total: rows.length,
@@ -254,6 +273,31 @@ export default function AdminCustomers() {
     setAddForm({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", admin_id: 0 });
   };
 
+  // Export the current filtered + sorted list (all of it, not just this page) to CSV.
+  const exportCsv = () => {
+    if (!filtered.length) { toast.error("Nothing to export"); return; }
+    const cols = ["ID", "Name", "Username", "Email", "Mobile", "Card URL", "Retailer", "Plan", "Status", "Activated On", "Expires On"];
+    const esc = (v: unknown) => { const s = String(v ?? ""); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const lines = [cols.join(",")];
+    for (const c of filtered) {
+      lines.push([
+        c.id, c.name, c.username, c.email, c.mobile1,
+        `https://digitalcarda.in/${c.slug}`, retailerName(c.admin_id),
+        packageName(c.package_id), rowStatus(c).label,
+        fmtDate(c.activated_on), fmtDate(c.expired_on),
+      ].map(esc).join(","));
+    }
+    // BOM + CRLF so Excel opens it cleanly with correct UTF-8.
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `digitalcarda-customers-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${filtered.length.toLocaleString("en-IN")} customers to CSV`);
+  };
+
   const actionItems = (c: Customer): ActionItem[] => [
     { icon: <LogIn size={15} className="text-[#0F172A]" />, label: "Login as Client", onClick: () => loginAsClient(c) },
     { icon: <Eye size={15} className="text-[#B45309]" />, label: "View Card", onClick: () => setCardModal(c) },
@@ -269,6 +313,49 @@ export default function AdminCustomers() {
     { label: "Expired", value: stats.expired, icon: Clock, tint: "#EF4444", bg: "#FEE2E2" },
     { label: "Retailers", value: stats.retailers, icon: Building2, tint: "#8B5CF6", bg: "#EDE9FE" },
   ];
+
+  // One customer card — shared by the mobile list and the desktop grid view.
+  const renderCard = (c: Customer) => {
+    const expired = isExpired(c.expired_on);
+    const st = rowStatus(c);
+    return (
+      <div key={c.id} className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-4 hover:shadow-premium-lg transition-shadow">
+        <div className="flex items-start gap-3">
+          <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarGrad(c.name || c.email)} flex items-center justify-center shrink-0 shadow-sm ring-2 ring-white`}>
+            <span className="text-white text-sm font-bold">{initials(c.name)}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[14px] font-bold text-[#0F172A] truncate">{c.name || "—"}</p>
+            <p className="text-[11px] text-[#94A3B8] truncate">@{c.username || "user"} · #{c.id}</p>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${PKG_STYLE[packageName(c.package_id)] || PKG_STYLE.Trial}`}>{packageName(c.package_id)}</span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}</span>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-[#F1F5F9] space-y-2 text-[12px]">
+          <a href={`mailto:${c.email}`} className="flex items-center gap-2 text-[#475569] min-w-0"><Mail size={13} className="text-[#94A3B8] shrink-0" /><span className="truncate">{c.email || "—"}</span></a>
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-[#475569]"><Phone size={13} className="text-[#94A3B8]" />{c.mobile1 || "—"}</span>
+            <button onClick={() => setRetailer(c.admin_id)} className="text-[10px] font-semibold text-[#0F766E] bg-[#CCFBF1] px-2 py-0.5 rounded-full">{retailerName(c.admin_id)}</button>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <a href={`/${c.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[#3B82F6] min-w-0"><Globe size={13} className="shrink-0" /><span className="truncate">/{c.slug}</span></a>
+            <span className={`text-[11px] font-medium ${expired ? "text-[#EF4444]" : "text-[#64748B]"} whitespace-nowrap`}>till {fmtDate(c.expired_on)}</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-end mt-3 pt-3 border-t border-[#F1F5F9]"><ActionMenu items={actionItems(c)} /></div>
+      </div>
+    );
+  };
+
+  const emptyState = (
+    <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-10 text-center">
+      <div className="w-12 h-12 rounded-2xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3"><Users size={22} className="text-[#94A3B8]" /></div>
+      <p className="text-sm font-medium text-[#0F172A]">No customers found</p>
+      <p className="text-xs text-[#94A3B8] mt-0.5">Try a different search or filter.</p>
+    </div>
+  );
 
   return (
     <ResponsiveDashboardLayout title="Customer List" subtitle="Manage all customer cards & subscriptions">
@@ -289,81 +376,80 @@ export default function AdminCustomers() {
 
         {/* Toolbar */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex items-center gap-2 text-sm text-[#64748B]">
               Show
               <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="h-10 bg-white rounded-lg px-2 border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
                 {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
-              entries
             </div>
             <select value={retailer} onChange={(e) => setRetailer(e.target.value === "all" ? "all" : Number(e.target.value))} className="h-10 bg-white rounded-lg px-3 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
               <option value="all">All Retailers</option>
               {retailerOptions.map((id) => <option key={id} value={id}>{retailerName(id)}</option>)}
             </select>
             <select value={pkg} onChange={(e) => setPkg(e.target.value)} className="h-10 bg-white rounded-lg px-3 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
-              <option value="all">All Packages</option>
+              <option value="all">All Plans</option>
               {PACKAGE_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
+            {/* Status filter */}
+            <div className="relative">
+              <Activity size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none" />
+              <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="h-10 bg-white rounded-lg pl-8 pr-3 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="expired">Expired</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            {/* Sort */}
+            <div className="relative">
+              <ArrowUpDown size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none" />
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="h-10 bg-white rounded-lg pl-8 pr-3 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
+                <option value="recent">Recent first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="name">Name A–Z</option>
+                <option value="name_desc">Name Z–A</option>
+                <option value="expiry">Expiring soon</option>
+              </select>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative w-full sm:w-64">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="relative w-full sm:w-56">
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
               <input type="text" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 bg-white rounded-lg pl-10 pr-4 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/20 transition-all placeholder:text-[#94A3B8]" />
             </div>
-            <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-lg text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] shrink-0"><Plus size={16} /> Add New</button>
+            {/* View toggle (table ⇄ grid) — desktop only */}
+            <div className="hidden md:flex items-center bg-white border border-[#E2E8F0] rounded-lg p-0.5 h-10 shrink-0">
+              <button onClick={() => setView("table")} title="Table view" className={`w-9 h-full rounded-md flex items-center justify-center transition-colors ${view === "table" ? "bg-[#0F172A] text-white" : "text-[#94A3B8] hover:text-[#0F172A]"}`}><List size={16} /></button>
+              <button onClick={() => setView("grid")} title="Grid view" className={`w-9 h-full rounded-md flex items-center justify-center transition-colors ${view === "grid" ? "bg-[#0F172A] text-white" : "text-[#94A3B8] hover:text-[#0F172A]"}`}><LayoutGrid size={16} /></button>
+            </div>
+            <button onClick={exportCsv} title="Export current list to CSV" className="flex items-center gap-2 h-10 px-3.5 bg-white border border-[#E2E8F0] text-[#334155] rounded-lg text-sm font-semibold hover:bg-[#F8FAFC] hover:border-[#CBD5E1] transition-all active:scale-[0.98] shrink-0"><Download size={16} /> <span className="hidden sm:inline">Export CSV</span></button>
+            <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-lg text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] shrink-0"><Plus size={16} /> <span className="hidden sm:inline">Add New</span></button>
           </div>
         </div>
 
-        {/* ─── Mobile: card list ─── */}
+        {/* ─── Mobile: card list (always cards) ─── */}
         <div className="md:hidden space-y-3">
           {loading ? (
             Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-40 bg-white rounded-2xl shadow-premium border border-[#F1F5F9] animate-pulse" />)
-          ) : pageRows.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-10 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3"><Users size={22} className="text-[#94A3B8]" /></div>
-              <p className="text-sm font-medium text-[#0F172A]">No customers found</p>
-              <p className="text-xs text-[#94A3B8] mt-0.5">Try a different search or filter.</p>
-            </div>
-          ) : (
-            pageRows.map((c) => {
-              const expired = isExpired(c.expired_on);
-              const st = rowStatus(c);
-              return (
-                <div key={c.id} className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-4">
-                  <div className="flex items-start gap-3">
-                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarGrad(c.name || c.email)} flex items-center justify-center shrink-0 shadow-sm ring-2 ring-white`}>
-                      <span className="text-white text-sm font-bold">{initials(c.name)}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-bold text-[#0F172A] truncate">{c.name || "—"}</p>
-                      <p className="text-[11px] text-[#94A3B8] truncate">@{c.username || "user"} · #{c.id}</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${PKG_STYLE[packageName(c.package_id)] || PKG_STYLE.Trial}`}>{packageName(c.package_id)}</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}</span>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-[#F1F5F9] space-y-2 text-[12px]">
-                    <a href={`mailto:${c.email}`} className="flex items-center gap-2 text-[#475569] min-w-0"><Mail size={13} className="text-[#94A3B8] shrink-0" /><span className="truncate">{c.email || "—"}</span></a>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-2 text-[#475569]"><Phone size={13} className="text-[#94A3B8]" />{c.mobile1 || "—"}</span>
-                      <button onClick={() => setRetailer(c.admin_id)} className="text-[10px] font-semibold text-[#0F766E] bg-[#CCFBF1] px-2 py-0.5 rounded-full">{retailerName(c.admin_id)}</button>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <a href={`/${c.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[#3B82F6] min-w-0"><Globe size={13} className="shrink-0" /><span className="truncate">/{c.slug}</span></a>
-                      <span className={`text-[11px] font-medium ${expired ? "text-[#EF4444]" : "text-[#64748B]"} whitespace-nowrap`}>till {fmtDate(c.expired_on)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-end mt-3 pt-3 border-t border-[#F1F5F9]"><ActionMenu items={actionItems(c)} /></div>
-                </div>
-              );
-            })
-          )}
+          ) : pageRows.length === 0 ? emptyState : pageRows.map(renderCard)}
         </div>
 
-        {/* ─── Desktop: table ─── */}
-        <div className="hidden md:block bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
+        {/* ─── Desktop: grid view ─── */}
+        {view === "grid" && (
+          <div className="hidden md:block">
+            {loading ? (
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-44 bg-white rounded-2xl shadow-premium border border-[#F1F5F9] animate-pulse" />)}
+              </div>
+            ) : pageRows.length === 0 ? emptyState : (
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">{pageRows.map(renderCard)}</div>
+            )}
+          </div>
+        )}
+
+        {/* ─── Desktop: table view ─── */}
+        <div className={`${view === "table" ? "hidden md:block" : "hidden"} bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[880px] text-sm">
               <thead>

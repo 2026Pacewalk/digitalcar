@@ -44,7 +44,23 @@ const SEED_PRESETS: Preset[] = [
   { id: 29, name: "Fuchsia", style: 29, primary: "#C026D3", secondary: "#4a044e", active: true },
   { id: 30, name: "Pine", style: 30, primary: "#047857", secondary: "#022c22", active: true },
   { id: 31, name: "Onyx Gold", style: 31, primary: "#F59E0B", secondary: "#1c1917", active: true },
+  // ── Link-in-bio (Linktree-style) layouts — a different, minimal design ──
+  { id: 32, name: "Ivory Bloom (Bio)", style: 32, primary: "#D9C7A8", secondary: "#2A2320", active: true },
+  { id: 33, name: "Aurora Glass (Bio)", style: 33, primary: "#9333EA", secondary: "#DB2777", active: true },
+  { id: 34, name: "Midnight Neon (Bio)", style: 34, primary: "#0EA5E9", secondary: "#0B1220", active: true },
+  { id: 35, name: "Sunset Warm (Bio)", style: 35, primary: "#FB7185", secondary: "#E11D48", active: true },
+  { id: 36, name: "Ocean Frost (Bio)", style: 36, primary: "#22D3EE", secondary: "#0E7490", active: true },
+  { id: 37, name: "Noir Bold (Bio)", style: 37, primary: "#111111", secondary: "#FFFFFF", active: true },
+  { id: 38, name: "Peach Soft (Bio)", style: 38, primary: "#FBCFE8", secondary: "#E26D6D", active: true },
+  { id: 39, name: "Gold Luxe (Bio)", style: 39, primary: "#C9A24B", secondary: "#14171D", active: true },
+  { id: 40, name: "Neon Cyber (Bio)", style: 40, primary: "#22D3EE", secondary: "#04060C", active: true },
+  { id: 41, name: "Retro Groove (Bio)", style: 41, primary: "#E9C893", secondary: "#7A4B22", active: true },
+  { id: 42, name: "Editorial (Bio)", style: 42, primary: "#111111", secondary: "#E5E7EB", active: true },
+  { id: 43, name: "Mint Fresh (Bio)", style: 43, primary: "#34D399", secondary: "#065F46", active: true },
+  { id: 44, name: "Lavender Dream (Bio)", style: 44, primary: "#A78BFA", secondary: "#7C3AED", active: true },
 ];
+/* The lowest preset id/style that is a link-in-bio layout (rest are card styles). */
+const LINKBIO_MIN_ID = 32;
 
 async function getSetting(db: ReturnType<typeof getDb>, key: string): Promise<string | null> {
   const row = await db.query.appSettings.findFirst({ where: eq(appSettings.key, key) });
@@ -53,10 +69,42 @@ async function getSetting(db: ReturnType<typeof getDb>, key: string): Promise<st
 async function setSetting(db: ReturnType<typeof getDb>, key: string, value: string) {
   await db.insert(appSettings).values({ key, value }).onDuplicateKeyUpdate({ set: { value } });
 }
+const K_LINKBIO_SEEN = "linkbio_seen_ids"; // built-in link-bio preset ids already introduced
 async function loadPresets(db: ReturnType<typeof getDb>): Promise<Preset[]> {
+  const builtinIds = SEED_PRESETS.filter((p) => p.id >= LINKBIO_MIN_ID).map((p) => p.id);
   const raw = await getSetting(db, K_PRESETS);
-  if (!raw) { await setSetting(db, K_PRESETS, JSON.stringify(SEED_PRESETS)); return SEED_PRESETS; }
-  try { const arr = JSON.parse(raw); return Array.isArray(arr) ? arr : SEED_PRESETS; } catch { return SEED_PRESETS; }
+  if (!raw) {
+    await setSetting(db, K_PRESETS, JSON.stringify(SEED_PRESETS));
+    await setSetting(db, K_LINKBIO_SEEN, JSON.stringify(builtinIds));
+    return SEED_PRESETS;
+  }
+  let list: Preset[];
+  try { const arr = JSON.parse(raw); list = Array.isArray(arr) ? arr : [...SEED_PRESETS]; } catch { return SEED_PRESETS; }
+
+  // Introduce any NEW built-in link-bio presets exactly once. We track which ids
+  // have ever been introduced in `seen`, so presets the admin later deletes are
+  // never resurrected, while genuinely-new designs (added in a later release) do
+  // get appended. Also migrates DBs that ran the earlier v1 flag (ids 32–39).
+  let seen: Set<number>;
+  const seenRaw = await getSetting(db, K_LINKBIO_SEEN);
+  if (seenRaw) {
+    try { seen = new Set(JSON.parse(seenRaw) as number[]); } catch { seen = new Set(); }
+  } else {
+    const v1 = await getSetting(db, "linkbio_presets_v1");
+    seen = new Set(v1 ? [32, 33, 34, 35, 36, 37, 38, 39] : []);
+  }
+  const have = new Set(list.map((p) => p.id));
+  const toIntroduce = SEED_PRESETS.filter((p) => p.id >= LINKBIO_MIN_ID && !seen.has(p.id));
+  if (toIntroduce.length) {
+    const fresh = toIntroduce.filter((p) => !have.has(p.id));
+    if (fresh.length) list = [...list, ...fresh];
+    toIntroduce.forEach((p) => seen.add(p.id));
+    await setSetting(db, K_PRESETS, JSON.stringify(list));
+    await setSetting(db, K_LINKBIO_SEEN, JSON.stringify([...seen]));
+  } else if (!seenRaw) {
+    await setSetting(db, K_LINKBIO_SEEN, JSON.stringify([...seen]));
+  }
+  return list;
 }
 async function defaultPresetId(db: ReturnType<typeof getDb>): Promise<number> {
   const raw = await getSetting(db, K_DEFAULT_PRESET);
@@ -66,7 +114,7 @@ async function defaultPresetId(db: ReturnType<typeof getDb>): Promise<number> {
 const presetInput = z.object({
   id: z.number().optional(),
   name: z.string().min(1),
-  style: z.number().min(1).max(31),
+  style: z.number().min(1).max(60), // 1–31 card styles, 32+ link-in-bio layouts
   primary: z.string(),
   secondary: z.string(),
   active: z.boolean().default(true),
