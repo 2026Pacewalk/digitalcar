@@ -3,10 +3,12 @@ import { trpc } from "@/providers/trpc";
 import { useEffect, useState } from "react";
 import {
   Phone, Mail, MapPin, Globe, Share2, Download, MessageCircle,
-  X, Send, Check, FileText, Briefcase, ChevronRight,
+  X, Send, Check, FileText, Briefcase, ChevronRight, UserPlus,
   Linkedin, Facebook, Instagram, Twitter, Youtube,
   Star, Hourglass, Zap, RefreshCw,
 } from "lucide-react";
+import { toast } from "sonner";
+import { downloadVCard, shareCard } from "@/lib/share";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { loadCustomerContent, decodeSpecialities, imgUrl } from "@/lib/cardContent";
 
@@ -147,6 +149,25 @@ export default function PublicCard() {
   const testimonials = testimonialsBlock?.content as { items?: Array<{name: string; text: string; rating?: number}> } || {};
   const gallery = galleryBlock?.content as { images?: Array<{url: string}> } || {};
 
+  const cardUrl = typeof window !== "undefined" ? window.location.href : "";
+  const saveContact = () => {
+    downloadVCard({
+      name: profile.name, title: profile.title, company: profile.company,
+      phone: contact.phone || whatsapp.phone, email: contact.email,
+      website: contact.website, address: contact.address, url: cardUrl,
+    });
+    toast.success("Contact saved to your phone");
+  };
+  const shareThisCard = async () => {
+    const r = await shareCard({
+      url: cardUrl,
+      title: profile.name || card.title || "Digital Card",
+      text: [profile.name, profile.company].filter(Boolean).join(" · "),
+    });
+    if (r === "copied") toast.success("Card link copied");
+    else if (r === "failed") toast.error("Couldn't share — copy the link from your browser bar");
+  };
+
   const socialIconMap: Record<string, React.ComponentType<{size?: number; className?: string}>> = {
     facebook: Facebook, instagram: Instagram, linkedin: Linkedin, twitter: Twitter,
     youtube: Youtube, whatsapp: MessageCircle, website: Globe, email: Mail,
@@ -162,7 +183,7 @@ export default function PublicCard() {
             <div className="absolute bottom-4 right-8 w-24 h-24 rounded-full bg-[#14B8A6] blur-xl" />
           </div>
           <div className="absolute top-4 right-4">
-            <button onClick={() => setShowLeadModal(true)} className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center hover:bg-white/20 transition-colors">
+            <button onClick={shareThisCard} aria-label="Share this card" className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center hover:bg-white/20 transition-colors">
               <Share2 size={18} className="text-white" />
             </button>
           </div>
@@ -201,13 +222,13 @@ export default function PublicCard() {
                 <MessageCircle size={18} className="text-white" />
               </a>
             )}
-            <button onClick={() => setShowLeadModal(true)} className="w-13 h-13 rounded-full bg-[#F1F5F9] flex items-center justify-center shadow-premium hover:bg-[#E2E8F0] hover:scale-105 transition-all">
-              <Download size={18} className="text-[#0F172A]" />
+            <button onClick={() => setShowLeadModal(true)} aria-label="Exchange contact — share your details" className="w-13 h-13 rounded-full bg-[#F1F5F9] flex items-center justify-center shadow-premium hover:bg-[#E2E8F0] hover:scale-105 transition-all">
+              <UserPlus size={18} className="text-[#0F172A]" />
             </button>
           </div>
 
           <button
-            onClick={() => setShowLeadModal(true)}
+            onClick={saveContact}
             className="w-full h-13 mt-5 gradient-gold text-[#0F172A] rounded-2xl font-semibold text-sm transition-all hover:shadow-gold active:scale-[0.98] flex items-center justify-center gap-2"
           >
             <Download size={16} /> Save Contact
@@ -423,14 +444,14 @@ export default function PublicCard() {
             <button onClick={() => setShowLeadModal(false)} className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-[#F1F5F9] text-[#64748B]"><X size={18} /></button>
             {!leadSubmitted ? (
               <>
-                <h2 className="text-xl font-semibold text-[#0F172A] text-center mb-1">Save Contact</h2>
-                <p className="text-sm text-[#94A3B8] text-center mb-5">Enter your details to save this contact</p>
+                <h2 className="text-xl font-semibold text-[#0F172A] text-center mb-1">Exchange Contact</h2>
+                <p className="text-sm text-[#94A3B8] text-center mb-5">Share your details and they'll get back to you</p>
                 <form onSubmit={handleLeadSubmit} className="space-y-3">
                   <input type="text" placeholder="Full Name" value={leadName} onChange={(e) => setLeadName(e.target.value)} required className="w-full h-12 bg-[#F8FAFC] rounded-xl px-4 text-sm outline-none border border-[#E2E8F0] focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/20 transition-all placeholder:text-[#94A3B8]" />
                   <input type="email" placeholder="Email Address" value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} className="w-full h-12 bg-[#F8FAFC] rounded-xl px-4 text-sm outline-none border border-[#E2E8F0] focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/20 transition-all placeholder:text-[#94A3B8]" />
                   <input type="tel" placeholder="Phone Number" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} className="w-full h-12 bg-[#F8FAFC] rounded-xl px-4 text-sm outline-none border border-[#E2E8F0] focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/20 transition-all placeholder:text-[#94A3B8]" />
                   <button type="submit" className="w-full h-12 gradient-gold text-[#0F172A] rounded-xl font-semibold text-sm transition-all hover:shadow-gold active:scale-[0.98] mt-2">
-                    Save Contact
+                    Send my details
                   </button>
                 </form>
               </>
