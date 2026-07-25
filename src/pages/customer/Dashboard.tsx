@@ -5,7 +5,7 @@ import {
   CalendarClock, MessageSquare, Eye, Pencil, MessageCircle,
   Copy, Check, ShieldAlert, ChevronRight, CreditCard, Wallet, Gift,
   ShoppingBag, ImageIcon, Share2, Star, Upload, QrCode, Info, Home as HomeIcon,
-  Sparkles, ArrowRight, TrendingUp, Layers,
+  Sparkles, ArrowRight, TrendingUp, Layers, PhoneCall,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { toast } from "sonner";
@@ -84,6 +84,12 @@ export default function CustomerDashboard() {
 
   // Refer & Earn wallet — live from the backend for the signed-in user
   const { data: program } = trpc.referral.myProgram.useQuery(undefined, { retry: false });
+  const { data: followUps } = trpc.lead.followUps.useQuery(undefined, { retry: false });
+  const dueFollowUps = (followUps ?? []).filter((l) => {
+    if (!l.followUpDate) return false;
+    const end = new Date(); end.setHours(23, 59, 59, 999);
+    return new Date(l.followUpDate).getTime() <= end.getTime();
+  }).slice(0, 4);
 
   useEffect(() => {
     const c = readCustomer(); // scoped to the logged-in user
@@ -282,6 +288,36 @@ export default function CustomerDashboard() {
             ))}
           </div>
         </div>
+
+        {/* ─── Follow-ups due (only when there are any) ─── */}
+        {dueFollowUps.length > 0 && (
+          <div className="bg-white rounded-2xl border border-[#FDE68A] shadow-premium overflow-hidden">
+            <div className="px-4 py-3 border-b border-[#F1F5F9] flex items-center justify-between bg-gradient-to-r from-[#FFFBEB] to-white">
+              <p className="text-xs font-semibold text-[#0F172A] flex items-center gap-1.5">
+                <CalendarClock size={14} className="text-[#D97706]" /> Follow-ups due
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E]">{dueFollowUps.length}</span>
+              </p>
+              <button onClick={() => navigate("/dashboard/leads")} className="text-[11px] font-semibold text-[#F7B31C] hover:text-[#D97706] transition-colors">View all</button>
+            </div>
+            <div className="divide-y divide-[#F1F5F9]">
+              {dueFollowUps.map((l) => {
+                const digits = (l.phone || "").replace(/\D/g, "");
+                const wa = digits.length === 10 ? `91${digits}` : digits;
+                return (
+                  <div key={l.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center shrink-0 text-[#0F172A] text-[11px] font-bold">{(l.fullName || "?").charAt(0).toUpperCase()}</span>
+                    <button onClick={() => navigate("/dashboard/leads")} className="min-w-0 flex-1 text-left">
+                      <p className="text-[12px] font-semibold text-[#0F172A] truncate">{l.fullName}</p>
+                      <p className="text-[10px] text-[#D97706] truncate">Due {new Date(l.followUpDate!).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</p>
+                    </button>
+                    {l.phone && <a href={`tel:${l.phone}`} className="w-8 h-8 rounded-lg bg-[#0F172A] text-white flex items-center justify-center shrink-0" aria-label="Call"><PhoneCall size={13} /></a>}
+                    {l.phone && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg bg-[#14B8A6] text-white flex items-center justify-center shrink-0" aria-label="WhatsApp"><MessageSquare size={13} /></a>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ─── Recent enquiries + Refer strip ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -2,9 +2,13 @@ import { z } from "zod";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { leads, cards } from "@db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, like, isNotNull, notInArray, lte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendLeadNotification } from "./lib/mail";
+
+// The lead pipeline stages (must match the DB enum on the leads table).
+const STAGES = ["new", "contacted", "interested", "follow_up", "converted", "not_interested", "closed"] as const;
+const stageEnum = z.enum(STAGES);
 
 export const leadRouter = createRouter({
   list: authedQuery
@@ -13,33 +17,38 @@ export const leadRouter = createRouter({
         page: z.number().default(1),
         limit: z.number().default(25),
         status: z.string().optional(),
-        cardId: z.number().optional(),
+        search: z.string().optional(),
       }).optional()
     )
     .query(async ({ ctx, input }) => {
       const db = getDb();
-      const { page = 1, limit = 25 } = input || {};
+      const { page = 1, limit = 25, status, search } = input || {};
       const offset = (page - 1) * limit;
 
-      let conditions = [eq(leads.userId, ctx.user.id)];
+      const conditions = [eq(leads.userId, ctx.user.id)];
+      if (status && status !== "all" && (STAGES as readonly string[]).includes(status)) {
+        conditions.push(eq(leads.status, status as (typeof STAGES)[number]));
+      }
+      const term = search?.trim();
+      if (term) {
+        const q = `%${term}%`;
+        const match = or(
+          like(leads.fullName, q),
+          like(leads.email, q),
+          like(leads.phone, q),
+          like(leads.company, q)
+        );
+        if (match) conditions.push(match);
+      }
 
-      const leadList = await db.query.leads.findMany({
-        where: and(...conditions),
-        limit,
-        offset,
-        orderBy: [desc(leads.createdAt)],
-      });
+      const where = and(...conditions);
+      const [leadList, totalResult] = await Promise.all([
+        db.query.leads.findMany({ where, limit, offset, orderBy: [desc(leads.createdAt)] }),
+        db.select({ count: sql<number>`count(*)` }).from(leads).where(where),
+      ]);
 
-      const totalResult = await db.select({ count: sql<number>`count(*)` })
-        .from(leads)
-        .where(and(...conditions));
-
-      return {
-        leads: leadList,
-        total: totalResult[0]?.count || 0,
-        page,
-        totalPages: Math.ceil((totalResult[0]?.count || 0) / limit),
-      };
+      const total = Number(totalResult[0]?.count || 0);
+      return { leads: leadList, total, page, totalPages: Math.ceil(total / limit) };
     }),
 
   listAll: adminQuery
@@ -130,26 +139,31 @@ export const leadRouter = createRouter({
       return db.query.leads.findFirst({ where: eq(leads.id, result[0].id) });
     }),
 
-  updateStatus: authedQuery
+  // Update a lead's pipeline stage, notes and/or follow-up date. Any field is
+  // optional; followUpDate can be set to null to clear the reminder.
+  update: authedQuery
     .input(
       z.object({
         id: z.number(),
-        status: z.enum(["new", "contacted", "interested", "follow_up", "converted", "not_interested", "closed"]),
+        status: stageEnum.optional(),
         notes: z.string().optional(),
-        followUpDate: z.date().optional(),
+        followUpDate: z.date().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      const { id, ...data } = input;
-
       const lead = await db.query.leads.findFirst({
-        where: and(eq(leads.id, id), eq(leads.userId, ctx.user.id)),
+        where: and(eq(leads.id, input.id), eq(leads.userId, ctx.user.id)),
       });
       if (!lead) throw new TRPCError({ code: "NOT_FOUND" });
 
-      await db.update(leads).set(data).where(eq(leads.id, id));
-      return db.query.leads.findFirst({ where: eq(leads.id, id) });
+      const data: Partial<typeof leads.$inferInsert> = {};
+      if (input.status !== undefined) data.status = input.status;
+      if (input.notes !== undefined) data.notes = input.notes;
+      if (input.followUpDate !== undefined) data.followUpDate = input.followUpDate;
+      if (Object.keys(data).length) await db.update(leads).set(data).where(eq(leads.id, input.id));
+
+      return db.query.leads.findFirst({ where: eq(leads.id, input.id) });
     }),
 
   delete: authedQuery
@@ -162,29 +176,46 @@ export const leadRouter = createRouter({
       return { success: true };
     }),
 
+  // Open leads that have a follow-up date, soonest first — powers the
+  // "follow-ups due" reminders on the dashboard and CRM.
+  followUps: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    return db.query.leads.findMany({
+      where: and(
+        eq(leads.userId, ctx.user.id),
+        isNotNull(leads.followUpDate),
+        notInArray(leads.status, ["converted", "not_interested", "closed"]),
+      ),
+      orderBy: [asc(leads.followUpDate)],
+      limit: 50,
+    });
+  }),
+
   stats: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
-    const [totalResult, newResult, contactedResult, convertedResult] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(leads).where(eq(leads.userId, ctx.user.id)),
+    const endToday = new Date();
+    endToday.setHours(23, 59, 59, 999);
+
+    const mine = eq(leads.userId, ctx.user.id);
+    const [totalResult, newResult, followUpResult, convertedResult, dueResult] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(leads).where(mine),
+      db.select({ count: sql<number>`count(*)` }).from(leads).where(and(mine, eq(leads.status, "new"))),
+      db.select({ count: sql<number>`count(*)` }).from(leads).where(and(mine, eq(leads.status, "follow_up"))),
+      db.select({ count: sql<number>`count(*)` }).from(leads).where(and(mine, eq(leads.status, "converted"))),
       db.select({ count: sql<number>`count(*)` }).from(leads).where(
-        and(eq(leads.userId, ctx.user.id), eq(leads.status, "new"))
-      ),
-      db.select({ count: sql<number>`count(*)` }).from(leads).where(
-        and(eq(leads.userId, ctx.user.id), eq(leads.status, "contacted"))
-      ),
-      db.select({ count: sql<number>`count(*)` }).from(leads).where(
-        and(eq(leads.userId, ctx.user.id), eq(leads.status, "converted"))
+        and(mine, isNotNull(leads.followUpDate), lte(leads.followUpDate, endToday), notInArray(leads.status, ["converted", "not_interested", "closed"]))
       ),
     ]);
 
-    const total = totalResult[0]?.count || 0;
-    const converted = convertedResult[0]?.count || 0;
+    const total = Number(totalResult[0]?.count || 0);
+    const converted = Number(convertedResult[0]?.count || 0);
 
     return {
       total,
-      newThisWeek: newResult[0]?.count || 0,
-      contacted: contactedResult[0]?.count || 0,
+      new: Number(newResult[0]?.count || 0),
+      followUp: Number(followUpResult[0]?.count || 0),
       converted,
+      followUpsDue: Number(dueResult[0]?.count || 0),
       conversionRate: total > 0 ? Math.round((converted / total) * 100) : 0,
     };
   }),
