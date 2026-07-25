@@ -69,10 +69,14 @@ export const userRouter = createRouter({
     .input(
       z.object({
         email: z.string().email(),
-        password: z.string().min(6),
+        password: z.string().min(8, "Use at least 8 characters"),
         fullName: z.string(),
         phone: z.string().optional(),
-        role: z.enum(["super_admin", "reseller", "customer"]),
+        // super_admin is intentionally NOT assignable through the API — the
+        // highest privilege can only be granted with db/reset-admin.mjs on the
+        // server. This is what prevents a weak "testing" account from becoming
+        // a super admin via the panel.
+        role: z.enum(["reseller", "customer"]),
         status: z.enum(["active", "inactive"]).optional(),
       })
     )
@@ -86,6 +90,7 @@ export const userRouter = createRouter({
       }).$returningId();
       return db.query.users.findFirst({
         where: eq(users.id, result[0].id),
+        columns: { id: true, email: true, fullName: true, phone: true, role: true, status: true },
       });
     }),
 
@@ -104,14 +109,30 @@ export const userRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const { id, ...data } = input;
+      // Never PROMOTE anyone to super_admin via the API. That privilege is only
+      // granted by the server-side db/reset-admin.mjs script.
+      if (data.role === "super_admin") {
+        const target = await db.query.users.findFirst({ where: eq(users.id, id), columns: { role: true } });
+        if (target?.role !== "super_admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "super_admin can't be granted from the panel. Use the server admin-reset tool." });
+        }
+      }
       await db.update(users).set(data).where(eq(users.id, id));
-      return db.query.users.findFirst({ where: eq(users.id, id) });
+      return db.query.users.findFirst({
+        where: eq(users.id, id),
+        columns: { id: true, email: true, fullName: true, phone: true, avatar: true, role: true, status: true },
+      });
     }),
 
   delete: adminQuery
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
+      // Protect super-admin accounts from being deleted through the panel.
+      const target = await db.query.users.findFirst({ where: eq(users.id, input.id), columns: { role: true } });
+      if (target?.role === "super_admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "A super_admin account can't be deleted from the panel." });
+      }
       await db.delete(users).where(eq(users.id, input.id));
       return { success: true };
     }),
