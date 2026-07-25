@@ -1,10 +1,11 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import {
   Search, Plus, Eye, Lock, LogIn, Database, ChevronLeft, ChevronRight,
   X, ExternalLink, Users, UserCheck, Clock, Building2, KeyRound, Globe,
-  CalendarPlus, Trash2, AlertTriangle, Mail, Phone,
+  CalendarPlus, Trash2, AlertTriangle, Mail, Phone, MoreVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
@@ -32,6 +33,8 @@ type Customer = {
   activated_on: string | null; expired_on: string | null; status: number;
   password: string; company_name?: string; designation?: string; views?: number;
 };
+
+type ActionItem = { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean };
 
 const fmtDate = (s: string | null) => {
   if (!s || s === "0000-00-00") return "—";
@@ -251,16 +254,14 @@ export default function AdminCustomers() {
     setAddForm({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", admin_id: 0 });
   };
 
-  const rowActions = (c: Customer) => (
-    <>
-      <button onClick={() => loginAsClient(c)} title="Login as Client" className="w-9 h-9 rounded-lg bg-[#0F172A] text-white flex items-center justify-center hover:bg-[#1E293B] transition-colors active:scale-95"><LogIn size={15} /></button>
-      <button onClick={() => setCardModal(c)} title="View Card" className="w-9 h-9 rounded-lg bg-[#FEF3C7] text-[#B45309] flex items-center justify-center hover:bg-[#FDE68A] transition-colors active:scale-95"><Eye size={15} /></button>
-      <button onClick={() => { setExpModal(c); setExpDays(30); }} title="Extend Validity" className="w-9 h-9 rounded-lg bg-[#DCFCE7] text-[#15803D] flex items-center justify-center hover:bg-[#BBF7D0] transition-colors active:scale-95"><CalendarPlus size={15} /></button>
-      <button onClick={() => { setPwdModal(c); setPwdValue(c.password || ""); }} title="Change Password" className="w-9 h-9 rounded-lg bg-[#FEE2E2] text-[#DC2626] flex items-center justify-center hover:bg-[#FECACA] transition-colors active:scale-95"><Lock size={15} /></button>
-      <button onClick={() => { setPkgModal(c); setPkgValue(packageName(c.package_id)); }} title="Change Package" className="w-9 h-9 rounded-lg bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center hover:bg-[#BFDBFE] transition-colors active:scale-95"><Database size={15} /></button>
-      <button onClick={() => setDelModal(c)} title="Delete Customer" className="w-9 h-9 rounded-lg bg-[#F1F5F9] text-[#64748B] flex items-center justify-center hover:bg-[#FEE2E2] hover:text-[#DC2626] transition-colors active:scale-95"><Trash2 size={15} /></button>
-    </>
-  );
+  const actionItems = (c: Customer): ActionItem[] => [
+    { icon: <LogIn size={15} className="text-[#0F172A]" />, label: "Login as Client", onClick: () => loginAsClient(c) },
+    { icon: <Eye size={15} className="text-[#B45309]" />, label: "View Card", onClick: () => setCardModal(c) },
+    { icon: <CalendarPlus size={15} className="text-[#15803D]" />, label: "Extend Validity", onClick: () => { setExpModal(c); setExpDays(30); } },
+    { icon: <Lock size={15} className="text-[#7C3AED]" />, label: "Change Password", onClick: () => { setPwdModal(c); setPwdValue(c.password || ""); } },
+    { icon: <Database size={15} className="text-[#2563EB]" />, label: "Change Package", onClick: () => { setPkgModal(c); setPkgValue(packageName(c.package_id)); } },
+    { icon: <Trash2 size={15} className="text-[#DC2626]" />, label: "Delete Customer", onClick: () => setDelModal(c), danger: true },
+  ];
 
   const statCards = [
     { label: "Total Customers", value: stats.total, icon: Users, tint: "#F7B31C", bg: "#FEF3C7" },
@@ -354,7 +355,7 @@ export default function AdminCustomers() {
                       <span className={`text-[11px] font-medium ${expired ? "text-[#EF4444]" : "text-[#64748B]"} whitespace-nowrap`}>till {fmtDate(c.expired_on)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#F1F5F9]">{rowActions(c)}</div>
+                  <div className="flex items-center justify-end mt-3 pt-3 border-t border-[#F1F5F9]"><ActionMenu items={actionItems(c)} /></div>
                 </div>
               );
             })
@@ -428,7 +429,7 @@ export default function AdminCustomers() {
                         </td>
                         {/* Actions */}
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">{rowActions(c)}</div>
+                          <div className="flex items-center"><ActionMenu items={actionItems(c)} /></div>
                         </td>
                       </tr>
                     );
@@ -575,5 +576,66 @@ function Modal({ children, onClose, icon, iconBg, title, subtitle, wide }: {
         <div className={subtitle ? "" : "mt-4"}>{children}</div>
       </div>
     </div>
+  );
+}
+
+/* 3-dots (kebab) action menu — portal-rendered so the dropdown never gets
+   clipped by the table's scroll container; flips up near the viewport bottom. */
+function ActionMenu({ items }: { items: ActionItem[] }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const W = 200;
+
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) {
+      const h = items.length * 40 + 14;
+      let top = r.bottom + 6;
+      if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+      let left = r.right - W;
+      if (left < 8) left = 8;
+      setPos({ top, left });
+    }
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node) && !btnRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onScroll = () => setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button ref={btnRef} onClick={toggle} aria-label="Actions" aria-haspopup="menu"
+        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors active:scale-95 ${open ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0] hover:text-[#0F172A]"}`}>
+        <MoreVertical size={16} />
+      </button>
+      {open && pos && createPortal(
+        <div ref={menuRef} role="menu" style={{ position: "fixed", top: pos.top, left: pos.left, width: W }}
+          className="z-[90] bg-white rounded-xl shadow-premium-lg border border-[#F1F5F9] p-1.5 animate-scale-in">
+          {items.map((it, i) => (
+            <button key={i} role="menuitem" onClick={() => { setOpen(false); it.onClick(); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-left transition-colors ${it.danger ? "text-[#DC2626] hover:bg-[#FEE2E2] mt-0.5 border-t border-[#F1F5F9] pt-2.5 rounded-t-none" : "text-[#334155] hover:bg-[#F8FAFC]"}`}>
+              <span className="shrink-0">{it.icon}</span> {it.label}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
