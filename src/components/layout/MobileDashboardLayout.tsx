@@ -8,6 +8,7 @@ import {
   ToggleRight, Search, ReceiptText, KeyRound, Gift,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { roleTheme } from "@/lib/roleTheme";
 import ProfileMenu from "@/components/ProfileMenu";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -213,6 +214,7 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
 
   const role = user?.role || "customer";
   const cfg = NAV[role] || NAV.customer;
+  const theme = roleTheme(role);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 6);
@@ -254,7 +256,7 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
 
           {/* ─── Native App Bar ─── */}
           <header
-            className={`sticky top-0 z-40 bg-white/90 backdrop-blur-xl pt-safe transition-shadow duration-200 ${
+            className={`sticky top-0 z-40 bg-white/90 backdrop-blur-xl pt-safe transition-shadow duration-200 ${theme.badge ? "border-t-2 " + theme.topAccent : ""} ${
               scrolled ? "shadow-[0_1px_0_0_#E2E8F0,0_4px_16px_-8px_rgba(15,23,42,0.15)]" : "border-b border-[#F1F5F9]"
             }`}
           >
@@ -271,8 +273,11 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
                 )}
               </div>
 
-              <div className="flex items-center justify-center min-w-0 px-1">
+              <div className="flex flex-col items-center justify-center min-w-0 px-1 leading-none">
                 <h1 className="text-[17px] font-bold text-[#0F172A] tracking-tight truncate max-w-[58vw]">{title}</h1>
+                {theme.badge && (
+                  <span className={`mt-0.5 text-[8px] px-1.5 py-px rounded font-bold tracking-wider ${theme.badgeCls}`}>{theme.badge}</span>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-0.5">

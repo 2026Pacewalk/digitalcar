@@ -4,6 +4,7 @@ import { useSidebar } from "./SidebarContext";
 import { Menu, Search, Settings, LogOut, User, Lock, Activity, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router";
 import NotificationBell from "@/components/NotificationBell";
+import { roleTheme } from "@/lib/roleTheme";
 
 interface TopBarProps {
   title: string;
@@ -17,9 +18,10 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const theme = roleTheme(user?.role);
 
   return (
-    <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-[#F1F5F9]">
+    <header className={`sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-[#F1F5F9] ${theme.badge ? "border-t-2 " + theme.topAccent : ""}`}>
       <div className="h-14 flex items-center px-3 lg:px-5">
         {/* Menu Button */}
         <button
@@ -32,7 +34,12 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
 
         {/* Title */}
         <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-bold text-[#0F172A] truncate">{title}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-sm font-bold text-[#0F172A] truncate">{title}</h1>
+            {theme.badge && (
+              <span className={`shrink-0 text-[9px] px-2 py-0.5 rounded-full font-bold tracking-wide ${theme.badgeCls}`}>{theme.badge}</span>
+            )}
+          </div>
           {subtitle && <p className="text-[10px] text-[#64748B] truncate">{subtitle}</p>}
         </div>
 
@@ -72,8 +79,8 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
               onClick={() => setProfileOpen(!profileOpen)}
               className="flex items-center gap-2 rounded-lg hover:bg-[#F8FAFC] px-2 py-1.5 transition-all"
             >
-              <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center shrink-0">
-                <span className="text-[#0F172A] text-xs font-bold">{(user?.fullName || "U").charAt(0).toUpperCase()}</span>
+              <div className={`w-8 h-8 rounded-full ${theme.brandGrad} flex items-center justify-center shrink-0`}>
+                <span className={`${theme.iconColor} text-xs font-bold`}>{(user?.fullName || "U").charAt(0).toUpperCase()}</span>
               </div>
               <span className="hidden lg:block text-xs font-medium text-[#0F172A]">{user?.fullName || "User"}</span>
               <ChevronDown size={14} className="hidden lg:block text-[#94A3B8]" />

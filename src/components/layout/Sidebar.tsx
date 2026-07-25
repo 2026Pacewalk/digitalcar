@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { roleTheme } from "@/lib/roleTheme";
 import {
-  LayoutDashboard, CreditCard, Palette, Users, UserCircle, Package,
+  LayoutDashboard, Palette, Users, UserCircle, Package,
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
   ChevronRight, Store, X, Search, ToggleRight, ReceiptText, KeyRound,
   Home as HomeIcon, Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
@@ -83,7 +84,8 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
 
   const role = user?.role || "customer";
   const groups = role === "super_admin" ? superAdminGroups : role === "reseller" ? resellerGroups : customerGroups;
-  const brandName = role === "super_admin" ? "Admin" : role === "reseller" ? "Reseller" : "Dashboard";
+  const theme = roleTheme(role);
+  const BrandIcon = theme.Icon;
 
   const isActive = (path: string) => {
     const [p, q] = path.split("?");
@@ -107,8 +109,8 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
           lg:translate-x-0 ${collapsed ? "lg:w-[72px]" : "lg:w-[260px]"}
         `}
       >
-        <button onClick={onToggle} className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-[#F7B31C] rounded-full items-center justify-center z-10 shadow-md">
-          {collapsed ? <ChevronRight size={12} className="text-[#0F172A]" /> : <ChevronLeft size={12} className="text-[#0F172A]" />}
+        <button onClick={onToggle} className={`hidden lg:flex absolute -right-3 top-20 w-6 h-6 ${theme.toggleBg} rounded-full items-center justify-center z-10 shadow-md`}>
+          {collapsed ? <ChevronRight size={12} className={theme.iconColor} /> : <ChevronLeft size={12} className={theme.iconColor} />}
         </button>
 
         <button onClick={onMobileToggle} className="lg:hidden absolute top-4 right-4 w-8 h-8 rounded-lg bg-[#1E293B] flex items-center justify-center text-[#94A3B8] hover:text-white z-10">
@@ -117,13 +119,15 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
 
         {/* Brand */}
         <div className="h-16 flex items-center px-5 border-b border-[#1E293B] shrink-0">
-          <div className="w-8 h-8 rounded-lg gradient-gold flex items-center justify-center shrink-0">
-            <CreditCard size={16} className="text-[#0F172A]" />
+          <div className={`w-8 h-8 rounded-lg ${theme.brandGrad} flex items-center justify-center shrink-0`}>
+            <BrandIcon size={16} className={theme.iconColor} />
           </div>
           {!collapsed && (
-            <div className="ml-3 overflow-hidden">
+            <div className="ml-3 overflow-hidden flex items-center gap-1.5">
               <span className="text-sm font-bold text-white whitespace-nowrap">DigitalCarda</span>
-              <span className="text-[10px] text-[#F7B31C] ml-1.5 font-medium">{brandName}</span>
+              {theme.badge
+                ? <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wide whitespace-nowrap ${theme.badgeCls}`}>{theme.badge}</span>
+                : <span className="text-[10px] text-[#F7B31C] font-medium">{theme.brandName}</span>}
             </div>
           )}
         </div>
@@ -145,10 +149,10 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
                       onClick={() => { if (window.innerWidth < 1024) onMobileToggle(); }}
                       title={collapsed ? item.label : undefined}
                       className={`flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 group
-                        ${active ? "bg-[#F7B31C]/10 text-[#F7B31C] border-l-2 border-[#F7B31C]" : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1E293B]"}
+                        ${active ? theme.activeNav : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1E293B]"}
                         ${collapsed ? "lg:justify-center lg:px-2" : ""}`}
                     >
-                      <item.icon size={17} className={`shrink-0 ${active ? "text-[#F7B31C]" : "text-[#64748B] group-hover:text-[#F8FAFC]"}`} />
+                      <item.icon size={17} className={`shrink-0 ${active ? theme.activeIcon : "text-[#64748B] group-hover:text-[#F8FAFC]"}`} />
                       {!collapsed && <span className="truncate">{item.label}</span>}
                     </Link>
                   );
