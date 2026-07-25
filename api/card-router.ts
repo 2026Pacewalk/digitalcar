@@ -70,13 +70,16 @@ export const cardRouter = createRouter({
 
   getBySlug: publicQuery
     .input(z.object({ slug: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       const card = await db.query.cards.findFirst({
         where: eq(cards.slug, input.slug),
         with: { blocks: { orderBy: cardBlocks.position } },
       });
       if (!card) return null;
+      // Draft / archived cards are visible only to their owner (for preview),
+      // never to the public by guessing a slug.
+      if (card.status !== "published" && ctx.user?.id !== card.userId) return null;
       // Attach the owner's referral code so the public card's
       // "Create Your Free Card" CTA can credit them for the referral.
       const owner = await db.query.users.findFirst({
@@ -421,6 +424,9 @@ export const cardRouter = createRouter({
     )
     .mutation(async ({ input }) => {
       const db = getDb();
+      // Ignore events for cards that don't exist (junk / spam protection).
+      const card = await db.query.cards.findFirst({ where: eq(cards.id, input.cardId), columns: { id: true } });
+      if (!card) return { success: false };
       await db.insert(analyticsEvents).values({
         cardId: input.cardId,
         eventType: input.eventType,

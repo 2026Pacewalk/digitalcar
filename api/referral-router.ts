@@ -10,6 +10,7 @@ import { eq, desc, and, gt, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { payoutRequestAdminEmail } from "./lib/email-templates";
+import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
 const COMMISSION_KEY = "referral_commission_percent";
 const DISCOUNT_KEY = "referral_discount_percent";
@@ -201,7 +202,8 @@ export const referralRouter = createRouter({
   // ─── Public: record a referral (fallback path) ───
   record: publicQuery
     .input(z.object({ code: z.string().min(2), refereeEmail: z.string().email().optional(), refereeId: z.number().optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`refrecord:${clientIp(ctx.req)}`, 10, 300_000);
       const db = getDb();
       const referrer = await db.query.users.findFirst({ where: eq(users.referralCode, input.code.toUpperCase()) });
       if (!referrer) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid referral code" });

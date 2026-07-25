@@ -5,6 +5,7 @@ import { leads, cards } from "@db/schema";
 import { eq, and, or, desc, asc, sql, like, isNotNull, notInArray, lte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendLeadNotification } from "./lib/mail";
+import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
 // The lead pipeline stages (must match the DB enum on the leads table).
 const STAGES = ["new", "contacted", "interested", "follow_up", "converted", "not_interested", "closed"] as const;
@@ -103,7 +104,9 @@ export const leadRouter = createRouter({
         browser: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // Throttle enquiry submissions per IP to blunt form-spam floods.
+      enforceRateLimit(`enquiry:${clientIp(ctx.req)}`, 6, 60_000);
       const db = getDb();
       const card = await db.query.cards.findFirst({
         where: eq(cards.id, input.cardId),

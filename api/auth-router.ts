@@ -8,6 +8,7 @@ import { eq, like } from "drizzle-orm";
 import { createToken, createResetToken, verifyResetToken } from "./lib/jwt";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail } from "./lib/email-templates";
+import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
 
@@ -147,7 +148,8 @@ export const authRouter = createRouter({
         referralCode: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`register:${clientIp(ctx.req)}`, 5, 300_000);
       const db = getDb();
       const email = input.email.toLowerCase().trim();
 
@@ -275,7 +277,11 @@ export const authRouter = createRouter({
         password: z.string(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const ip = clientIp(ctx.req);
+      enforceRateLimit(`login:${ip}`, 8, 60_000);
+      const idKey = String(input.email || "").toLowerCase().trim();
+      if (idKey) enforceRateLimit(`login-id:${idKey}`, 10, 300_000);
       const db = getDb();
 
       const user = await resolveLoginUser(db, input.email);
@@ -463,7 +469,8 @@ export const authRouter = createRouter({
   // ── Forgot password: email a reset link ──
   requestPasswordReset: publicQuery
     .input(z.object({ email: z.string().email() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`pwreset:${clientIp(ctx.req)}`, 4, 300_000);
       const db = getDb();
       const email = input.email.toLowerCase().trim();
       const user = await db.query.users.findFirst({ where: eq(users.email, email) });
@@ -479,7 +486,8 @@ export const authRouter = createRouter({
   // ── Forgot password: set a new password with the emailed token ──
   resetPassword: publicQuery
     .input(z.object({ token: z.string().min(10), newPassword: strongPassword }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`pwreset-confirm:${clientIp(ctx.req)}`, 10, 300_000);
       const data = await verifyResetToken(input.token);
       if (!data) throw new TRPCError({ code: "BAD_REQUEST", message: "This reset link is invalid or has expired." });
       const db = getDb();
