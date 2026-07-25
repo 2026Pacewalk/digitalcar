@@ -5,6 +5,10 @@ import { subscriptionRouter } from "./subscription-router";
 import { cardRouter } from "./card-router";
 import { blockRouter } from "./block-router";
 import { templateRouter } from "./template-router";
+import { productRouter } from "./product-router";
+import { trialRouter } from "./trial-router";
+import { publishRouter } from "./publish-router";
+import { companyRouter } from "./company-router";
 import { leadRouter } from "./lead-router";
 import { analyticsRouter } from "./analytics-router";
 import { settingsRouter } from "./settings-router";
@@ -23,6 +27,10 @@ export const appRouter = createRouter({
   card: cardRouter,
   block: blockRouter,
   template: templateRouter,
+  product: productRouter,
+  trial: trialRouter,
+  publish: publishRouter,
+  company: companyRouter,
   lead: leadRouter,
   analytics: analyticsRouter,
   settings: settingsRouter,

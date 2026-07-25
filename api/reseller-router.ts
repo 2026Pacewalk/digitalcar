@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
-import { createRouter, publicQuery, adminQuery } from "./middleware";
+import { createRouter, publicQuery, adminQuery, resellerQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { resellerApplications, users, resellerProfiles } from "@db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { resellerApplications, users, resellerProfiles, notifications } from "@db/schema";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createResetToken } from "./lib/jwt";
 import { sendEmail, ownerAddress } from "./lib/mail";
@@ -109,5 +109,29 @@ export const resellerRouter = createRouter({
       }).where(eq(resellerApplications.id, app.id));
       void sendEmail(app.email, resellerRejectedEmail({ name: app.fullName, note: input.note?.trim() }));
       return { ok: true };
+    }),
+
+  // ─── Reseller creates a customer under their account (Reseller 2.0) ───
+  // This is what finally WRITES users.resellerId, activating the reseller→
+  // customer link (and the stats/commission that depend on it).
+  createCustomer: resellerQuery
+    .input(z.object({
+      fullName: z.string().min(1), email: z.string().email(),
+      phone: z.string().optional(), password: z.string().min(6),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const email = input.email.trim().toLowerCase();
+      const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
+      if (existing) throw new TRPCError({ code: "BAD_REQUEST", message: "That email is already registered." });
+      const password = await bcrypt.hash(input.password, 12);
+      const [ins] = await db.insert(users).values({
+        email, password, fullName: input.fullName.trim(), phone: input.phone?.trim() || null,
+        role: "customer", status: "active", resellerId: ctx.user.id,
+      }).$returningId();
+      await db.update(resellerProfiles)
+        .set({ totalCustomers: sql`${resellerProfiles.totalCustomers} + 1` })
+        .where(eq(resellerProfiles.userId, ctx.user.id));
+      return { ok: true, id: ins.id };
     }),
 });

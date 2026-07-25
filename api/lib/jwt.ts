@@ -1,6 +1,17 @@
 import { SignJWT, jwtVerify } from "jose";
 
-const RAW_SECRET = process.env.JWT_SECRET || "digitalcarda-super-secret-key-2024-change-in-production";
+// The JWT signing key. In production it MUST be provided (>=16 chars) — we
+// refuse to boot with a default, so tokens can never be forged with a public
+// key. In dev a fixed local-only key keeps sessions stable across restarts.
+const DEV_ONLY_SECRET = "digitalcarda-dev-only-key-not-valid-in-production";
+const RAW_SECRET = (() => {
+  const s = process.env.JWT_SECRET;
+  if (s && s.length >= 16) return s;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("FATAL: JWT_SECRET is not set (needs >=16 chars). Set a strong random value (openssl rand -hex 48) before starting in production.");
+  }
+  return DEV_ONLY_SECRET;
+})();
 const SECRET_KEY = new TextEncoder().encode(RAW_SECRET);
 // A distinct key for password-reset tokens so they can NEVER be used as auth
 // tokens (verifyToken uses SECRET_KEY and will reject these).

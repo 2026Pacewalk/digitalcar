@@ -14,6 +14,8 @@ const PIE_COLORS = ["#F7B31C", "#14B8A6", "#3B82F6", "#8B5CF6", "#EC4899", "#CBD
 
 export default function AdminAnalytics() {
   const { data, isLoading } = trpc.analytics.adminOverview.useQuery();
+  const { data: funnel } = trpc.analytics.funnel.useQuery(undefined, { retry: false });
+  const { data: prodFunnel } = trpc.analytics.productFunnel.useQuery(undefined, { retry: false });
 
   const stats = [
     { label: "Total Views", value: data?.totalViews ?? 0, icon: Eye, color: "bg-[#FEF3C7] text-[#92400E]" },
@@ -39,6 +41,69 @@ export default function AdminAnalytics() {
             </div>
           ))}
         </div>
+
+        {/* Conversion funnel (Phase 23) */}
+        {funnel && (
+          <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">
+            <h2 className="text-base font-semibold text-[#0F172A]">Conversion Funnel</h2>
+            <p className="text-xs text-[#64748B] mb-4">Where visitors drop off — product view → demo → try free → register → publish → paid.</p>
+            <div className="space-y-2.5">
+              {funnel.steps.map((s, i) => {
+                const top = funnel.steps[0].count || 1;
+                const prev = i > 0 ? funnel.steps[i - 1].count : s.count;
+                const pctTop = Math.round((s.count / top) * 100);
+                const pctPrev = prev > 0 ? Math.round((s.count / prev) * 100) : 0;
+                return (
+                  <div key={s.key}>
+                    <div className="flex items-center justify-between text-[12px] mb-1">
+                      <span className="font-semibold text-[#334155]">{s.label}</span>
+                      <span className="text-[#64748B] tabular-nums">{s.count.toLocaleString("en-IN")}<span className="text-[#94A3B8]"> · {pctTop}%{i > 0 ? ` · ${pctPrev}% from prev` : ""}</span></span>
+                    </div>
+                    <div className="h-6 rounded-lg bg-[#F1F5F9] overflow-hidden">
+                      <div className="h-full rounded-lg transition-all duration-500" style={{ width: `${Math.max(2, pctTop)}%`, background: "linear-gradient(90deg,#F7B31C,#D97706)" }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Per-product performance (Phase 24) — which designs convert */}
+        {prodFunnel && prodFunnel.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
+            <div className="p-5 pb-3">
+              <h2 className="text-base font-semibold text-[#0F172A]">Product Performance</h2>
+              <p className="text-xs text-[#64748B]">Which designs drive views, trials and published cards.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[620px] text-sm">
+                <thead>
+                  <tr className="bg-[#F8FAFC] border-y border-[#F1F5F9] text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
+                    <th className="text-left px-5 py-2.5">Product</th>
+                    <th className="text-right px-3 py-2.5">Views</th>
+                    <th className="text-right px-3 py-2.5">Demos</th>
+                    <th className="text-right px-3 py-2.5">Try Free</th>
+                    <th className="text-right px-3 py-2.5">Published</th>
+                    <th className="text-right px-5 py-2.5">Conv. %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F1F5F9]">
+                  {prodFunnel.map((p) => (
+                    <tr key={p.slug} className="hover:bg-[#FAFBFC]">
+                      <td className="px-5 py-2.5 font-semibold text-[#0F172A] truncate max-w-[240px]">{p.name}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[#334155]">{p.views.toLocaleString("en-IN")}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[#64748B]">{p.demo.toLocaleString("en-IN")}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[#64748B]">{p.tryFree.toLocaleString("en-IN")}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[#64748B]">{p.published.toLocaleString("en-IN")}</td>
+                      <td className="px-5 py-2.5 text-right"><span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF3C7] text-[#92400E] tabular-nums">{p.convRate}%</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Views chart */}

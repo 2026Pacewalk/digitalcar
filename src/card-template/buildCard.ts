@@ -423,6 +423,15 @@ ${footer}
   </div>
 </div>
 <script>
+/* Real engagement tracking (Phase 20): a view ping + a delegated tap listener.
+   Suppressed inside the dashboard builder preview and /demo pages so the owner's
+   own editing/previews never inflate their numbers (§36 — real data only). */
+var DC_SLUG = ${JSON.stringify(slug)};
+var DC_OFF = false;
+try { var _pp = (window.parent && window.parent !== window && window.parent.location.pathname) || ""; if (/^\\/dashboard|^\\/demo\\//.test(_pp)) DC_OFF = true; } catch (e) {}
+function dcTrack(t){ if(!DC_SLUG||DC_OFF) return; try{ var b=new Blob([JSON.stringify({slug:DC_SLUG,type:t})],{type:'application/json'}); if(!navigator.sendBeacon||!navigator.sendBeacon('/api/track',b)) throw 0; }catch(e){ try{ fetch('/api/track',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:DC_SLUG,type:t})}); }catch(_){} } }
+dcTrack('view');
+document.addEventListener('click', function(e){ var a=e.target.closest?e.target.closest('a,button'):null; if(!a) return; var href=(a.getAttribute&&a.getAttribute('href'))||''; var oc=(a.getAttribute&&a.getAttribute('onclick'))||''; if(/saveVCard/.test(oc)) return dcTrack('save_contact'); if(/openShare/.test(oc)) return dcTrack('share'); if(href.indexOf('tel:')===0) return dcTrack('call'); if(href.indexOf('mailto:')===0) return dcTrack('email'); if(/wa\\.me|whatsapp/i.test(href)) return dcTrack('whatsapp'); if(/maps\\.google|google\\.[a-z.]+\\/maps|goo\\.gl\\/maps/i.test(href)) return dcTrack('directions'); if(a.closest&&a.closest('.product-card')) return dcTrack('product'); if(/facebook|instagram|youtube|twitter|linkedin|pinterest/i.test(href)) return dcTrack('social'); if(href.indexOf('http')===0) return dcTrack('website'); }, true);
 var galImgs = ${JSON.stringify(gallery.map((g) => s(g.filename)))};
 var lbI = 0;
 function lbShow(){ document.getElementById('lbImg').src = galImgs[lbI]; document.getElementById('lbCount').textContent = (lbI+1)+' / '+galImgs.length; }
