@@ -10,8 +10,8 @@ import { useCustomer, getAuthUser } from "@/hooks/useCustomer";
 
 const PKG: Record<number, { name: string; amount: number; days: number }> = {
   7: { name: "Trial", amount: 0, days: 7 },
-  5: { name: "Starter", amount: 1499, days: 365 },
-  6: { name: "Standard", amount: 2499, days: 1095 },
+  5: { name: "Gold", amount: 999, days: 365 },
+  6: { name: "Platinum", amount: 1999, days: 365 },
 };
 
 /* Compact settings-style row: icon · label · value · optional action */

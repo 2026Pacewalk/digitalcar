@@ -62,7 +62,7 @@ export default function Features() {
             <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">
               Start Free Trial <Check size={16} />
             </Link>
-            <Link to="/templates" className="h-12 px-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">
+            <Link to="/digital-business-cards-templates" className="h-12 px-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">
               View Templates
             </Link>
           </div>

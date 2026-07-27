@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router";
+import { Routes, Route, Navigate, useParams } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 import PublicLayout from "@/components/layout/PublicLayout";
@@ -11,7 +11,6 @@ const BecomeReseller = lazy(() => import("./pages/BecomeReseller"));
 const AdminResellerApplications = lazy(() => import("./pages/admin/ResellerApplications"));
 const Home = lazy(() => import("./pages/public/Home"));
 const Features = lazy(() => import("./pages/public/Features"));
-const Templates = lazy(() => import("./pages/public/Templates"));
 const Marketplace = lazy(() => import("./pages/public/Marketplace"));
 const ProductDetail = lazy(() => import("./pages/public/ProductDetail"));
 const CardDemo = lazy(() => import("./pages/public/CardDemo"));
@@ -122,6 +121,12 @@ function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allo
   return <>{children}</>;
 }
 
+/* Old product URL /digital-business-cards/:slug → new /digital-business-cards-templates/:slug */
+function LegacyProductRedirect() {
+  const { slug } = useParams();
+  return <Navigate to={`/digital-business-cards-templates/${slug ?? ""}`} replace />;
+}
+
 export default function App() {
   return (
     <>
@@ -133,9 +138,12 @@ export default function App() {
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/features" element={<Features />} />
-          <Route path="/templates" element={<Templates />} />
-          <Route path="/digital-business-cards" element={<Marketplace />} />
-          <Route path="/digital-business-cards/:slug" element={<ProductDetail />} />
+          <Route path="/digital-business-cards-templates" element={<Marketplace />} />
+          <Route path="/digital-business-cards-templates/:slug" element={<ProductDetail />} />
+          {/* Old URLs → the consolidated Templates page (keeps existing links & SEO alive) */}
+          <Route path="/templates" element={<Navigate to="/digital-business-cards-templates" replace />} />
+          <Route path="/digital-business-cards" element={<Navigate to="/digital-business-cards-templates" replace />} />
+          <Route path="/digital-business-cards/:slug" element={<LegacyProductRedirect />} />
           <Route path="/demo/:slug" element={<CardDemo />} />
           <Route path="/industries" element={<Industries />} />
           <Route path="/pricing" element={<Pricing />} />

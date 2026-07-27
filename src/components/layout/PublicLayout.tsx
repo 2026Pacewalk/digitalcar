@@ -17,13 +17,9 @@ const seoMap: Record<string, { title: string; description: string }> = {
     title: "Features - DigitalCarda | Everything You Need in One Digital Card",
     description: "Explore 20+ powerful features including AI content generation, QR codes, lead tracking, payment links, analytics, custom domains, and more.",
   },
-  "/templates": {
-    title: "Templates - DigitalCarda | Beautiful Ready-to-Use Card Designs",
-    description: "Choose from professional card templates for corporate, freelancer, doctor, real estate, restaurant, salon, and more industries.",
-  },
-  "/digital-business-cards": {
-    title: "Digital Business Cards - DigitalCarda | Browse & Try Free",
-    description: "Browse professionally-designed digital business cards for every profession. Preview a live demo and start your 30-day free trial — no app, no printing, no credit card upfront.",
+  "/digital-business-cards-templates": {
+    title: "Card Templates - DigitalCarda | Browse Digital Business Card Designs",
+    description: "Browse professionally-designed digital business card templates for every profession. Preview a live demo and start your 30-day free trial — no app, no printing, no credit card upfront.",
   },
   "/industries": {
     title: "Industries - DigitalCarda | Made for Every Business Type",
@@ -31,7 +27,7 @@ const seoMap: Record<string, { title: string; description: string }> = {
   },
   "/pricing": {
     title: "Pricing - DigitalCarda | Simple Pricing for Every Business",
-    description: "Start a 30-day free trial that requires no credit card details upfront. Plans from Rs. 1499/year. Includes AI tools, QR codes, analytics, custom domains, and reseller options.",
+    description: "Start a 30-day free trial that requires no credit card details upfront. Plans from Rs. 99/month. Includes AI tools, QR codes, analytics, custom domains, and reseller options.",
   },
   "/ai-card-generator": {
     title: "AI Card Generator - DigitalCarda | Build Cards with AI",
@@ -141,9 +137,8 @@ export default function PublicLayout() {
   }, [mobileOpen]);
 
   const navLinks = [
-    { label: "Browse Cards", href: "/digital-business-cards", icon: LayoutGrid },
+    { label: "Templates", href: "/digital-business-cards-templates", icon: LayoutGrid },
     { label: "Features", href: "/features", icon: Sparkles },
-    { label: "Templates", href: "/templates", icon: Layers },
     { label: "Pricing", href: "/pricing", icon: Tag },
     { label: "Bulk Cards", href: "/bulk-cards", icon: Layers },
     { label: "AI Generator", href: "/ai-card-generator", icon: Wand2 },
@@ -344,7 +339,7 @@ export default function PublicLayout() {
               <div className="space-y-2.5">
                 <Link to="/" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">About DigitalCarda</Link>
                 <Link to="/features" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Features</Link>
-                <Link to="/templates" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Templates</Link>
+                <Link to="/digital-business-cards-templates" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Templates</Link>
                 <Link to="/pricing" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Pricing</Link>
                 <Link to="/contact" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Contact</Link>
               </div>

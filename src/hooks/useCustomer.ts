@@ -22,15 +22,19 @@ export const DEFAULT_CUSTOMER: CustomerRecord = {
   package_id: 6, views: 1284,
 };
 
-/* Per-package content limits (from the `package` table) */
+/* Per-plan content limits — the single source of truth for what each plan
+   unlocks, matching the public pricing page (Trial gets full Gold features;
+   Platinum lifts the caps and allows 3 cards). Keyed by the stored package_id:
+   7 = Trial · 5 = Gold · 6 = Platinum. `cards` = how many digital cards the
+   login may hold (the multi-card limit). */
 export const PACKAGE_LIMITS: Record<number, Record<string, number>> = {
-  5: { product: 15, offer: 5, gallery: 10, video: 5, uploads: 2, qrcode: 5 },   // Starter
-  6: { product: 20, offer: 10, gallery: 15, video: 10, uploads: 5, qrcode: 5 }, // Standard
-  7: { product: 5, offer: 2, gallery: 5, video: 2, uploads: 1, qrcode: 5 },     // Trial
+  7: { product: 25, offer: 15, gallery: 20, video: 8, uploads: 5, qrcode: 5, cards: 1 },      // Trial (full Gold features)
+  5: { product: 25, offer: 15, gallery: 20, video: 8, uploads: 5, qrcode: 5, cards: 1 },      // Gold
+  6: { product: 999, offer: 999, gallery: 60, video: 25, uploads: 20, qrcode: 10, cards: 3 }, // Platinum
 };
 export function packageLimit(packageId: number | undefined, key: string): number {
   const p = PACKAGE_LIMITS[Number(packageId)] || PACKAGE_LIMITS[7];
-  return p[key] ?? 5;
+  return p[key] ?? (key === "cards" ? 1 : 5);
 }
 
 /* ── Per-user scoping ──────────────────────────────────────────────
@@ -55,10 +59,113 @@ function isShowcase(u: AuthUserLite | null): boolean {
   return !u || u.email?.toLowerCase() === SHOWCASE_EMAIL;
 }
 
-/** Namespace a base localStorage key to the current logged-in user. */
-export function scopedKey(base: string): string {
+/* ── Multi-card (Approach A) ────────────────────────────────────────
+   One login can hold several template cards (plan-gated). Content is
+   namespaced by user AND by the ACTIVE card. The first/primary card
+   (id 1) keeps the original un-suffixed keys, so every existing
+   single-card user's data is preserved untouched; extra cards get a
+   `__c{id}` suffix. The registry + active pointer are user-scoped
+   (shared across all of that user's cards). */
+export type CardMeta = { id: number; name: string; slug: string };
+const PRIMARY_CARD_ID = 1;
+
+/** A key shared across all of a user's cards (registry, active pointer). */
+function userKey(base: string): string {
   const u = getAuthUser();
   return u ? `${base}__u${u.id}` : base;
+}
+
+/** Which card is currently being edited (defaults to the primary card). */
+export function getActiveCardId(): number {
+  try { const v = Number(localStorage.getItem(userKey("dc_active_card"))); return v > 0 ? v : PRIMARY_CARD_ID; }
+  catch { return PRIMARY_CARD_ID; }
+}
+export function setActiveCardId(id: number): void {
+  try { localStorage.setItem(userKey("dc_active_card"), String(id)); } catch { /* ignore */ }
+}
+
+/** The account's plan (package_id). Always read from the PRIMARY card's record,
+    because the plan is account-level even when a non-primary card is active
+    (a non-primary card's package_id is frozen at creation and can go stale). */
+export function accountPackageId(): number {
+  const u = getAuthUser();
+  if (!u) return 7;
+  try {
+    const raw = localStorage.getItem(`dc_customer__u${u.id}`);
+    if (raw) return Number((JSON.parse(raw) as { package_id?: number }).package_id) || 7;
+  } catch { /* ignore */ }
+  return 7;
+}
+
+/** Namespace a base localStorage key to the current user + active card.
+    Primary card (id 1) → legacy `base__u{id}` keys (no data migration). */
+export function scopedKey(base: string): string {
+  const u = getAuthUser();
+  if (!u) return base;
+  const k = `${base}__u${u.id}`;
+  const cardId = getActiveCardId();
+  return cardId > PRIMARY_CARD_ID ? `${k}__c${cardId}` : k;
+}
+
+/** The user's card registry. Seeds a primary entry from their existing card
+    (its keys already exist) the first time it's read. */
+export function getCards(): CardMeta[] {
+  try {
+    const raw = localStorage.getItem(userKey("dc_cards"));
+    if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) return arr as CardMeta[]; }
+  } catch { /* seed below */ }
+  const c = readCustomer();
+  const primary: CardMeta = { id: PRIMARY_CARD_ID, name: String(c.company_name || c.name || "My Card"), slug: String(c.slug || "card") };
+  try { localStorage.setItem(userKey("dc_cards"), JSON.stringify([primary])); } catch { /* ignore */ }
+  return [primary];
+}
+function saveCards(cards: CardMeta[]): void {
+  try { localStorage.setItem(userKey("dc_cards"), JSON.stringify(cards)); } catch { /* ignore */ }
+}
+
+/** Sync one card's name/slug into the registry (e.g. after profile edits). */
+export function syncCardMeta(patch: Partial<CardMeta>): void {
+  const id = getActiveCardId();
+  const cards = getCards().map((c) => (c.id === id ? { ...c, ...patch, id } : c));
+  saveCards(cards);
+}
+
+/** Create a new blank card, gated by the plan's `cards` limit.
+    Returns the new card meta, or null when the plan limit is reached. */
+export function createCard(name: string): CardMeta | null {
+  const u = getAuthUser();
+  if (!u) return null;
+  const cards = getCards();
+  const pkg = accountPackageId();
+  const max = packageLimit(pkg, "cards");
+  if (cards.length >= max) return null;
+  const id = Math.max(PRIMARY_CARD_ID, ...cards.map((x) => x.id)) + 1;
+  const baseSlug = (name || "card").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "card";
+  const slug = `${baseSlug}-${id}`;
+  const meta: CardMeta = { id, name: name || `Card ${id}`, slug };
+  saveCards([...cards, meta]);
+  setActiveCardId(id);
+  const seed: CustomerRecord = {
+    ...seedFromAuth(u),
+    package_id: pkg,
+    name: name || u.fullName || slug,
+    company_name: name || "",
+    slug, username: slug,
+  };
+  try { localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(seed)); } catch { /* ignore */ }
+  return meta;
+}
+
+/** Delete a non-primary card and all of its scoped content. */
+export function deleteCard(id: number): void {
+  const u = getAuthUser();
+  if (!u || id === PRIMARY_CARD_ID) return;
+  saveCards(getCards().filter((c) => c.id !== id));
+  const suffix = `__u${u.id}__c${id}`;
+  try {
+    Object.keys(localStorage).filter((k) => k.includes(suffix)).forEach((k) => localStorage.removeItem(k));
+  } catch { /* ignore */ }
+  if (getActiveCardId() === id) setActiveCardId(PRIMARY_CARD_ID);
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -117,6 +224,10 @@ export function useCustomer() {
     setData((prev) => {
       const next = { ...prev, ...patch };
       try { localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(next)); } catch { /* ignore */ }
+      // Keep the card registry's label/slug in step with profile edits.
+      if (patch.name !== undefined || patch.company_name !== undefined || patch.slug !== undefined) {
+        syncCardMeta({ name: String(next.company_name || next.name || "My Card"), slug: String(next.slug || "card") });
+      }
       return next;
     });
   }, []);

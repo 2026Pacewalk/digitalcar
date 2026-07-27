@@ -110,7 +110,8 @@ _______________end__________________________*/
 	text-align: center;
 	font-size: 12px;
 	margin-bottom: 2px;
-	color: #4b4b4d;
+	/* Section background here is dark slate — dark grey text was invisible. */
+	color: #fff;
 	text-transform: capitalize;
 }
 #home-section .home-social .social-icons li a{

@@ -147,38 +147,38 @@ _______________end__________________________*/
 
 
 }
+/* Pill now HUGS the text (width:fit-content) so any-length designation stays
+   inside it — the old fixed width:75% pill let long titles like "Certified
+   Personal Trainer" spill out both sides. Font eased to 1.1rem for balance. */
 #home-section .owner-details .owner-designation{
-	font-size: 1.5rem;
+	display: block;
+	width: fit-content;
+	max-width: 90%;
+	margin: 0 auto -17px;
+	box-sizing: border-box;
+	padding: 4px 24px;
+	font-size: 1.1rem;
 	font-weight: 500;
 	text-transform: uppercase;
 	color: #fff;
-	margin-bottom: -17px;
+	text-align: center;
+	background-color: var(--theme-color);
+	border-radius: 20px;
 	position: relative;
 	z-index: 1;
-	line-height: 35px;
+	line-height: 27px;
 }
+/* Full-width thin bar behind the pill — the "chip on a line" motif. 100vw is
+   clipped to the card by #home-section{overflow:hidden}. */
 #home-section .owner-details .owner-designation::before{
 	content: "";
 	position: absolute;
-	width: 75%;
-	height: 35px;
-	border-radius: 20px;
-	background-color: var(--theme-color);
-	top:0;
-	left:50%;
-	transform: translateX(-50%);
-	z-index: -1;
-
-}
-#home-section .owner-details .owner-designation::after{
-	content: "";
-	position: absolute;
-	width: 100%;
+	width: 100vw;
 	height: 6px;
 	background-color: var(--theme-color);
 	top:50%;
-	left:0;
-	transform: translateY(-50%);
+	left:50%;
+	transform: translate(-50%,-50%);
 	z-index: -1;
 
 }

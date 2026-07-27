@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
-import { Search, SlidersHorizontal, Sparkles, X, ExternalLink, ArrowRight, Eye, ShieldCheck, Zap, Share2 } from "lucide-react";
+import { Search, SlidersHorizontal, Sparkles, X, ArrowRight, Eye } from "lucide-react";
 import { trpc } from "@/providers/trpc";
-import { buildCardThumb, buildCardHtml } from "@/card-template/buildCard";
+import { buildCardThumb } from "@/card-template/buildCard";
 import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
+import { demoForProduct } from "@/lib/demoData";
 
 type Product = {
   id: number; slug: string; name: string; tagline?: string | null; category?: string | null;
@@ -12,14 +13,20 @@ type Product = {
 };
 
 const inr = (v?: string | number | null) => "₹" + Number(v || 0).toLocaleString("en-IN");
-const THUMB_W = 375, THUMB_H = 560;
+const THUMB_W = 375, THUMB_H = 626;   // fixed preview size — matches the Midnight Gold front (looks right in any browser)
 
-/* Responsive card-front preview (same engine the real cards use). */
-function ThumbFrame({ style, primary, secondary }: { style: number; primary?: string | null; secondary?: string | null }) {
-  const html = useMemo(
-    () => buildCardThumb({ ...DEFAULT_CUSTOMER, color: primary || "#F7B31C", color2: secondary || "" }, style),
-    [style, primary, secondary],
-  );
+/* The industry a card belongs to (from its assigned demo persona), so the
+   filter reflects every industry shown — not just the few with a DB category. */
+const industryOf = (p: Product): string => String(demoForProduct(p).customer.nature || "Other");
+
+/* Card-front preview (same engine the real cards use). Every card is rendered at
+   its native width and shown top-aligned in a fixed 375×626 frame — so all
+   designs appear at the same, correct size, never shrunk to fit. */
+function ThumbFrame({ style, primary, secondary, category }: { style: number; primary?: string | null; secondary?: string | null; category?: string | null }) {
+  const html = useMemo(() => {
+    const demo = demoForProduct({ styleNumber: style, category });
+    return buildCardThumb({ ...DEFAULT_CUSTOMER, ...demo.customer, color: primary || "#F7B31C", color2: secondary || "" } as Parameters<typeof buildCardThumb>[0], style);
+  }, [style, primary, secondary, category]);
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   useEffect(() => {
@@ -45,6 +52,14 @@ const SORTS = [
 ] as const;
 type SortId = (typeof SORTS)[number]["id"];
 
+/* Quick-pick industries for the hero (labels match the persona `nature`). */
+const QUICK = [
+  { label: "Real Estate", emoji: "🏠" }, { label: "Healthcare", emoji: "⚕️" },
+  { label: "Restaurant", emoji: "🍽️" }, { label: "Beauty & Salon", emoji: "💇" },
+  { label: "Legal Services", emoji: "⚖️" }, { label: "Photography", emoji: "📸" },
+  { label: "Fitness", emoji: "💪" }, { label: "IT & Digital", emoji: "💻" },
+];
+
 export default function Marketplace() {
   const { data: products = [], isLoading } = trpc.product.catalogue.useQuery();
   const [q, setQ] = useState("");
@@ -53,16 +68,17 @@ export default function Marketplace() {
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    for (const p of products) if (p.category) set.add(p.category);
+    for (const p of products) { const ind = industryOf(p); if (ind) set.add(ind); }
     return [...set].sort();
   }, [products]);
 
   const shown = useMemo(() => {
     const term = q.toLowerCase().trim();
     let list = products.filter((p) => {
-      if (cat !== "all" && (p.category || "") !== cat) return false;
+      const ind = industryOf(p);
+      if (cat !== "all" && ind !== cat) return false;
       if (!term) return true;
-      return p.name.toLowerCase().includes(term) || (p.category || "").toLowerCase().includes(term) || (p.tagline || "").toLowerCase().includes(term);
+      return p.name.toLowerCase().includes(term) || ind.toLowerCase().includes(term) || (p.tagline || "").toLowerCase().includes(term);
     });
     const price = (p: Product) => Number(p.salePrice || p.price);
     list = [...list].sort((a, b) =>
@@ -76,45 +92,65 @@ export default function Marketplace() {
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
       {/* Hero */}
-      <section className="pt-28 pb-10 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center">
-          <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#F7B31C] bg-[#FEF3C7]/60 px-3 py-1.5 rounded-full"><Sparkles size={13} /> Digital Business Card Marketplace</span>
-          <h1 className="mt-4 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#0F172A] tracking-tight text-balance">Choose a card. Make it yours. <span className="text-gradient-gold">Try it free.</span></h1>
-          <p className="mt-3 text-[15px] sm:text-base text-[#64748B] max-w-2xl mx-auto">Browse professionally-designed digital cards, preview a live demo, and start your 30-day free trial — no app, no printing, no credit card upfront.</p>
+      <section className="relative pt-24 sm:pt-28 pb-8 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div aria-hidden className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-x-0 top-0 h-[440px] bg-gradient-to-b from-[#FFFCF3] to-transparent" />
+          <div className="absolute -top-16 left-[22%] w-80 h-80 rounded-full bg-[#F7B31C]/25 blur-[90px]" />
+          <div className="absolute top-2 right-[16%] w-72 h-72 rounded-full bg-[#14B8A6]/15 blur-[90px]" />
+          <div className="absolute top-28 left-[10%] w-56 h-56 rounded-full bg-[#8B5CF6]/10 blur-[80px]" />
+        </div>
+        <div className="relative max-w-3xl mx-auto text-center">
+          <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#B45309] bg-white/70 ring-1 ring-[#F7B31C]/30 px-3.5 py-1.5 rounded-full shadow-sm backdrop-blur"><Sparkles size={13} className="text-[#F7B31C]" /> Digital Business Card Marketplace</span>
+          <h1 className="mt-4 text-[32px] leading-[1.16] sm:text-4xl lg:text-[52px] font-extrabold text-[#0F172A] tracking-tight text-balance">
+            Choose a card. Make it{" "}
+            <span className="relative inline-block text-[#D97706]">yours
+              <svg viewBox="0 0 120 14" preserveAspectRatio="none" aria-hidden className="absolute -bottom-1 left-0 w-full h-[9px] text-[#F7B31C]">
+                <path d="M3 9 C 30 2, 90 2, 117 8" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+              </svg>
+            </span>.{" "}
+            <span className="relative inline-block">
+              <span className="text-gradient-gold">Try it free.</span>
+              <Sparkles size={20} className="absolute -top-2 -right-3 text-[#F7B31C] hidden sm:block animate-pulse" />
+            </span>
+          </h1>
+          <p className="mt-3.5 text-[15px] sm:text-base text-[#64748B] max-w-xl mx-auto">40+ ready designs for every industry. Preview a live demo and launch in minutes — no app, no printing.</p>
           {/* Search */}
           <div className="mt-6 max-w-xl mx-auto">
-            <div className="flex items-center gap-2.5 bg-white border border-[#E2E8F0] rounded-full px-5 py-3 shadow-premium focus-within:border-[#F7B31C] transition-colors">
+            <div className="flex items-center gap-2.5 bg-white border border-[#E2E8F0] rounded-2xl px-5 py-3.5 shadow-premium-lg focus-within:border-[#F7B31C] focus-within:ring-4 focus-within:ring-[#F7B31C]/10 transition-all">
               <Search size={18} className="text-[#94A3B8] shrink-0" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search real estate, doctor, luxury black, minimal…" className="flex-1 bg-transparent outline-none text-sm text-[#0F172A] placeholder:text-[#94A3B8]" />
               {q && <button onClick={() => setQ("")} className="text-[#94A3B8] hover:text-[#0F172A]"><X size={16} /></button>}
             </div>
           </div>
-          {/* Trust */}
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] font-medium text-[#64748B]">
-            <span className="inline-flex items-center gap-1.5"><Zap size={14} className="text-[#F7B31C]" /> Instant activation</span>
-            <span className="inline-flex items-center gap-1.5"><Share2 size={14} className="text-[#F7B31C]" /> Share instantly</span>
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-[#F7B31C]" /> Permanent URL &amp; QR</span>
+          {/* Quick industries */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {QUICK.map((qi) => (
+              <button key={qi.label} onClick={() => setCat(cat === qi.label ? "all" : qi.label)}
+                className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-[13px] font-semibold transition-all active:scale-95 ${cat === qi.label ? "gradient-gold text-[#0F172A] shadow-gold" : "bg-white/80 ring-1 ring-[#E2E8F0] text-[#475569] hover:ring-[#F7B31C]/50 backdrop-blur"}`}>
+                <span className="text-[14px] leading-none">{qi.emoji}</span> {qi.label}
+              </button>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Toolbar */}
-      <section className="px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6 border-b border-[#E2E8F0]">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
-            <button onClick={() => setCat("all")} className={`shrink-0 px-4 py-2 rounded-full text-[13px] font-semibold transition-colors ${cat === "all" ? "bg-[#0F172A] text-white" : "bg-white border border-[#E2E8F0] text-[#64748B] hover:border-[#F7B31C]"}`}>All cards</button>
+      {/* Sticky filter bar (app-like) */}
+      <div className="sticky top-16 z-30 bg-[#F8FAFC]/90 backdrop-blur-xl border-y border-[#E2E8F0]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-3">
+          <div className="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-none -mx-1 px-1">
+            <button onClick={() => setCat("all")} className={`shrink-0 h-9 px-4 rounded-full text-[13px] font-semibold transition-all active:scale-95 ${cat === "all" ? "gradient-gold text-[#0F172A] shadow-gold" : "bg-white ring-1 ring-[#E2E8F0] text-[#64748B] hover:ring-[#F7B31C]/50"}`}>All</button>
             {categories.map((c) => (
-              <button key={c} onClick={() => setCat(c)} className={`shrink-0 px-4 py-2 rounded-full text-[13px] font-semibold transition-colors ${cat === c ? "bg-[#0F172A] text-white" : "bg-white border border-[#E2E8F0] text-[#64748B] hover:border-[#F7B31C]"}`}>{c}</button>
+              <button key={c} onClick={() => setCat(c)} className={`shrink-0 h-9 px-4 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all active:scale-95 ${cat === c ? "gradient-gold text-[#0F172A] shadow-gold" : "bg-white ring-1 ring-[#E2E8F0] text-[#64748B] hover:ring-[#F7B31C]/50"}`}>{c}</button>
             ))}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <SlidersHorizontal size={15} className="text-[#94A3B8]" />
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortId)} className="h-10 bg-white border border-[#E2E8F0] rounded-lg px-3 text-sm text-[#334155] outline-none focus:border-[#F7B31C]">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <SlidersHorizontal size={15} className="hidden sm:block text-[#94A3B8]" />
+            <select value={sort} onChange={(e) => setSort(e.target.value as SortId)} className="h-9 bg-white ring-1 ring-[#E2E8F0] rounded-full px-3 text-[13px] text-[#334155] outline-none focus:ring-[#F7B31C] max-w-[130px]">
               {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* Grid */}
       <section className="px-4 sm:px-6 lg:px-8 py-8">
@@ -126,23 +162,26 @@ export default function Marketplace() {
               : shown.map((p) => {
                 const onSale = !!p.salePrice && Number(p.salePrice) < Number(p.price);
                 return (
-                  <article key={p.id} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1 transition-all flex flex-col">
-                    <Link to={`/digital-business-cards/${p.slug}`} className="relative block">
-                      <span className="absolute top-2.5 left-2.5 z-10 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#FEF3C7] text-[#92400E]">◷ {p.trialDays}-Day Trial</span>
-                      {p.isFeatured && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0F172A] text-[#F7B31C]">★ Featured</span>}
-                      <ThumbFrame style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} />
+                  <article key={p.id} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1.5 transition-all duration-300 flex flex-col">
+                    <Link to={`/digital-business-cards-templates/${p.slug}`} className="relative block active:scale-[0.99] transition-transform">
+                      <span className="absolute top-2.5 left-2.5 z-10 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/90 text-[#92400E] shadow-sm backdrop-blur">◷ {p.trialDays}d trial</span>
+                      {p.isFeatured && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0F172A] text-[#F7B31C] shadow-sm">★ Featured</span>}
+                      <ThumbFrame style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />
+                      <div className="absolute inset-0 hidden md:flex items-center justify-center bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
+                        <span className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0F172A] text-[13px] font-bold shadow-lg"><Eye size={14} /> Live Preview</span>
+                      </div>
                     </Link>
                     <div className="p-3.5 flex flex-col flex-1">
-                      <p className="text-[10px] font-bold text-[#F7B31C] uppercase tracking-wide truncate">{p.category || "Digital Card"}</p>
-                      <Link to={`/digital-business-cards/${p.slug}`} className="hover:text-[#F7B31C] transition-colors"><h3 className="text-[14px] font-bold text-[#0F172A] leading-snug line-clamp-2 min-h-[36px] mt-0.5">{p.name}</h3></Link>
+                      <p className="text-[10px] font-bold text-[#F7B31C] uppercase tracking-wide truncate">{industryOf(p)}</p>
+                      <Link to={`/digital-business-cards-templates/${p.slug}`} className="hover:text-[#F7B31C] transition-colors"><h3 className="text-[14px] font-bold text-[#0F172A] leading-snug line-clamp-2 min-h-[36px] mt-0.5">{p.name}</h3></Link>
                       <div className="flex items-baseline gap-1.5 mt-1.5">
                         <span className="text-[16px] font-extrabold text-[#0F172A] tabular-nums">{inr(p.salePrice || p.price)}</span>
                         {onSale && <span className="text-[12px] text-[#94A3B8] line-through tabular-nums">{inr(p.price)}</span>}
                         <span className="text-[11px] text-[#94A3B8]">/year</span>
                       </div>
                       <div className="flex items-center gap-2 mt-3 pt-0.5">
-                        <Link to={`/signup?product=${encodeURIComponent(p.slug)}`} className="flex-1 h-9 rounded-xl gradient-gold text-[#0F172A] text-[13px] font-bold flex items-center justify-center hover:shadow-gold transition-all">Try Free</Link>
-                        <Link to={`/demo/${p.slug}`} className="h-9 px-3 rounded-xl border border-[#E2E8F0] text-[#334155] text-[13px] font-semibold flex items-center gap-1.5 hover:border-[#F7B31C] hover:text-[#F7B31C] transition-colors"><Eye size={14} /> View</Link>
+                        <Link to={`/signup?product=${encodeURIComponent(p.slug)}`} className="flex-1 h-9 rounded-xl gradient-gold text-[#0F172A] text-[13px] font-bold flex items-center justify-center whitespace-nowrap hover:shadow-gold active:scale-[0.97] transition-all">Try Free</Link>
+                        <Link to={`/demo/${p.slug}`} className="h-9 px-2.5 rounded-xl border border-[#E2E8F0] text-[#334155] text-[13px] font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap hover:border-[#F7B31C] hover:text-[#F7B31C] active:scale-[0.97] transition-all"><Eye size={14} /> View</Link>
                       </div>
                     </div>
                   </article>

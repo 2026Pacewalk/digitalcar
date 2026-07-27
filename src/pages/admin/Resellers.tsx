@@ -80,7 +80,7 @@ export default function AdminResellers() {
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="bg-[#F8FAFC]">
-                  {["SN", "Reseller", "Customers", "Trial", "Starter", "Standard", ""].map((h) => (
+                  {["SN", "Reseller", "Customers", "Trial", "Gold", "Platinum", ""].map((h) => (
                     <th key={h} className="text-left text-[11px] font-semibold text-[#64748B] uppercase tracking-wider px-4 py-3.5 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>

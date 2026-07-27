@@ -4,6 +4,7 @@ import { useSidebar } from "./SidebarContext";
 import { Menu, Search, Settings, LogOut, User, Lock, Activity, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router";
 import NotificationBell from "@/components/NotificationBell";
+import CardSwitcher from "@/components/customer/CardSwitcher";
 import { roleTheme } from "@/lib/roleTheme";
 
 interface TopBarProps {
@@ -42,6 +43,11 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
           </div>
           {subtitle && <p className="text-[10px] text-[#64748B] truncate">{subtitle}</p>}
         </div>
+
+        {/* Multi-card switcher (customers) */}
+        {(user as unknown as { role?: string })?.role === "customer" && (
+          <div className="shrink-0 mr-2"><CardSwitcher /></div>
+        )}
 
         {/* Right Actions */}
         <div className="flex items-center gap-1">

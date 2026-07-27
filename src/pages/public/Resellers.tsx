@@ -7,7 +7,7 @@ import { useState } from "react";
 
 const features = [
   { icon: Users, title: "Add Customers", desc: "Create and manage unlimited customer accounts from your reseller dashboard." },
-  { icon: CreditCard, title: "Assign Packages", desc: "Allocate Starter, Standard, or Premium plans to each customer easily." },
+  { icon: CreditCard, title: "Assign Packages", desc: "Allocate Trial, Gold, or Platinum plans to each customer easily." },
   { icon: ClockIcon, title: "Track Expiry", desc: "Monitor subscription expiry dates and send renewal reminders automatically." },
   { icon: BarChart3, title: "Manage Leads", desc: "View and manage leads captured through all your customers' digital cards." },
   { icon: Palette, title: "White Label Branding", desc: "Rebrand the platform with your logo, colors, and custom domain." },

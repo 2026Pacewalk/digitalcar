@@ -27,8 +27,8 @@ const SWATCHES = ["#F7B31C", "#14243E", "#3B82F6", "#A21CAF", "#06B6D4", "#EF444
 
 const PKG: Record<number, { name: string; amount: number; days: number }> = {
   7: { name: "Trial", amount: 0, days: 30 },
-  5: { name: "Starter", amount: 1499, days: 365 },
-  6: { name: "Standard", amount: 2499, days: 1095 },
+  5: { name: "Gold", amount: 999, days: 365 },
+  6: { name: "Platinum", amount: 1999, days: 365 },
 };
 
 const TAB_IDS = ["module", "theme", "seo", "package", "invoice", "password"] as const;

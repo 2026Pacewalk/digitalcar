@@ -280,7 +280,7 @@ function HeroSection() {
               <Link to="/signup" className="btn-gold h-12 px-7 flex items-center justify-center gap-2 text-base">
                 30 Days Free Cardless Trial <ArrowRight size={18} />
               </Link>
-              <Link to="/templates" className="btn-navy h-12 px-7 flex items-center justify-center gap-2 text-base">
+              <Link to="/digital-business-cards-templates" className="btn-navy h-12 px-7 flex items-center justify-center gap-2 text-base">
                 <Eye size={18} /> View Templates
               </Link>
             </div>
@@ -612,7 +612,7 @@ function TemplatesSection() {
           {categories.map((cat, i) => {
             const a = accents[i % accents.length];
             return (
-              <Link to="/templates" key={i} className="group">
+              <Link to="/digital-business-cards-templates" key={i} className="group">
                 <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden card-hover">
                   <div className="h-24 bg-gradient-to-br from-[#0F172A] to-[#1E293B] relative overflow-hidden">
                     <div className="absolute top-2 left-2 w-8 h-8 rounded-full" style={{ background: a, opacity: 0.5 }} />
@@ -630,7 +630,7 @@ function TemplatesSection() {
           })}
         </Reveal>
         <div className="text-center mt-10">
-          <Link to="/templates" className="btn-navy inline-flex items-center gap-2">Browse All Templates <ChevronRight size={16} /></Link>
+          <Link to="/digital-business-cards-templates" className="btn-navy inline-flex items-center gap-2">Browse All Templates <ChevronRight size={16} /></Link>
         </div>
       </div>
     </section>
@@ -921,10 +921,9 @@ function ResellerSection() {
 /* ─── Pricing ─── */
 function PricingSection() {
   const plans = [
-    { name: "Trial", price: "₹0", period: "30 Days", popular: false, cta: "Start Free Trial", features: ["1 Digital Card", "Basic Template", "Basic Contact Buttons", "Shareable Link", "Limited Features"] },
-    { name: "Starter", price: "₹1,499", period: "/ year", popular: true, cta: "Upgrade Now", features: ["1 Digital Card", "Products & Services", "Social Links", "WhatsApp Button", "QR Code", "Enquiry Form", "Basic Analytics", "SEO Settings"] },
-    { name: "Standard", price: "₹2,499", period: "/ 3 years", popular: false, cta: "Upgrade Now", features: ["Everything in Starter", "Gallery & Videos", "Payment QR", "Offers", "PDF Downloads", "Advanced Analytics", "Google Reviews", "Priority Support"] },
-    { name: "Premium", price: "Custom", period: "pricing", popular: false, cta: "Contact Sales", features: ["Custom Domain", "AI Content Tools", "Multilingual Card", "CRM Sync", "Advanced Integrations", "Team Access", "Premium Templates", "Dedicated Support"] },
+    { name: "Free Trial", price: "₹0", period: "30 Days", popular: false, cta: "Start Free Trial", features: ["Full Gold features", "1 Digital Card", "All 40+ templates", "No credit card needed", "Live in minutes"] },
+    { name: "Gold", price: "₹999", period: "/ year", popular: true, cta: "Get Gold", features: ["1 Digital Card", "Products & Services", "Gallery, Videos & Offers", "QR & UPI Payments", "Enquiry Form + Leads", "Full Analytics", "Custom URL & Colours"] },
+    { name: "Platinum", price: "₹1,999", period: "/ year", popular: false, cta: "Go Platinum", features: ["Everything in Gold", "Up to 3 Cards", "Unlimited Products & Offers", "Remove Branding", "Custom Domain + SEO", "AI Content Tools", "Priority Support"] },
   ];
   return (
     <section className="py-20 bg-[#F8FAFC]" id="pricing">
@@ -975,7 +974,7 @@ function FinalCTA() {
             <p className="text-base text-[#94A3B8] mb-8">Join thousands of businesses using DigitalCarda to create, share, and track professional digital cards.</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2 text-base">Start Free Trial <ArrowRight size={18} /></Link>
-              <Link to="/templates" className="h-12 px-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">View Templates</Link>
+              <Link to="/digital-business-cards-templates" className="h-12 px-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">View Templates</Link>
             </div>
           </div>
         </Reveal>

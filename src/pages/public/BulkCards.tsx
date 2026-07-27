@@ -79,30 +79,30 @@ function SectionHeading({ eyebrow, title, subtitle, light }: { eyebrow?: string;
 /* ─────────────────────────────────────────────────────────────
    Bulk pricing config
    ───────────────────────────────────────────────────────────── */
-const BASE_PRICE = 599; // single-card price, used to compute savings
+const BASE_PRICE = 999; // single-card yearly price (Starter), used to compute savings
 const TIERS = [
-  { min: 10, max: 24, price: 499 },
-  { min: 25, max: 49, price: 399 },
-  { min: 50, max: 99, price: 349 },
-  { min: 100, max: 249, price: 299 },
-  { min: 250, max: Infinity, price: 249 },
+  { min: 10, max: 24, price: 799 },
+  { min: 25, max: 49, price: 699 },
+  { min: 50, max: 99, price: 599 },
+  { min: 100, max: 249, price: 499 },
+  { min: 250, max: Infinity, price: 399 },
 ];
 const GST_RATE = 0.18;
 const MIN_QTY = 10;
 
 const PACKAGES = [
   {
-    name: "Team", icon: Users, qty: 10, pricePerCard: 499, tagline: "Small teams & startups",
+    name: "Team", icon: Users, qty: 10, pricePerCard: 799, tagline: "Small teams & startups",
     color: "from-[#14B8A6] to-[#0D9488]", accent: "#14B8A6", popular: false,
     features: ["10 Digital Cards", "Shared Team Template", "QR Code for each card", "WhatsApp & Call buttons", "Basic Lead Tracking", "Email support"],
   },
   {
-    name: "Business", icon: Briefcase, qty: 25, pricePerCard: 399, tagline: "Growing companies & agencies",
+    name: "Business", icon: Briefcase, qty: 25, pricePerCard: 699, tagline: "Growing companies & agencies",
     color: "from-[#F7B31C] to-[#D97706]", accent: "#F7B31C", popular: true,
     features: ["25 Digital Cards", "Custom Branded Template", "Company logo on all cards", "Products & Services", "Advanced Analytics", "Bulk QR download", "Priority support"],
   },
   {
-    name: "Enterprise", icon: Building2, qty: 100, pricePerCard: 299, tagline: "Large orgs & partners",
+    name: "Enterprise", icon: Building2, qty: 100, pricePerCard: 499, tagline: "Large orgs & partners",
     color: "from-[#0F172A] to-[#334155]", accent: "#6366F1", popular: false,
     features: ["100 Digital Cards", "White-label branding", "Custom domain", "Dedicated onboarding", "Team roles & access", "CRM / CSV export", "Dedicated account manager"],
   },
@@ -122,7 +122,7 @@ const steps = [
 ];
 
 const bulkFaqs = [
-  { q: "What is the minimum order for bulk pricing?", a: "Bulk pricing starts from 10 cards. Below that, the standard single-card price of Rs. 599 applies." },
+  { q: "What is the minimum order for bulk pricing?", a: "Bulk pricing starts from 10 cards. Below that, the standard single-card plan of Rs. 999/year applies. Every bulk card is a yearly plan — the more cards you add, the lower the per-card price." },
   { q: "Can each card have different details?", a: "Yes. Every card is personalized with the individual's name, designation, phone, email, and photo — while sharing your company's branding and template." },
   { q: "Do I have to enter everyone's details right now?", a: "No. You can reserve the quantity now and share the full staff list later. Only names are needed to lock in a card." },
   { q: "How is billing handled for bulk orders?", a: "You get a single consolidated invoice for the whole order. No payment is taken upfront — our team confirms your requirement and shares a final invoice first." },
@@ -333,7 +333,7 @@ export default function BulkCards() {
 
               <div className="mt-8 grid grid-cols-3 gap-3 max-w-md">
                 {[
-                  { end: 58, suffix: "%", label: "Max discount", dec: 0 },
+                  { end: 60, suffix: "%", label: "Max discount", dec: 0 },
                   { end: 48, suffix: "h", label: "Turnaround", dec: 0 },
                   { end: 10, suffix: "+", label: "Min. per order", dec: 0 },
                 ].map((s, i) => (
@@ -398,9 +398,9 @@ export default function BulkCards() {
                   <div className="p-6 flex flex-col flex-1">
                     <div className="flex items-end gap-1.5">
                       <span className="text-3xl font-extrabold text-[#0F172A]">{inr(pkg.pricePerCard)}</span>
-                      <span className="text-sm text-[#94A3B8] mb-1">/ card</span>
+                      <span className="text-sm text-[#94A3B8] mb-1">/ card / yr</span>
                     </div>
-                    <p className="text-xs text-[#64748B] mt-1 mb-4">{pkg.qty} cards · <span className="font-semibold text-[#0F172A]">{inr(total)}</span> total</p>
+                    <p className="text-xs text-[#64748B] mt-1 mb-4">{pkg.qty} cards · <span className="font-semibold text-[#0F172A]">{inr(total)}</span> / year</p>
                     <span className="inline-flex items-center gap-1 self-start px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#DCFCE7] text-[#166534] mb-5">
                       <TrendingDown size={12} /> Save {inr(save)} · {pct(pkg.pricePerCard)}% off
                     </span>
@@ -441,7 +441,7 @@ export default function BulkCards() {
                   </div>
                 ))}
               </div>
-              <p className="text-[11px] text-[#64748B] mt-4">Single card price is {inr(BASE_PRICE)}. Bulk pricing applies automatically from {MIN_QTY} cards. Prices exclusive of 18% GST.</p>
+              <p className="text-[11px] text-[#64748B] mt-4">A single card is {inr(BASE_PRICE)}/year. Bulk pricing (per card, billed yearly) applies automatically from {MIN_QTY} cards. Prices exclusive of 18% GST.</p>
             </div>
           </Reveal>
         </div>
@@ -572,8 +572,8 @@ export default function BulkCards() {
                   </div>
                   <div className="space-y-3.5 text-sm">
                     <div className="flex items-center justify-between"><span className="text-[#64748B]">Quantity</span><span className="font-semibold text-[#0F172A]">{billingQty} cards</span></div>
-                    <div className="flex items-center justify-between"><span className="text-[#64748B]">Price per card</span><span className="font-semibold text-[#0F172A]">{inr(summary.perCard)}</span></div>
-                    <div className="flex items-center justify-between"><span className="text-[#64748B]">Subtotal</span><span className="font-semibold text-[#0F172A]">{inr(summary.subtotal)}</span></div>
+                    <div className="flex items-center justify-between"><span className="text-[#64748B]">Price per card / yr</span><span className="font-semibold text-[#0F172A]">{inr(summary.perCard)}</span></div>
+                    <div className="flex items-center justify-between"><span className="text-[#64748B]">Subtotal / year</span><span className="font-semibold text-[#0F172A]">{inr(summary.subtotal)}</span></div>
                     <div className="flex items-center justify-between"><span className="text-[#64748B]">GST (18%)</span><span className="font-semibold text-[#0F172A]">{inr(summary.gst)}</span></div>
                     <div className="border-t border-dashed border-[#E2E8F0] pt-3.5 flex items-center justify-between">
                       <span className="text-[#0F172A] font-semibold">Total</span>
@@ -585,7 +585,7 @@ export default function BulkCards() {
                       <TrendingDown size={18} className="text-[#166534] shrink-0" />
                       <div>
                         <p className="text-sm font-bold text-[#166534]">You save {inr(summary.savings)}</p>
-                        <p className="text-[11px] text-[#15803D]">{summary.discountPct}% off vs. single cards ({inr(BASE_PRICE)} each)</p>
+                        <p className="text-[11px] text-[#15803D]">{summary.discountPct}% off vs. single cards ({inr(BASE_PRICE)}/yr each)</p>
                       </div>
                     </div>
                   )}

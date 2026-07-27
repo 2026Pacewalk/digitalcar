@@ -37,7 +37,7 @@ const MARKETING: Record<string, { title: string; description: string }> = {
   "/": { title: "DigitalCarda — AI-Powered Digital Business Cards", description: "Create a stunning digital business card with QR sharing, lead capture, payment links and analytics. Start your free 7-day trial." },
   "/features": { title: "Features — DigitalCarda", description: "QR & WhatsApp sharing, lead capture, mini-CRM, analytics, payments and custom branding — everything to turn a shared card into a customer." },
   "/pricing": { title: "Pricing — DigitalCarda", description: "Simple plans for individuals, professionals, teams and resellers. Start free, upgrade anytime." },
-  "/templates": { title: "Card Templates — DigitalCarda", description: "Beautiful, professional digital card templates for every industry." },
+  "/digital-business-cards-templates": { title: "Card Templates — DigitalCarda", description: "Browse professional digital business card templates for every industry." },
   "/industries": { title: "Solutions by Industry — DigitalCarda", description: "Digital cards built for real estate, finance, healthcare, consultants and more." },
   "/bulk-cards": { title: "Bulk Cards for Teams — DigitalCarda", description: "Create and manage digital business cards for your whole team from one dashboard." },
   "/ai-card-generator": { title: "AI Card Generator — DigitalCarda", description: "Let AI write your headline, about and services and build your card in minutes." },

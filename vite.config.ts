@@ -11,7 +11,9 @@ export default defineConfig({
     devServer({ entry: "api/boot.ts", exclude: [/^\/(?!api\/).*$/] }),
     inspectAttr(), react()],
   server: {
-    port: 3000,
+    // Honor a harness/host-assigned PORT (e.g. when 3000 is taken by another
+    // dev server); fall back to 3000 when run standalone.
+    port: Number(process.env.PORT) || 3000,
   },
   resolve: {
     alias: {

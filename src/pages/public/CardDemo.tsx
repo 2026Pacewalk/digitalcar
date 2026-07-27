@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router";
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { buildCardHtml } from "@/card-template/buildCard";
-import { demoFor } from "@/lib/demoData";
+import { demoForProduct } from "@/lib/demoData";
 import { logFunnel } from "@/lib/funnel";
 
 /* Live Demo — renders a full, interactive card using clearly-fictional sample
@@ -14,7 +14,7 @@ export default function CardDemo() {
 
   const html = useMemo(() => {
     if (!product) return "";
-    const { customer, products } = demoFor(product.category);
+    const { customer, products } = demoForProduct(product);
     const rec = {
       ...customer,
       slug: "demo",
@@ -33,7 +33,7 @@ export default function CardDemo() {
   if (!product || product.status !== "published") return (
     <div className="pt-32 pb-24 text-center px-4">
       <p className="text-lg font-bold text-[#0F172A]">Demo not available</p>
-      <Link to="/digital-business-cards" className="inline-flex items-center gap-2 mt-5 h-11 px-5 rounded-xl gradient-gold text-[#0F172A] font-bold">Browse cards <ArrowRight size={16} /></Link>
+      <Link to="/digital-business-cards-templates" className="inline-flex items-center gap-2 mt-5 h-11 px-5 rounded-xl gradient-gold text-[#0F172A] font-bold">Browse cards <ArrowRight size={16} /></Link>
     </div>
   );
 
@@ -43,7 +43,7 @@ export default function CardDemo() {
       <div className="sticky top-16 z-30 bg-[#0F172A]/95 backdrop-blur border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <Link to={`/digital-business-cards/${product.slug}`} className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 shrink-0"><ArrowLeft size={16} /></Link>
+            <Link to={`/digital-business-cards-templates/${product.slug}`} className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 shrink-0"><ArrowLeft size={16} /></Link>
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-widest text-[#F7B31C] flex items-center gap-1"><Sparkles size={11} /> Live Demo · Sample data</p>
               <p className="text-sm font-semibold text-white truncate">{product.name}</p>

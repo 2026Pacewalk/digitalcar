@@ -24,8 +24,8 @@ const RETAILERS: Record<number, string> = {
 };
 const retailerName = (id: number) => RETAILERS[id] ?? (id === 0 ? "Website" : `Retailer #${id}`);
 
-const PACKAGES: Record<number, string> = { 5: "Starter", 6: "Standard", 7: "Trial" };
-const PACKAGE_OPTIONS = ["Trial", "Starter", "Standard", "Premium"];
+const PACKAGES: Record<number, string> = { 5: "Gold", 6: "Platinum", 7: "Trial" };
+const PACKAGE_OPTIONS = ["Trial", "Gold", "Platinum"];
 const packageName = (id: number) => PACKAGES[id] || "Trial";
 
 type Customer = {
@@ -63,9 +63,8 @@ const avatarGrad = (seed: string) =>
 
 const PKG_STYLE: Record<string, string> = {
   Trial: "bg-[#FEF3C7] text-[#92400E]",
-  Starter: "bg-[#DBEAFE] text-[#1E40AF]",
-  Standard: "bg-[#EDE9FE] text-[#6D28D9]",
-  Premium: "bg-[#FCE7F3] text-[#9D174D]",
+  Gold: "bg-[#FEF3C7] text-[#B45309]",
+  Platinum: "bg-[#EDE9FE] text-[#6D28D9]",
 };
 
 const rowStatus = (c: { status: number; expired_on: string | null }) => {

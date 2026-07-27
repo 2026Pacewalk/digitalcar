@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 const planIcons: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   starter: Zap, professional: Users, business: Building2, enterprise: Crown,
+  trial: Zap, gold: Crown, platinum: Building2,
 };
 
 /* ── Real package features from digitalcarda.in (package_features table) ── */
@@ -179,9 +180,9 @@ type Plan = {
   product: number; offer: number; gallery: number; video: number; uploads: number;
 };
 const REAL_PACKAGES: Plan[] = [
-  { id: 7, name: "Trial", duration: 7, amount: 0, seo: 0, product: 5, offer: 2, gallery: 5, video: 2, uploads: 1 },
-  { id: 5, name: "Starter", duration: 365, amount: 1499, seo: 1, product: 15, offer: 5, gallery: 10, video: 5, uploads: 2 },
-  { id: 6, name: "Standard", duration: 1095, amount: 2499, seo: 1, product: 20, offer: 10, gallery: 15, video: 10, uploads: 5 },
+  { id: 7, name: "Trial", duration: 30, amount: 0, seo: 0, product: 25, offer: 15, gallery: 20, video: 8, uploads: 5 },
+  { id: 5, name: "Gold", duration: 365, amount: 999, seo: 0, product: 25, offer: 15, gallery: 20, video: 8, uploads: 5 },
+  { id: 6, name: "Platinum", duration: 365, amount: 1999, seo: 1, product: 9999, offer: 9999, gallery: 60, video: 25, uploads: 20 },
 ];
 
 const durationLabel = (d: number) => {
@@ -319,7 +320,7 @@ function PackageList() {
                 </td>
                 <td className="px-3 py-3 text-[#64748B] whitespace-nowrap">{durationLabel(p.duration)}</td>
                 {limitCols.map((c) => (
-                  <td key={c.key} className="px-2 py-3 text-center text-[#334155] font-medium">{p[c.key]}</td>
+                  <td key={c.key} className="px-2 py-3 text-center text-[#334155] font-medium">{(p[c.key] as number) >= 9999 ? "∞" : p[c.key]}</td>
                 ))}
                 <td className="px-5 py-3">
                   <div className="flex items-center justify-end gap-1">
@@ -387,7 +388,7 @@ export default function AdminPackages() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {(packages || []).map((pkg: Record<string, unknown>) => {
-              const Icon = planIcons[(pkg.code as string) || "starter"] || Package;
+              const Icon = planIcons[(pkg.slug as string) || "starter"] || Package;
               const features = (pkg.features as string[]) || [];
               return (
                 <div key={pkg.id as number} className={`bg-white rounded-2xl p-6 shadow-premium border-2 ${pkg.isPopular ? "border-[#F7B31C]" : "border-[#F1F5F9]"} card-hover relative`}>
@@ -400,7 +401,7 @@ export default function AdminPackages() {
                     </div>
                     <div>
                       <h3 className="text-base font-semibold text-[#0F172A]">{pkg.name as string}</h3>
-                      <p className="text-xs text-[#94A3B8]">{pkg.code as string}</p>
+                      <p className="text-xs text-[#94A3B8]">{pkg.slug as string}</p>
                     </div>
                   </div>
                   <div className="mb-4">

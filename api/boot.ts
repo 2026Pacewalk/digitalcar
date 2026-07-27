@@ -316,7 +316,7 @@ app.get("/q/:publicId", async (c) => {
 // all 500+ card profiles.
 app.get("/sitemap.xml", async (c) => {
   const base = "https://digitalcarda.in";
-  const pages = ["", "/digital-business-cards", "/features", "/pricing", "/templates", "/industries", "/bulk-cards",
+  const pages = ["", "/digital-business-cards-templates", "/features", "/pricing", "/industries", "/bulk-cards",
     "/ai-card-generator", "/resellers", "/refer-earn", "/custom-domain", "/contact",
     "/privacy", "/refund-policy", "/terms-of-service"];
   const customers = (await readPublicJson("customers")) as { slug?: string }[];
@@ -335,7 +335,7 @@ app.get("/sitemap.xml", async (c) => {
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7")).join("\n") + "\n" +
-    productSlugs.map((s) => url(`${base}/digital-business-cards/${encodeURIComponent(s)}`, "0.8")).join("\n") + "\n" +
+    productSlugs.map((s) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(s)}`, "0.8")).join("\n") + "\n" +
     slugs.map((s) => url(`${base}/${encodeURIComponent(s)}`, "0.5")).join("\n") +
     `\n</urlset>`;
   return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
@@ -356,7 +356,7 @@ app.get("/feed/products.xml", async (c) => {
     const { eq } = await import("drizzle-orm");
     const rows = await getDb().select().from(products).where(eq(products.status, "published"));
     items = rows.map((p) => {
-      const link = `${base}/digital-business-cards/${encodeURIComponent(p.slug)}`;
+      const link = `${base}/digital-business-cards-templates/${encodeURIComponent(p.slug)}`;
       const price = Number(p.price).toFixed(2);
       const sale = p.salePrice != null ? Number(p.salePrice).toFixed(2) : null;
       const image = ((p.images as string[] | null)?.[0]) || `${base}/why-businessman.png`;
@@ -381,7 +381,7 @@ app.get("/feed/products.xml", async (c) => {
       ].join("\n");
     }).join("\n");
   } catch { /* products table may not exist yet */ }
-  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n<channel>\n  <title>DigitalCarda — Digital Business Cards</title>\n  <link>${base}/digital-business-cards</link>\n  <description>Digital business card products by DigitalCarda</description>\n${items}\n</channel>\n</rss>`;
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n<channel>\n  <title>DigitalCarda — Digital Business Cards</title>\n  <link>${base}/digital-business-cards-templates</link>\n  <description>Digital business card products by DigitalCarda</description>\n${items}\n</channel>\n</rss>`;
   return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
 });
 

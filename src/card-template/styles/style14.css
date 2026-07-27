@@ -346,7 +346,9 @@ _______________end__________________________*/
 }
 #home-section .home-social{
 	min-height: 52px;
-	margin-top: 100px;
+	/* Was 100px — placed "Follow Us" on top of the dark chevron decoration
+	   (tip ends ~250px), hiding it. Push it clear onto the white area. */
+	margin-top: 124px;
 }
 /*==========home section css_______ end*/
 

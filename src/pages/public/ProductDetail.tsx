@@ -7,6 +7,7 @@ import {
 import { trpc } from "@/providers/trpc";
 import { buildCardThumb, buildCardHtml } from "@/card-template/buildCard";
 import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
+import { demoForProduct } from "@/lib/demoData";
 import { logFunnel } from "@/lib/funnel";
 
 type Product = {
@@ -19,8 +20,11 @@ type Product = {
 const inr = (v?: string | number | null) => "₹" + Number(v || 0).toLocaleString("en-IN");
 const THUMB_W = 375, THUMB_H = 560;
 
-function ThumbFrame({ style, primary, secondary, className }: { style: number; primary?: string | null; secondary?: string | null; className?: string }) {
-  const html = useMemo(() => buildCardThumb({ ...DEFAULT_CUSTOMER, color: primary || "#F7B31C", color2: secondary || "" }, style), [style, primary, secondary]);
+function ThumbFrame({ style, primary, secondary, category, className }: { style: number; primary?: string | null; secondary?: string | null; category?: string | null; className?: string }) {
+  const html = useMemo(() => {
+    const demo = demoForProduct({ styleNumber: style, category });
+    return buildCardThumb({ ...DEFAULT_CUSTOMER, ...demo.customer, color: primary || "#F7B31C", color2: secondary || "" } as Parameters<typeof buildCardThumb>[0], style);
+  }, [style, primary, secondary, category]);
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   useEffect(() => {
@@ -93,7 +97,7 @@ export default function ProductDetail() {
         "@type": "Offer", priceCurrency: product.currency || "INR",
         price: Number(product.salePrice || product.price).toFixed(2),
         availability: "https://schema.org/InStock",
-        url: `https://digitalcarda.in/digital-business-cards/${product.slug}`,
+        url: `https://digitalcarda.in/digital-business-cards-templates/${product.slug}`,
       },
     };
     let s = document.getElementById("pdp-ld");
@@ -107,7 +111,7 @@ export default function ProductDetail() {
     <div className="pt-32 pb-24 text-center px-4">
       <p className="text-lg font-bold text-[#0F172A]">Card not available</p>
       <p className="text-sm text-[#64748B] mt-1">This design may have been unpublished.</p>
-      <Link to="/digital-business-cards" className="inline-flex items-center gap-2 mt-5 h-11 px-5 rounded-xl gradient-gold text-[#0F172A] font-bold">Browse all cards <ArrowRight size={16} /></Link>
+      <Link to="/digital-business-cards-templates" className="inline-flex items-center gap-2 mt-5 h-11 px-5 rounded-xl gradient-gold text-[#0F172A] font-bold">Browse all cards <ArrowRight size={16} /></Link>
     </div>
   );
 
@@ -119,7 +123,7 @@ export default function ProductDetail() {
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-[12px] text-[#94A3B8] py-4" aria-label="Breadcrumb">
           <Link to="/" className="hover:text-[#F7B31C]">Home</Link><ChevronRight size={13} />
-          <Link to="/digital-business-cards" className="hover:text-[#F7B31C]">Digital Business Cards</Link><ChevronRight size={13} />
+          <Link to="/digital-business-cards-templates" className="hover:text-[#F7B31C]">Digital Business Cards</Link><ChevronRight size={13} />
           <span className="text-[#334155] font-medium truncate">{product.name}</span>
         </nav>
 
@@ -129,7 +133,7 @@ export default function ProductDetail() {
           <div className="relative">
             <div className="sticky top-24 rounded-3xl bg-white border border-[#F1F5F9] shadow-premium p-5 sm:p-8">
               <div className="max-w-[300px] mx-auto rounded-2xl overflow-hidden shadow-premium-lg border border-[#E2E8F0]">
-                <ThumbFrame style={product.styleNumber} primary={product.primaryColor} secondary={product.secondaryColor} />
+                <ThumbFrame style={product.styleNumber} primary={product.primaryColor} secondary={product.secondaryColor} category={product.category} />
               </div>
               <Link to={`/demo/${product.slug}`} className="mt-5 w-full h-11 rounded-xl border-2 border-[#0F172A] text-[#0F172A] font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#0F172A] hover:text-white transition-colors"><Eye size={16} /> View Live Demo</Link>
             </div>
@@ -222,8 +226,8 @@ export default function ProductDetail() {
           <Section title="You may also like">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4">
               {related.map((p) => (
-                <Link key={p.id} to={`/digital-business-cards/${p.slug}`} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1 transition-all">
-                  <ThumbFrame style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} />
+                <Link key={p.id} to={`/digital-business-cards-templates/${p.slug}`} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1 transition-all">
+                  <ThumbFrame style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />
                   <div className="p-3">
                     <p className="text-[13px] font-bold text-[#0F172A] line-clamp-1">{p.name}</p>
                     <p className="text-[13px] font-extrabold text-[#0F172A] mt-0.5 tabular-nums">{inr(p.salePrice || p.price)}<span className="text-[11px] font-normal text-[#94A3B8]"> /yr</span></p>

@@ -1,9 +1,10 @@
 /*
- * Fictional demo personas for the Live Demo system (Phase 09).
+ * Fictional demo personas for the marketplace previews & Live Demo (Phase 09).
  * Every value here is invented sample data — clearly-fake numbers
- * (+91 90000 000xx), example.com emails — so a demo NEVER exposes a real
- * customer's information (Section 20). A product's category picks the
- * matching persona; anything else falls back to a generic business.
+ * (+91 90000 000xx) and example.com emails — so a demo NEVER exposes a real
+ * customer's information (Section 20). Each marketplace card is assigned a
+ * different industry persona (by its design number) so the gallery shows
+ * realistic, varied cards instead of the same placeholder everywhere.
  */
 type DemoProduct = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
 export type DemoBundle = { customer: Record<string, unknown>; products: DemoProduct[] };
@@ -11,102 +12,62 @@ export type DemoBundle = { customer: Record<string, unknown>; products: DemoProd
 const base = {
   logo: "", gst: "", establishment: "2019", about_on: 1, product_on: 1, enquiry_on: 1,
   payment_on: 0, gallery_on: 0, video_on: 0, qrcode_on: 0, offer_on: 0, feedback_on: 0,
-  mobile2: "+91 90000 00002", email: "hello@example.com", views: 128,
+  mobile2: "+91 90000 00002", views: 128,
   facebook: "https://facebook.com", instagram: "https://instagram.com", linkedin: "https://linkedin.com",
 };
 const svc = (id: number, name: string, description: string, button_title: string): DemoProduct =>
   ({ id, name, filename: "", price: "", offer_price: "", description, button: "", button_title });
 
-type Persona = { keys: string[]; bundle: DemoBundle };
+type Persona = { keys?: string[]; bundle: DemoBundle };
 
+/* ~20 industry personas — each complete enough to look like a real card. */
 const PERSONAS: Persona[] = [
-  {
-    keys: ["real estate", "loan advisors", "insurance"],
-    bundle: {
-      customer: { ...base, name: "Aditya Rao", designation: "Real Estate Advisor", company_name: "Skyline Estates",
-        nature: "Real Estate", mobile1: "+91 90000 00011", url: "https://example.com", address: "MG Road, Bengaluru 560001",
-        google_map: "https://maps.google.com", about_us: "Helping families find their perfect home for 8+ years. Residential, commercial and rental — end to end.",
-        specialties_title: "What we do", specialities: "Home Buying, Commercial Leasing, Investment Advisory, Site Visits" },
-      products: [
-        svc(1, "3BHK Luxury Apartments", "Ready-to-move premium flats near the metro. Book a free site visit.", "Visit Us"),
-        svc(2, "Commercial Office Space", "Grade-A office spaces from 1,000 sq ft. Flexible terms.", "WhatsApp"),
-        svc(3, "Free Property Consultation", "Talk to an advisor about buying, selling or investing.", "Call Now"),
-      ],
-    },
-  },
-  {
-    keys: ["doctors & clinics", "doctors", "clinics", "healthcare"],
-    bundle: {
-      customer: { ...base, name: "Dr. Meera Nair", designation: "Dental Surgeon, BDS MDS", company_name: "SmileCare Dental Clinic",
-        nature: "Healthcare", mobile1: "+91 90000 00022", url: "https://example.com", address: "Jubilee Hills, Hyderabad 500033",
-        google_map: "https://maps.google.com", about_us: "Gentle, modern dentistry. Painless treatments with the latest technology and a caring team.",
-        specialties_title: "Treatments", specialities: "Implants, Braces & Aligners, Root Canal, Teeth Whitening, Kids Dentistry" },
-      products: [
-        svc(1, "Book an Appointment", "Same-day slots available. Reserve your visit in seconds.", "WhatsApp"),
-        svc(2, "Free Dental Check-up", "Complimentary first consultation and X-ray review.", "Call Now"),
-        svc(3, "Find the Clinic", "Easy parking, near the metro. Get directions.", "Visit Us"),
-      ],
-    },
-  },
-  {
-    keys: ["consultants", "digital marketers", "chartered accountants", "lawyers", "freelancers"],
-    bundle: {
-      customer: { ...base, name: "Rohit Verma", designation: "Growth & Marketing Consultant", company_name: "Northstar Consulting",
-        nature: "Consulting", mobile1: "+91 90000 00033", url: "https://example.com", address: "Andheri East, Mumbai 400069",
-        google_map: "https://maps.google.com", about_us: "I help small businesses grow with clear strategy, better marketing and measurable results. 120+ clients served.",
-        specialties_title: "Services", specialities: "Growth Strategy, Performance Marketing, Branding, Sales Funnels" },
-      products: [
-        svc(1, "Free 30-min Strategy Call", "Tell me your goals — I'll share 3 quick wins, no strings attached.", "WhatsApp"),
-        svc(2, "Marketing Audit", "A full review of your funnel with an action plan.", "Get Quote"),
-        svc(3, "Talk to Rohit", "Prefer to chat? Give me a call.", "Call Now"),
-      ],
-    },
-  },
-  {
-    keys: ["restaurants"],
-    bundle: {
-      customer: { ...base, name: "Spice Route", designation: "Modern Indian Kitchen", company_name: "Spice Route Restaurant",
-        nature: "Restaurant", mobile1: "+91 90000 00044", url: "https://example.com", address: "Koramangala, Bengaluru 560095",
-        google_map: "https://maps.google.com", about_us: "Bold flavours, warm hospitality. Dine-in, takeaway and delivery — every day 12pm to 11pm.",
-        specialties_title: "Highlights", specialities: "Live Tandoor, Family Booths, Pure Veg Section, Home Delivery" },
-      products: [
-        svc(1, "Reserve a Table", "Book your table for tonight in one tap.", "WhatsApp"),
-        svc(2, "Order Delivery", "Craving something? Order now, hot to your door.", "Visit Us"),
-        svc(3, "Call the Restaurant", "Large party or a special request? Give us a ring.", "Call Now"),
-      ],
-    },
-  },
-  {
-    keys: ["beauty & salon", "beauty", "salon"],
-    bundle: {
-      customer: { ...base, name: "Glow Studio", designation: "Hair · Skin · Makeup", company_name: "Glow Beauty Studio",
-        nature: "Beauty & Salon", mobile1: "+91 90000 00055", url: "https://example.com", address: "Sector 29, Gurugram 122001",
-        google_map: "https://maps.google.com", about_us: "Look and feel your best. Certified stylists, premium products and a relaxing space.",
-        specialties_title: "Services", specialities: "Hair Styling, Bridal Makeup, Facials, Nail Art, Spa" },
-      products: [
-        svc(1, "Book an Appointment", "Weekend slots fill fast — reserve yours now.", "WhatsApp"),
-        svc(2, "Bridal Packages", "Custom bridal looks with a free trial. Ask for details.", "Get Quote"),
-        svc(3, "Call the Studio", "Questions about a service? We're happy to help.", "Call Now"),
-      ],
-    },
-  },
+  { keys: ["real estate", "loan advisors", "insurance", "property"], bundle: { customer: { ...base, name: "Aditya Rao", designation: "Real Estate Advisor", company_name: "Skyline Estates", nature: "Real Estate", mobile1: "+91 90000 00011", email: "aditya@example.com", url: "https://skylineestates.example.com", address: "MG Road, Bengaluru 560001", google_map: "https://maps.google.com", about_us: "Helping families find their perfect home for 8+ years. Residential, commercial and rental — end to end.", specialties_title: "What we do", specialities: "Home Buying, Commercial Leasing, Investment Advisory, Site Visits" }, products: [svc(1, "3BHK Luxury Apartments", "Ready-to-move premium flats near the metro. Book a free site visit.", "Visit Us"), svc(2, "Commercial Office Space", "Grade-A office spaces from 1,000 sq ft. Flexible terms.", "WhatsApp"), svc(3, "Free Property Consultation", "Talk to an advisor about buying, selling or investing.", "Call Now")] } },
+  { keys: ["doctors & clinics", "doctors", "clinics", "healthcare", "dental"], bundle: { customer: { ...base, name: "Dr. Meera Nair", designation: "Dental Surgeon, BDS MDS", company_name: "SmileCare Dental Clinic", nature: "Healthcare", mobile1: "+91 90000 00022", email: "care@example.com", url: "https://smilecare.example.com", address: "Jubilee Hills, Hyderabad 500033", google_map: "https://maps.google.com", about_us: "Gentle, modern dentistry. Painless treatments with the latest technology and a caring team.", specialties_title: "Treatments", specialities: "Implants, Braces & Aligners, Root Canal, Teeth Whitening, Kids Dentistry" }, products: [svc(1, "Book an Appointment", "Same-day slots available. Reserve your visit in seconds.", "WhatsApp"), svc(2, "Free Dental Check-up", "Complimentary first consultation and X-ray review.", "Call Now"), svc(3, "Find the Clinic", "Easy parking, near the metro. Get directions.", "Visit Us")] } },
+  { keys: ["consultants", "digital marketers", "marketing"], bundle: { customer: { ...base, name: "Rohit Verma", designation: "Growth & Marketing Consultant", company_name: "Northstar Consulting", nature: "Consulting", mobile1: "+91 90000 00033", email: "rohit@example.com", url: "https://northstar.example.com", address: "Andheri East, Mumbai 400069", google_map: "https://maps.google.com", about_us: "I help small businesses grow with clear strategy, better marketing and measurable results. 120+ clients served.", specialties_title: "Services", specialities: "Growth Strategy, Performance Marketing, Branding, Sales Funnels" }, products: [svc(1, "Free 30-min Strategy Call", "Tell me your goals — I'll share 3 quick wins, no strings attached.", "WhatsApp"), svc(2, "Marketing Audit", "A full review of your funnel with an action plan.", "Get Quote"), svc(3, "Talk to Rohit", "Prefer to chat? Give me a call.", "Call Now")] } },
+  { keys: ["restaurants", "restaurant", "food"], bundle: { customer: { ...base, name: "Spice Route", designation: "Modern Indian Kitchen", company_name: "Spice Route Restaurant", nature: "Restaurant", mobile1: "+91 90000 00044", email: "eat@example.com", url: "https://spiceroute.example.com", address: "Koramangala, Bengaluru 560095", google_map: "https://maps.google.com", about_us: "Bold flavours, warm hospitality. Dine-in, takeaway and delivery — every day 12pm to 11pm.", specialties_title: "Highlights", specialities: "Live Tandoor, Family Booths, Pure Veg Section, Home Delivery" }, products: [svc(1, "Reserve a Table", "Book your table for tonight in one tap.", "WhatsApp"), svc(2, "Order Delivery", "Craving something? Order now, hot to your door.", "Visit Us"), svc(3, "Call the Restaurant", "Large party or a special request? Give us a ring.", "Call Now")] } },
+  { keys: ["beauty & salon", "beauty", "salon"], bundle: { customer: { ...base, name: "Glow Studio", designation: "Hair · Skin · Makeup", company_name: "Glow Beauty Studio", nature: "Beauty & Salon", mobile1: "+91 90000 00055", email: "hello@example.com", url: "https://glowstudio.example.com", address: "Sector 29, Gurugram 122001", google_map: "https://maps.google.com", about_us: "Look and feel your best. Certified stylists, premium products and a relaxing space.", specialties_title: "Services", specialities: "Hair Styling, Bridal Makeup, Facials, Nail Art, Spa" }, products: [svc(1, "Book an Appointment", "Weekend slots fill fast — reserve yours now.", "WhatsApp"), svc(2, "Bridal Packages", "Custom bridal looks with a free trial. Ask for details.", "Get Quote"), svc(3, "Call the Studio", "Questions about a service? We're happy to help.", "Call Now")] } },
+  { keys: ["lawyers", "lawyer", "advocate", "legal"], bundle: { customer: { ...base, name: "Adv. Kavita Menon", designation: "Advocate · High Court", company_name: "Menon & Associates", nature: "Legal Services", mobile1: "+91 90000 00066", email: "office@example.com", url: "https://menonlaw.example.com", address: "Fort, Mumbai 400001", google_map: "https://maps.google.com", about_us: "Trusted legal counsel for families and businesses. Clear advice, honest fees, 15+ years of practice.", specialties_title: "Practice Areas", specialities: "Property & Documentation, Family Law, Corporate, Contracts, Civil Litigation" }, products: [svc(1, "Book a Consultation", "Discuss your matter confidentially with our team.", "WhatsApp"), svc(2, "Document Review", "Agreements, wills and property papers — reviewed right.", "Get Quote"), svc(3, "Call the Office", "Speak to us about your case today.", "Call Now")] } },
+  { keys: ["chartered accountants", "accountant", "ca", "tax", "finance"], bundle: { customer: { ...base, name: "CA Nikhil Jain", designation: "Chartered Accountant", company_name: "Jain & Co.", nature: "Finance & Tax", mobile1: "+91 90000 00077", email: "info@example.com", url: "https://jainca.example.com", address: "C-Scheme, Jaipur 302001", google_map: "https://maps.google.com", about_us: "Stress-free taxes and accounting for individuals and small businesses. On time, every time.", specialties_title: "Services", specialities: "Income Tax Filing, GST, Company Registration, Bookkeeping, Audit" }, products: [svc(1, "File Your ITR", "Quick, accurate returns filed by experts.", "WhatsApp"), svc(2, "GST Registration", "Get GST-ready in a few simple steps.", "Get Quote"), svc(3, "Talk to a CA", "Have a tax question? Give us a call.", "Call Now")] } },
+  { keys: ["photographer", "photography"], bundle: { customer: { ...base, name: "Ishaan Kapoor", designation: "Wedding & Portrait Photographer", company_name: "Frame Stories", nature: "Photography", mobile1: "+91 90000 00088", email: "book@example.com", url: "https://framestories.example.com", address: "Bandra West, Mumbai 400050", google_map: "https://maps.google.com", about_us: "Timeless photos that feel like you. Weddings, pre-weddings, portraits and events across India.", specialties_title: "What we shoot", specialities: "Weddings, Pre-Wedding, Portraits, Events, Product Shoots" }, products: [svc(1, "Check Availability", "Share your date — we'll get back within a day.", "WhatsApp"), svc(2, "View Packages", "Half-day to full wedding coverage. See what fits.", "Get Quote"), svc(3, "Call Ishaan", "Discuss your shoot over a quick call.", "Call Now")] } },
+  { keys: ["gym", "fitness", "trainer"], bundle: { customer: { ...base, name: "Arjun Singh", designation: "Certified Personal Trainer", company_name: "IronCore Fitness", nature: "Fitness", mobile1: "+91 90000 00099", email: "train@example.com", url: "https://ironcore.example.com", address: "Baner, Pune 411045", google_map: "https://maps.google.com", about_us: "Get stronger, leaner and more energetic. Personalised plans, real results, no fads.", specialties_title: "Programs", specialities: "Personal Training, Weight Loss, Strength, Group Classes, Diet Plans" }, products: [svc(1, "Free Trial Session", "Come try a session on us — no commitment.", "WhatsApp"), svc(2, "Membership Plans", "Monthly and quarterly plans to suit you.", "Get Quote"), svc(3, "Call the Gym", "Ask about timings and offers.", "Call Now")] } },
+  { keys: ["interior", "designer", "architect"], bundle: { customer: { ...base, name: "Sneha Reddy", designation: "Interior Designer", company_name: "Studio Nivas", nature: "Interior Design", mobile1: "+91 90000 00101", email: "studio@example.com", url: "https://studionivas.example.com", address: "Banjara Hills, Hyderabad 500034", google_map: "https://maps.google.com", about_us: "Beautiful, liveable spaces on any budget. Homes and offices designed around you.", specialties_title: "Services", specialities: "Home Interiors, Modular Kitchens, Office Design, Turnkey Projects, 3D Views" }, products: [svc(1, "Free Design Consult", "Share your space — get ideas and an estimate.", "WhatsApp"), svc(2, "View Portfolio", "See recent homes and offices we've designed.", "Visit Us"), svc(3, "Call the Studio", "Let's talk about your project.", "Call Now")] } },
+  { keys: ["event", "wedding planner", "events"], bundle: { customer: { ...base, name: "Riya Malhotra", designation: "Event & Wedding Planner", company_name: "Celebrations by Riya", nature: "Event Planning", mobile1: "+91 90000 00112", email: "plan@example.com", url: "https://celebrations.example.com", address: "Vasant Kunj, New Delhi 110070", google_map: "https://maps.google.com", about_us: "Stress-free celebrations, beautifully done. Weddings, birthdays and corporate events end to end.", specialties_title: "We plan", specialities: "Weddings, Birthdays, Corporate Events, Decor, Catering & Venue" }, products: [svc(1, "Plan My Event", "Tell us your date and vision — we'll handle the rest.", "WhatsApp"), svc(2, "Get a Quote", "Custom packages for any budget.", "Get Quote"), svc(3, "Call Riya", "Let's bring your celebration to life.", "Call Now")] } },
+  { keys: ["boutique", "fashion", "clothing"], bundle: { customer: { ...base, name: "Aara Boutique", designation: "Ethnic & Designer Wear", company_name: "Aara Boutique", nature: "Fashion", mobile1: "+91 90000 00123", email: "shop@example.com", url: "https://aaraboutique.example.com", address: "Lajpat Nagar, New Delhi 110024", google_map: "https://maps.google.com", about_us: "Handpicked ethnic and designer wear for every occasion. Custom stitching and fittings available.", specialties_title: "Collections", specialities: "Lehengas, Sarees, Suits, Custom Stitching, Bridal Wear" }, products: [svc(1, "New Arrivals", "See this season's latest collection.", "Visit Us"), svc(2, "Book a Fitting", "Reserve a personal styling appointment.", "WhatsApp"), svc(3, "Call the Store", "Ask about sizes, colours and offers.", "Call Now")] } },
+  { keys: ["cafe", "bakery", "coffee"], bundle: { customer: { ...base, name: "Brew & Bake", designation: "Cafe · Bakery", company_name: "Brew & Bake", nature: "Cafe & Bakery", mobile1: "+91 90000 00134", email: "cafe@example.com", url: "https://brewbake.example.com", address: "Indiranagar, Bengaluru 560038", google_map: "https://maps.google.com", about_us: "Freshly baked every morning. Great coffee, cosy corners and cakes made to order.", specialties_title: "Favourites", specialities: "Artisan Coffee, Fresh Bakes, Custom Cakes, Breakfast, Free Wi-Fi" }, products: [svc(1, "Order a Custom Cake", "Birthdays and events — baked just for you.", "WhatsApp"), svc(2, "View the Menu", "Coffee, bakes and all-day breakfast.", "Visit Us"), svc(3, "Call the Cafe", "Reserve a table or ask about catering.", "Call Now")] } },
+  { keys: ["home services", "electrician", "plumber", "repair"], bundle: { customer: { ...base, name: "QuickFix Services", designation: "Electrical · Plumbing · AC", company_name: "QuickFix Home Services", nature: "Home Services", mobile1: "+91 90000 00145", email: "help@example.com", url: "https://quickfix.example.com", address: "Kothrud, Pune 411038", google_map: "https://maps.google.com", about_us: "Reliable home repairs, same day. Verified technicians, upfront pricing, work guaranteed.", specialties_title: "We fix", specialities: "Electrical, Plumbing, AC Service, Appliance Repair, Installations" }, products: [svc(1, "Book a Technician", "Tell us the issue — we'll be there today.", "WhatsApp"), svc(2, "Get an Estimate", "Transparent pricing before we start.", "Get Quote"), svc(3, "Call QuickFix", "Emergency? Call us right now.", "Call Now")] } },
+  { keys: ["travel", "tours", "agency"], bundle: { customer: { ...base, name: "Wanderlust Trips", designation: "Holidays & Tour Packages", company_name: "Wanderlust Trips", nature: "Travel", mobile1: "+91 90000 00156", email: "trips@example.com", url: "https://wanderlust.example.com", address: "Sector 17, Chandigarh 160017", google_map: "https://maps.google.com", about_us: "Handcrafted holidays without the hassle. Flights, stays and experiences — all sorted.", specialties_title: "Packages", specialities: "Domestic Tours, International Holidays, Honeymoons, Group Trips, Visas" }, products: [svc(1, "Plan My Trip", "Share where you'd like to go — get a custom itinerary.", "WhatsApp"), svc(2, "See Packages", "Popular destinations and deals.", "Get Quote"), svc(3, "Call an Expert", "Talk to a travel planner today.", "Call Now")] } },
+  { keys: ["coaching", "education", "tutor", "academy"], bundle: { customer: { ...base, name: "Vikram Iyer", designation: "Founder · Educator", company_name: "Apex Learning Academy", nature: "Education", mobile1: "+91 90000 00167", email: "admissions@example.com", url: "https://apexlearning.example.com", address: "T. Nagar, Chennai 600017", google_map: "https://maps.google.com", about_us: "Coaching that builds confidence and results. Small batches, expert faculty, proven track record.", specialties_title: "Courses", specialities: "Maths & Science, Board Exams, Competitive Prep, Spoken English, Online Classes" }, products: [svc(1, "Book a Free Demo Class", "See our teaching before you join.", "WhatsApp"), svc(2, "View Courses & Fees", "Batches, timings and fee details.", "Get Quote"), svc(3, "Call for Admissions", "Speak to our counsellor today.", "Call Now")] } },
+  { keys: ["automobile", "car", "motors", "dealer"], bundle: { customer: { ...base, name: "Sandeep Yadav", designation: "Sales · AutoHub Motors", company_name: "AutoHub Motors", nature: "Automobile", mobile1: "+91 90000 00178", email: "sales@example.com", url: "https://autohub.example.com", address: "Ring Road, Surat 395002", google_map: "https://maps.google.com", about_us: "Certified pre-owned and new cars with easy finance. Honest deals and full service support.", specialties_title: "We offer", specialities: "New & Used Cars, Easy Finance, Exchange, Insurance, Servicing" }, products: [svc(1, "Book a Test Drive", "Pick a car and a time that suits you.", "WhatsApp"), svc(2, "Get Best Price", "Share the model — we'll send our best offer.", "Get Quote"), svc(3, "Call Showroom", "Ask about stock and finance.", "Call Now")] } },
+  { keys: ["jewellery", "jewelry", "jeweller"], bundle: { customer: { ...base, name: "Suhani Jewels", designation: "Gold · Diamond · Silver", company_name: "Suhani Jewels", nature: "Jewellery", mobile1: "+91 90000 00189", email: "care@example.com", url: "https://suhanijewels.example.com", address: "Johari Bazaar, Jaipur 302003", google_map: "https://maps.google.com", about_us: "Timeless jewellery, hallmarked and fairly priced. Bridal sets, daily wear and custom designs.", specialties_title: "Collections", specialities: "Bridal Sets, Gold, Diamonds, Custom Design, Hallmarked" }, products: [svc(1, "Book a Viewing", "See our latest collection in person.", "WhatsApp"), svc(2, "Custom Design", "Bring your idea to life — get a quote.", "Get Quote"), svc(3, "Call the Store", "Ask about designs and prices.", "Call Now")] } },
+  { keys: ["digital agency", "it", "software", "web"], bundle: { customer: { ...base, name: "Karan Mehta", designation: "Founder · Digital Agency", company_name: "PixelForge Studios", nature: "IT & Digital", mobile1: "+91 90000 00190", email: "team@example.com", url: "https://pixelforge.example.com", address: "HITEC City, Hyderabad 500081", google_map: "https://maps.google.com", about_us: "Websites, apps and marketing that grow your business. A small, senior team that ships fast.", specialties_title: "Services", specialities: "Web & App Development, SEO, Social Media, Branding, E-commerce" }, products: [svc(1, "Free Project Call", "Tell us your idea — get a clear plan and quote.", "WhatsApp"), svc(2, "See Our Work", "Recent websites, apps and campaigns.", "Visit Us"), svc(3, "Call the Team", "Let's talk about your project.", "Call Now")] } },
+  { keys: ["insurance", "loan", "advisor"], bundle: { customer: { ...base, name: "Deepak Sharma", designation: "Insurance & Loan Advisor", company_name: "SecureLife Advisors", nature: "Insurance & Loans", mobile1: "+91 90000 00201", email: "advisor@example.com", url: "https://securelife.example.com", address: "Civil Lines, Nagpur 440001", google_map: "https://maps.google.com", about_us: "The right cover and the right loan, explained simply. Trusted by 500+ families.", specialties_title: "Services", specialities: "Life & Health Insurance, Home Loans, Car Loans, Mutual Funds, Claims Help" }, products: [svc(1, "Free Advice Call", "Get honest guidance — no pushy selling.", "WhatsApp"), svc(2, "Compare Plans", "Find the best cover for your budget.", "Get Quote"), svc(3, "Call Deepak", "Have a question? I'm happy to help.", "Call Now")] } },
 ];
 
 const DEFAULT: DemoBundle = {
-  customer: { ...base, name: "Aarav Sharma", designation: "Founder & CEO", company_name: "Bright Ideas Pvt Ltd",
+  customer: { ...base, name: "Aarav Sharma", designation: "Founder & CEO", company_name: "Bright Ideas Pvt Ltd", email: "hello@example.com",
     nature: "Business Services", mobile1: "+91 90000 00001", url: "https://example.com", address: "Connaught Place, New Delhi 110001",
     google_map: "https://maps.google.com", about_us: "A modern business built on trust and quality. Reach out — we'd love to work with you.",
     specialties_title: "What we offer", specialities: "Consultation, Quality Service, Fast Support, Fair Pricing" },
-  products: [
-    svc(1, "Enquire Now", "Interested in working together? Send us a message.", "WhatsApp"),
-    svc(2, "Get a Free Quote", "Tell us what you need and we'll send a quick estimate.", "Get Quote"),
-    svc(3, "Call Us", "Prefer to talk? We're just a call away.", "Call Now"),
-  ],
+  products: [svc(1, "Enquire Now", "Interested in working together? Send us a message.", "WhatsApp"), svc(2, "Get a Free Quote", "Tell us what you need and we'll send a quick estimate.", "Get Quote"), svc(3, "Call Us", "Prefer to talk? We're just a call away.", "Call Now")],
 };
 
 /* Pick a persona from a product's category (case-insensitive), else default. */
 export function demoFor(category?: string | null): DemoBundle {
   const c = (category || "").toLowerCase().trim();
-  if (c) for (const p of PERSONAS) if (p.keys.some((k) => c.includes(k) || k.includes(c))) return p.bundle;
+  if (c) for (const p of PERSONAS) if (p.keys?.some((k) => c.includes(k) || k.includes(c))) return p.bundle;
   return DEFAULT;
+}
+
+/*
+ * Persona for a specific marketplace product. If its category matches an
+ * industry we use that; otherwise we deterministically spread personas by the
+ * product's design number so the gallery shows a variety of industries instead
+ * of the same placeholder on every card.
+ */
+export function demoForProduct(p?: { category?: string | null; styleNumber?: number; id?: number } | null): DemoBundle {
+  const c = (p?.category || "").toLowerCase().trim();
+  if (c) for (const per of PERSONAS) if (per.keys?.some((k) => c.includes(k) || k.includes(c))) return per.bundle;
+  const seed = Number(p?.styleNumber ?? p?.id ?? 0);
+  return PERSONAS[((seed % PERSONAS.length) + PERSONAS.length) % PERSONAS.length].bundle;
 }

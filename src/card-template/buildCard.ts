@@ -36,6 +36,39 @@ for (const n of Object.keys(STYLES)) STYLES[n] = themeableSecondary(STYLES[n]);
 
 const styleFor = (theme: number) => STYLES[String(Math.min(CARD_STYLE_COUNT, Math.max(1, Number(theme) || 1)))] || STYLES["1"] || "";
 
+/* First-page height normalisation. Every card's front should be the size of the
+   Midnight Gold design (style 1 ≈ 626px) so the catalogue and live cards share a
+   consistent first page. Shorter templates were cramped in the contact section;
+   we give the contact section a min-height and spread its rows EVENLY with flex
+   (space-evenly) — the balanced, airy feel of style 1 — instead of leaving them
+   clustered up top with a gap below. The value is the section's content-box
+   min-height in px. Style 28 is special-cased: its rows use a tall vertical
+   icon-over-text layout that already fills the space, so it just gets padding. */
+const FIRST_PAGE_FILL: Record<number, number> = {
+  2: 265, 3: 312, 4: 259, 5: 287, 7: 232, 8: 280, 10: 232, 13: 281, 14: 184,
+  15: 292, 16: 253, 17: 222, 18: 197, 19: 282, 20: 237, 21: 252, 23: 254,
+  24: 263, 29: 229, 30: 212, 31: 257,
+};
+const FIRST_PAGE_PAD: Record<number, [number, number]> = { 28: [30, 29] };
+const firstPagePadCss = (theme: number) => {
+  const t = Number(theme);
+  const h = FIRST_PAGE_FILL[t];
+  if (h) {
+    return `#home-section .home-details{min-height:${h}px !important;padding-top:18px !important;padding-bottom:18px !important;`
+      + `display:flex !important;flex-direction:column !important;justify-content:space-evenly !important;}`
+      + `#home-section .home-details .home-single-details a{margin-bottom:0 !important;}`;
+  }
+  const p = FIRST_PAGE_PAD[t];
+  return p ? `#home-section .home-details{padding-top:${p[0]}px !important;padding-bottom:${p[1]}px !important;}` : "";
+};
+
+/* A few templates render the job title (designation) at only 9–10px — too small
+   to read. Lift those to a comfortable 12px. Kept in one place so it's easy to
+   tune; it wins over the per-style CSS via source order + !important. */
+const SMALL_DESIG = new Set([3, 6, 7, 12, 13, 16, 28]);
+const desigFontCss = (theme: number) =>
+  SMALL_DESIG.has(Number(theme)) ? `#home-section .owner-designation{font-size:12px !important;letter-spacing:.2px;}` : "";
+
 type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
 type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
@@ -314,6 +347,8 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 <style>
 ${mainCss}
 ${styleFor(Number(theme))}
+${firstPagePadCss(Number(theme))}
+${desigFontCss(Number(theme))}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 html{scroll-behavior:smooth;}
 body{background:#f1f1f1;}
@@ -515,6 +550,8 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
 <style>
 ${mainCss}
 ${styleFor(theme)}
+${firstPagePadCss(theme)}
+${desigFontCss(theme)}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 html,body{margin:0;background:#fff;overflow:hidden;}
 main{box-shadow:none;padding:0;}
