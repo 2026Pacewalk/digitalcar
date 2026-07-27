@@ -75,7 +75,11 @@ export const trialRouter = createRouter({
   config: publicQuery.query(async () => {
     const db = getDb();
     const g = await graceConfig(db);
-    return { trialDays: await trialDays(db), graceEnabled: g.enabled, graceDays: g.days, expiryMode: (await getSetting(db, "expiry_mode")) || "deactivate" };
+    return {
+      trialDays: await trialDays(db), graceEnabled: g.enabled, graceDays: g.days,
+      expiryMode: (await getSetting(db, "expiry_mode")) || "deactivate",
+      lifecycleEnabled: (await getSetting(db, "lifecycle_enabled")) !== "0",
+    };
   }),
 
   // The signed-in user's current trial state (source of truth).
@@ -123,5 +127,11 @@ export const trialRouter = createRouter({
   setExpiryMode: adminQuery.input(z.object({ mode: z.enum(["deactivate", "limited", "basic"]) })).mutation(async ({ input }) => {
     await setSetting(getDb(), "expiry_mode", input.mode);
     return { ok: true, mode: input.mode };
+  }),
+
+  // Admin: master on/off for the trial lifecycle emails (§68).
+  setLifecycle: adminQuery.input(z.object({ enabled: z.boolean() })).mutation(async ({ input }) => {
+    await setSetting(getDb(), "lifecycle_enabled", input.enabled ? "1" : "0");
+    return { ok: true, enabled: input.enabled };
   }),
 });

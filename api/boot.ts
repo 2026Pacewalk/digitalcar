@@ -113,18 +113,54 @@ app.post("/api/enquiry", async (c) => {
   }
 });
 
-// Daily trial FOMO emailer — trigger from a cron: POST with ?key=CRON_SECRET
+// Daily lifecycle + trial emails. Runs the §9 milestone journey (card_trials
+// engine) plus the legacy subscription-trial FOMO emailer. Both are dedup-safe.
+async function runDailyEmailJobs() {
+  const [{ runLifecycle }, { runTrialEmails }] = await Promise.all([
+    import("./cron/lifecycle"),
+    import("./cron/trial-emails"),
+  ]);
+  const lifecycle = await runLifecycle();          // new card_trials milestones
+  const legacy = await runTrialEmails().catch((e) => { console.error("[cron] legacy trial-emails:", (e as Error).message); return null; });
+  return { lifecycle, legacy };
+}
+
+// Manual/external trigger (e.g. an OS cron): POST with ?key=CRON_SECRET. Always runs.
 app.post("/api/cron/trial-emails", async (c) => {
   const key = c.req.query("key") || c.req.header("x-cron-key");
   if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) return c.json({ error: "Unauthorized" }, 401);
   try {
-    const { runTrialEmails } = await import("./cron/trial-emails");
-    return c.json({ ok: true, ...(await runTrialEmails()) });
+    return c.json({ ok: true, ...(await runDailyEmailJobs()) });
   } catch (e) {
-    console.error("[cron] trial-emails error:", (e as Error).message);
+    console.error("[cron] daily jobs error:", (e as Error).message);
     return c.json({ ok: false }, 500);
   }
 });
+
+// In-process daily scheduler (production only) — guarantees the lifecycle runs
+// once per calendar day even without an OS crontab. Guarded by a date marker in
+// app_settings so a restart (or an OS cron also hitting the endpoint) can't
+// double-run. Checks every 6h; the dedup ledger makes any overlap harmless.
+if (process.env.NODE_ENV === "production") {
+  const runIfDue = async () => {
+    try {
+      const { getDb } = await import("./queries/connection");
+      const { appSettings } = await import("@db/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = getDb();
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await db.select().from(appSettings).where(eq(appSettings.key, "lifecycle_last_run"));
+      if (rows[0]?.value === today) return;
+      await db.insert(appSettings).values({ key: "lifecycle_last_run", value: today }).onDuplicateKeyUpdate({ set: { value: today } });
+      const res = await runDailyEmailJobs();
+      console.log("[lifecycle] daily run", JSON.stringify(res));
+    } catch (e) {
+      console.error("[lifecycle] scheduler error:", (e as Error).message);
+    }
+  };
+  setTimeout(runIfDue, 45_000);              // shortly after boot
+  setInterval(runIfDue, 6 * 60 * 60 * 1000); // and every 6 hours
+}
 
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII.
