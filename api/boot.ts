@@ -163,9 +163,10 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // ─── Sensitive data files: block public access, serve only to super-admins ───
-// customers.json has passwords + bank/UPI details; enquiries.json is lead PII.
-// Neither may be publicly downloadable.
-const SENSITIVE = new Set(["customers", "enquiries"]);
+// customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
+// members_data / members_migration are full user PII dumps. None may be
+// publicly downloadable — served only via the super-admin route below.
+const SENSITIVE = new Set(["customers", "enquiries", "members_data", "members_migration"]);
 
 const readPublicJson = async (file: string): Promise<unknown[]> => {
   const { readFile } = await import("node:fs/promises");
@@ -372,8 +373,9 @@ app.get("/feed/products.xml", async (c) => {
   return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
 });
 
-app.get("/customers.json", (c) => c.json({ error: "Forbidden" }, 403));
-app.get("/enquiries.json", (c) => c.json({ error: "Forbidden" }, 403));
+// Block every sensitive dump at the web root — otherwise serveStatic serves
+// them verbatim. Admins fetch these only via the token-gated /api/admin/data/:file.
+for (const f of SENSITIVE) app.get(`/${f}.json`, (c) => c.json({ error: "Forbidden" }, 403));
 
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
