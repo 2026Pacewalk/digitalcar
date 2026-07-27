@@ -41,10 +41,23 @@ npm ci --no-audit --no-fund
 echo "▶ Building (frontend + server bundle)…"
 npm run build
 
-# NOTE: DB schema changes are intentionally NOT auto-applied here to protect
-# production data. After a schema change, run manually on the server:
-#   npm run db:push
-# (First-time data seed/import is a one-time step — see DEPLOY.md.)
+# ── Ensure a persistent JWT signing key (never a public default) ─────────────
+# Generated once and appended to .env, so sessions stay stable across restarts.
+if ! grep -q '^JWT_SECRET=' .env 2>/dev/null; then
+  echo "▶ Generating a persistent JWT_SECRET…"
+  SECRET="$(openssl rand -hex 48 2>/dev/null || node -e 'console.log(require("crypto").randomBytes(48).toString("hex"))')"
+  printf '\nJWT_SECRET=%s\n' "$SECRET" >> .env
+fi
+
+# ── Additive DB migration + first-time catalogue seed ────────────────────────
+# 100% additive & idempotent: CREATE TABLE IF NOT EXISTS for the new tables, and
+# a catalogue seed that self-skips once products exist. Runs BEFORE the restart
+# so if anything fails the deploy aborts (set -e) and the OLD app keeps serving —
+# no downtime, no half-migrated state. No existing table or row is ever touched.
+echo "▶ Applying additive schema migration…"
+node db/migrate-live.mjs
+echo "▶ Seeding catalogue (first deploy only)…"
+node db/golive-seed.mjs
 
 echo "▶ Restarting app via PM2…"
 if pm2 describe digitalcarda > /dev/null 2>&1; then
