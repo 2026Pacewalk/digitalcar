@@ -46,7 +46,10 @@ export default function AdminMigration() {
   const loadMembers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/members_migration.json");
+      // Authed super-admin endpoint (the raw file is blocked publicly — it's PII).
+      const res = await fetch("/api/admin/data/members_migration", {
+        headers: { "x-auth-token": localStorage.getItem("auth_token") || "" },
+      });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       const migratedIds: number[] = JSON.parse(localStorage.getItem("migrated_members") || "[]");
