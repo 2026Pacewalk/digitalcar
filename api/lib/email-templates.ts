@@ -290,6 +290,22 @@ export function referralSignupAdminEmail(o: { newUserName?: string; newUserEmail
   };
 }
 
+export function referralRewardEmail(o: { name?: string; refereeName?: string; amount: number | string; balance?: number | string }): Email {
+  const rows: [string, string][] = [["Reward credited", inr(o.amount)]];
+  if (o.balance != null) rows.push(["Wallet balance", inr(o.balance)]);
+  const bodyHtml =
+    hi(o.name) +
+    p(`Great news — <strong>${esc(o.refereeName || "someone you referred")}</strong> just upgraded to a paid plan, so you've earned a referral reward! 🎉`) +
+    detailTable(rows, { accentLast: true }) +
+    p("Keep sharing your link — every friend who goes paid earns you more.") +
+    button("View my wallet", `${SITE}/dashboard/refer`);
+  return {
+    subject: `You earned ${inr(o.amount)} 🎉`,
+    html: layout({ preheader: `${o.refereeName || "A referral"} went paid — you earned ${inr(o.amount)}.`, badge: "Reward earned", heading: "You earned a reward 🎉", bodyHtml, accent: "#22C55E" }),
+    text: `Hi ${o.name || "there"},\n\n${o.refereeName || "Someone you referred"} went paid — you earned ${inr(o.amount)}. View your wallet: ${SITE}/dashboard/refer`,
+  };
+}
+
 export function payoutRequestAdminEmail(o: { name?: string; email?: string; amount: number; method: string; destination: string; accountName?: string | null; ifsc?: string | null }): Email {
   const rows: [string, string][] = [
     ["Requested by", esc(o.name || "—")],

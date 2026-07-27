@@ -3,11 +3,12 @@ import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   paymentOrders, appSettings, subscriptionPackages, subscriptions, users, notifications, cardTrials, funnelEvents, resellerProfiles,
+  referrals, walletTransactions,
 } from "@db/schema";
-import { eq, desc, and, gt, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, gt, ne, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
-import { paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail } from "./lib/email-templates";
+import { paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail, referralRewardEmail } from "./lib/email-templates";
 import { getUpgradeOfferPercent } from "./lib/pricing";
 
 const n = (v: unknown) => Number(v ?? 0);
@@ -228,17 +229,34 @@ export const paymentRouter = createRouter({
         }));
       } catch { /* non-critical */ }
 
-      // If this is their first paid plan, flag the referrer's reward opportunity
+      // Auto-credit the referrer's wallet on this genuine (admin-verified) paid
+      // conversion — completes the Refer & Earn growth loop without manual admin
+      // action (Phase 29). Idempotent: only an un-rewarded referral is credited.
       try {
         const buyer = await db.query.users.findFirst({ where: eq(users.id, order.userId), columns: { referredById: true, fullName: true } });
         if (buyer?.referredById) {
-          await db.insert(notifications).values({
-            userId: buyer.referredById,
-            type: "referral_reward",
-            title: "Your referral upgraded 💰",
-            message: `${buyer.fullName} just went paid. Your referral commission is ready to be credited.`,
-            link: "/dashboard/refer",
+          const ref = await db.query.referrals.findFirst({
+            where: and(eq(referrals.refereeId, order.userId), ne(referrals.status, "rewarded")),
           });
+          if (ref) {
+            const pctRow = await db.query.appSettings.findFirst({ where: eq(appSettings.key, "referral_commission_percent") });
+            const pct = pctRow ? Number(pctRow.value) : 15;
+            const reward = money((n(order.amount) * (Number.isFinite(pct) ? pct : 15)) / 100);
+            await db.update(referrals).set({ status: "rewarded", rewardAmount: reward, rewardedAt: now }).where(eq(referrals.id, ref.id));
+            const rr = await db.query.users.findFirst({ where: eq(users.id, buyer.referredById), columns: { walletBalance: true } });
+            const nextBal = money(n(rr?.walletBalance) + n(reward));
+            await db.update(users).set({ walletBalance: nextBal }).where(eq(users.id, buyer.referredById));
+            await db.insert(walletTransactions).values({
+              userId: buyer.referredById, type: "reward", amount: reward, balanceAfter: nextBal,
+              status: "completed", referralId: ref.id, note: "Referral reward — paid conversion",
+            });
+            await db.insert(notifications).values({
+              userId: buyer.referredById, type: "referral_reward", title: "Referral reward credited 🎉",
+              message: `${buyer.fullName} went paid — ₹${reward} added to your wallet.`, link: "/dashboard/refer",
+            });
+            const rrUser = await db.query.users.findFirst({ where: eq(users.id, buyer.referredById), columns: { email: true, fullName: true } });
+            void sendEmail(rrUser?.email, referralRewardEmail({ name: rrUser?.fullName, refereeName: buyer.fullName, amount: reward, balance: nextBal }));
+          }
         }
       } catch { /* non-critical */ }
 
