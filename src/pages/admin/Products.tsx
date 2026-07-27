@@ -8,8 +8,9 @@ import {
 import { trpc } from "@/providers/trpc";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
 import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
+import { demoForProduct } from "@/lib/demoData";
 
-const THUMB_W = 375, THUMB_H = 560;
+const THUMB_W = 375, THUMB_H = 626;
 
 type Product = {
   id: number; slug: string; name: string; tagline?: string | null; description?: string | null;
@@ -26,11 +27,15 @@ const CATEGORIES = ["Real Estate", "Doctors & Clinics", "Consultants", "Insuranc
 
 const inr = (v?: string | number | null) => "₹" + Number(v || 0).toLocaleString("en-IN");
 
-/* Card-front preview by design number + colours (same engine as Templates). */
-function Thumb({ style, primary, secondary }: { style: number; primary?: string | null; secondary?: string | null }) {
+/* Card-front preview — same engine and industry-persona demo data as the public
+   store, so the admin catalogue shows the exact card customers see. */
+function Thumb({ style, primary, secondary, category }: { style: number; primary?: string | null; secondary?: string | null; category?: string | null }) {
   const html = useMemo(
-    () => buildCardThumb({ ...DEFAULT_CUSTOMER, color: primary || "#F7B31C", color2: secondary || "" }, style),
-    [style, primary, secondary],
+    () => {
+      const demo = demoForProduct({ styleNumber: style, category });
+      return buildCardThumb({ ...DEFAULT_CUSTOMER, ...demo.customer, color: primary || "#F7B31C", color2: secondary || "" }, style);
+    },
+    [style, primary, secondary, category],
   );
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -114,7 +119,7 @@ export default function AdminProducts() {
             <div key={p.id} className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all ${p.isFeatured ? "border-[#F7B31C] shadow-gold" : "border-[#F1F5F9]"} ${p.status === "archived" ? "opacity-60" : ""}`}>
               {p.isFeatured && <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#F7B31C] text-[#0F172A]"><Star size={10} /> Featured</span>}
               <span className={`absolute top-2 right-2 z-10 text-[9px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLE[p.status]}`}>{p.status}</span>
-              <Thumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} />
+              <Thumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />
               <div className="p-2.5">
                 <p className="text-[10px] font-semibold text-[#F7B31C] uppercase tracking-wide truncate">{p.category || "Uncategorised"}</p>
                 <p className="text-[12.5px] font-bold text-[#0F172A] leading-tight line-clamp-2 min-h-[32px]">{p.name}</p>
@@ -172,7 +177,7 @@ function ProductEditor({ draft, setDraft, onSave, saving, onClose }: {
           {/* Live preview */}
           <div className="sm:w-[40%] bg-[#F8FAFC] p-4 flex flex-col items-center gap-3 shrink-0">
             <div className="w-[170px] rounded-xl overflow-hidden shadow-premium border border-[#E2E8F0]">
-              <Thumb style={draft.styleNumber} primary={draft.primaryColor} secondary={draft.secondaryColor} />
+              <Thumb style={draft.styleNumber} primary={draft.primaryColor} secondary={draft.secondaryColor} category={draft.category} />
             </div>
             <F label={`Design (1–${TEMPLATE_COUNT})`}>
               <div className="flex flex-wrap gap-1 justify-center max-w-[220px]">

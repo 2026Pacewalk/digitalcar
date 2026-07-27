@@ -8,6 +8,7 @@ import {
 import { trpc } from "@/providers/trpc";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
 import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
+import { demoForProduct } from "@/lib/demoData";
 
 const PRIMARY_SW = ["#F7B31C", "#3B82F6", "#16A34A", "#A21CAF", "#EF4444", "#06B6D4", "#F97316", "#EC4899", "#6366F1", "#EAB308"];
 const SECONDARY_SW = ["#0F172A", "#0f2b2e", "#052e16", "#3b0764", "#450a0a", "#083344", "#431407", "#500724", "#1e1b4b", "#082f49"];
@@ -15,12 +16,17 @@ const SECONDARY_SW = ["#0F172A", "#0f2b2e", "#052e16", "#3b0764", "#450a0a", "#0
 type Draft = { id?: number; name: string; style: number; primary: string; secondary: string; active: boolean };
 const NEW: Draft = { name: "", style: 1, primary: "#F7B31C", secondary: "#0F172A", active: true };
 
-const thumbHtml = (style: number, primary: string, secondary: string) =>
-  buildCardThumb({ ...DEFAULT_CUSTOMER, color: primary, color2: secondary }, style);
+// Match the public marketplace: each template previews with its industry demo
+// persona (seeded by style) and the same first-page height, so admin and store
+// show the identical, updated card — not a generic placeholder.
+const thumbHtml = (style: number, primary: string, secondary: string) => {
+  const demo = demoForProduct({ styleNumber: style });
+  return buildCardThumb({ ...DEFAULT_CUSTOMER, ...demo.customer, color: primary, color2: secondary }, style);
+};
 
 // Card front is rendered at this design width; the frame scales it to fit its own width.
 const THUMB_W = 375;
-const THUMB_H = 560;
+const THUMB_H = 626;
 
 function Thumb({ style, primary, secondary }: { style: number; primary: string; secondary: string }) {
   const html = useMemo(() => thumbHtml(style, primary, secondary), [style, primary, secondary]);
