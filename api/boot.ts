@@ -25,9 +25,48 @@ app.use("/api/trpc/*", async (c) => {
   });
 });
 
+// ── Lightweight in-memory rate limiter (per client IP + bucket) ───────
+// Single-process (PM2) guard for the public write endpoints — blunts abuse
+// without adding a dependency or external store. Fails OPEN on any error so
+// it can never take the site down. Behind Cloudflare/nginx we trust the
+// forwarded client IP headers.
+const rlBuckets = new Map<string, { count: number; resetAt: number }>();
+let rlLastSweep = Date.now();
+function rateLimit(
+  c: { req: { header: (k: string) => string | undefined } },
+  bucket: string,
+  limit: number,
+  windowMs: number,
+): boolean {
+  try {
+    const now = Date.now();
+    if (now - rlLastSweep > 60_000) {
+      rlLastSweep = now;
+      for (const [k, v] of rlBuckets) if (now > v.resetAt) rlBuckets.delete(k);
+    }
+    const ip =
+      c.req.header("cf-connecting-ip") ||
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
+      c.req.header("x-real-ip") ||
+      "unknown";
+    const key = bucket + ":" + ip;
+    const b = rlBuckets.get(key);
+    if (!b || now > b.resetAt) {
+      rlBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return true;
+    }
+    if (b.count >= limit) return false;
+    b.count++;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 // Public enquiry capture for the legacy (customers.json) cards — stores the lead
 // when the slug maps to a known card, and always emails the owner.
 app.post("/api/enquiry", async (c) => {
+  if (!rateLimit(c, "enquiry", 10, 60_000)) return c.json({ ok: false, error: "rate_limited" }, 429);
   try {
     const body = await c.req.json<{ slug?: string; name?: string; contact?: string; email?: string; description?: string }>();
     const name = String(body.name || "").trim();
@@ -168,6 +207,7 @@ app.get("/api/card/:slug", async (c) => {
 // so it works for snapshot AND legacy cards. Numbers are always real (§36).
 const TRACK_TYPES = ["view", "call", "whatsapp", "email", "website", "directions", "save_contact", "qr_scan", "product", "share", "social", "enquiry"];
 app.post("/api/track", async (c) => {
+  if (!rateLimit(c, "track", 120, 60_000)) return c.json({ ok: false, error: "rate_limited" }, 429);
   try {
     let body: { slug?: string; type?: string } | null = null;
     try { body = await c.req.json(); } catch { try { body = JSON.parse(await c.req.text()); } catch { body = null; } }
@@ -186,6 +226,7 @@ app.post("/api/track", async (c) => {
 // try_free → registration → published → payment) so drop-off is visible (§62).
 const FUNNEL_STAGES = ["product_view", "demo_view", "try_free", "registration", "customization", "published", "first_share", "payment", "upgrade"];
 app.post("/api/funnel", async (c) => {
+  if (!rateLimit(c, "funnel", 60, 60_000)) return c.json({ ok: false, error: "rate_limited" }, 429);
   try {
     let body: { stage?: string; productSlug?: string; userId?: number } | null = null;
     try { body = await c.req.json(); } catch { try { body = JSON.parse(await c.req.text()); } catch { body = null; } }
