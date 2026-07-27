@@ -157,8 +157,17 @@ export const paymentRouter = createRouter({
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
       if (order.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
 
-      const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, order.packageId) });
       const now = new Date();
+      // Atomically claim the order: the WHERE status='pending' guard means only one
+      // of two concurrent verifies wins, preventing double-activation + double
+      // commission credit (Phase 31 TOCTOU). If nothing was updated, someone else won.
+      const claim = await db.update(paymentOrders).set({ status: "verified", verifiedAt: now })
+        .where(and(eq(paymentOrders.id, order.id), eq(paymentOrders.status, "pending")));
+      const affected = (claim as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+        ?? (claim as unknown as { affectedRows?: number })?.affectedRows ?? 0;
+      if (!affected) throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
+
+      const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, order.packageId) });
       const periodEnd = new Date(now);
       if (order.billingCycle === "yearly") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
       else periodEnd.setMonth(periodEnd.getMonth() + 1);
@@ -175,7 +184,6 @@ export const paymentRouter = createRouter({
         currentPeriodEnd: periodEnd,
         paymentGateway: "manual",
       });
-      await db.update(paymentOrders).set({ status: "verified", verifiedAt: now }).where(eq(paymentOrders.id, order.id));
 
       // The trial has converted to a paid plan — reflect it in the trial engine
       // so the lifecycle banner stops and the card stays live past trial end.

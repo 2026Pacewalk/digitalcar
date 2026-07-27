@@ -12,6 +12,15 @@ import { downloadVCard, shareCard } from "@/lib/share";
 import { buildCardHtml, buildPausedHtml } from "@/card-template/buildCard";
 import { loadCustomerContent, decodeSpecialities, imgUrl } from "@/lib/cardContent";
 
+// Only allow safe schemes for owner-supplied links — blocks javascript:/data:
+// URIs that React does not stop at runtime (Phase 31). Bare domains get https://.
+function safeUrl(u: unknown): string {
+  const s = String(u ?? "").trim();
+  if (/^(https?:|mailto:|tel:)/i.test(s)) return s;
+  if (/^[\w-]+(\.[\w-]+)+(\/|$)/.test(s)) return "https://" + s;
+  return "#";
+}
+
 export default function PublicCard() {
   const { slug = "" } = useParams();
   // retry:false so a missing/errored DB card settles immediately and we fall
@@ -314,7 +323,7 @@ export default function PublicCard() {
                 </div>
               )}
               {contact.website && (
-                <a href={contact.website} target="_blank" className="flex items-center gap-4 p-4 hover:bg-[#F1F5F9] transition-colors group">
+                <a href={safeUrl(contact.website)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 hover:bg-[#F1F5F9] transition-colors group">
                   <div className="w-10 h-10 rounded-xl bg-[#FCE7F3] flex items-center justify-center shrink-0"><Globe size={16} className="text-[#EC4899]" /></div>
                   <div className="flex-1 min-w-0"><p className="text-xs text-[#94A3B8]">Website</p><p className="text-sm font-medium text-[#0F172A] truncate">{contact.website}</p></div>
                   <ChevronRight size={16} className="text-[#CBD5E1] group-hover:text-[#F7B31C] transition-colors" />
@@ -432,7 +441,7 @@ export default function PublicCard() {
                 const platform = link.platform.toLowerCase();
                 const Icon = socialIconMap[platform] || Globe;
                 return (
-                  <a key={i} href={link.url} target="_blank" className="w-12 h-12 rounded-full bg-[#0F172A] flex items-center justify-center hover:bg-[#F7B31C] transition-colors group">
+                  <a key={i} href={safeUrl(link.url)} target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-full bg-[#0F172A] flex items-center justify-center hover:bg-[#F7B31C] transition-colors group">
                     <Icon size={18} className="text-white group-hover:text-[#0F172A]" />
                   </a>
                 );

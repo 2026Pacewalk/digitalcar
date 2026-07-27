@@ -1,22 +1,8 @@
 import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { subscriptions, subscriptionPackages, invoices, appSettings, notifications } from "@db/schema";
-import { eq, desc, sql, and, gt } from "drizzle-orm";
-import { getUpgradeOfferPercent } from "./lib/pricing";
-
-const DEFAULT_DISCOUNT = 15;
-/** Referral discount % for a referee's first paid plan (0 if not eligible). */
-async function referralDiscountFor(db: ReturnType<typeof getDb>, user: { id: number; referredById: number | null }): Promise<number> {
-  if (!user.referredById) return 0;
-  const alreadyPaid = await db.query.subscriptions.findFirst({
-    where: and(eq(subscriptions.userId, user.id), gt(subscriptions.amount, "0")),
-  });
-  if (alreadyPaid) return 0; // one-time only
-  const row = await db.query.appSettings.findFirst({ where: eq(appSettings.key, "referral_discount_percent") });
-  const pct = row ? Number(row.value) : DEFAULT_DISCOUNT;
-  return Number.isFinite(pct) ? pct : DEFAULT_DISCOUNT;
-}
+import { subscriptions, invoices } from "@db/schema";
+import { eq, desc, sql } from "drizzle-orm";
 
 export const subscriptionRouter = createRouter({
   mySubscription: authedQuery.query(async ({ ctx }) => {
@@ -30,124 +16,12 @@ export const subscriptionRouter = createRouter({
     return sub ?? null;
   }),
 
-  subscribe: authedQuery
-    .input(
-      z.object({
-        packageId: z.number(),
-        billingCycle: z.enum(["monthly", "yearly"]),
-        paymentMethod: z.enum(["stripe", "paypal", "razorpay"]),
-        wantsOffer: z.boolean().optional(), // limited-time upgrade offer (percentage is server-owned)
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      const db = getDb();
-      const pkg = await db.query.subscriptionPackages.findFirst({
-        where: eq(subscriptionPackages.id, input.packageId),
-      });
-      if (!pkg) throw new Error("Package not found");
-
-      const round2 = (v: number) => Math.round(v * 100) / 100;
-      const base = Number(input.billingCycle === "yearly" ? pkg.yearlyPrice : pkg.monthlyPrice);
-
-      // Is this the user's first paid plan, or an upgrade from one they already pay for?
-      const existingPaid = await db.query.subscriptions.findFirst({
-        where: and(eq(subscriptions.userId, ctx.user.id), gt(subscriptions.amount, "0")),
-        orderBy: [desc(subscriptions.createdAt)],
-      });
-
-      let discountPct = 0;   // referral discount — first paid plan only
-      let adjustment = 0;    // credit for what they already paid on the current plan
-      let charged: number;   // what they pay right now
-      let stored: number;    // amount saved on the subscription row
-
-      if (!existingPaid) {
-        // First paid plan → apply the one-time referral discount (if eligible).
-        discountPct = await referralDiscountFor(db, ctx.user);
-        charged = round2(base * (1 - discountPct / 100));
-        stored = charged;
-      } else {
-        // Upgrade → no discount/commission; credit the old amount toward the new plan.
-        adjustment = Number(existingPaid.amount);
-        charged = Math.max(0, round2(base - adjustment));
-        stored = round2(base); // plan value, so the next upgrade credits the full paid-up amount
-      }
-      // Apply the limited-time upgrade offer on top of whatever they pay now.
-      // The percentage is server-owned; the client may only request the offer.
-      const offerPct = input.wantsOffer ? await getUpgradeOfferPercent(db) : 0;
-      if (offerPct) charged = round2(charged * (1 - offerPct / 100));
-      const amount = stored.toFixed(2);
-      const now = new Date();
-      const periodEnd = new Date(now);
-      if (input.billingCycle === "yearly") {
-        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-      } else {
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
-      }
-
-      const trialEnd = new Date(now);
-      trialEnd.setDate(trialEnd.getDate() + pkg.trialDays);
-
-      const result = await db.insert(subscriptions).values({
-        userId: ctx.user.id,
-        packageId: input.packageId,
-        status: pkg.trialDays > 0 ? "trial" : "active",
-        billingCycle: input.billingCycle,
-        amount,
-        currency: "INR",
-        trialEndsAt: pkg.trialDays > 0 ? trialEnd : null,
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-        paymentGateway: input.paymentMethod,
-      }).$returningId();
-
-      // GST invoice — plan prices are GST-inclusive, so extract the 18% component
-      try {
-        const totalPaid = charged;
-        const taxable = Math.round((totalPaid / 1.18) * 100) / 100;
-        const gst = Math.round((totalPaid - taxable) * 100) / 100;
-        await db.insert(invoices).values({
-          subscriptionId: result[0].id,
-          userId: ctx.user.id,
-          invoiceNumber: `DC-${now.getFullYear()}-${String(result[0].id).padStart(5, "0")}`,
-          amount: taxable.toFixed(2),
-          taxAmount: gst.toFixed(2),
-          totalAmount: totalPaid.toFixed(2),
-          currency: "INR",
-          status: "paid",
-          paidAt: now,
-          dueDate: now,
-          gateway: input.paymentMethod,
-        });
-      } catch { /* non-critical */ }
-
-      // Notify the user their plan is live (shows in the top bell)
-      try {
-        await db.insert(notifications).values({
-          userId: ctx.user.id,
-          type: "plan",
-          title: existingPaid ? `Upgraded to ${pkg.name} 🚀` : `${pkg.name} plan activated 🎉`,
-          message: existingPaid
-            ? `₹${adjustment.toFixed(2)} was adjusted from your previous plan — you paid ₹${charged.toFixed(2)}.`
-            : discountPct > 0
-              ? `Your ${discountPct}% referral discount was applied — you paid ₹${charged.toFixed(2)}.`
-              : `Your ${pkg.name} plan is now active. Enjoy all its features!`,
-          link: "/dashboard/settings?tab=package",
-        });
-      } catch { /* non-critical */ }
-
-      const subscription = await db.query.subscriptions.findFirst({
-        where: eq(subscriptions.id, result[0].id),
-        with: { package: true },
-      });
-      return {
-        subscription,
-        planPrice: base,
-        discountPercent: discountPct,
-        adjustment,
-        charged,
-        isUpgrade: !!existingPaid,
-      };
-    }),
+  // NOTE: the former `subscribe` and `upgrade` mutations were removed (Phase 31
+  // security). They self-activated a paid subscription with NO payment
+  // verification — any authenticated client could grant itself the top plan for
+  // free over tRPC. The real, money-safe path is payment.createOrder → admin
+  // payment.verifyOrder (server-verified). Do not reintroduce client-callable
+  // activation without server-verified payment (§42).
 
   cancel: authedQuery
     .input(z.object({ reason: z.string().optional() }))
@@ -164,25 +38,6 @@ export const subscriptionRouter = createRouter({
 
       return db.query.subscriptions.findFirst({
         where: eq(subscriptions.userId, ctx.user.id),
-      });
-    }),
-
-  upgrade: authedQuery
-    .input(z.object({ packageId: z.number() }))
-    .mutation(async ({ ctx, input }) => {
-      const db = getDb();
-      const currentSub = await db.query.subscriptions.findFirst({
-        where: eq(subscriptions.userId, ctx.user.id),
-      });
-      if (!currentSub) throw new Error("No active subscription");
-
-      await db.update(subscriptions)
-        .set({ packageId: input.packageId, status: "active" })
-        .where(eq(subscriptions.id, currentSub.id));
-
-      return db.query.subscriptions.findFirst({
-        where: eq(subscriptions.id, currentSub.id),
-        with: { package: true },
       });
     }),
 
