@@ -46,6 +46,9 @@ type Review = { id: number; name: string; rating: number | string; text: string;
 const s = (v: unknown) => String(v ?? "").trim();
 const on = (v: unknown) => Number(v ?? 1) === 1;
 const esc = (v: unknown) => s(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Safe interpolation of user data inside an inline <script> — quotes it as a JS
+// string literal and neutralises "</script>" so it can't break out (Phase 31 XSS).
+const jsq = (v: unknown) => JSON.stringify(String(v ?? "")).replace(/</g, "\\u003c");
 const ytId = (url: string) => (url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/) || [])[1] || "";
 const IMG = 'referrerpolicy="no-referrer"';
 const darken = (hex: string, f: number) => {
@@ -69,7 +72,10 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const accentDark = darken(accent, 0.16);
   const secondary = s(c.color2);
   const theme = String(Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1)));
-  const slug = s(c.slug);
+  // Sanitize to URL/identifier-safe chars: a no-op for valid slugs, but it
+  // neutralises any injected quote / angle-bracket before slug (and cardUrl,
+  // which derives from it) flows into href attributes and inline scripts (Phase 31).
+  const slug = s(c.slug).replace(/[^a-zA-Z0-9_-]/g, "");
   const cardUrl = `https://digitalcarda.in/${slug}`;
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
   const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean);
@@ -139,7 +145,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
           <div class="heading-2"><h5>${esc(p.name)}</h5></div>
           ${(p.price || p.offer_price) ? `<div style="padding:2px 0 6px" class="heading-2">Price ${p.price && p.offer_price ? `<strike style="color:#666"> ₹${esc(p.price)}</strike>` : ""} <strong> ₹${esc(p.offer_price || p.price)}</strong></div>` : ""}
           ${p.filename ? `<img src="${esc(p.filename)}" class="img-fluid" style="width:100%;border-radius:4px" ${IMG} onerror="this.style.display='none'">` : ""}
-          ${p.description ? `<div class="heading-2" style="margin-top:14px"><h5>Other Detail</h5></div><div style="font-size:13px">${fixMojibake(p.description)}</div>` : ""}
+          ${p.description ? `<div class="heading-2" style="margin-top:14px"><h5>Other Detail</h5></div><div style="font-size:13px">${esc(fixMojibake(p.description))}</div>` : ""}
           <div class="text-right" style="margin-top:12px"><a href="${b.href}" class="product-enquiry-btn" target="${b.target}" rel="noopener"><i class="${b.icon}" style="margin-right:6px"></i>${esc(p.button_title || "Send Enquiry")}</a></div>
         </div>`;
       }).join("")}
@@ -470,7 +476,7 @@ function closeShare(){ document.getElementById('shareModal').style.display='none
 function copyShare(){ var u='${cardUrl}'; if(navigator.clipboard){navigator.clipboard.writeText(u).then(function(){alert('Link copied');});}else{alert(u);} }
 document.getElementById('shareModal').addEventListener('click', function(e){ if(e.target.id==='shareModal') closeShare(); });
 function saveVCard(){
-  var v = "${vcard}";
+  var v = ${jsq(vcard)};
   var b = new Blob([v], {type:'text/vcard'});
   var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = '${slug || "card"}.vcf'; a.click();
 }

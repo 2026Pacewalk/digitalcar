@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
+import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { publishedCards, cardTrials, subscriptions, appSettings, cardEvents } from "@db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, ne } from "drizzle-orm";
 
 const DAY = 86_400_000;
 async function setting(db: ReturnType<typeof getDb>, key: string): Promise<string | null> {
@@ -23,13 +24,22 @@ export const publishRouter = createRouter({
     .input(z.object({ slug: z.string().min(1).max(191), data: z.any() }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      // Sanitize to identifier-safe chars (also blocks slug-based XSS in the card).
+      const slug = input.slug.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+      if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid card URL." });
+      // Reject a slug already owned by ANOTHER user — otherwise a snapshot could be
+      // served on a victim's public URL and steal their enquiries (Phase 31 IDOR).
+      const taken = await db.select({ userId: publishedCards.userId }).from(publishedCards)
+        .where(and(eq(publishedCards.slug, slug), ne(publishedCards.userId, ctx.user.id)));
+      if (taken[0]) throw new TRPCError({ code: "CONFLICT", message: "That card URL is already taken." });
+
       const existing = await db.select().from(publishedCards).where(eq(publishedCards.userId, ctx.user.id));
       if (existing[0]) {
-        await db.update(publishedCards).set({ slug: input.slug, data: input.data }).where(eq(publishedCards.userId, ctx.user.id));
+        await db.update(publishedCards).set({ slug, data: input.data }).where(eq(publishedCards.userId, ctx.user.id));
         return { ok: true, publicId: existing[0].publicId };
       }
       const publicId = nanoid(10);
-      await db.insert(publishedCards).values({ userId: ctx.user.id, slug: input.slug, publicId, data: input.data });
+      await db.insert(publishedCards).values({ userId: ctx.user.id, slug, publicId, data: input.data });
       return { ok: true, publicId };
     }),
 
@@ -38,7 +48,7 @@ export const publishRouter = createRouter({
     .input(z.object({ slug: z.string() }))
     .query(async ({ input }) => {
       const db = getDb();
-      const rows = await db.select().from(publishedCards).where(eq(publishedCards.slug, input.slug));
+      const rows = await db.select().from(publishedCards).where(eq(publishedCards.slug, input.slug)).orderBy(publishedCards.id).limit(1);
       return rows[0]?.data ?? null;
     }),
 
@@ -47,7 +57,7 @@ export const publishRouter = createRouter({
   publicState: publicQuery.input(z.object({ slug: z.string() })).query(async ({ input }) => {
     const db = getDb();
     const mode = (await setting(db, "expiry_mode")) || "deactivate";
-    const rows = await db.select({ userId: publishedCards.userId }).from(publishedCards).where(eq(publishedCards.slug, input.slug));
+    const rows = await db.select({ userId: publishedCards.userId }).from(publishedCards).where(eq(publishedCards.slug, input.slug)).orderBy(publishedCards.id).limit(1);
     if (!rows[0]) return { paused: false, mode };
     const uid = rows[0].userId;
     const now = Date.now();

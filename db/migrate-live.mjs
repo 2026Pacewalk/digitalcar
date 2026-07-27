@@ -84,6 +84,16 @@ if (col[0] && col[0].IS_NULLABLE === "NO") {
   log("• leads.card_id already nullable (skipped)");
 }
 
+// Phase 31: enforce unique published_cards.slug (defense-in-depth vs card hijack).
+// Best-effort — if legacy duplicates exist it's skipped (the app-level ownership
+// check already prevents new collisions), never failing the deploy.
+try {
+  await conn.query("ALTER TABLE published_cards ADD UNIQUE INDEX uq_pubcard_slug (slug)");
+  log("✓ published_cards.slug -> UNIQUE");
+} catch (e) {
+  log("• published_cards.slug unique skipped (" + (e.code || e.message) + ")");
+}
+
 console.log("\n✅  Migration complete — additive only, no existing data touched.\n");
 console.log("   Next: seed products (node db/seed-products.mjs) once the app has");
 console.log("   generated its template presets, then set real INR prices in admin.\n");

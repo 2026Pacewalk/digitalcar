@@ -16,6 +16,19 @@ function slugify(input: string): string {
     .slice(0, 40) || "card";
 }
 
+/** The package of the user's currently-active (non-expired) subscription, or
+    null. Used for server-side entitlement + quota checks (Phase 31 §44/§45). */
+async function activeSubPackage(db: ReturnType<typeof getDb>, userId: number) {
+  const sub = await db.query.subscriptions.findFirst({
+    where: and(eq(subscriptions.userId, userId), sql`${subscriptions.status} in ('trial','active')`),
+    with: { package: true },
+    orderBy: [desc(subscriptions.createdAt)],
+  });
+  if (!sub) return null;
+  if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd).getTime() < Date.now()) return null;
+  return sub.package ?? null;
+}
+
 export const cardRouter = createRouter({
   list: authedQuery
     .input(
@@ -115,6 +128,15 @@ export const cardRouter = createRouter({
         where: eq(cards.slug, input.slug),
       });
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "Slug already in use" });
+
+      // Quota: enforce the active plan's maxCards (mirrors bulkCreate — Phase 31).
+      const [usedRow] = await db.select({ count: sql<number>`count(*)` }).from(cards).where(eq(cards.userId, ctx.user.id));
+      const used = Number(usedRow?.count || 0);
+      const pkg = await activeSubPackage(db, ctx.user.id);
+      const maxCards = pkg?.maxCards ?? 0; // 0 = unlimited / not enforced
+      if (maxCards > 0 && used + 1 > maxCards) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Your plan allows ${maxCards} card${maxCards === 1 ? "" : "s"}. Upgrade your plan to create more.` });
+      }
 
       const result = await db.insert(cards).values({
         userId: ctx.user.id,
@@ -271,10 +293,23 @@ export const cardRouter = createRouter({
         if (data.status === "published") updateData.publishedAt = new Date();
       }
       if (data.templateId !== undefined) updateData.templateId = data.templateId;
-      if (data.customDomain !== undefined) updateData.customDomain = data.customDomain;
       if (data.language !== undefined) updateData.language = data.language;
       if (data.settings !== undefined) updateData.settings = data.settings;
-      if (data.seoSettings !== undefined) updateData.seoSettings = data.seoSettings;
+      // Server-side entitlement: custom domain + SEO are paid features (§44/§45).
+      // Setting a non-empty value requires an active plan that includes it; clearing
+      // is always allowed. Frontend gating alone was bypassable over tRPC (Phase 31).
+      if (data.customDomain !== undefined || data.seoSettings !== undefined) {
+        const pkg = await activeSubPackage(db, ctx.user.id);
+        if (data.customDomain !== undefined) {
+          if (data.customDomain && !pkg?.featureCustomDomain) throw new TRPCError({ code: "FORBIDDEN", message: "A custom domain requires an eligible plan." });
+          updateData.customDomain = data.customDomain;
+        }
+        if (data.seoSettings !== undefined) {
+          const hasSeo = data.seoSettings && Object.keys(data.seoSettings).length > 0;
+          if (hasSeo && !pkg?.featureSEO) throw new TRPCError({ code: "FORBIDDEN", message: "Custom SEO settings require an eligible plan." });
+          updateData.seoSettings = data.seoSettings;
+        }
+      }
 
       await db.update(cards).set(updateData).where(eq(cards.id, id));
 

@@ -12,7 +12,15 @@ const app = new Hono<{ Bindings: HttpBindings }>();
 async function requireSuperAdmin(c: { req: { header: (k: string) => string | undefined } }) {
   const token = c.req.header("x-auth-token") || c.req.header("authorization")?.replace("Bearer ", "");
   const payload = token ? await verifyToken(token) : null;
-  return payload?.role === "super_admin" ? payload : null;
+  if (!payload) return null;
+  // Re-check the CURRENT role in the DB — never trust the (possibly stale) token
+  // claim for the most sensitive endpoint in the app (Phase 31). A demoted admin
+  // must lose access immediately, not at token expiry.
+  const { getDb } = await import("./queries/connection");
+  const { users } = await import("@db/schema");
+  const { eq } = await import("drizzle-orm");
+  const row = await getDb().select({ role: users.role }).from(users).where(eq(users.id, payload.userId));
+  return row[0]?.role === "super_admin" ? payload : null;
 }
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
@@ -269,12 +277,16 @@ app.post("/api/funnel", async (c) => {
     try { body = await c.req.json(); } catch { try { body = JSON.parse(await c.req.text()); } catch { body = null; } }
     const stage = String(body?.stage || "").slice(0, 40);
     if (FUNNEL_STAGES.includes(stage)) {
+      // Attribute to the signed-in user (from the token) — never a client-supplied
+      // userId, which would let anyone pollute another user's funnel (Phase 31).
+      const tk = c.req.header("x-auth-token") || c.req.header("authorization")?.replace("Bearer ", "");
+      const authed = tk ? await verifyToken(tk) : null;
       const { getDb } = await import("./queries/connection");
       const { funnelEvents } = await import("@db/schema");
       getDb().insert(funnelEvents).values({
         stage,
         productSlug: body?.productSlug ? String(body.productSlug).slice(0, 191) : null,
-        userId: Number(body?.userId) || null,
+        userId: authed?.userId ?? null,
       }).catch(() => {});
     }
   } catch { /* best-effort */ }
