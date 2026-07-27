@@ -384,6 +384,112 @@ export function resellerRejectedEmail(o: { name?: string; note?: string }): Emai
   };
 }
 
+/* ── Trial lifecycle (§9) — driven by the card_trials engine ─────────────
+   Each is sent at most once per user (notifications ledger dedup). Metric
+   emails show ONLY real numbers pulled from card_events (§36 — never faked). */
+
+export interface TrialMetrics { views: number; saves: number; whatsapp: number; calls: number; leads: number; }
+
+function metricsBlock(m: TrialMetrics): string {
+  const cell = (n: number, label: string) =>
+    `<td align="center" style="padding:14px 8px;border:1px solid ${BRAND.line};border-radius:12px">
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:bold;color:${BRAND.ink}">${n}</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${BRAND.sub};text-transform:uppercase;letter-spacing:.4px;margin-top:2px">${label}</div>
+    </td>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="6" style="margin:18px 0"><tr>
+    ${cell(m.views, "Views")}${cell(m.saves, "Saves")}${cell(m.whatsapp, "WhatsApp")}${cell(m.leads, "Leads")}
+  </tr></table>`;
+}
+
+const CTA = `${SITE}/dashboard/subscription`;
+
+export function trialDay1Email(o: { name?: string; cardUrl?: string }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p("Your DigitalCarda is <strong>live</strong> and ready to share 🎉 The best next step is to get it in front of people — every view, save and WhatsApp click starts here.") +
+    p("Share it in your WhatsApp status, email signature, and social bios today.") +
+    button("Share my card", o.cardUrl || `${SITE}/dashboard`);
+  return {
+    subject: "Your DigitalCarda is live — start sharing 🎉",
+    html: layout({ preheader: "Your card is live. Share it to start getting engagement.", badge: "Day 1 · Live", heading: "Your card is live 🎉", bodyHtml, accent: "#22C55E" }),
+    text: `Hi ${o.name || "there"},\n\nYour DigitalCarda is live! Share it everywhere to start getting views, saves and leads: ${o.cardUrl || SITE + "/dashboard"}`,
+  };
+}
+
+export function trialDay7Email(o: { name?: string; cardUrl?: string }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p("One week in — here's how to get more out of your card:") +
+    `<ul style="margin:0 0 14px;padding-left:20px;color:#334155">
+      <li style="margin-bottom:6px">Add your <strong>services &amp; gallery</strong> so visitors know what you offer</li>
+      <li style="margin-bottom:6px">Turn on <strong>lead capture</strong> to collect enquiries automatically</li>
+      <li style="margin-bottom:6px">Put your <strong>QR code</strong> on your visiting card &amp; signage</li>
+    </ul>` +
+    button("Improve my card", `${SITE}/dashboard`);
+  return {
+    subject: "Get more from your DigitalCarda 💡",
+    html: layout({ preheader: "3 quick ways to get more views and leads from your card.", badge: "Day 7 · Tips", heading: "Make your card work harder 💡", bodyHtml }),
+    text: `Hi ${o.name || "there"},\n\nOne week in! Add services & gallery, enable lead capture, and share your QR code to get more from your card: ${SITE}/dashboard`,
+  };
+}
+
+export function trialDay15Email(o: { name?: string; daysLeft: number; metrics: TrialMetrics }): Email {
+  const any = o.metrics.views + o.metrics.saves + o.metrics.leads > 0;
+  const bodyHtml =
+    hi(o.name) +
+    p(`You're halfway through your free trial — <strong>${o.daysLeft} days left</strong>.`) +
+    (any ? p("Here's what your card has done so far:") + metricsBlock(o.metrics)
+         : p("Your card is live — share it more this week to start seeing views, saves and leads roll in.")) +
+    button("Keep my card active", CTA);
+  return {
+    subject: `Halfway through your trial — ${o.daysLeft} days left`,
+    html: layout({ preheader: `${o.daysLeft} days left on your trial. Here's your progress.`, badge: "Day 15 · Halfway", heading: "You're halfway there ⏳", bodyHtml }),
+    text: `Hi ${o.name || "there"},\n\nHalfway through your trial — ${o.daysLeft} days left. Views: ${o.metrics.views}, Saves: ${o.metrics.saves}, Leads: ${o.metrics.leads}. Keep it active: ${CTA}`,
+  };
+}
+
+export function trialDay21Email(o: { name?: string; daysLeft: number; metrics: TrialMetrics }): Email {
+  const any = o.metrics.views + o.metrics.saves + o.metrics.leads > 0;
+  const bodyHtml =
+    hi(o.name) +
+    (any
+      ? p("Your DigitalCarda is working. Here's the value it's generated:") + metricsBlock(o.metrics) +
+        p(`Don't lose this momentum — <strong>${o.daysLeft} days left</strong> on your trial.`)
+      : p(`<strong>${o.daysLeft} days left</strong> on your trial. Share your card a few more times this week to start seeing real engagement before it ends.`)) +
+    button("Keep my card active", CTA);
+  return {
+    subject: "Your DigitalCarda is working 📈",
+    html: layout({ preheader: `Your card's results so far — ${o.daysLeft} days left.`, badge: "Day 21 · Results", heading: "Your card is working 📈", bodyHtml, accent: "#22C55E" }),
+    text: `Hi ${o.name || "there"},\n\nYour card's results — Views: ${o.metrics.views}, Saves: ${o.metrics.saves}, WhatsApp: ${o.metrics.whatsapp}, Leads: ${o.metrics.leads}. ${o.daysLeft} days left. Keep it active: ${CTA}`,
+  };
+}
+
+export function trialDay25Email(o: { name?: string; daysLeft: number; metrics: TrialMetrics }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p(`Only <strong style="color:${BRAND.goldDark}">${o.daysLeft} days left</strong> on your free trial. Activate your plan now so your card — and everything you've built — stays online without interruption.`) +
+    (o.metrics.views + o.metrics.leads > 0 ? metricsBlock(o.metrics) : "") +
+    button("Keep my card active", CTA);
+  return {
+    subject: `Keep your card active — ${o.daysLeft} days left`,
+    html: layout({ preheader: `${o.daysLeft} days left — activate to keep your card online.`, badge: "Day 25 · Reminder", heading: "Keep your card active 🔔", bodyHtml }),
+    text: `Hi ${o.name || "there"},\n\nOnly ${o.daysLeft} days left on your trial. Activate your plan to keep your card online: ${CTA}`,
+  };
+}
+
+export function abandonedPublishEmail(o: { name?: string; productName?: string; cardUrl?: string }): Email {
+  const what = o.productName ? `your <strong>${esc(o.productName)}</strong> card` : "your digital card";
+  const bodyHtml =
+    hi(o.name) +
+    p(`You're almost there — ${what} is set up but not published yet. Publishing takes one click, and your <strong>30-day free trial only starts when you publish</strong>, so you lose nothing by finishing now.`) +
+    button("Finish &amp; publish my card", o.cardUrl || `${SITE}/dashboard/build`);
+  return {
+    subject: "Your DigitalCarda is almost ready 🚀",
+    html: layout({ preheader: "One click to publish — your free trial starts only when you publish.", badge: "Almost done", heading: "You're one click away 🚀", bodyHtml, accent: BRAND.gold }),
+    text: `Hi ${o.name || "there"},\n\nYour digital card is almost ready — publish it to make it live. Your 30-day free trial only starts when you publish: ${o.cardUrl || SITE + "/dashboard/build"}`,
+  };
+}
+
 export function trialEndedEmail(o: { name?: string }): Email {
   const bodyHtml =
     hi(o.name) +
