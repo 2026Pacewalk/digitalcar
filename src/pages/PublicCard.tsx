@@ -21,6 +21,15 @@ function safeUrl(u: unknown): string {
   return "#";
 }
 
+// Sandbox the PUBLIC card iframe (Phase 31 defense-in-depth): the card renders
+// owner-supplied content, so we deny it same-origin access — even if an XSS sink
+// were missed, the script can't read the parent's localStorage (the auth token).
+// The allow-* flags keep every legitimate interaction working: scripts (tracking,
+// vCard), target=_blank + tel/mailto links, downloads, the enquiry form, alerts.
+// NOTE: only the public card is sandboxed — the dashboard preview and /demo rely
+// on window.parent to SUPPRESS tracking, which sandbox would break.
+const CARD_SANDBOX = "allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads allow-forms allow-modals allow-top-navigation-by-user-activation";
+
 export default function PublicCard() {
   const { slug = "" } = useParams();
   // retry:false so a missing/errored DB card settles immediately and we fall
@@ -129,12 +138,12 @@ export default function PublicCard() {
         (s.qrcodes ?? []) as Parameters<typeof buildCardHtml>[5],
       );
     }
-    return <iframe srcDoc={html} title={slug} className="w-full min-h-screen border-0 bg-white" />;
+    return <iframe srcDoc={html} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" />;
   }
 
   // Real customer card rendered from customers.json (the common case today).
   if (!dbHasContent && legacyHtml) {
-    return <iframe srcDoc={legacyHtml} title={slug} className="w-full min-h-screen border-0 bg-white" />;
+    return <iframe srcDoc={legacyHtml} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" />;
   }
 
   // No usable DB card and not in the legacy data → genuinely not found.

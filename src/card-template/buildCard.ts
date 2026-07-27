@@ -435,7 +435,9 @@ ${footer}
 var DC_SLUG = ${JSON.stringify(slug)};
 var DC_OFF = false;
 try { var _pp = (window.parent && window.parent !== window && window.parent.location.pathname) || ""; if (/^\\/dashboard|^\\/demo\\//.test(_pp)) DC_OFF = true; } catch (e) {}
-function dcTrack(t){ if(!DC_SLUG||DC_OFF) return; try{ var b=new Blob([JSON.stringify({slug:DC_SLUG,type:t})],{type:'application/json'}); if(!navigator.sendBeacon||!navigator.sendBeacon('/api/track',b)) throw 0; }catch(e){ try{ fetch('/api/track',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:DC_SLUG,type:t})}); }catch(_){} } }
+/* text/plain body = CORS-safelisted (no preflight) so it works from the
+   sandboxed public-card iframe (opaque origin). Server parses text as JSON. */
+function dcTrack(t){ if(!DC_SLUG||DC_OFF) return; try{ var b=new Blob([JSON.stringify({slug:DC_SLUG,type:t})],{type:'text/plain'}); if(!navigator.sendBeacon||!navigator.sendBeacon('/api/track',b)) throw 0; }catch(e){ try{ fetch('/api/track',{method:'POST',keepalive:true,body:JSON.stringify({slug:DC_SLUG,type:t})}); }catch(_){} } }
 dcTrack('view');
 document.addEventListener('click', function(e){ var a=e.target.closest?e.target.closest('a,button'):null; if(!a) return; var href=(a.getAttribute&&a.getAttribute('href'))||''; var oc=(a.getAttribute&&a.getAttribute('onclick'))||''; if(/saveVCard/.test(oc)) return dcTrack('save_contact'); if(/openShare/.test(oc)) return dcTrack('share'); if(href.indexOf('tel:')===0) return dcTrack('call'); if(href.indexOf('mailto:')===0) return dcTrack('email'); if(/wa\\.me|whatsapp/i.test(href)) return dcTrack('whatsapp'); if(/maps\\.google|google\\.[a-z.]+\\/maps|goo\\.gl\\/maps/i.test(href)) return dcTrack('directions'); if(a.closest&&a.closest('.product-card')) return dcTrack('product'); if(/facebook|instagram|youtube|twitter|linkedin|pinterest/i.test(href)) return dcTrack('social'); if(href.indexOf('http')===0) return dcTrack('website'); }, true);
 var galImgs = ${JSON.stringify(gallery.map((g) => s(g.filename)))};
@@ -458,15 +460,13 @@ function dcSendEnquiry(form){
       name:(form.name.value||'').trim(), contact:(form.contact.value||'').trim(),
       email:(form.email.value||'').trim(), description:(form.description.value||'').trim(),
       uname:'${slug}', created_on:ts, status:'new' };
-    var key='dc_new_enquiries', list=[];
-    try{ list=JSON.parse(localStorage.getItem(key)||'[]'); if(!Array.isArray(list))list=[]; }catch(_){ list=[]; }
-    list.push(e);
-    localStorage.setItem(key, JSON.stringify(list));
-    localStorage.setItem('dc_enquiry_ping', String(d.getTime())); /* wake cross-tab listeners */
+    /* Send to the server FIRST (owner stored + emailed) — the important path.
+       Runs before any localStorage, which throws in the sandboxed public card. */
+    try{ fetch('/api/enquiry',{method:'POST',body:JSON.stringify({slug:e.uname,name:e.name,contact:e.contact,email:e.email,description:e.description})}).catch(function(){}); }catch(_){}
+    /* Best-effort local mirror for the owner's dashboard — silently no-ops under sandbox. */
+    try{ var key='dc_new_enquiries', list=[]; try{ list=JSON.parse(localStorage.getItem(key)||'[]'); if(!Array.isArray(list))list=[]; }catch(_){ list=[]; } list.push(e); localStorage.setItem(key, JSON.stringify(list)); localStorage.setItem('dc_enquiry_ping', String(d.getTime())); }catch(_){}
     try{ window.dispatchEvent(new CustomEvent('dc:new-enquiry',{detail:e})); }catch(_){}
     try{ if(window.parent && window.parent!==window) window.parent.dispatchEvent(new CustomEvent('dc:new-enquiry',{detail:e})); }catch(_){}
-    /* Send to the server so the owner is stored + emailed. Fire-and-forget. */
-    try{ fetch('/api/enquiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:e.uname,name:e.name,contact:e.contact,email:e.email,description:e.description})}).catch(function(){}); }catch(_){}
   }catch(err){}
   form.innerHTML='<p class="dc-sent">✓ Thank you! We will get back to you shortly.</p>';
   return false;
