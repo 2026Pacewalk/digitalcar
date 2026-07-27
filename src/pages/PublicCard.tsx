@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadVCard, shareCard } from "@/lib/share";
-import { buildCardHtml } from "@/card-template/buildCard";
+import { buildCardHtml, buildPausedHtml } from "@/card-template/buildCard";
 import { loadCustomerContent, decodeSpecialities, imgUrl } from "@/lib/cardContent";
 
 export default function PublicCard() {
@@ -17,6 +17,11 @@ export default function PublicCard() {
   // retry:false so a missing/errored DB card settles immediately and we fall
   // back to the legacy (customers.json) renderer instead of retry-storming.
   const { data: card, isLoading: cardLoading } = trpc.card.getBySlug.useQuery({ slug }, { retry: false });
+  // Server snapshot saved when a user publishes from the builder (Phase 15) —
+  // the source for new-flow cards whose content isn't in customers.json.
+  const { data: snapshot, isLoading: snapLoading } = trpc.publish.bySlug.useQuery({ slug }, { retry: false });
+  // Expiry state — pauses an expired card for visitors (never deletes it, §12).
+  const { data: pubState, isLoading: stateLoading } = trpc.publish.publicState.useQuery({ slug }, { retry: false });
   // Only treat the DB card as usable if it actually has content blocks. Imported
   // (recovery) cards are slug-only with no blocks — those must fall back to the
   // legacy customers.json renderer, not render as an empty card.
@@ -42,8 +47,15 @@ export default function PublicCard() {
 
   // Real customers live in customers.json (the DB has no card for them yet), so
   // when the DB has nothing, render their actual card via the legacy renderer.
+  // Canonical URL — /c/:slug and /:slug serve the same card; point both at /:slug.
   useEffect(() => {
-    if (cardLoading || dbHasContent) return;
+    let el = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (!el) { el = document.createElement("link"); el.rel = "canonical"; document.head.appendChild(el); }
+    el.href = `https://digitalcarda.in/${slug}`;
+  }, [slug]);
+
+  useEffect(() => {
+    if (cardLoading || dbHasContent || snapshot) return; // snapshot wins over legacy JSON
     let cancelled = false;
     (async () => {
       try {
@@ -77,13 +89,38 @@ export default function PublicCard() {
     });
   };
 
-  // Still resolving (DB query, then legacy lookup).
-  if (cardLoading || (!dbHasContent && legacyHtml === undefined)) {
+  // Still resolving (DB card, snapshot, expiry state, then legacy lookup).
+  if (cardLoading || snapLoading || (snapshot && stateLoading) || (!dbHasContent && !snapshot && legacyHtml === undefined)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <RefreshCw size={22} className="animate-spin text-[#94A3B8]" />
       </div>
     );
+  }
+
+  // New-flow card rendered from its server snapshot (Phase 15), with expiry
+  // handling (Phase 18): a paused card is never deleted — the URL stays, the
+  // visitor just sees the configured expiry view. Reactivating (paying) makes
+  // it render fully again instantly.
+  if (!dbHasContent && snapshot && (snapshot as { customer?: unknown }).customer) {
+    const s = snapshot as { customer: unknown; products?: unknown[]; gallery?: unknown[]; videos?: unknown[]; offers?: unknown[]; qrcodes?: unknown[] };
+    const cust = s.customer as Parameters<typeof buildCardHtml>[0];
+    let html: string;
+    if (pubState?.paused && pubState.mode !== "basic") {
+      html = buildPausedHtml(cust); // deactivate / limited → paused screen
+    } else if (pubState?.paused) {
+      html = buildCardHtml(cust, [], [], [], [], []); // basic → contact only, premium locked
+    } else {
+      html = buildCardHtml(
+        cust,
+        (s.products ?? []) as Parameters<typeof buildCardHtml>[1],
+        (s.gallery ?? []) as Parameters<typeof buildCardHtml>[2],
+        (s.videos ?? []) as Parameters<typeof buildCardHtml>[3],
+        (s.offers ?? []) as Parameters<typeof buildCardHtml>[4],
+        (s.qrcodes ?? []) as Parameters<typeof buildCardHtml>[5],
+      );
+    }
+    return <iframe srcDoc={html} title={slug} className="w-full min-h-screen border-0 bg-white" />;
   }
 
   // Real customer card rendered from customers.json (the common case today).

@@ -2,9 +2,9 @@ import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
-  paymentOrders, appSettings, subscriptionPackages, subscriptions, users, notifications,
+  paymentOrders, appSettings, subscriptionPackages, subscriptions, users, notifications, cardTrials, funnelEvents, resellerProfiles,
 } from "@db/schema";
-import { eq, desc, and, gt, inArray } from "drizzle-orm";
+import { eq, desc, and, gt, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail } from "./lib/email-templates";
@@ -176,6 +176,29 @@ export const paymentRouter = createRouter({
         paymentGateway: "manual",
       });
       await db.update(paymentOrders).set({ status: "verified", verifiedAt: now }).where(eq(paymentOrders.id, order.id));
+
+      // The trial has converted to a paid plan — reflect it in the trial engine
+      // so the lifecycle banner stops and the card stays live past trial end.
+      await db.update(cardTrials).set({ status: "converted" }).where(eq(cardTrials.userId, order.userId));
+      db.insert(funnelEvents).values({ stage: "payment", userId: order.userId }).catch(() => {}); // funnel: paid
+
+      // Reseller commission: if this buyer belongs to a reseller, credit them (§55).
+      try {
+        const rc = await db.query.users.findFirst({ where: eq(users.id, order.userId), columns: { resellerId: true, fullName: true } });
+        if (rc?.resellerId) {
+          const profile = await db.query.resellerProfiles.findFirst({ where: eq(resellerProfiles.userId, rc.resellerId) });
+          const rate = Number(profile?.commissionRate ?? 10);
+          const commission = money((n(order.amount) * rate) / 100);
+          await db.update(resellerProfiles).set({
+            totalEarnings: sql`${resellerProfiles.totalEarnings} + ${commission}`,
+            pendingPayout: sql`${resellerProfiles.pendingPayout} + ${commission}`,
+          }).where(eq(resellerProfiles.userId, rc.resellerId));
+          await db.insert(notifications).values({
+            userId: rc.resellerId, type: "reseller_commission", title: "Commission earned 💰",
+            message: `${rc.fullName} activated a plan — ₹${commission} added to your pending payout.`, link: "/reseller",
+          });
+        }
+      } catch { /* non-critical */ }
 
       // Notify the buyer
       await db.insert(notifications).values({

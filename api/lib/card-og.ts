@@ -28,7 +28,7 @@ function customers(distPath: string): Row[] {
   return cache ?? [];
 }
 
-export interface CardMeta { title: string; description: string; image: string; url: string }
+export interface CardMeta { title: string; description: string; image: string; url: string; jsonLd?: string; ogType?: string }
 
 const OG_IMAGE = `${SITE}/why-businessman.png`;
 
@@ -71,15 +71,23 @@ export function cardMetaFor(pathname: string, distPath: string): CardMeta | null
     : String(row.about_us || "").replace(/<[^>]*>/g, "").slice(0, 150)) || "View my digital business card.";
   const logo = String(row.logo || "");
   const image = logo ? (/^https?:/.test(logo) ? logo : `${IMG_BASE}/home/${encodeURIComponent(logo)}`) : `${SITE}/why-businessman.png`;
-  return { title, description, image, url: `${SITE}/${slug}` };
+  const url = `${SITE}/${slug}`;
+  // Genuine Person structured data — helps rich results / AI answers (§52).
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org", "@type": "Person", name, url,
+    ...(row.designation ? { jobTitle: String(row.designation) } : {}),
+    ...(row.company_name ? { worksFor: { "@type": "Organization", name: String(row.company_name) } } : {}),
+    ...(logo ? { image } : {}),
+  });
+  return { title, description, image, url, jsonLd, ogType: "profile" };
 }
 
-/** Inject the meta into an index.html string. */
+/** Inject the meta (+ optional JSON-LD) into an index.html string. */
 export function injectCardMeta(html: string, meta: CardMeta): string {
   const tags = [
     `<meta name="description" content="${esc(meta.description)}">`,
     `<link rel="canonical" href="${esc(meta.url)}">`,
-    `<meta property="og:type" content="profile">`,
+    `<meta property="og:type" content="${esc(meta.ogType || "website")}">`,
     `<meta property="og:site_name" content="DigitalCarda">`,
     `<meta property="og:title" content="${esc(meta.title)}">`,
     `<meta property="og:description" content="${esc(meta.description)}">`,
@@ -89,6 +97,7 @@ export function injectCardMeta(html: string, meta: CardMeta): string {
     `<meta name="twitter:title" content="${esc(meta.title)}">`,
     `<meta name="twitter:description" content="${esc(meta.description)}">`,
     `<meta name="twitter:image" content="${esc(meta.image)}">`,
+    ...(meta.jsonLd ? [`<script type="application/ld+json">${meta.jsonLd.replace(/</g, "\\u003c")}</script>`] : []),
   ].join("\n    ");
   return html
     .replace(/<title>.*?<\/title>/, `<title>${esc(meta.title)}</title>`)

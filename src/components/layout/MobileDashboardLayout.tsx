@@ -5,7 +5,7 @@ import {
   Plus, Eye, Share2, CreditCard, Menu, MessageSquare,
   Settings, LogOut, HelpCircle, ChevronLeft,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Star, Upload, Mail, Layers,
-  ToggleRight, Search, ReceiptText, KeyRound, Gift,
+  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
@@ -109,39 +109,39 @@ const NAV: Record<string, NavConfig> = {
     fab: true,
     roots: ["/dashboard", "/dashboard/home"],
     tabs: [
-      { icon: Home, label: "Home", path: "/dashboard/home" },
-      { icon: Palette, label: "Builder", path: "/dashboard/builder" },
-      { icon: CreditCard, label: "Cards", path: "/dashboard/cards" },
+      { icon: Home, label: "Home", path: "/dashboard" },
+      { icon: Wand2, label: "Edit", path: "/dashboard/build" },
+      { icon: QrCode, label: "QR", path: "/dashboard/qr" },
       { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
       { icon: User, label: "Profile", path: "/dashboard/profile" },
     ],
     drawer: [
-      { title: "Overview", items: [
+      { title: "My Card", items: [
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: Wand2, label: "Edit Card", path: "/dashboard/build" },
         { icon: Eye, label: "View Card", path: "/dashboard/view" },
       ] },
-      { title: "My Card", items: [
-        { icon: Home, label: "Profile", path: "/dashboard/home" },
-        { icon: Palette, label: "Templates", path: "/dashboard/templates" },
-        { icon: Info, label: "About Us", path: "/dashboard/about" },
-        { icon: ShoppingBag, label: "Products / Services", path: "/dashboard/products?tab=products" },
-        { icon: Wallet, label: "Payments", path: "/dashboard/payments" },
-        { icon: ImageIcon, label: "Gallery (Images / Videos)", path: "/dashboard/media" },
-        { icon: Share2, label: "Social Links", path: "/dashboard/social" },
-        { icon: Star, label: "Google Reviews", path: "/dashboard/reviews" },
-        { icon: Upload, label: "Uploads", path: "/dashboard/uploads" },
-      ] },
-      { title: "Engage", items: [
-        { icon: Mail, label: "Enquiries", path: "/dashboard/enquiry" },
-        { icon: Layers, label: "Bulk Create", path: "/dashboard/bulk" },
+      { title: "Grow", items: [
+        { icon: Mail, label: "Leads", path: "/dashboard/leads" },
+        { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
+        { icon: QrCode, label: "QR & Share", path: "/dashboard/qr" },
         { icon: Gift, label: "Refer & Earn", path: "/dashboard/refer" },
       ] },
-      { title: "Settings", items: [
-        { icon: ToggleRight, label: "Modules", path: "/dashboard/settings?tab=module" },
-        { icon: Search, label: "SEO", path: "/dashboard/settings?tab=seo" },
-        { icon: Package, label: "Package", path: "/dashboard/settings?tab=package" },
-        { icon: ReceiptText, label: "Invoice", path: "/dashboard/settings?tab=invoice" },
-        { icon: KeyRound, label: "Password", path: "/dashboard/settings?tab=password" },
+      { title: "Card Sections", items: [
+        { icon: Palette, label: "Templates", path: "/dashboard/templates" },
+        { icon: ShoppingBag, label: "Products / Services", path: "/dashboard/products?tab=products" },
+        { icon: ImageIcon, label: "Gallery & Videos", path: "/dashboard/media" },
+        { icon: Share2, label: "Social Links", path: "/dashboard/social" },
+        { icon: Star, label: "Google Reviews", path: "/dashboard/reviews" },
+        { icon: Info, label: "About Us", path: "/dashboard/about" },
+        { icon: Wallet, label: "Payments", path: "/dashboard/payments" },
+        { icon: Upload, label: "Uploads", path: "/dashboard/uploads" },
+      ] },
+      { title: "Account", items: [
+        { icon: CreditCard, label: "Subscription", path: "/dashboard/subscription" },
+        { icon: Layers, label: "Bulk Create", path: "/dashboard/bulk" },
+        { icon: User, label: "Profile", path: "/dashboard/profile" },
+        { icon: Settings, label: "Settings", path: "/dashboard/settings?tab=module" },
       ] },
     ],
   },

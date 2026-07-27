@@ -199,10 +199,143 @@ export const templates = mysqlTable("templates", {
 
 export type Template = typeof templates.$inferSelect;
 
+// ─── Products (ecommerce catalogue) ─────────────────────────────
+// A sellable listing. Distinct from a template (design) and a card
+// (instance): a product wraps a design with a name, price, category,
+// images and SEO — what the customer browses and tries. Section 15.
+export const products = mysqlTable("products", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 191 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  tagline: varchar("tagline", { length: 255 }),
+  description: text("description"),
+  styleNumber: int("style_number").notNull().default(1), // design 1..44 (CSS/link-bio)
+  category: varchar("category", { length: 100 }),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  salePrice: decimal("sale_price", { precision: 10, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+  trialDays: int("trial_days").notNull().default(30),
+  primaryColor: varchar("primary_color", { length: 7 }),
+  secondaryColor: varchar("secondary_color", { length: 7 }),
+  images: json("images"), // string[] of image URLs
+  seoTitle: varchar("seo_title", { length: 255 }),
+  seoDescription: varchar("seo_description", { length: 500 }),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
+  isFeatured: boolean("is_featured").notNull().default(false),
+  displayOrder: int("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("product_status_idx").on(table.status),
+  index("product_category_idx").on(table.category),
+]);
+
+export type Product = typeof products.$inferSelect;
+
+// ─── Card Trials (backend-authoritative 30-day trial) ───────────
+// The trial starts on FIRST PUBLISH (not registration) and is the source of
+// truth for a card's live status. Dates come from the server clock — never a
+// frontend timer (Section 5). Keyed by user for now (one card per user);
+// moves to card_id when the card-instance migration runs.
+export const cardTrials = mysqlTable("card_trials", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().unique(),
+  productId: bigint("product_id", { mode: "number", unsigned: true }),
+  status: mysqlEnum("status", ["not_started", "active", "expiring_soon", "expired", "converted", "cancelled", "grace"]).notNull().default("active"),
+  startedAt: timestamp("started_at"),
+  endsAt: timestamp("ends_at"),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type CardTrial = typeof cardTrials.$inferSelect;
+
+// ─── Published Cards (server snapshot for the public URL) ───────
+// When a user publishes from the builder, we snapshot their card (profile +
+// content) here so the PUBLIC /slug page can render it server-side — the
+// content no longer lives only in the browser. A pragmatic bridge until the
+// full card_blocks migration; keyed by user, looked up by slug.
+export const publishedCards = mysqlTable("published_cards", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().unique(),
+  slug: varchar("slug", { length: 191 }).notNull(),
+  publicId: varchar("public_id", { length: 16 }).unique(), // permanent QR/redirect id
+  data: json("data").notNull(),
+  publishedAt: timestamp("published_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("pubcard_slug_idx").on(table.slug),
+]);
+
+export type PublishedCard = typeof publishedCards.$inferSelect;
+
+// ─── Card Events (real engagement analytics, slug-keyed) ────────
+// Lightweight event log for the PUBLIC card: views, QR scans, and every action
+// tap (call / whatsapp / email / website / directions / save-contact). Keyed by
+// slug so it works for both snapshot and legacy cards. Never fabricated (§36).
+export const cardEvents = mysqlTable("card_events", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 191 }).notNull(),
+  type: varchar("type", { length: 32 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("cardev_slug_idx").on(table.slug),
+  index("cardev_type_idx").on(table.type),
+]);
+
+export type CardEvent = typeof cardEvents.$inferSelect;
+
+// ─── Funnel Events (conversion funnel analytics) ───────────────
+// One row per funnel step a visitor/user reaches: product_view → demo_view →
+// try_free → registration → published → payment. Powers the admin funnel view
+// so drop-off is visible (§62). Product-scoped where relevant.
+export const funnelEvents = mysqlTable("funnel_events", {
+  id: serial("id").primaryKey(),
+  stage: varchar("stage", { length: 40 }).notNull(),
+  productSlug: varchar("product_slug", { length: 191 }),
+  userId: bigint("user_id", { mode: "number", unsigned: true }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("funnel_stage_idx").on(table.stage),
+  index("funnel_product_idx").on(table.productSlug),
+]);
+
+export type FunnelEvent = typeof funnelEvents.$inferSelect;
+
+// ─── Companies / Teams (corporate accounts) ────────────────────
+// A company buys many cards; a company admin governs branding + approved
+// designs; employees get cards under that identity (§56). Foundation layer.
+export const companies = mysqlTable("companies", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  adminUserId: bigint("admin_user_id", { mode: "number", unsigned: true }).notNull(),
+  logo: varchar("logo", { length: 500 }),
+  brandColor: varchar("brand_color", { length: 7 }),
+  brandColor2: varchar("brand_color2", { length: 7 }),
+  approvedStyles: json("approved_styles"),   // number[] — templates employees may use
+  mandatoryFields: json("mandatory_fields"), // string[] — fields employees must fill
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export const companyMembers = mysqlTable("company_members", {
+  id: serial("id").primaryKey(),
+  companyId: bigint("company_id", { mode: "number", unsigned: true }).notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().unique(),
+  role: mysqlEnum("role", ["admin", "employee"]).notNull().default("employee"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("companymember_company_idx").on(table.companyId),
+]);
+
+export type Company = typeof companies.$inferSelect;
+export type CompanyMember = typeof companyMembers.$inferSelect;
+
 // ─── Leads ──────────────────────────────────────────────────────
 export const leads = mysqlTable("leads", {
   id: serial("id").primaryKey(),
-  cardId: bigint("card_id", { mode: "number", unsigned: true }).notNull(),
+  cardId: bigint("card_id", { mode: "number", unsigned: true }), // nullable: snapshot cards have no DB card row
   userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   fullName: varchar("full_name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }),

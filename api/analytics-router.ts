@@ -1,10 +1,50 @@
 import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { analyticsEvents, cards, users, subscriptions, invoices, leads } from "@db/schema";
-import { eq, and, sql, gte, desc, inArray } from "drizzle-orm";
+import { analyticsEvents, cards, users, subscriptions, invoices, leads, funnelEvents, products } from "@db/schema";
+import { eq, and, sql, gte, desc, inArray, isNotNull } from "drizzle-orm";
 
 export const analyticsRouter = createRouter({
+  // Admin: per-product funnel — which designs drive views → try → publish (§61).
+  productFunnel: adminQuery.query(async () => {
+    const db = getDb();
+    const rows = await db.select({ slug: funnelEvents.productSlug, stage: funnelEvents.stage, n: sql<number>`count(*)` })
+      .from(funnelEvents).where(isNotNull(funnelEvents.productSlug)).groupBy(funnelEvents.productSlug, funnelEvents.stage);
+    const prodRows = await db.select({ slug: products.slug, name: products.name }).from(products);
+    const map: Record<string, Record<string, number>> = {};
+    for (const r of rows) { if (!r.slug) continue; (map[r.slug] ??= {})[r.stage] = Number(r.n); }
+    return prodRows.map((p) => {
+      const m = map[p.slug] || {};
+      const views = m.product_view ?? 0;
+      const published = m.published ?? 0;
+      return {
+        slug: p.slug, name: p.name, views,
+        demo: m.demo_view ?? 0, tryFree: m.try_free ?? 0,
+        registration: m.registration ?? 0, published,
+        convRate: views ? Math.round((published / views) * 100) : 0,
+      };
+    }).filter((x) => x.views > 0 || x.tryFree > 0 || x.published > 0)
+      .sort((a, b) => b.views - a.views);
+  }),
+
+  // Admin: conversion funnel counts by stage (§62).
+  funnel: adminQuery.query(async () => {
+    const db = getDb();
+    const rows = await db.select({ stage: funnelEvents.stage, n: sql<number>`count(*)` }).from(funnelEvents).groupBy(funnelEvents.stage);
+    const c = Object.fromEntries(rows.map((r) => [r.stage, Number(r.n)])) as Record<string, number>;
+    const at = (s: string) => c[s] ?? 0;
+    return {
+      steps: [
+        { key: "product_view", label: "Product Views", count: at("product_view") },
+        { key: "demo_view", label: "Demo Views", count: at("demo_view") },
+        { key: "try_free", label: "Try-Free Clicks", count: at("try_free") },
+        { key: "registration", label: "Registrations", count: at("registration") },
+        { key: "published", label: "Cards Published", count: at("published") },
+        { key: "payment", label: "Paid Conversions", count: at("payment") },
+      ],
+    };
+  }),
+
   cardOverview: authedQuery
     .input(
       z.object({

@@ -14,6 +14,8 @@ import { readCustomer, scopedKey, getAuthUser } from "@/hooks/useCustomer";
 import { fetchMyLeads } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import TrialBanner from "@/components/customer/TrialBanner";
+import TrialLifecycleBanner from "@/components/customer/TrialLifecycleBanner";
+import LeadReminder from "@/components/customer/LeadReminder";
 import OnboardingGuide, { type GuideStep } from "@/components/customer/OnboardingGuide";
 
 /* Glass action button for the dark hero card (icon + tiny label) */
@@ -209,6 +211,12 @@ export default function CustomerDashboard() {
   return (
     <ResponsiveDashboardLayout>
       <div className="p-4 sm:p-6 space-y-4 max-w-5xl mx-auto">
+
+        {/* ─── Trial lifecycle banner (server-authoritative) ─── */}
+        <TrialLifecycleBanner />
+
+        {/* ─── Follow-up reminder (mini-CRM) ─── */}
+        <LeadReminder />
 
         {/* ─── Hero: your digital card ─── */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0F172A] via-[#172033] to-[#1E293B] p-5 shadow-premium-lg ring-1 ring-black/5">

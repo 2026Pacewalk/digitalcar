@@ -12,6 +12,9 @@ const AdminResellerApplications = lazy(() => import("./pages/admin/ResellerAppli
 const Home = lazy(() => import("./pages/public/Home"));
 const Features = lazy(() => import("./pages/public/Features"));
 const Templates = lazy(() => import("./pages/public/Templates"));
+const Marketplace = lazy(() => import("./pages/public/Marketplace"));
+const ProductDetail = lazy(() => import("./pages/public/ProductDetail"));
+const CardDemo = lazy(() => import("./pages/public/CardDemo"));
 const Industries = lazy(() => import("./pages/public/Industries"));
 const Pricing = lazy(() => import("./pages/public/Pricing"));
 const BulkCards = lazy(() => import("./pages/public/BulkCards"));
@@ -28,6 +31,7 @@ const AdminResellers = lazy(() => import("./pages/admin/Resellers"));
 const AdminCustomers = lazy(() => import("./pages/admin/Customers"));
 const AdminPackages = lazy(() => import("./pages/admin/Packages"));
 const AdminTemplates = lazy(() => import("./pages/admin/Templates"));
+const AdminProducts = lazy(() => import("./pages/admin/Products"));
 const AdminMigration = lazy(() => import("./pages/admin/Migration"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const AdminLeads = lazy(() => import("./pages/admin/Leads"));
@@ -51,6 +55,7 @@ const CustomerProfile = lazy(() => import("./pages/customer/Profile"));
 const CustomerQR = lazy(() => import("./pages/customer/QR"));
 const AITools = lazy(() => import("./pages/customer/AITools"));
 const CustomerHome = lazy(() => import("./pages/customer/Home"));
+const CardStudio = lazy(() => import("./pages/customer/CardStudio"));
 const CustomerAbout = lazy(() => import("./pages/customer/About"));
 const CustomerProducts = lazy(() => import("./pages/customer/Products"));
 const CustomerPayments = lazy(() => import("./pages/customer/Payments"));
@@ -129,6 +134,9 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/features" element={<Features />} />
           <Route path="/templates" element={<Templates />} />
+          <Route path="/digital-business-cards" element={<Marketplace />} />
+          <Route path="/digital-business-cards/:slug" element={<ProductDetail />} />
+          <Route path="/demo/:slug" element={<CardDemo />} />
           <Route path="/industries" element={<Industries />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/bulk-cards" element={<BulkCards />} />
@@ -159,6 +167,7 @@ export default function App() {
         <Route path="/admin/resellers" element={<RoleRoute allowedRoles={["super_admin"]}><AdminResellers /></RoleRoute>} />
         <Route path="/admin/reseller-applications" element={<RoleRoute allowedRoles={["super_admin"]}><AdminResellerApplications /></RoleRoute>} />
         <Route path="/admin/customers" element={<RoleRoute allowedRoles={["super_admin"]}><AdminCustomers /></RoleRoute>} />
+        <Route path="/admin/products" element={<RoleRoute allowedRoles={["super_admin"]}><AdminProducts /></RoleRoute>} />
         <Route path="/admin/packages" element={<RoleRoute allowedRoles={["super_admin"]}><AdminPackages /></RoleRoute>} />
         <Route path="/admin/templates" element={<RoleRoute allowedRoles={["super_admin"]}><AdminTemplates /></RoleRoute>} />
         <Route path="/admin/migration" element={<RoleRoute allowedRoles={["super_admin"]}><AdminMigration /></RoleRoute>} />
@@ -189,6 +198,7 @@ export default function App() {
         <Route path="/dashboard/profile" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerProfile /></RoleRoute>} />
         <Route path="/dashboard/qr" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerQR /></RoleRoute>} />
         <Route path="/dashboard/ai" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><AITools /></RoleRoute>} />
+        <Route path="/dashboard/build" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardStudio /></RoleRoute>} />
         <Route path="/dashboard/home" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerHome /></RoleRoute>} />
         <Route path="/dashboard/about" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerAbout /></RoleRoute>} />
         <Route path="/dashboard/products" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerProducts /></RoleRoute>} />

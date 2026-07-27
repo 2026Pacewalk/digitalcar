@@ -1,6 +1,22 @@
 import { SignJWT, jwtVerify } from "jose";
+import { randomBytes } from "crypto";
 
-const RAW_SECRET = process.env.JWT_SECRET || "digitalcarda-super-secret-key-2024-change-in-production";
+// The JWT signing key. Production MUST provide JWT_SECRET (>=16 chars). If it is
+// missing we NEVER fall back to a public/committed key — instead we generate a
+// strong random per-process key and warn loudly. Fail-safe: the app still boots
+// (no outage) and tokens can't be forged, but sessions reset on each restart
+// until a persistent JWT_SECRET is set (the deploy writes one to .env). In dev a
+// fixed local-only key keeps sessions stable across restarts.
+const DEV_ONLY_SECRET = "digitalcarda-dev-only-key-not-valid-in-production";
+const RAW_SECRET = (() => {
+  const s = process.env.JWT_SECRET;
+  if (s && s.length >= 16) return s;
+  if (process.env.NODE_ENV === "production") {
+    console.warn("⚠ JWT_SECRET not set — using a random per-process key. Set a persistent JWT_SECRET in .env (openssl rand -hex 48).");
+    return randomBytes(48).toString("hex");
+  }
+  return DEV_ONLY_SECRET;
+})();
 const SECRET_KEY = new TextEncoder().encode(RAW_SECRET);
 // A distinct key for password-reset tokens so they can NEVER be used as auth
 // tokens (verifyToken uses SECRET_KEY and will reject these).

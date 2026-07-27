@@ -3,7 +3,7 @@ import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Eye, UserCheck, MessageSquare, CreditCard, BarChart3 } from "lucide-react";
+import { Eye, UserCheck, MessageSquare, CreditCard, BarChart3, QrCode, Phone, MessageCircle, Mail, Globe, MapPin, UserPlus } from "lucide-react";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dayLabel = (ymd: string) => {
@@ -15,6 +15,19 @@ const BAR_COLORS = ["#F7B31C", "#14B8A6", "#3B82F6", "#8B5CF6", "#EC4899", "#647
 
 export default function CustomerAnalytics() {
   const { data, isLoading } = trpc.analytics.myOverview.useQuery();
+  const { data: eng } = trpc.publish.myStats.useQuery(undefined, { retry: false });
+
+  const t = eng?.total ?? {};
+  const engMetrics = [
+    { label: "Card Views", value: t.view ?? 0, icon: Eye, color: "bg-[#FEF3C7] text-[#92400E]" },
+    { label: "QR Scans", value: t.qr_scan ?? 0, icon: QrCode, color: "bg-[#EDE9FE] text-[#6D28D9]" },
+    { label: "Call Clicks", value: t.call ?? 0, icon: Phone, color: "bg-[#DCFCE7] text-[#166534]" },
+    { label: "WhatsApp", value: t.whatsapp ?? 0, icon: MessageCircle, color: "bg-[#DCFCE7] text-[#166534]" },
+    { label: "Email Clicks", value: t.email ?? 0, icon: Mail, color: "bg-[#DBEAFE] text-[#1E40AF]" },
+    { label: "Website", value: t.website ?? 0, icon: Globe, color: "bg-[#DBEAFE] text-[#1E40AF]" },
+    { label: "Directions", value: t.directions ?? 0, icon: MapPin, color: "bg-[#FEE2E2] text-[#991B1B]" },
+    { label: "Contact Saves", value: t.save_contact ?? 0, icon: UserPlus, color: "bg-[#F1F5F9] text-[#334155]" },
+  ];
 
   const stats = [
     { label: "Total Views", value: data?.totalViews ?? 0, icon: Eye, color: "bg-[#FEF3C7] text-[#92400E]" },
@@ -50,6 +63,21 @@ export default function CustomerAnalytics() {
               <p className="text-xs text-[#64748B] mt-0.5">{s.label}</p>
             </div>
           ))}
+        </div>
+
+        {/* Real engagement — every tap on the live card (Phase 20) */}
+        <div>
+          <h2 className="text-base font-semibold text-[#0F172A]">Real engagement</h2>
+          <p className="text-xs text-[#64748B] mb-3">Actual taps on your live card — never estimated.</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {engMetrics.map((m) => (
+              <div key={m.label} className="bg-white rounded-2xl p-4 shadow-premium border border-[#F1F5F9]">
+                <div className={`w-9 h-9 rounded-xl ${m.color} flex items-center justify-center mb-2`}><m.icon size={16} /></div>
+                <p className="text-xl font-bold text-[#0F172A] tabular-nums">{Number(m.value).toLocaleString("en-IN")}</p>
+                <p className="text-[11px] text-[#64748B] mt-0.5">{m.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

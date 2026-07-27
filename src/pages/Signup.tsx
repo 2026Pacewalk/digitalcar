@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
@@ -9,7 +9,9 @@ import {
 import AuthBrandPanel from "@/components/AuthBrandPanel";
 import { passwordProblems, passwordChecks } from "@/lib/password";
 import { slugifyUsername } from "@/lib/username";
-import { scopedKey } from "@/hooks/useCustomer";
+import { scopedKey, DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
+import { buildCardThumb } from "@/card-template/buildCard";
+import { logFunnel } from "@/lib/funnel";
 
 function GoogleIcon({ size = 18 }: { size?: number }) {
   return (
@@ -38,10 +40,19 @@ export default function Signup() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const referralCode = searchParams.get("ref") || "";
+  const productSlug = searchParams.get("product") || "";
   const registerMut = trpc.auth.register.useMutation();
   const utils = trpc.useUtils();
   const { data: refInfo } = trpc.referral.validate.useQuery({ code: referralCode }, { enabled: !!referralCode });
   const refDiscount = refInfo?.valid ? refInfo.discountPercent : 0;
+  // The card the visitor chose in the marketplace — carried through signup so
+  // their new card starts on that design and they land in customisation (§32).
+  const { data: selectedProduct } = trpc.product.bySlug.useQuery({ slug: productSlug }, { enabled: !!productSlug });
+  const productThumb = useMemo(
+    () => (selectedProduct ? buildCardThumb({ ...DEFAULT_CUSTOMER, color: selectedProduct.primaryColor || "#F7B31C", color2: selectedProduct.secondaryColor || "" }, selectedProduct.styleNumber) : ""),
+    [selectedProduct],
+  );
+  useEffect(() => { if (productSlug) logFunnel("try_free", productSlug); }, [productSlug]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [form, setForm] = useState({
@@ -99,18 +110,36 @@ export default function Signup() {
       });
       localStorage.setItem("auth_token", res.token);
       localStorage.setItem("digitalcarda_user", JSON.stringify(res.user));
+      logFunnel("registration", productSlug || undefined, res.user?.id);
       // Auto-derive the card username from the business name (fall back to full
       // name, then email). The user can change it later from their dashboard.
       const handle = slugifyUsername(form.businessName || form.fullName || form.email.split("@")[0]);
-      if (handle && res.user?.id) {
+      if (res.user?.id) {
         try {
           const key = scopedKey("dc_customer");
           const existing = JSON.parse(localStorage.getItem(key) || "{}");
-          localStorage.setItem(key, JSON.stringify({ ...existing, username: handle, slug: handle }));
+          const next: Record<string, unknown> = { ...existing };
+          if (handle) { next.username = handle; next.slug = handle; }
+          // Start the new card on the chosen product's design + record the product.
+          if (selectedProduct) {
+            next.theme = selectedProduct.styleNumber;
+            next.color = selectedProduct.primaryColor || existing.color || "#F7B31C";
+            next.color2 = selectedProduct.secondaryColor || existing.color2 || "";
+            next.product_id = selectedProduct.id;
+            next.product_slug = selectedProduct.slug;
+          }
+          localStorage.setItem(key, JSON.stringify(next));
         } catch { /* non-critical — dashboard will seed a default */ }
       }
-      toast.success("Account created! Welcome to DigitalCarda.");
-      navigate("/dashboard");
+      // Trial does NOT start here — it begins on first publish (§5, Phase 13).
+      // Land the user straight in customisation when they picked a card (§32).
+      if (selectedProduct) {
+        toast.success(`Account created! Let's make your ${selectedProduct.name} yours.`);
+        navigate("/dashboard/build");
+      } else {
+        toast.success("Account created! Welcome to DigitalCarda.");
+        navigate("/dashboard/build");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create account");
       setLoading(false);
@@ -159,6 +188,20 @@ export default function Signup() {
             <h1 className="text-2xl sm:text-[1.7rem] font-extrabold text-[#0F172A] tracking-tight">Create Your Account</h1>
             <p className="text-sm text-[#64748B] mt-1">No credit card required · Cancel anytime</p>
           </div>
+
+          {selectedProduct && (
+            <div className="flex items-center gap-3 rounded-2xl bg-white border border-[#E2E8F0] px-3 py-3 mb-5 shadow-premium">
+              <div className="w-[68px] h-[101px] rounded-lg overflow-hidden border border-[#E2E8F0] shrink-0 bg-white relative">
+                <iframe srcDoc={productThumb} title="Selected design" scrolling="no" tabIndex={-1}
+                  style={{ width: 375, height: 560, border: 0, transform: "scale(0.1813)", transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-[#F7B31C] uppercase tracking-wide">You're creating</p>
+                <p className="text-sm font-bold text-[#0F172A] leading-tight line-clamp-2">{selectedProduct.name}</p>
+                <p className="text-[11px] text-[#64748B] mt-1">₹{Number(selectedProduct.salePrice || selectedProduct.price).toLocaleString("en-IN")}/yr · {selectedProduct.trialDays}-day free trial · no card</p>
+              </div>
+            </div>
+          )}
 
           {referralCode && (
             <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#FEF3C7] to-[#FFF7E6] border border-[#FDE68A] px-4 py-3 mb-5">
