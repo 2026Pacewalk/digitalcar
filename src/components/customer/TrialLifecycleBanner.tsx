@@ -17,10 +17,13 @@ const TONES: Record<string, Tone> = {
 };
 const today = () => new Date().toISOString().slice(0, 10);
 
-export default function TrialLifecycleBanner() {
+/* `paidPlan` — the account is on a paid subscription (Gold/Platinum), so the
+   trial lifecycle is irrelevant: never show trial messaging to a paying user
+   (a Platinum card that is already live must not read "start your free trial"). */
+export default function TrialLifecycleBanner({ paidPlan = false }: { paidPlan?: boolean }) {
   const { data: t } = trpc.trial.me.useQuery(undefined, { retry: false });
   const [hidden, setHidden] = useState(() => localStorage.getItem("dc_trial_dismiss") === today());
-  if (!t) return null;
+  if (!t || paidPlan) return null;
 
   const n = t.daysLeft;
   let tone = "gold", cta = "Keep My Card Active", ctaTo = "/dashboard/subscription", dismissible = false;

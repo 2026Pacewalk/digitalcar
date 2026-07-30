@@ -217,7 +217,7 @@ export default function CustomerDashboard() {
       <div className="p-4 sm:p-6 space-y-4 max-w-5xl mx-auto">
 
         {/* ─── Trial lifecycle banner (server-authoritative) ─── */}
-        <TrialLifecycleBanner />
+        <TrialLifecycleBanner paidPlan={customer.package_id === 5 || customer.package_id === 6} />
 
         {/* ─── Follow-up reminder (mini-CRM) ─── */}
         <LeadReminder />
