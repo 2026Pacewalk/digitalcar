@@ -2,7 +2,7 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { useState } from "react";
-import { Download, QrCode, ExternalLink, Copy, Check, MessageCircle, Share2, ShieldCheck } from "lucide-react";
+import { Download, QrCode, ExternalLink, Copy, Check, MessageCircle, Share2, ShieldCheck, Printer, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useCustomer } from "@/hooks/useCustomer";
 
@@ -24,6 +24,12 @@ export default function CustomerQR() {
 
   const colors = ["#0F172A", "#F7B31C", "#14B8A6", "#3B82F6", "#EF4444", "#8B5CF6"];
   const bgs = ["#FFFFFF", "#F8FAFC", "#FEF3C7", "#E0F2FE"];
+
+  // Branding shown on the printable standee.
+  const brandName = String(data.company_name || data.name || "My Business");
+  const subtitle = String(data.designation || data.nature || "");
+  const phone = String(data.mobile1 || "");
+  const linkText = `${ORIGIN}/${slug}`.replace(/^https?:\/\//, "");
 
   const qrSrc = (size: number, fmt = "png") =>
     `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=12&format=${fmt}&data=${encodeURIComponent(qrTarget)}&color=${color.replace("#", "")}&bgcolor=${bg.replace("#", "")}`;
@@ -47,9 +53,132 @@ export default function CustomerQR() {
     finally { setBusy(""); }
   };
 
+  /* ── Branded standee: shared markup for the on-screen preview AND the print
+     window, so what you see is exactly what prints. Portrait "table tent" a
+     shop can stand on the desk/counter. ─────────────────────────────────── */
+  const standeeStyles = `
+    .dc-tent{width:100%;max-width:420px;margin:0 auto;background:#fff;border-radius:26px;overflow:hidden;
+      box-shadow:0 20px 60px rgba(15,23,42,.14);font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;border:1px solid #EEF2F7;}
+    .dc-tent-head{background:linear-gradient(135deg,#F7B31C 0%,#F59E0B 55%,#EA9A08 100%);padding:26px 26px 38px;text-align:center;position:relative;}
+    .dc-tent-brand{display:inline-flex;align-items:center;gap:7px;font-weight:800;font-size:15px;letter-spacing:.2px;color:#0F172A;opacity:.85;margin-bottom:14px;}
+    .dc-tent-brand span{color:#fff;}
+    .dc-tent-logo{width:22px;height:22px;border-radius:7px;background:#0F172A;display:inline-flex;align-items:center;justify-content:center;color:#F7B31C;font-size:12px;font-weight:900;}
+    .dc-tent-name{font-size:26px;line-height:1.15;font-weight:800;color:#0F172A;margin:0;word-break:break-word;}
+    .dc-tent-sub{font-size:13px;font-weight:600;color:#0F172A;opacity:.72;margin-top:6px;}
+    .dc-tent-body{padding:0 26px 22px;text-align:center;margin-top:-14px;}
+    .dc-tent-pill{position:relative;z-index:2;display:inline-block;background:#0F172A;color:#F7B31C;font-size:12px;font-weight:800;letter-spacing:2px;padding:8px 20px;border-radius:999px;box-shadow:0 10px 22px rgba(15,23,42,.28);}
+    .dc-tent-qr{background:#fff;border:1px solid #EEF2F7;border-radius:20px;padding:16px;margin:16px auto 0;width:fit-content;box-shadow:0 10px 30px rgba(15,23,42,.08);}
+    .dc-tent-qr img{display:block;width:220px;height:220px;border-radius:8px;}
+    .dc-tent-prompt{font-size:15px;font-weight:700;color:#0F172A;margin-top:16px;}
+    .dc-tent-prompt small{display:block;font-size:12px;font-weight:500;color:#64748B;margin-top:3px;}
+    .dc-tent-link{display:inline-block;margin-top:12px;background:#F1F5F9;color:#0F172A;font-weight:700;font-size:13px;padding:8px 16px;border-radius:10px;}
+    .dc-tent-phone{font-size:13px;font-weight:600;color:#334155;margin-top:8px;}
+    .dc-tent-foot{background:#0F172A;color:#94A3B8;font-size:11px;text-align:center;padding:12px;}
+    .dc-tent-foot b{color:#F7B31C;}
+  `;
+
+  const standeeInner = () => `
+    <div class="dc-tent">
+      <div class="dc-tent-head">
+        <div class="dc-tent-brand"><span class="dc-tent-logo">D</span> Digital<span>Carda</span></div>
+        <h2 class="dc-tent-name">${escapeHtml(brandName)}</h2>
+        ${subtitle ? `<div class="dc-tent-sub">${escapeHtml(subtitle)}</div>` : ""}
+      </div>
+      <div class="dc-tent-body">
+        <div class="dc-tent-pill">SCAN ME</div>
+        <div class="dc-tent-qr"><img src="${qrSrc(440)}" alt="QR code" crossorigin="anonymous" referrerpolicy="no-referrer" /></div>
+        <div class="dc-tent-prompt">Scan to view my digital card<small>Save my contact · See products · Get directions</small></div>
+        <div class="dc-tent-link">${escapeHtml(linkText)}</div>
+        ${phone ? `<div class="dc-tent-phone">📞 ${escapeHtml(phone)}</div>` : ""}
+      </div>
+      <div class="dc-tent-foot">Powered by <b>DigitalCarda</b> · Your smart digital business card</div>
+    </div>`;
+
+  const printStandee = () => {
+    const w = window.open("", "_blank", "width=520,height=760");
+    if (!w) { toast.error("Allow pop-ups to print"); return; }
+    w.document.write(`<!doctype html><html><head><title>${escapeHtml(brandName)} — QR</title>
+      <meta charset="utf-8"/>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+      <style>@page{size:A6;margin:10mm;}body{margin:0;padding:24px;display:flex;justify-content:center;background:#fff;}${standeeStyles}</style>
+      </head><body>${standeeInner()}
+      <script>window.onload=function(){setTimeout(function(){window.focus();window.print();},400);};<\/script>
+      </body></html>`);
+    w.document.close();
+  };
+
+  // High-resolution PNG of the standee, composed on a canvas (no libraries).
+  const downloadStandee = async () => {
+    setBusy("poster");
+    try {
+      const S = 3; // scale for crisp print (≈1260×1740)
+      const W = 420 * S, H = 580 * S;
+      const cv = document.createElement("canvas");
+      cv.width = W; cv.height = H;
+      const ctx = cv.getContext("2d")!;
+      const rr = (x: number, y: number, w: number, h: number, r: number) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+      };
+      // card background
+      ctx.fillStyle = "#fff"; rr(0, 0, W, H, 26 * S); ctx.fill();
+      // gold header
+      const hh = 150 * S;
+      const g = ctx.createLinearGradient(0, 0, W, hh);
+      g.addColorStop(0, "#F7B31C"); g.addColorStop(1, "#EA9A08");
+      ctx.save(); rr(0, 0, W, hh, 26 * S); ctx.clip(); ctx.fillStyle = g; ctx.fillRect(0, 0, W, hh); ctx.restore();
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(15,23,42,.85)"; ctx.font = `800 ${15 * S}px Inter, sans-serif`;
+      ctx.fillText("DigitalCarda", W / 2, 34 * S);
+      ctx.fillStyle = "#0F172A"; ctx.font = `800 ${26 * S}px Inter, sans-serif`;
+      wrapText(ctx, brandName, W / 2, 74 * S, W - 60 * S, 30 * S);
+      if (subtitle) { ctx.fillStyle = "rgba(15,23,42,.72)"; ctx.font = `600 ${13 * S}px Inter, sans-serif`; ctx.fillText(clip(subtitle, 42), W / 2, 118 * S); }
+      // SCAN ME pill
+      const pillY = 168 * S;
+      ctx.fillStyle = "#0F172A"; rr(W / 2 - 55 * S, pillY - 15 * S, 110 * S, 28 * S, 14 * S); ctx.fill();
+      ctx.fillStyle = "#F7B31C"; ctx.font = `800 ${12 * S}px Inter, sans-serif`; ctx.fillText("S C A N   M E", W / 2, pillY + 3 * S);
+      // QR frame + image
+      const frame = 252 * S, fx = (W - frame) / 2, fy = 200 * S;
+      ctx.fillStyle = "#fff"; ctx.strokeStyle = "#EEF2F7"; ctx.lineWidth = 1 * S;
+      rr(fx, fy, frame, frame, 20 * S); ctx.fill(); ctx.stroke();
+      const qrImg = await loadImg(qrSrc(600));
+      const q = frame - 32 * S; ctx.drawImage(qrImg, fx + 16 * S, fy + 16 * S, q, q);
+      // prompt
+      ctx.fillStyle = "#0F172A"; ctx.font = `700 ${15 * S}px Inter, sans-serif`;
+      ctx.fillText("Scan to view my digital card", W / 2, fy + frame + 34 * S);
+      ctx.fillStyle = "#64748B"; ctx.font = `500 ${12 * S}px Inter, sans-serif`;
+      ctx.fillText("Save my contact · See products · Get directions", W / 2, fy + frame + 56 * S);
+      // link pill
+      const ly = fy + frame + 82 * S;
+      ctx.font = `700 ${13 * S}px Inter, sans-serif`;
+      const lw = ctx.measureText(linkText).width + 32 * S;
+      ctx.fillStyle = "#F1F5F9"; rr(W / 2 - lw / 2, ly - 15 * S, lw, 30 * S, 10 * S); ctx.fill();
+      ctx.fillStyle = "#0F172A"; ctx.fillText(linkText, W / 2, ly + 4 * S);
+      if (phone) { ctx.fillStyle = "#334155"; ctx.font = `600 ${13 * S}px Inter, sans-serif`; ctx.fillText("📞 " + phone, W / 2, ly + 34 * S); }
+      // footer
+      ctx.fillStyle = "#0F172A"; ctx.fillRect(0, H - 40 * S, W, 40 * S);
+      ctx.save(); rr(0, 0, W, H, 26 * S); ctx.clip();
+      ctx.fillStyle = "#0F172A"; ctx.fillRect(0, H - 40 * S, W, 40 * S); ctx.restore();
+      ctx.fillStyle = "#94A3B8"; ctx.font = `500 ${11 * S}px Inter, sans-serif`;
+      ctx.fillText("Powered by DigitalCarda · Your smart digital business card", W / 2, H - 16 * S);
+
+      cv.toBlob((blob) => {
+        if (!blob) { toast.error("Could not create image"); return; }
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `digitalcarda-standee-${slug || "card"}.png`;
+        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+        toast.success("Standee downloaded");
+      }, "image/png");
+    } catch { toast.error("Download failed — check your connection"); }
+    finally { setBusy(""); }
+  };
+
   return (
     <ResponsiveDashboardLayout>
-      <div className="hidden md:block"><TopBar title="QR & Share" subtitle="Your permanent QR code and share tools" /></div>
+      <div className="hidden md:block"><TopBar title="QR & Share" subtitle="A print-ready, branded QR standee for your desk & counter" /></div>
+      <style>{standeeStyles}</style>
       <div className="p-4 sm:p-6 space-y-5">
         {!slug ? (
           <div className="bg-white rounded-2xl p-12 shadow-premium border border-[#F1F5F9] text-center">
@@ -58,26 +187,29 @@ export default function CustomerQR() {
             <p className="text-sm text-[#94A3B8]">Finish and publish your card to get a QR.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* QR preview */}
-            <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9] flex flex-col items-center">
-              <div className="p-4 rounded-2xl" style={{ background: bg }}>
-                <img src={qrSrc(280)} alt="Your card QR code" width={240} height={240} className="rounded-lg" referrerPolicy="no-referrer" />
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+            {/* Branded standee preview */}
+            <div className="bg-gradient-to-b from-[#F8FAFC] to-[#EEF2F7] rounded-2xl p-6 sm:p-8 shadow-premium border border-[#F1F5F9] flex flex-col items-center">
+              <div className="w-full max-w-[420px]" dangerouslySetInnerHTML={{ __html: standeeInner() }} />
               {mine?.publicId && (
-                <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><ShieldCheck size={13} /> Permanent QR — redesign your card anytime, it keeps working</p>
+                <p className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><ShieldCheck size={13} /> Permanent QR — redesign your card anytime, it keeps working</p>
               )}
-              <div className="mt-4 w-full flex items-center gap-2 p-2.5 bg-[#F8FAFC] rounded-xl">
-                <span className="text-xs text-[#64748B] truncate flex-1">{shareUrl.replace(/^https?:\/\//, "")}</span>
-                <button onClick={copy} className="p-1.5 rounded-lg hover:bg-[#E2E8F0] text-[#64748B]">{copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}</button>
-              </div>
             </div>
 
             {/* Controls */}
             <div className="space-y-4">
               <div className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
-                <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Style</h3>
-                <label className="block text-xs text-[#64748B] mb-1.5">QR colour</label>
+                <h3 className="text-sm font-semibold text-[#0F172A] mb-1">Print-ready standee</h3>
+                <p className="text-[12px] text-[#94A3B8] mb-3">Download or print this branded card and stand it on your desk, shop counter or reception.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={downloadStandee} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all disabled:opacity-60"><ImageIcon size={16} /> {busy === "poster" ? "Preparing…" : "Download PNG"}</button>
+                  <button onClick={printStandee} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 border border-[#E2E8F0] text-[#334155] rounded-xl text-sm font-semibold hover:bg-[#F8FAFC] transition-all disabled:opacity-60"><Printer size={16} /> Print / PDF</button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
+                <h3 className="text-sm font-semibold text-[#0F172A] mb-3">QR colour</h3>
+                <label className="block text-xs text-[#64748B] mb-1.5">Code colour</label>
                 <div className="flex gap-2 flex-wrap mb-4">
                   {colors.map((c) => <button key={c} onClick={() => setColor(c)} className={`w-8 h-8 rounded-lg border-2 transition-all ${color === c ? "border-[#0F172A] scale-110" : "border-transparent"}`} style={{ background: c }} />)}
                   <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-8 h-8 rounded-lg border border-[#E2E8F0] cursor-pointer bg-transparent" />
@@ -89,16 +221,19 @@ export default function CustomerQR() {
               </div>
 
               <div className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
-                <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Download</h3>
+                <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Just the QR</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => download("png")} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all disabled:opacity-60"><Download size={16} /> PNG</button>
+                  <button onClick={() => download("png")} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 bg-[#0F172A] text-white rounded-xl text-sm font-semibold hover:bg-[#1E293B] transition-all disabled:opacity-60"><Download size={16} /> PNG</button>
                   <button onClick={() => download("svg")} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 border border-[#E2E8F0] text-[#334155] rounded-xl text-sm font-semibold hover:bg-[#F8FAFC] transition-all disabled:opacity-60"><Download size={16} /> SVG</button>
                 </div>
-                <p className="text-[11px] text-[#94A3B8] mt-2">High-resolution — perfect for visiting cards, brochures, signage and packaging.</p>
+                <p className="text-[11px] text-[#94A3B8] mt-2">High-resolution — for visiting cards, brochures, signage & packaging.</p>
               </div>
 
               <div className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
-                <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Share</h3>
+                <div className="flex items-center gap-2 p-2.5 bg-[#F8FAFC] rounded-xl mb-3">
+                  <span className="text-xs text-[#64748B] truncate flex-1">{linkText}</span>
+                  <button onClick={copy} className="p-1.5 rounded-lg hover:bg-[#E2E8F0] text-[#64748B]">{copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}</button>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={whatsapp} className="flex items-center justify-center gap-2 h-10 rounded-xl bg-[#DCFCE7] text-[#166534] text-[13px] font-semibold hover:bg-[#BBF7D0] transition-colors"><MessageCircle size={15} /> WhatsApp</button>
                   <button onClick={nativeShare} className="flex items-center justify-center gap-2 h-10 rounded-xl bg-[#F1F5F9] text-[#334155] text-[13px] font-semibold hover:bg-[#E2E8F0] transition-colors"><Share2 size={15} /> Share</button>
@@ -112,4 +247,31 @@ export default function CustomerQR() {
       </div>
     </ResponsiveDashboardLayout>
   );
+}
+
+/* ── helpers ─────────────────────────────────────────────────────────── */
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
+function clip(s: string, n: number): string { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lh: number) {
+  const words = text.split(" ");
+  let line = "", lines: string[] = [];
+  for (const w of words) {
+    const test = line ? line + " " + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  lines = lines.slice(0, 2);
+  lines.forEach((l, i) => ctx.fillText(l, x, y + i * lh));
 }
