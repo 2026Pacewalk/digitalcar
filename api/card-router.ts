@@ -30,6 +30,14 @@ async function activeSubPackage(db: ReturnType<typeof getDb>, userId: number) {
 }
 
 export const cardRouter = createRouter({
+  // The signed-in user's admin card-limit override (null = use the plan default).
+  // The client adds this on top of its own per-plan default in the switcher.
+  myLimit: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const u = await db.query.users.findFirst({ where: eq(users.id, ctx.user.id), columns: { cardLimit: true } });
+    return { override: u?.cardLimit ?? null };
+  }),
+
   list: authedQuery
     .input(
       z.object({
@@ -133,9 +141,10 @@ export const cardRouter = createRouter({
       const [usedRow] = await db.select({ count: sql<number>`count(*)` }).from(cards).where(eq(cards.userId, ctx.user.id));
       const used = Number(usedRow?.count || 0);
       const pkg = await activeSubPackage(db, ctx.user.id);
-      const maxCards = pkg?.maxCards ?? 0; // 0 = unlimited / not enforced
+      const override = (await db.query.users.findFirst({ where: eq(users.id, ctx.user.id), columns: { cardLimit: true } }))?.cardLimit;
+      const maxCards = override ?? pkg?.maxCards ?? 0; // 0 = unlimited / not enforced
       if (maxCards > 0 && used + 1 > maxCards) {
-        throw new TRPCError({ code: "FORBIDDEN", message: `Your plan allows ${maxCards} card${maxCards === 1 ? "" : "s"}. Upgrade your plan to create more.` });
+        throw new TRPCError({ code: "FORBIDDEN", message: `Your account allows ${maxCards} card${maxCards === 1 ? "" : "s"}. Upgrade your plan to create more.` });
       }
 
       const result = await db.insert(cards).values({
@@ -197,7 +206,8 @@ export const cardRouter = createRouter({
         orderBy: [desc(subscriptions.createdAt)],
       });
 
-      const maxCards = activeSub?.package?.maxCards ?? 0;
+      const bulkOverride = (await db.query.users.findFirst({ where: eq(users.id, ctx.user.id), columns: { cardLimit: true } }))?.cardLimit;
+      const maxCards = bulkOverride ?? activeSub?.package?.maxCards ?? 0;
       // maxCards <= 0 is treated as "unlimited / not enforced" (e.g. no plan yet).
       if (maxCards > 0 && used + input.members.length > maxCards) {
         throw new TRPCError({

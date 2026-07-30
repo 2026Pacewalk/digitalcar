@@ -109,6 +109,16 @@ try {
   log("• published_cards.slug unique skipped (" + (e.code || e.message) + ")");
 }
 
+// Phase 35: super-admin per-user card-limit override (null = plan default).
+{
+  const [cc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='users' AND column_name='card_limit'");
+  if (cc[0].n === 0) {
+    await conn.query("ALTER TABLE users ADD COLUMN card_limit INT NULL AFTER status");
+    log("✓ users.card_limit added (nullable override)");
+  } else { log("• users.card_limit present (skipped)"); }
+}
+
 // Phase 34: multi-card publishing — published_cards goes one-row-per-card so a
 // multi-card plan can publish several. Add card_id (default 1 = primary), drop
 // the single-column user_id UNIQUE, add composite UNIQUE (user_id, card_id).

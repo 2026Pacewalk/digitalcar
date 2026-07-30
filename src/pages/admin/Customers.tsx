@@ -6,7 +6,7 @@ import {
   Search, Plus, Eye, Lock, LogIn, Database, ChevronLeft, ChevronRight,
   X, ExternalLink, Users, UserCheck, Clock, Building2, KeyRound, Globe,
   CalendarPlus, Trash2, AlertTriangle, Mail, Phone, MoreVertical,
-  LayoutGrid, List, Download, ArrowUpDown, Activity,
+  LayoutGrid, List, Download, ArrowUpDown, Activity, Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
@@ -106,6 +106,8 @@ export default function AdminCustomers() {
   const [pwdModal, setPwdModal] = useState<Customer | null>(null);
   const [pkgModal, setPkgModal] = useState<Customer | null>(null);
   const [expModal, setExpModal] = useState<Customer | null>(null);
+  const [limitModal, setLimitModal] = useState<Customer | null>(null);
+  const [limitValue, setLimitValue] = useState<number>(3);
   const [delModal, setDelModal] = useState<Customer | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [pwdValue, setPwdValue] = useState("");
@@ -185,6 +187,17 @@ export default function AdminCustomers() {
   const impersonate = trpc.auth.impersonate.useMutation();
   const extendMut = trpc.user.extendValidity.useMutation();
   const deactivateMut = trpc.user.deactivateCustomer.useMutation();
+  const setLimitMut = trpc.user.setCardLimit.useMutation();
+  const saveLimit = async (limit: number | null) => {
+    if (!limitModal) return;
+    const c = limitModal;
+    setLimitModal(null);
+    try {
+      const res = await setLimitMut.mutateAsync({ email: c.email, limit });
+      if (res.ok) toast.success(limit == null ? `${c.name} reset to plan default` : `${c.name} can now hold ${limit} card${limit === 1 ? "" : "s"}`);
+      else toast.warning(`No live account matched ${c.email} to save it server-side.`);
+    } catch { toast.error("Could not update the card limit"); }
+  };
   const loginAsClient = async (c: Customer) => {
     const rec = { ...c, specialities: decodeSpecialities((c as Record<string, unknown>).specialities), logo: imgUrl("home", (c as Record<string, unknown>).logo) };
     // Mint a REAL token for the customer (if they have a DB account) so authed
@@ -307,6 +320,7 @@ export default function AdminCustomers() {
     { icon: <CalendarPlus size={15} className="text-[#15803D]" />, label: "Extend Validity", onClick: () => { setExpModal(c); setExpDays(30); } },
     { icon: <Lock size={15} className="text-[#7C3AED]" />, label: "Change Password", onClick: () => { setPwdModal(c); setPwdValue(c.password || ""); } },
     { icon: <Database size={15} className="text-[#2563EB]" />, label: "Change Package", onClick: () => { setPkgModal(c); setPkgValue(packageName(c.package_id)); } },
+    { icon: <Layers size={15} className="text-[#7C3AED]" />, label: "Card Limit", onClick: () => { setLimitModal(c); setLimitValue(3); } },
     { icon: <Trash2 size={15} className="text-[#DC2626]" />, label: "Delete Customer", onClick: () => setDelModal(c), danger: true },
   ];
 
@@ -604,6 +618,27 @@ export default function AdminCustomers() {
         <div className="flex gap-3 mt-6">
           <button onClick={() => setExpModal(null)} className="flex-1 h-11 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]">Cancel</button>
           <button onClick={saveExtend} className="flex-1 h-11 rounded-xl bg-[#16A34A] text-white text-sm font-bold hover:bg-[#15803D] transition-colors">Add {Math.max(1, Number(expDays) || 0)} days</button>
+        </div>
+      </Modal>}
+
+      {/* Card Limit modal */}
+      {limitModal && <Modal onClose={() => setLimitModal(null)} icon={<Layers size={20} className="text-[#7C3AED]" />} iconBg="bg-[#EDE9FE]" title="Card Limit" subtitle={`${limitModal.name} · how many cards this account may hold`}>
+        <label className="block text-xs font-semibold text-[#334155] mb-1.5">Quick set</label>
+        <div className="flex gap-2 mb-3">
+          {[1, 3, 10].map((n) => (
+            <button key={n} onClick={() => setLimitValue(n)} className={`flex-1 h-9 rounded-lg text-xs font-semibold border transition-colors ${limitValue === n ? "bg-[#EDE9FE] border-[#7C3AED] text-[#6D28D9]" : "border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"}`}>{n} card{n === 1 ? "" : "s"}</button>
+          ))}
+        </div>
+        <label className="block text-xs font-semibold text-[#334155] mb-1.5">Or set a custom number</label>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setLimitValue((v) => Math.max(1, v - 1))} className="w-11 h-11 rounded-xl border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC] shrink-0 text-lg">−</button>
+          <input type="number" min={1} max={1000} value={limitValue} onChange={(e) => setLimitValue(Math.max(1, Math.min(1000, Number(e.target.value) || 1)))} className="h-11 flex-1 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm text-center outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/15 focus:bg-white transition-all" />
+          <button onClick={() => setLimitValue((v) => Math.min(1000, v + 1))} className="w-11 h-11 rounded-xl border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC] shrink-0 text-lg">+</button>
+        </div>
+        <p className="text-[11px] text-[#94A3B8] mt-2">Overrides the plan default for this user only. Use “Reset” to fall back to their plan’s limit.</p>
+        <div className="flex gap-3 mt-6">
+          <button onClick={() => saveLimit(null)} className="h-11 px-4 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]">Reset to plan</button>
+          <button onClick={() => saveLimit(limitValue)} className="flex-1 h-11 rounded-xl bg-[#7C3AED] text-white text-sm font-bold hover:bg-[#6D28D9] transition-colors">Set {limitValue} card{limitValue === 1 ? "" : "s"}</button>
         </div>
       </Modal>}
 

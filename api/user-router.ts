@@ -165,6 +165,20 @@ export const userRouter = createRouter({
       return { ok: true as const, expiredOn: end.toISOString().slice(0, 10) };
     }),
 
+  // ─── Super-admin: set a user's card-limit override (null = plan default) ───
+  // Keyed by email so it works from the customers admin table. Controls how many
+  // cards the account may hold (the multi-card limit), independent of plan.
+  setCardLimit: adminQuery
+    .input(z.object({ email: z.string().email(), limit: z.number().int().min(1).max(1000).nullable() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase().trim();
+      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } });
+      if (!user) return { ok: false as const, reason: "no_account" as const };
+      await db.update(users).set({ cardLimit: input.limit }).where(eq(users.id, user.id));
+      return { ok: true as const, limit: input.limit };
+    }),
+
   // ─── Deactivate a customer (safe soft-delete: pauses their card, reversible) ───
   deactivateCustomer: adminQuery
     .input(z.object({ email: z.string().email() }))

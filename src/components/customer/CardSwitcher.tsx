@@ -22,12 +22,17 @@ export default function CardSwitcher() {
   const { data: published } = trpc.publish.myCards.useQuery(undefined, { retry: false });
   const removePub = trpc.publish.removeCard.useMutation();
   const liveIds = new Set((published || []).map((p) => Number(p.cardId)));
+  // Super-admin per-user override wins over the plan default when set.
+  const { data: limitInfo } = trpc.card.myLimit.useQuery(undefined, { retry: false });
 
   useEffect(() => {
     setCards(getCards());
     setActiveId(getActiveCardId());
-    setMax(packageLimit(accountPackageId(), "cards"));
   }, []);
+  useEffect(() => {
+    const override = limitInfo?.override;
+    setMax(override != null ? override : packageLimit(accountPackageId(), "cards"));
+  }, [limitInfo]);
 
   useEffect(() => { if (adding) inputRef.current?.focus(); }, [adding]);
 

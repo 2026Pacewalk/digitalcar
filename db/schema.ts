@@ -24,6 +24,8 @@ export const users = mysqlTable("users", {
   avatar: varchar("avatar", { length: 500 }),
   role: mysqlEnum("role", ["super_admin", "reseller", "customer"]).notNull().default("customer"),
   status: mysqlEnum("status", ["active", "inactive", "suspended"]).notNull().default("active"),
+  // Super-admin per-user card-limit override (null = use the plan default).
+  cardLimit: int("card_limit"),
   resellerId: bigint("reseller_id", { mode: "number", unsigned: true }),
   referralCode: varchar("referral_code", { length: 50 }),
   referredById: bigint("referred_by_id", { mode: "number", unsigned: true }),
