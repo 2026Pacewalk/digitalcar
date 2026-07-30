@@ -83,6 +83,67 @@ const savingsPct = (p: Plan, period: Period) => {
 };
 const periodLabel = (period: Period) => (period === "monthly" ? "/mo" : period === "yearly" ? "/yr" : "/ 3 yrs");
 
+/* ── Build the display plans from the DB (admin → Packages). Prices, limits &
+   feature flags come from subscription_packages; the per-plan bullets are
+   auto-generated from that data, so editing a plan in the admin updates this
+   page. Falls back to the static PLANS while the query loads. ── */
+type DbPkg = {
+  name: string; description?: string | null; monthlyPrice: string | number; yearlyPrice: string | number;
+  maxCards: number; maxProducts: number; maxGalleryImages: number; maxVideos: number;
+  featureCustomDomain: boolean; featureSEO: boolean; featureAnalytics: boolean; featureLeadCapture: boolean;
+  featureRemoveBranding: boolean; featureWhiteLabel: boolean; featurePrioritySupport: boolean;
+  featureAI: boolean; featureMultilingual: boolean; featureCRM: boolean;
+};
+const ICON_BY: Record<string, typeof IdCard> = { Trial: Sparkles, Gold: Star, Platinum: Crown };
+const ACCENT_BY: Record<string, string> = { Trial: "#14B8A6", Gold: "#F7B31C", Platinum: "#8B5CF6" };
+const num = (v: unknown) => Number(v ?? 0);
+
+function planBullets(p: DbPkg): { text: string }[] {
+  const b: string[] = [];
+  const cards = p.maxCards ?? 1;
+  b.push(cards <= 1 ? "1 digital card + personal link & QR" : `Up to ${cards} digital cards`);
+  b.push(num(p.maxProducts) >= 9999 ? "Unlimited products & services" : `Up to ${p.maxProducts} products / services`);
+  b.push(`${p.maxGalleryImages}-photo gallery + ${p.maxVideos} videos`);
+  if (p.featureLeadCapture) b.push("Enquiry form — capture every lead");
+  b.push("Google reviews + payment links");
+  b.push("All 31 designs + link-in-bio styles");
+  b.push(p.featureCustomDomain ? "Advanced analytics + export" : "Visit & tap analytics");
+  if (p.featureCustomDomain) b.push("Custom domain (yourbrand.com)");
+  if (p.featureRemoveBranding) b.push("Remove DigitalCarda branding");
+  if (p.featureAI) b.push("AI writes your card content");
+  if (p.featureMultilingual) b.push("Multi-language card");
+  if (p.featureSEO) b.push("Full SEO controls");
+  if (p.featureWhiteLabel) b.push("White-label reseller panel");
+  if (p.featurePrioritySupport) b.push("Priority support");
+  return b.map((text) => ({ text }));
+}
+
+function buildPlans(pkgs: DbPkg[]): Plan[] {
+  return pkgs.map((p) => {
+    const monthly = num(p.monthlyPrice), yearly = num(p.yearlyPrice);
+    const isFree = monthly === 0 && yearly === 0;
+    return {
+      name: isFree ? "Free Trial" : p.name,
+      tagline: p.description || "",
+      icon: ICON_BY[p.name] || Star,
+      accent: ACCENT_BY[p.name] || "#F7B31C",
+      popular: p.name === "Gold",
+      price: { monthly, yearly, "3year": Math.round(yearly * 2.5) },
+      cta: isFree ? "Start Free Trial" : `Get ${p.name}`,
+      headline: isFree ? "Everything, free for 30 days:" : `Your ${p.name} plan includes:`,
+      features: isFree
+        ? [
+            { text: "Your live digital card in minutes" },
+            { text: "All premium features unlocked" },
+            { text: "Custom QR code + shareable link" },
+            { text: "Call, WhatsApp & Save-Contact buttons" },
+            { text: "No credit card required" },
+          ]
+        : planBullets(p),
+    };
+  });
+}
+
 const faqs = [
   { q: "What happens after the 30-day free trial?", a: "You get the full card — every premium feature — free for 30 days, no credit card needed. When it ends, simply pick a plan to keep your card live. Nothing is charged automatically." },
   { q: "What's the difference between Monthly, Yearly and 3-Year?", a: "Same card, cheaper the longer you commit. Yearly saves ~16% (about 2 months free) over monthly, and the 3-Year plan works out to just ₹69/month for Gold — our best value." },
@@ -97,6 +158,8 @@ export default function Pricing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const { data: featureData } = trpc.package.features.useQuery();
   const includedFeatures = featureData?.customer ?? [];
+  const { data: pkgs } = trpc.package.list.useQuery();
+  const plans = pkgs && pkgs.length ? buildPlans(pkgs as unknown as DbPkg[]) : PLANS;
 
   return (
     <div className="pt-24 pb-20 bg-[#F8FAFC]">
@@ -123,7 +186,7 @@ export default function Pricing() {
 
         {/* Plans */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-5xl mx-auto items-start">
-          {PLANS.map((plan) => {
+          {plans.map((plan) => {
             const isFree = plan.price.monthly === 0;
             const price = plan.price[period];
             const sv = savingsPct(plan, period);
