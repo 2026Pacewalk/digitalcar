@@ -462,6 +462,11 @@ export const authRouter = createRouter({
         if (card) user = await db.query.users.findFirst({ where: eq(users.id, card.userId) });
       }
       if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "No matching account" });
+      // Never impersonate a non-customer. Legacy card records sometimes carry the
+      // owner/admin's email as a placeholder — matching one must NOT hand out an
+      // admin/reseller token, or every link/QR in the session resolves to the
+      // admin's own card (the "sees Shekhar's card" bug).
+      if (user.role !== "customer") throw new TRPCError({ code: "NOT_FOUND", message: "No matching customer account" });
       const token = await createToken({ userId: user.id, email: user.email, role: user.role });
       return { token, user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role } };
     }),

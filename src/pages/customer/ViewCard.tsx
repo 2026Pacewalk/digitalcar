@@ -26,6 +26,8 @@ export default function CustomerViewCard() {
   const reviews = useLocalList<Review>("dc_reviews", []);
   const { data: program } = trpc.referral.myProgram.useQuery();
   const { data: siteConfig } = trpc.template.siteConfig.useQuery();
+  // Server-verified published identity — my real public link, per account.
+  const { data: mine } = trpc.publish.mine.useQuery(undefined, { retry: false });
   const [copied, setCopied] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -37,7 +39,9 @@ export default function CustomerViewCard() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  const slug = String(data.slug || "acme-digital");
+  // Never fall back to another card's slug — server truth first, then the
+  // user's own local record; empty shows the card as unpublished.
+  const slug = String(mine?.slug || data.slug || "");
   const url = `https://digitalcarda.in/${slug}`;
 
   // Trial/plan expired → the public card is paused for visitors.

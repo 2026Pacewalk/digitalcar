@@ -86,6 +86,9 @@ export default function CustomerDashboard() {
 
   // Refer & Earn wallet — live from the backend for the signed-in user
   const { data: program } = trpc.referral.myProgram.useQuery(undefined, { retry: false });
+  // Server-verified published card identity — the source of truth for MY link,
+  // so copy/share can never surface another account's (or a stale local) slug.
+  const { data: mine } = trpc.publish.mine.useQuery(undefined, { retry: false });
   const { data: followUps } = trpc.lead.followUps.useQuery(undefined, { retry: false });
   const dueFollowUps = (followUps ?? []).filter((l) => {
     if (!l.followUpDate) return false;
@@ -121,7 +124,9 @@ export default function CustomerDashboard() {
     });
   }, []);
 
-  const slug = customer.slug || "";
+  // Prefer the slug of MY published card (server truth, per signed-in account);
+  // fall back to the local record for cards not yet published.
+  const slug = mine?.slug || customer.slug || "";
   const cardUrl = CARD_BASE + slug;
   const pkg = PKG[customer.package_id] || PKG[7];
 
@@ -175,9 +180,11 @@ export default function CustomerDashboard() {
     catch { toast.error("Copy failed — select and copy manually"); }
   };
   const shareWhatsApp = () => {
-    const num = (customer.mobile2 || customer.mobile1 || "").replace(/[^\d]/g, "");
+    // No recipient prefilled — WhatsApp opens its contact picker so the user
+    // chooses who to send to. (Prefilling the card owner's own number opened a
+    // chat with themselves — the "shares to its own number" bug.)
     const text = encodeURIComponent(`Here is my digital business card: ${cardUrl}`);
-    window.open(num ? `https://wa.me/${num}?text=${text}` : `https://wa.me/?text=${text}`, "_blank");
+    window.open(`https://wa.me/?text=${text}`, "_blank");
   };
   const copyRefLink = async () => {
     if (!program?.code) return;
