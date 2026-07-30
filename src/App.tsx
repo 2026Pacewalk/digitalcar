@@ -45,6 +45,7 @@ const ResellerCustomers = lazy(() => import("./pages/reseller/Customers"));
 const ResellerProfile = lazy(() => import("./pages/reseller/Profile"));
 const CustomerDashboard = lazy(() => import("./pages/customer/Dashboard"));
 const CardBuilder = lazy(() => import("./pages/customer/CardBuilder"));
+const CardTemplateEditor = lazy(() => import("./pages/customer/CardTemplateEditor"));
 const CustomerTemplates = lazy(() => import("./pages/customer/Templates"));
 const CustomerCards = lazy(() => import("./pages/customer/Cards"));
 const CustomerBulkCreate = lazy(() => import("./pages/customer/BulkCreate"));
@@ -202,7 +203,7 @@ export default function App() {
         {/* Customer */}
         <Route path="/dashboard" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerDashboard /></RoleRoute>} />
         <Route path="/dashboard/builder" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardBuilder /></RoleRoute>} />
-        <Route path="/dashboard/builder/:cardId" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardBuilder /></RoleRoute>} />
+        <Route path="/dashboard/builder/:cardId" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardTemplateEditor /></RoleRoute>} />
         <Route path="/dashboard/templates" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerTemplates /></RoleRoute>} />
         <Route path="/dashboard/cards" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerCards /></RoleRoute>} />
         <Route path="/dashboard/bulk" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerBulkCreate /></RoleRoute>} />
