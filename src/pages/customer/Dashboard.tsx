@@ -11,6 +11,7 @@ import type { ComponentType } from "react";
 import { toast } from "sonner";
 import { loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
 import { readCustomer, scopedKey, getAuthUser } from "@/hooks/useCustomer";
+import { useValidityDays } from "@/hooks/useValidityDays";
 import { fetchMyLeads } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import TrialBanner from "@/components/customer/TrialBanner";
@@ -130,13 +131,9 @@ export default function CustomerDashboard() {
   const cardUrl = CARD_BASE + slug;
   const pkg = PKG[customer.package_id] || PKG[7];
 
-  const daysPending = useMemo(() => {
-    if (!customer.expired_on || customer.expired_on === "0000-00-00") return pkg.days;
-    const d = new Date(String(customer.expired_on).replace(" ", "T"));
-    if (isNaN(d.getTime())) return pkg.days;
-    return Math.max(0, Math.ceil((d.getTime() - Date.now()) / 86_400_000));
-  }, [customer.expired_on, pkg.days]);
-  const active = daysPending > 0;
+  // Single source of truth (server trial clock while on trial, else stored plan
+  // expiry) — keeps the Dashboard, Card Builder, Profile & Settings all in sync.
+  const { days: daysPending, active, onTrial } = useValidityDays(customer.expired_on, pkg.days);
 
   // live enquiries count = historical + card submissions − deleted
   useEffect(() => {
@@ -193,7 +190,7 @@ export default function CustomerDashboard() {
   };
 
   const stats = [
-    { icon: CalendarClock, value: daysPending.toLocaleString("en-IN"), label: active ? "Days left" : "Plan expired", bg: active ? "#DCFCE7" : "#FEE2E2", fg: active ? "#16A34A" : "#DC2626", onClick: () => navigate("/dashboard/settings?tab=package") },
+    { icon: CalendarClock, value: daysPending.toLocaleString("en-IN"), label: !active ? "Plan expired" : onTrial ? "Trial days left" : "Days left", bg: active ? "#DCFCE7" : "#FEE2E2", fg: active ? "#16A34A" : "#DC2626", onClick: () => navigate("/dashboard/settings?tab=package") },
     { icon: MessageSquare, value: enquiries === null ? "…" : String(enquiries), label: "Enquiries", bg: "#FEF3C7", fg: "#D97706", onClick: () => navigate("/dashboard/enquiry") },
     { icon: Eye, value: customer.views.toLocaleString("en-IN"), label: "Total Views", bg: "#CFFAFE", fg: "#0891B2", onClick: () => navigate("/dashboard/analytics") },
     { icon: Wallet, value: inr(program?.wallet?.balance ?? 0), label: "Wallet", bg: "#EDE9FE", fg: "#7C3AED", onClick: () => navigate("/dashboard/refer") },

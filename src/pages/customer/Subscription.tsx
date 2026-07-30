@@ -34,7 +34,8 @@ export default function CustomerSubscription() {
   const { data: orders } = trpc.payment.myOrders.useQuery();
   const pendingOrder = (orders || []).find((o) => o.status === "pending");
 
-  const [isYearly, setIsYearly] = useState(false);
+  const [cycle, setCycle] = useState<"monthly" | "yearly" | "triennial">("yearly");
+  const isYearly = cycle !== "monthly"; // "billed yearly+"-style copy for any multi-month term
   const [now, setNow] = useState(() => Date.now());
   const [offerExp, setOfferExp] = useState<number>(0);
   useEffect(() => { setOfferExp(getOfferExpiry()); const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
@@ -107,13 +108,21 @@ export default function CustomerSubscription() {
           </div>
         )}
 
-        {/* Billing Toggle */}
-        <div className="flex items-center justify-center gap-3">
-          <span className={`text-sm font-medium ${!isYearly ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>Monthly</span>
-          <button onClick={() => setIsYearly(!isYearly)} className={`relative w-12 h-6 rounded-full transition-colors ${isYearly ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`}>
-            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${isYearly ? "translate-x-7" : "translate-x-1"}`} />
-          </button>
-          <span className={`text-sm font-medium ${isYearly ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>Yearly <span className="badge-green text-[10px] ml-1">Save more</span></span>
+        {/* Billing Toggle — Monthly · Yearly · 3 Years */}
+        <div className="flex justify-center">
+          <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-white ring-1 ring-[#E2E8F0] shadow-premium">
+            {([
+              { id: "monthly", label: "Monthly" },
+              { id: "yearly", label: "Yearly", badge: "Save more" },
+              { id: "triennial", label: "3 Years", badge: "Best value" },
+            ] as const).map((c) => (
+              <button key={c.id} onClick={() => setCycle(c.id)}
+                className={`relative px-4 sm:px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all ${cycle === c.id ? "gradient-gold text-[#0F172A] shadow-gold" : "text-[#64748B] hover:text-[#0F172A]"}`}>
+                {c.label}
+                {c.badge && <span className={`ml-1.5 hidden sm:inline text-[10px] font-bold px-1.5 py-0.5 rounded-full ${cycle === c.id ? "bg-[#0F172A]/10 text-[#0F172A]" : "bg-[#DCFCE7] text-[#166534]"}`}>{c.badge}</span>}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Plans Grid */}
@@ -121,7 +130,7 @@ export default function CustomerSubscription() {
           {(packages || []).map((plan, idx) => {
             const isCurrent = currentPkgId === plan.id;
             const Icon = PLAN_ICONS[idx % PLAN_ICONS.length];
-            const base = Number(isYearly ? plan.yearlyPrice : plan.monthlyPrice);
+            const base = Number(cycle === "triennial" ? plan.threeYearPrice : cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice);
             const isPaid = base > 0;
             // First paid plan → referral discount. Upgrade → credit the old amount.
             const isUpgrade = hasPaid && !isCurrent && isPaid;
@@ -146,7 +155,7 @@ export default function CustomerSubscription() {
                     <span className="text-3xl font-bold text-[#0F172A]">{inr(finalPrice)}</span>
                     {isPaid && finalPrice < base && <span className="text-sm text-[#94A3B8] line-through">{inr(base)}</span>}
                   </div>
-                  <span className="text-sm text-[#94A3B8]">/{isYearly ? "mo, billed yearly" : "month"}</span>
+                  <span className="text-sm text-[#94A3B8]">{cycle === "triennial" ? " for 3 years" : cycle === "yearly" ? " / year" : " / month"}</span>
                   <span className="ml-2 inline-flex flex-wrap gap-1.5 align-middle">
                     {isUpgrade && <span className="text-[11px] font-semibold text-blue-600">−{inr(currentPaid)} adjusted</span>}
                     {dPct > 0 && isPaid && <span className="text-[11px] font-semibold text-emerald-600">−{dPct}% referral</span>}
@@ -173,7 +182,7 @@ export default function CustomerSubscription() {
 
       {payFor && (
         <PayModal
-          plan={payFor} offerPct={offerPct} isYearly={isYearly}
+          plan={payFor} offerPct={offerPct} cycle={cycle}
           onClose={() => setPayFor(null)}
           onDone={() => { setPayFor(null); utils.payment.myOrders.invalidate(); }}
         />
@@ -183,10 +192,11 @@ export default function CustomerSubscription() {
 }
 
 /* ─── Manual payment modal (UPI QR / bank transfer + submit reference) ─── */
-function PayModal({ plan, offerPct, isYearly, onClose, onDone }: {
-  plan: { id: number; name: string; amount: number }; offerPct: number; isYearly: boolean;
+function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
+  plan: { id: number; name: string; amount: number }; offerPct: number; cycle: "monthly" | "yearly" | "triennial";
   onClose: () => void; onDone: () => void;
 }) {
+  const cycleLabel = cycle === "triennial" ? "3 Years" : cycle === "yearly" ? "Yearly" : "Monthly";
   const { data: pay } = trpc.payment.instructions.useQuery();
   const createOrder = trpc.payment.createOrder.useMutation();
   const [method, setMethod] = useState<"upi" | "bank">("upi");
@@ -199,7 +209,7 @@ function PayModal({ plan, offerPct, isYearly, onClose, onDone }: {
   const submit = async () => {
     if (reference.trim().length < 3) return toast.error("Enter your UPI/transaction reference (UTR)");
     try {
-      await createOrder.mutateAsync({ packageId: plan.id, billingCycle: isYearly ? "yearly" : "monthly", method, reference: reference.trim(), wantsOffer: offerPct > 0 });
+      await createOrder.mutateAsync({ packageId: plan.id, billingCycle: cycle, method, reference: reference.trim(), wantsOffer: offerPct > 0 });
       toast.success("Payment submitted — we'll verify and activate your plan shortly");
       onDone();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
@@ -217,7 +227,7 @@ function PayModal({ plan, offerPct, isYearly, onClose, onDone }: {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-xl w-full max-w-md relative z-10 max-h-[94vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#F1F5F9] shrink-0">
-          <div><p className="text-base font-bold text-[#0F172A]">Pay {inr(plan.amount)}</p><p className="text-[11px] text-[#94A3B8]">{plan.name} · {isYearly ? "Yearly" : "Monthly"}</p></div>
+          <div><p className="text-base font-bold text-[#0F172A]">Pay {inr(plan.amount)}</p><p className="text-[11px] text-[#94A3B8]">{plan.name} · {cycleLabel}</p></div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#F1F5F9] text-[#64748B]"><X size={18} /></button>
         </div>
 

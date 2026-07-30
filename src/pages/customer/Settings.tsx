@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router";
 import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/customer/ModuleShell";
 import InvoicePanel from "@/components/customer/InvoicePanel";
 import { useCustomer, scopedKey } from "@/hooks/useCustomer";
+import { useValidityDays } from "@/hooks/useValidityDays";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
 import { passwordProblems, PASSWORD_HINT } from "@/lib/password";
 import { slugifyUsername, usernameNextChangeDate, fmtDate } from "@/lib/username";
@@ -115,16 +116,10 @@ export default function CustomerSettings() {
     setForm({});
   };
 
-  // Package details
+  // Package details — days left from the shared source (server trial clock
+  // while on trial, else stored plan expiry) so every page shows the same number.
   const pkg = PKG[Number(data.package_id)] || PKG[7];
-  const daysLeft = (() => {
-    const exp = String(data.expired_on || "");
-    if (!exp || exp === "0000-00-00") return pkg.days;
-    const d = new Date(exp.replace(" ", "T"));
-    if (isNaN(d.getTime())) return pkg.days;
-    return Math.max(0, Math.ceil((d.getTime() - Date.now()) / 86_400_000));
-  })();
-  const active = daysLeft > 0;
+  const { days: daysLeft, active, endsAt } = useValidityDays(data.expired_on, pkg.days);
 
   const showTopSave = tab === "module" || tab === "theme" || tab === "seo";
 
@@ -220,7 +215,7 @@ export default function CustomerSettings() {
             <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-[#F1F5F9] bg-white">
               <div className="p-4"><p className="text-[11px] text-[#94A3B8] flex items-center gap-1"><IndianRupee size={11} /> Amount</p><p className="text-lg font-bold text-[#0F172A] mt-1">₹{pkg.amount.toLocaleString("en-IN")}</p></div>
               <div className="p-4"><p className="text-[11px] text-[#94A3B8] flex items-center gap-1"><Calendar size={11} /> Validity</p><p className="text-lg font-bold text-[#0F172A] mt-1">{pkg.days} days</p></div>
-              <div className="p-4"><p className="text-[11px] text-[#94A3B8] flex items-center gap-1"><Calendar size={11} /> Expires</p><p className="text-sm font-semibold text-[#0F172A] mt-1">{String(data.expired_on || "—")}</p></div>
+              <div className="p-4"><p className="text-[11px] text-[#94A3B8] flex items-center gap-1"><Calendar size={11} /> Expires</p><p className="text-sm font-semibold text-[#0F172A] mt-1">{endsAt ? endsAt.toISOString().slice(0, 10) : String(data.expired_on || "—")}</p></div>
             </div>
           </div>
           <div className="flex justify-end mt-4"><Link to="/dashboard/subscription" className="inline-flex items-center gap-2 h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold"><PackageIcon size={15} /> Upgrade / Renew</Link></div>

@@ -37,12 +37,12 @@ async function setSetting(db: ReturnType<typeof getDb>, key: string, value: stri
 async function computeAmount(
   db: ReturnType<typeof getDb>,
   user: { id: number; referredById: number | null },
-  packageId: number, cycle: "monthly" | "yearly", wantsOffer: boolean
+  packageId: number, cycle: "monthly" | "yearly" | "triennial", wantsOffer: boolean
 ) {
   const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, packageId) });
   if (!pkg) throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
   const round2 = (v: number) => Math.round(v * 100) / 100;
-  const base = n(cycle === "yearly" ? pkg.yearlyPrice : pkg.monthlyPrice);
+  const base = n(cycle === "triennial" ? pkg.threeYearPrice : cycle === "yearly" ? pkg.yearlyPrice : pkg.monthlyPrice);
   const existingPaid = await db.query.subscriptions.findFirst({
     where: and(eq(subscriptions.userId, user.id), gt(subscriptions.amount, "0")),
     orderBy: [desc(subscriptions.createdAt)],
@@ -83,7 +83,7 @@ export const paymentRouter = createRouter({
   createOrder: authedQuery
     .input(z.object({
       packageId: z.number(),
-      billingCycle: z.enum(["monthly", "yearly"]),
+      billingCycle: z.enum(["monthly", "yearly", "triennial"]),
       method: z.enum(["upi", "bank"]),
       reference: z.string().min(3),
       wantsOffer: z.boolean().optional(),
@@ -170,7 +170,8 @@ export const paymentRouter = createRouter({
 
       const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, order.packageId) });
       const periodEnd = new Date(now);
-      if (order.billingCycle === "yearly") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+      if (order.billingCycle === "triennial") periodEnd.setFullYear(periodEnd.getFullYear() + 3);
+      else if (order.billingCycle === "yearly") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
       else periodEnd.setMonth(periodEnd.getMonth() + 1);
 
       // Activate a paid subscription for the user

@@ -5,8 +5,19 @@
 -- (maxCards, feature flags in api/card-router.ts) actually apply to those users.
 -- Idempotent: safe to run again (updates on conflict). Run on prod to sync.
 
+-- 3-year billing support (added 2026-07-28). Idempotent (MySQL-safe).
+SET @c := (SELECT COUNT(*) FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'subscription_packages' AND COLUMN_NAME = 'three_year_price');
+SET @s := IF(@c = 0, 'ALTER TABLE subscription_packages ADD COLUMN three_year_price DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER yearly_price', 'DO 0');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+-- MODIFY is idempotent — re-running with the same definition is a no-op.
+ALTER TABLE subscriptions
+  MODIFY COLUMN billing_cycle ENUM('monthly','yearly','triennial') NOT NULL DEFAULT 'monthly';
+ALTER TABLE payment_orders
+  MODIFY COLUMN billing_cycle ENUM('monthly','yearly','triennial') NOT NULL DEFAULT 'monthly';
+
 INSERT INTO subscription_packages
-  (id, name, slug, description, monthly_price, yearly_price, trial_days,
+  (id, name, slug, description, monthly_price, yearly_price, three_year_price, trial_days,
    max_cards, max_products, max_gallery_images, max_videos, storage_limit_mb,
    feature_custom_domain, feature_seo, feature_analytics, feature_lead_capture,
    feature_remove_branding, feature_white_label, feature_priority_support,
@@ -14,15 +25,15 @@ INSERT INTO subscription_packages
 VALUES
   -- Trial: full Gold features, 30 days, 1 card
   (7, 'Trial', 'trial', 'Full Gold features, free for 30 days',
-   0.00, 0.00, 30, 1, 25, 20, 8, 100,
+   0.00, 0.00, 0.00, 30, 1, 25, 20, 8, 100,
    0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0),
-  -- Gold: the flagship. Monthly 99 / Yearly 999. 1 card.
+  -- Gold: the flagship. Monthly 99 / Yearly 999 / 3-Year 2499. 1 card.
   (5, 'Gold', 'gold', 'Everything a business needs',
-   99.00, 999.00, 30, 1, 25, 20, 8, 500,
+   99.00, 999.00, 2499.00, 30, 1, 25, 20, 8, 500,
    0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1),
-  -- Platinum: premium. Monthly 199 / Yearly 1999. 3 cards, unlimited content.
+  -- Platinum: premium. Monthly 199 / Yearly 1999 / 3-Year 4999. 3 cards, unlimited content.
   (6, 'Platinum', 'platinum', 'For brands that want it all',
-   199.00, 1999.00, 30, 3, 9999, 60, 25, 2000,
+   199.00, 1999.00, 4999.00, 30, 3, 9999, 60, 25, 2000,
    1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 2)
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
@@ -30,6 +41,7 @@ ON DUPLICATE KEY UPDATE
   description = VALUES(description),
   monthly_price = VALUES(monthly_price),
   yearly_price = VALUES(yearly_price),
+  three_year_price = VALUES(three_year_price),
   trial_days = VALUES(trial_days),
   max_cards = VALUES(max_cards),
   max_products = VALUES(max_products),

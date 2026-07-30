@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import ModuleShell from "@/components/customer/ModuleShell";
 import { useCustomer, getAuthUser } from "@/hooks/useCustomer";
+import { useValidityDays } from "@/hooks/useValidityDays";
 
 const PKG: Record<number, { name: string; amount: number; days: number }> = {
   7: { name: "Trial", amount: 0, days: 7 },
@@ -39,13 +40,9 @@ export default function CustomerProfile() {
   const slug = String(data.slug || "");
   const cardUrl = `https://digitalcarda.in/${slug}`;
   const pkg = PKG[Number(data.package_id)] || PKG[7];
-  const daysLeft = (() => {
-    const exp = String(data.expired_on || "");
-    if (!exp || exp === "0000-00-00") return 0;
-    const d = new Date(exp.replace(" ", "T"));
-    return isNaN(d.getTime()) ? 0 : Math.max(0, Math.ceil((d.getTime() - Date.now()) / 86_400_000));
-  })();
-  const active = daysLeft > 0;
+  // Server trial clock while on trial, else stored plan expiry — matches the
+  // Dashboard & Card Builder so "days left" is identical everywhere.
+  const { days: daysLeft, active } = useValidityDays(data.expired_on, pkg.days);
   const pctLeft = Math.min(100, Math.round((daysLeft / pkg.days) * 100));
   // Staff accounts (super-admin / reseller) aren't card customers — send them to
   // their own area instead of the customer card profile. (Impersonated clients
