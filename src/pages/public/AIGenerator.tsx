@@ -14,6 +14,16 @@ type AiCard = {
 const CARD_STYLES = 31;
 const THUMB_W = 375, THUMB_H = 626;
 
+/* Varied brand palettes so each template shows in its own colour — the spread of
+   designs looks like the products/templates gallery, not one flat AI colour. */
+const PALETTE: [string, string][] = [
+  ["#F7B31C", "#0F172A"], ["#3B82F6", "#0f2b2e"], ["#16A34A", "#052e16"], ["#8B5CF6", "#2E1065"],
+  ["#EF4444", "#450a0a"], ["#F97316", "#431407"], ["#EC4899", "#500724"], ["#0EA5E9", "#0C4A6E"],
+  ["#14B8A6", "#042f2e"], ["#334155", "#0f172a"], ["#D946EF", "#4a044e"], ["#EAB308", "#422006"],
+  ["#06B6D4", "#083344"], ["#DC2626", "#450a0a"], ["#7C3AED", "#2e1065"], ["#0D9488", "#042f2e"],
+];
+const colorForStyle = (s: number): [string, string] => PALETTE[(s - 1) % PALETTE.length];
+
 /* A small, selectable template thumbnail (scaled card front). */
 function TemplateThumb({ html, active, label, onClick }: { html: string; active: boolean; label: number; onClick: () => void }) {
   const W = 92;
@@ -65,33 +75,35 @@ export default function AIGenerator() {
   };
 
   const effTheme = theme ?? gen?.theme ?? 1;
+  const [effColor, effColor2]: [string, string] = gen ? (theme !== null ? colorForStyle(theme) : [gen.color, gen.color2]) : ["#F7B31C", ""];
 
-  const baseRec = useMemo(() => gen ? ({
+  const contentRec = useMemo(() => gen ? ({
     name: form.businessName || "Your Business", designation: form.profession || "",
     company_name: form.businessName || "", address: form.city || "", city: form.city || "",
     about: gen.about, about_on: 1, specialities: gen.services.map((s) => s.name).join(", "),
-    product_on: 1, enquiry_on: 1, color: gen.color, color2: gen.color2,
+    product_on: 1, enquiry_on: 1,
     slug: "ai-preview", mobile1: "+91 98765 43210", mobile2: "+91 98765 43210",
     email: "hello@yourbusiness.in", url: "yourbusiness.in", social_title: gen.tagline,
   }) : null, [gen, form]);
 
   const previewHtml = useMemo(() => {
-    if (!gen || !baseRec) return "";
-    const rec = { ...baseRec, theme: effTheme } as unknown as Parameters<typeof buildCardHtml>[0];
+    if (!gen || !contentRec) return "";
+    const rec = { ...contentRec, theme: effTheme, color: effColor, color2: effColor2 } as unknown as Parameters<typeof buildCardHtml>[0];
     const products = gen.services.map((s, i) => ({ id: i + 1, name: s.name, description: s.description, filename: "", price: "", offer_price: "", button: "", button_title: gen.cta }));
     return buildCardHtml(rec, products as unknown as Parameters<typeof buildCardHtml>[1], [], [], [], [], []);
-  }, [gen, baseRec, effTheme]);
+  }, [gen, contentRec, effTheme, effColor, effColor2]);
 
   const thumbs = useMemo(() => {
-    if (!baseRec) return [];
-    return Array.from({ length: CARD_STYLES }, (_, i) => i + 1).map((sn) => ({
-      style: sn, html: buildCardThumb({ ...baseRec, theme: sn } as unknown as Parameters<typeof buildCardThumb>[0], sn),
-    }));
-  }, [baseRec]);
+    if (!contentRec) return [];
+    return Array.from({ length: CARD_STYLES }, (_, i) => i + 1).map((sn) => {
+      const [col, col2] = colorForStyle(sn);
+      return { style: sn, html: buildCardThumb({ ...contentRec, theme: sn, color: col, color2: col2 } as unknown as Parameters<typeof buildCardThumb>[0], sn) };
+    });
+  }, [contentRec]);
 
   const saveAndSignup = () => {
     if (!gen) return;
-    try { localStorage.setItem("dc_ai_draft", JSON.stringify({ form, gen: { ...gen, theme: effTheme }, at: Date.now() })); } catch { /* ignore */ }
+    try { localStorage.setItem("dc_ai_draft", JSON.stringify({ form, gen: { ...gen, theme: effTheme, color: effColor, color2: effColor2 }, at: Date.now() })); } catch { /* ignore */ }
     navigate("/signup?ai=1");
   };
 
@@ -150,37 +162,40 @@ export default function AIGenerator() {
         )}
 
         {step === "result" && gen && (
-          <div className="mt-10 grid grid-cols-1 lg:grid-cols-[minmax(0,360px)_1fr] gap-8 items-start">
-            <div className="lg:sticky lg:top-24">
-              <div className="mx-auto w-full max-w-[360px] bg-white rounded-[2rem] overflow-hidden shadow-2xl border-[6px] border-[#1E293B]" style={{ height: "min(72vh, 720px)" }}>
-                <iframe srcDoc={previewHtml} title="AI card preview" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads allow-forms allow-modals allow-top-navigation-by-user-activation" className="w-full h-full border-0 bg-white" />
+          <div className="mt-10 space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#16A34A]"><Check size={12} /> {gen.source === "ai" ? "AI-generated" : "Generated"}</span>
+                <h2 className="text-xl font-bold text-[#0F172A] mt-1">Your card is ready 🎉</h2>
               </div>
-              <p className="text-center text-[11px] text-[#94A3B8] mt-3">Live preview · sample contact details — you'll add yours after signup</p>
+              <button onClick={generate} className="h-10 px-4 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] flex items-center gap-2"><RefreshCw size={15} /> Regenerate all</button>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#16A34A]"><Check size={12} /> {gen.source === "ai" ? "AI-generated" : "Generated"}</span>
-                  <h2 className="text-xl font-bold text-[#0F172A] mt-1">Your card is ready 🎉</h2>
+            {/* Design / template picker — on top, full width, each in its own colour */}
+            <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] flex items-center gap-1.5"><Palette size={12} /> Choose your design ({CARD_STYLES} styles)</p>
+                <span className="text-[11px] font-medium text-[#64748B]">Design #{effTheme}{theme === null ? " · AI pick" : ""}</span>
+              </div>
+              <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-1 px-1">
+                {thumbs.map((t) => (
+                  <TemplateThumb key={t.style} html={t.html} label={t.style} active={effTheme === t.style} onClick={() => setTheme(t.style)} />
+                ))}
+              </div>
+              <p className="text-[11px] text-[#94A3B8] mt-1">Scroll & tap any design — the preview and colours update instantly.</p>
+            </div>
+
+            {/* Preview + content */}
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,360px)_1fr] gap-8 items-start">
+              <div className="lg:sticky lg:top-24">
+                <div className="mx-auto w-full max-w-[360px] bg-white rounded-[2rem] overflow-hidden shadow-2xl border-[6px] border-[#1E293B]" style={{ height: "min(72vh, 720px)" }}>
+                  <iframe srcDoc={previewHtml} title="AI card preview" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads allow-forms allow-modals allow-top-navigation-by-user-activation" className="w-full h-full border-0 bg-white" />
                 </div>
-                <button onClick={generate} className="h-10 px-4 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] flex items-center gap-2"><RefreshCw size={15} /> Regenerate all</button>
+                <p className="text-center text-[11px] text-[#94A3B8] mt-3">Live preview · sample contact — you'll add yours after signup</p>
               </div>
 
-              {/* Design / template picker */}
-              <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
-                <div className="flex items-center justify-between mb-2.5">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] flex items-center gap-1.5"><Palette size={12} /> Choose your design</p>
-                  <span className="text-[11px] font-medium text-[#64748B]">Design #{effTheme}{theme === null ? " · AI pick" : ""}</span>
-                </div>
-                <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-1 px-1">
-                  {thumbs.map((t) => (
-                    <TemplateThumb key={t.style} html={t.html} label={t.style} active={effTheme === t.style} onClick={() => setTheme(t.style)} />
-                  ))}
-                </div>
-                <p className="text-[11px] text-[#94A3B8] mt-1">Tap any design — the preview updates instantly.</p>
-              </div>
-
+              <div className="space-y-4">
               <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
                 <div className="flex items-center justify-between mb-1"><p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Tagline</p>{regenBtn("tagline")}</div>
                 <p className="text-sm font-semibold text-[#0F172A]">{gen.tagline}</p>
@@ -198,10 +213,10 @@ export default function AIGenerator() {
                 </div>
               </div>
               <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] mb-2 flex items-center gap-1.5"><Palette size={12} /> AI-matched design</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] mb-2 flex items-center gap-1.5"><Palette size={12} /> Design &amp; colours</p>
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: gen.color }} /> {gen.color}</span>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: gen.color2 }} /> {gen.color2}</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: effColor }} /> {effColor}</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: effColor2 }} /> {effColor2}</span>
                   <span className="text-xs text-[#64748B]">· Design style #{effTheme}</span>
                 </div>
                 <p className="text-[12px] text-[#64748B] mt-2">{gen.avatarStyle}</p>
@@ -213,6 +228,7 @@ export default function AIGenerator() {
                 <button onClick={saveAndSignup} className="mt-4 w-full h-12 rounded-xl gradient-gold text-[#0F172A] font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all"><Zap size={18} /> Save &amp; Sign Up Free <ArrowRight size={17} /></button>
               </div>
               <button onClick={() => setStep("form")} className="w-full text-sm text-[#94A3B8] hover:text-[#0F172A] flex items-center justify-center gap-1.5 transition-colors"><ArrowLeft size={14} /> Start over</button>
+              </div>
             </div>
           </div>
         )}
