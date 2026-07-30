@@ -141,6 +141,16 @@ try {
   log("✓ live INR plans upserted (Trial/Gold/Platinum + 3-year prices)");
 }
 
+// Phase 33: back-fill legacy enquiries.json into the leads CRM so old + new
+// leads live in one place (/dashboard/leads). Idempotent & additive — reads
+// dist/public|public JSON (built just before this step), never deletes it.
+try {
+  const { importLegacyEnquiries } = await import("./import-legacy-enquiries.mjs");
+  await importLegacyEnquiries(conn, log);
+} catch (e) {
+  log("• legacy enquiries import skipped (" + (e.code || e.message) + ")");
+}
+
 console.log("\n✅  Migration complete — additive only, no existing data touched.\n");
 console.log("   Next: seed products (node db/seed-products.mjs) once the app has");
 console.log("   generated its template presets, then set real INR prices in admin.\n");

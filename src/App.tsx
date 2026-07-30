@@ -62,7 +62,6 @@ const CustomerPayments = lazy(() => import("./pages/customer/Payments"));
 const CustomerMedia = lazy(() => import("./pages/customer/Media"));
 const CustomerSocial = lazy(() => import("./pages/customer/Social"));
 const CustomerUploads = lazy(() => import("./pages/customer/Uploads"));
-const CustomerEnquiry = lazy(() => import("./pages/customer/Enquiry"));
 const CustomerViewCard = lazy(() => import("./pages/customer/ViewCard"));
 const CustomerReviews = lazy(() => import("./pages/customer/Reviews"));
 const CustomerReferEarn = lazy(() => import("./pages/customer/ReferEarn"));
@@ -221,7 +220,8 @@ export default function App() {
         <Route path="/dashboard/media" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerMedia /></RoleRoute>} />
         <Route path="/dashboard/social" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSocial /></RoleRoute>} />
         <Route path="/dashboard/uploads" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerUploads /></RoleRoute>} />
-        <Route path="/dashboard/enquiry" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerEnquiry /></RoleRoute>} />
+        {/* Enquiries merged into the Leads CRM — keep the old URL working. */}
+        <Route path="/dashboard/enquiry" element={<Navigate to="/dashboard/leads" replace />} />
         <Route path="/dashboard/view" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerViewCard /></RoleRoute>} />
         {/* QR code is now part of the Payments module */}
         <Route path="/dashboard/qrcode" element={<Navigate to="/dashboard/payments" replace />} />
