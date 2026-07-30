@@ -1,11 +1,11 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus, Package, Check, X, Pencil, Trash2, Zap, Users, Building2, Crown,
-  ListChecks, GripVertical, Search, ShoppingBag, Image, Video, Tag, Upload,
-  Calendar, IndianRupee, Layers,
+  ListChecks, Search, ShoppingBag, Image, Video, Tag, Upload,
+  Calendar, IndianRupee, Layers, ChevronUp, ChevronDown, ExternalLink, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,64 +14,56 @@ const planIcons: Record<string, React.ComponentType<{ size?: number; className?:
   trial: Zap, gold: Crown, platinum: Building2,
 };
 
-/* ── Real package features from digitalcarda.in (package_features table) ── */
-type Feature = { id: number; name: string };
-const CUSTOMER_FEATURES: Feature[] = [
-  { id: 1, name: "Share cards with anyone, Unlimited times" },
-  { id: 2, name: "Update card any time." },
-  { id: 3, name: "Ecommerce Online Store" },
-  { id: 4, name: "Company Logo / Profile Photo" },
-  { id: 5, name: "Multiple Templates" },
-  { id: 6, name: "Social Media Links" },
-  { id: 7, name: "Payment Section" },
-  { id: 8, name: "Contact Form Included" },
-  { id: 9, name: "Special Page for Offers" },
-  { id: 10, name: "Fully Dynamic Backend" },
-];
-const RESELLER_FEATURES: Feature[] = [
-  { id: 101, name: "White-Label Reseller Panel" },
-  { id: 102, name: "Add & Manage Customers" },
-  { id: 103, name: "Assign Packages & Credits" },
-  { id: 104, name: "Commission Reports" },
-];
-
-const toTitle = (s: string) =>
-  s.replace(/\b\w/g, (c) => c.toUpperCase());
+/* ── Package Feature List — dynamic, DB-backed (app_settings), editable here and
+   read by the public pricing page. Each feature can deep-link to its real page. */
+type Feat = { name: string; link?: string };
+type Audience = "customer" | "reseller";
 
 function PackageFeatureList() {
-  const [type, setType] = useState<"customer" | "reseller">("customer");
-  const [sets, setSets] = useState<Record<"customer" | "reseller", Feature[]>>({
-    customer: CUSTOMER_FEATURES,
-    reseller: RESELLER_FEATURES,
+  const utils = trpc.useUtils();
+  const { data: apiFeatures, isLoading } = trpc.package.features.useQuery();
+  const save = trpc.package.setFeatures.useMutation({
+    onSuccess: () => utils.package.features.invalidate(),
+    onError: (e) => toast.error(e.message),
   });
+
+  const [type, setType] = useState<Audience>("customer");
+  const [sets, setSets] = useState<Record<Audience, Feat[]>>({ customer: [], reseller: [] });
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    if (apiFeatures && !loaded) {
+      setSets({ customer: apiFeatures.customer ?? [], reseller: apiFeatures.reseller ?? [] });
+      setLoaded(true);
+    }
+  }, [apiFeatures, loaded]);
+
   const [newName, setNewName] = useState("");
-  const [editId, setEditId] = useState<number | null>(null);
+  const [newLink, setNewLink] = useState("");
+  const [editIdx, setEditIdx] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [editLink, setEditLink] = useState("");
 
   const features = sets[type];
-  const setFeatures = (fn: (f: Feature[]) => Feature[]) =>
-    setSets((prev) => ({ ...prev, [type]: fn(prev[type]) }));
-
+  const persist = (list: Feat[]) => {
+    setSets((prev) => ({ ...prev, [type]: list }));
+    save.mutate({ audience: type, features: list.map((f) => ({ name: f.name, link: f.link || undefined })) });
+  };
   const addFeature = () => {
     const name = newName.trim();
     if (!name) { toast.error("Enter a feature name"); return; }
-    const id = Math.max(0, ...Object.values(sets).flat().map((f) => f.id)) + 1;
-    setFeatures((f) => [...f, { id, name }]);
-    setNewName("");
-    toast.success("Feature added");
+    persist([...features, { name, link: newLink.trim() || undefined }]);
+    setNewName(""); setNewLink(""); toast.success("Feature added");
   };
-
-  const saveEdit = (id: number) => {
+  const saveEdit = (i: number) => {
     const name = editName.trim();
-    if (!name) { toast.error("Feature name can't be empty"); return; }
-    setFeatures((f) => f.map((x) => (x.id === id ? { ...x, name } : x)));
-    setEditId(null);
-    toast.success("Feature updated");
+    if (!name) { toast.error("Name can't be empty"); return; }
+    persist(features.map((f, idx) => (idx === i ? { name, link: editLink.trim() || undefined } : f)));
+    setEditIdx(null); toast.success("Feature updated");
   };
-
-  const removeFeature = (id: number) => {
-    setFeatures((f) => f.filter((x) => x.id !== id));
-    toast.success("Feature deleted");
+  const removeFeature = (i: number) => { persist(features.filter((_, idx) => idx !== i)); toast.success("Feature removed"); };
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir; if (j < 0 || j >= features.length) return;
+    const list = [...features]; [list[i], list[j]] = [list[j], list[i]]; persist(list);
   };
 
   const tabs = [
@@ -84,22 +76,20 @@ function PackageFeatureList() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 border-b border-[#F1F5F9]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center">
-            <ListChecks size={19} className="text-[#F7B31C]" />
-          </div>
+          <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center"><ListChecks size={19} className="text-[#F7B31C]" /></div>
           <div>
-            <h2 className="text-base font-semibold text-[#0F172A]">Package Feature List</h2>
-            <p className="text-xs text-[#64748B] mt-0.5">Features displayed across pricing plans &amp; cards</p>
+            <h2 className="text-base font-semibold text-[#0F172A] flex items-center gap-2">
+              Package Feature List
+              {save.isPending && <span className="inline-flex items-center gap-1 text-[11px] font-normal text-[#94A3B8]"><Loader2 size={11} className="animate-spin" /> saving…</span>}
+            </h2>
+            <p className="text-xs text-[#64748B] mt-0.5">Shown live on the pricing page &amp; cards. Add a link to deep-link each feature.</p>
           </div>
         </div>
-        {/* Type tabs */}
+        {/* Audience tabs */}
         <div className="relative flex rounded-xl bg-[#F1F5F9] p-1 self-start">
-          <span
-            className="absolute top-1 bottom-1 rounded-lg bg-white shadow-sm transition-all duration-300"
-            style={{ width: "calc((100% - 0.5rem) / 2)", left: `calc(0.25rem + ${type === "reseller" ? 1 : 0} * ((100% - 0.5rem) / 2))` }}
-          />
+          <span className="absolute top-1 bottom-1 rounded-lg bg-white shadow-sm transition-all duration-300" style={{ width: "calc((100% - 0.5rem) / 2)", left: `calc(0.25rem + ${type === "reseller" ? 1 : 0} * ((100% - 0.5rem) / 2))` }} />
           {tabs.map((t) => (
-            <button key={t.id} onClick={() => { setType(t.id); setEditId(null); }} className={`relative z-10 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${type === t.id ? "text-[#0F172A]" : "text-[#64748B] hover:text-[#0F172A]"}`}>
+            <button key={t.id} onClick={() => { setType(t.id); setEditIdx(null); }} className={`relative z-10 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${type === t.id ? "text-[#0F172A]" : "text-[#64748B] hover:text-[#0F172A]"}`}>
               <t.icon size={14} /> {t.label}
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${type === t.id ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#E2E8F0] text-[#64748B]"}`}>{t.count}</span>
             </button>
@@ -109,46 +99,40 @@ function PackageFeatureList() {
 
       {/* List */}
       <div className="divide-y divide-[#F1F5F9]">
-        {/* Column header */}
-        <div className="hidden sm:grid grid-cols-[48px_1fr_120px] items-center px-5 py-2.5 bg-[#F8FAFC] text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8]">
-          <span>#</span><span>Feature Name</span><span className="text-right">Actions</span>
-        </div>
-
-        {features.length === 0 && (
-          <div className="px-5 py-10 text-center text-sm text-[#94A3B8]">No features yet. Add one below.</div>
-        )}
+        {isLoading && !loaded && <div className="px-5 py-10 text-center text-sm text-[#94A3B8]"><Loader2 size={18} className="animate-spin mx-auto mb-2" /> Loading…</div>}
+        {loaded && features.length === 0 && <div className="px-5 py-10 text-center text-sm text-[#94A3B8]">No features yet. Add one below.</div>}
 
         {features.map((f, i) => (
-          <div key={f.id} className="grid grid-cols-[36px_1fr_auto] sm:grid-cols-[48px_1fr_120px] items-center px-5 py-3 group hover:bg-[#F8FAFC] transition-colors">
-            <div className="flex items-center gap-1.5 text-[#94A3B8]">
-              <GripVertical size={14} className="hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
+          <div key={i} className="flex items-start gap-3 px-5 py-3 group hover:bg-[#F8FAFC] transition-colors">
+            {/* reorder + number */}
+            <div className="flex flex-col items-center gap-0.5 pt-1">
+              <button onClick={() => move(i, -1)} disabled={i === 0} className="w-5 h-4 rounded text-[#CBD5E1] hover:text-[#0F172A] disabled:opacity-30 flex items-center justify-center" aria-label="Move up"><ChevronUp size={13} /></button>
               <span className="w-6 h-6 rounded-lg bg-[#F1F5F9] flex items-center justify-center text-[11px] font-bold text-[#64748B]">{i + 1}</span>
+              <button onClick={() => move(i, 1)} disabled={i === features.length - 1} className="w-5 h-4 rounded text-[#CBD5E1] hover:text-[#0F172A] disabled:opacity-30 flex items-center justify-center" aria-label="Move down"><ChevronDown size={13} /></button>
             </div>
 
-            {editId === f.id ? (
-              <input
-                autoFocus
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") saveEdit(f.id); if (e.key === "Escape") setEditId(null); }}
-                className="h-9 w-full rounded-lg bg-white border border-[#F7B31C] px-3 text-sm text-[#0F172A] outline-none focus:ring-2 focus:ring-[#F7B31C]/20 mr-3"
-              />
+            {editIdx === i ? (
+              <div className="flex-1 space-y-2">
+                <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Feature name" className="h-9 w-full rounded-lg bg-white border border-[#F7B31C] px-3 text-sm text-[#0F172A] outline-none focus:ring-2 focus:ring-[#F7B31C]/20" />
+                <input value={editLink} onChange={(e) => setEditLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveEdit(i); if (e.key === "Escape") setEditIdx(null); }} placeholder="Link (optional) — e.g. /templates" className="h-9 w-full rounded-lg bg-white border border-[#E2E8F0] px-3 text-sm text-[#0F172A] outline-none focus:border-[#F7B31C]" />
+              </div>
             ) : (
-              <span className="flex items-center gap-2 text-sm font-medium text-[#334155] pr-3">
-                <Check size={14} className="text-emerald-500 shrink-0" /> {toTitle(f.name)}
-              </span>
+              <div className="flex-1 min-w-0 pt-1">
+                <p className="text-sm font-medium text-[#334155] flex items-center gap-2"><Check size={14} className="text-emerald-500 shrink-0" /> {f.name}</p>
+                {f.link && <a href={f.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[#94A3B8] hover:text-[#F7B31C] mt-1 ml-6"><ExternalLink size={10} /> {f.link}</a>}
+              </div>
             )}
 
-            <div className="flex items-center justify-end gap-1">
-              {editId === f.id ? (
+            <div className="flex items-center gap-1 pt-0.5">
+              {editIdx === i ? (
                 <>
-                  <button onClick={() => saveEdit(f.id)} className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors" aria-label="Save"><Check size={15} /></button>
-                  <button onClick={() => setEditId(null)} className="w-8 h-8 rounded-lg bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0] flex items-center justify-center transition-colors" aria-label="Cancel"><X size={15} /></button>
+                  <button onClick={() => saveEdit(i)} className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center" aria-label="Save"><Check size={15} /></button>
+                  <button onClick={() => setEditIdx(null)} className="w-8 h-8 rounded-lg bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0] flex items-center justify-center" aria-label="Cancel"><X size={15} /></button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => { setEditId(f.id); setEditName(f.name); }} className="w-8 h-8 rounded-lg text-[#64748B] hover:bg-white hover:text-[#0F172A] border border-transparent hover:border-[#E2E8F0] flex items-center justify-center transition-all" aria-label="Edit"><Pencil size={14} /></button>
-                  <button onClick={() => removeFeature(f.id)} className="w-8 h-8 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-colors" aria-label="Delete"><Trash2 size={14} /></button>
+                  <button onClick={() => { setEditIdx(i); setEditName(f.name); setEditLink(f.link || ""); }} className="w-8 h-8 rounded-lg text-[#64748B] hover:bg-white hover:text-[#0F172A] border border-transparent hover:border-[#E2E8F0] flex items-center justify-center" aria-label="Edit"><Pencil size={14} /></button>
+                  <button onClick={() => removeFeature(i)} className="w-8 h-8 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 flex items-center justify-center" aria-label="Delete"><Trash2 size={14} /></button>
                 </>
               )}
             </div>
@@ -156,18 +140,11 @@ function PackageFeatureList() {
         ))}
 
         {/* Add row */}
-        <div className="flex items-center gap-2 px-5 py-3 bg-[#F8FAFC]">
-          <span className="w-6 h-6 rounded-lg bg-[#FEF3C7] flex items-center justify-center shrink-0"><Plus size={13} className="text-[#F7B31C]" /></span>
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") addFeature(); }}
-            placeholder={`Add a new ${type} feature…`}
-            className="h-9 flex-1 rounded-lg bg-white border border-[#E2E8F0] px-3 text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 transition-all placeholder:text-[#94A3B8]"
-          />
-          <button onClick={addFeature} className="h-9 px-4 gradient-gold text-[#0F172A] rounded-lg text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] flex items-center gap-1.5">
-            <Plus size={15} /> Add
-          </button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 px-5 py-3 bg-[#F8FAFC]">
+          <span className="hidden sm:flex w-6 h-6 rounded-lg bg-[#FEF3C7] items-center justify-center shrink-0"><Plus size={13} className="text-[#F7B31C]" /></span>
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addFeature(); }} placeholder={`New ${type} feature…`} className="h-9 flex-1 rounded-lg bg-white border border-[#E2E8F0] px-3 text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 placeholder:text-[#94A3B8]" />
+          <input value={newLink} onChange={(e) => setNewLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addFeature(); }} placeholder="Link (optional)" className="h-9 sm:w-48 rounded-lg bg-white border border-[#E2E8F0] px-3 text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] placeholder:text-[#94A3B8]" />
+          <button onClick={addFeature} className="h-9 px-4 gradient-gold text-[#0F172A] rounded-lg text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 shrink-0"><Plus size={15} /> Add</button>
         </div>
       </div>
     </div>

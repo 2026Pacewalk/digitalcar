@@ -1,6 +1,7 @@
 import { Check, ArrowRight, HelpCircle, Sparkles, Zap, Crown, IdCard, QrCode, Images, Tag, MessageSquare, Globe, Star } from "lucide-react";
 import { Link } from "react-router";
 import { useState } from "react";
+import { trpc } from "@/providers/trpc";
 
 /* ── Billing periods ──────────────────────────────────────────── */
 type Period = "monthly" | "yearly" | "3year";
@@ -94,6 +95,8 @@ const faqs = [
 export default function Pricing() {
   const [period, setPeriod] = useState<Period>("yearly");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const { data: featureData } = trpc.package.features.useQuery();
+  const includedFeatures = featureData?.customer ?? [];
 
   return (
     <div className="pt-24 pb-20 bg-[#F8FAFC]">
@@ -193,6 +196,28 @@ export default function Pricing() {
 
         {/* Trust line */}
         <p className="mt-6 text-center text-[13px] text-[#94A3B8]">7-day money-back guarantee · Cancel anytime · UPI, Cards, Net Banking, Paytm & GPay</p>
+
+        {/* Everything included — dynamic, admin-managed feature list */}
+        {includedFeatures.length > 0 && (
+          <div className="mt-20 max-w-4xl mx-auto">
+            <h2 className="text-2xl font-bold text-[#0F172A] text-center">Everything included</h2>
+            <p className="text-sm text-[#64748B] text-center mt-2 mb-8">Every plan comes packed with the tools to grow your business.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+              {includedFeatures.map((f, i) => {
+                const inner = (
+                  <span className="flex items-center gap-3 py-2">
+                    <span className="w-6 h-6 rounded-full bg-[#F0FDF4] flex items-center justify-center shrink-0"><Check size={13} className="text-[#16A34A]" /></span>
+                    <span className="text-sm text-[#334155]">{f.name}</span>
+                    {f.link && <ArrowRight size={13} className="text-[#CBD5E1] ml-auto shrink-0" />}
+                  </span>
+                );
+                return f.link
+                  ? <Link key={i} to={f.link} className="group rounded-xl px-3 -mx-3 hover:bg-[#F8FAFC] transition-colors [&_span:last-child]:group-hover:text-[#F7B31C]">{inner}</Link>
+                  : <div key={i} className="px-3 -mx-3">{inner}</div>;
+              })}
+            </div>
+          </div>
+        )}
 
         {/* FAQs */}
         <div className="mt-20 max-w-3xl mx-auto">

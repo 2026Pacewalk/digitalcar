@@ -1,10 +1,65 @@
 import { z } from "zod";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { subscriptionPackages } from "@db/schema";
+import { subscriptionPackages, appSettings } from "@db/schema";
 import { eq } from "drizzle-orm";
 
+/* ── Package Feature List — the marketing feature bullets shown on the pricing
+   page & product cards. Stored dynamically in app_settings (admin-editable),
+   with an accurate default where every feature deep-links to its real page. */
+const FEATURES_KEY = "package_features";
+type Feat = { name: string; link?: string };
+const DEFAULT_FEATURES: { customer: Feat[]; reseller: Feat[] } = {
+  customer: [
+    { name: "Your digital card + permanent link & QR", link: "/features" },
+    { name: "31+ premium designs & link-in-bio styles", link: "/templates" },
+    { name: "Share anywhere — WhatsApp, QR & link", link: "/features" },
+    { name: "Edit your card anytime — instant updates", link: "/features" },
+    { name: "Products & services online store", link: "/digital-business-cards" },
+    { name: "Photo gallery + YouTube videos", link: "/features" },
+    { name: "Lead capture form → built-in mini-CRM", link: "/features" },
+    { name: "Payment links — UPI, Paytm, GPay & cards", link: "/features" },
+    { name: "Google reviews + Maps directions", link: "/features" },
+    { name: "Real-time analytics — views, clicks & scans", link: "/features" },
+    { name: "Save-contact, call & all social links", link: "/features" },
+    { name: "AI content generator", link: "/ai-card-generator" },
+    { name: "SEO settings for Google", link: "/features" },
+    { name: "Custom domain support", link: "/custom-domain" },
+  ],
+  reseller: [
+    { name: "White-label reseller panel", link: "/resellers" },
+    { name: "Add & manage unlimited customers", link: "/resellers" },
+    { name: "Assign packages & set your pricing", link: "/resellers" },
+    { name: "Commission tracking + wallet payouts", link: "/refer-earn" },
+  ],
+};
+async function readFeatures(db: ReturnType<typeof getDb>): Promise<{ customer: Feat[]; reseller: Feat[] }> {
+  const row = await db.query.appSettings.findFirst({ where: eq(appSettings.key, FEATURES_KEY) });
+  if (!row?.value) return DEFAULT_FEATURES;
+  try {
+    const j = JSON.parse(row.value);
+    return { customer: Array.isArray(j.customer) ? j.customer : DEFAULT_FEATURES.customer, reseller: Array.isArray(j.reseller) ? j.reseller : DEFAULT_FEATURES.reseller };
+  } catch { return DEFAULT_FEATURES; }
+}
+
 export const packageRouter = createRouter({
+  // Public: the dynamic feature list (pricing page + product cards read this).
+  features: publicQuery.query(async () => readFeatures(getDb())),
+
+  // Admin: replace the feature list for one audience (persists to app_settings).
+  setFeatures: adminQuery
+    .input(z.object({
+      audience: z.enum(["customer", "reseller"]),
+      features: z.array(z.object({ name: z.string().min(1).max(120), link: z.string().max(200).optional() })).max(40),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const current = await readFeatures(db);
+      const next = { ...current, [input.audience]: input.features };
+      const value = JSON.stringify(next);
+      await db.insert(appSettings).values({ key: FEATURES_KEY, value }).onDuplicateKeyUpdate({ set: { value } });
+      return { ok: true, count: input.features.length };
+    }),
   list: publicQuery.query(async () => {
     const db = getDb();
     return db.query.subscriptionPackages.findMany({
