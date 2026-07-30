@@ -38,6 +38,16 @@ try {
     await conn.query(fs.readFileSync(plansPath, "utf8"));
     const [pl] = await conn.query("SELECT COUNT(*) AS n FROM subscription_packages WHERE is_active = 1");
     console.log(`✓ Plans synced — ${pl[0].n} active tiers (Trial/Gold/Platinum).`);
+
+    // Align products to the Gold plan price ("plans are the price"): bump only
+    // the old ₹499 placeholder to Gold's yearly price. Anything else (admin edits)
+    // is left untouched, so this becomes a no-op once done.
+    const [gold] = await conn.query("SELECT yearly_price AS p FROM subscription_packages WHERE slug='gold' LIMIT 1");
+    const goldYearly = gold[0]?.p;
+    if (goldYearly) {
+      const [up] = await conn.query("UPDATE products SET price=?, sale_price=NULL WHERE price='499.00'", [goldYearly]);
+      if (up.affectedRows) console.log(`✓ Aligned ${up.affectedRows} products to Gold price ₹${goldYearly}.`);
+    }
   } catch (e) {
     console.log("• Plans seed skipped: " + (e.code || e.message));
   }
