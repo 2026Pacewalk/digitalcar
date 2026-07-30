@@ -6,7 +6,7 @@ import {
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
   ChevronRight, Store, X, Search, ToggleRight, ReceiptText, KeyRound,
   Home as HomeIcon, Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
-  Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard,
+  Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -60,6 +60,7 @@ const superAdminGroups: NavGroup[] = [
     { label: "Applications", icon: ClipboardList, path: "/admin/reseller-applications" },
     { label: "Customers", icon: UserCircle, path: "/admin/customers" },
     { label: "Leads", icon: MessageSquare, path: "/admin/leads" },
+    { label: "Bulk Orders", icon: ShoppingCart, path: "/admin/bulk-orders" },
     { label: "AI Generator", icon: Wand2, path: "/admin/ai-generator" },
   ] },
   { title: "Catalog", items: [

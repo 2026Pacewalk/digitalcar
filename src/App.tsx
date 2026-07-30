@@ -34,6 +34,7 @@ const AdminProducts = lazy(() => import("./pages/admin/Products"));
 const AdminMigration = lazy(() => import("./pages/admin/Migration"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const AdminLeads = lazy(() => import("./pages/admin/Leads"));
+const AdminBulkOrders = lazy(() => import("./pages/admin/BulkOrders"));
 const AdminAiGenerator = lazy(() => import("./pages/admin/AiGenerator"));
 const AdminReferrals = lazy(() => import("./pages/admin/Referrals"));
 const AdminPayments = lazy(() => import("./pages/admin/Payments"));
@@ -186,6 +187,7 @@ export default function App() {
         <Route path="/admin/migration" element={<RoleRoute allowedRoles={["super_admin"]}><AdminMigration /></RoleRoute>} />
         <Route path="/admin/analytics" element={<RoleRoute allowedRoles={["super_admin"]}><AdminAnalytics /></RoleRoute>} />
         <Route path="/admin/leads" element={<RoleRoute allowedRoles={["super_admin"]}><AdminLeads /></RoleRoute>} />
+        <Route path="/admin/bulk-orders" element={<RoleRoute allowedRoles={["super_admin"]}><AdminBulkOrders /></RoleRoute>} />
         <Route path="/admin/ai-generator" element={<RoleRoute allowedRoles={["super_admin"]}><AdminAiGenerator /></RoleRoute>} />
         <Route path="/admin/referrals" element={<RoleRoute allowedRoles={["super_admin"]}><AdminReferrals /></RoleRoute>} />
         <Route path="/admin/payments" element={<RoleRoute allowedRoles={["super_admin"]}><AdminPayments /></RoleRoute>} />

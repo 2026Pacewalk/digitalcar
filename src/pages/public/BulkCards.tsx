@@ -235,6 +235,13 @@ export default function BulkCards() {
     },
     onError: (err) => toast.error(err.message || "Could not create cards. Please try again."),
   });
+  const bulkOrder = trpc.bulkOrder.create.useMutation({
+    onSuccess: (r) => {
+      if ((r as { ok?: boolean; error?: string })?.ok === false) { toast.error((r as { error?: string }).error || "Add a phone or email so we can reach you."); return; }
+      toast.success(`Bulk request for ${billingQty} cards sent! Our team will contact you within 24 hours.`);
+    },
+    onError: () => toast.error("Could not send your request — please try again."),
+  });
 
   const filledMembers = members.filter((m) => m.name.trim());
   const billingQty = Math.max(quantity, filledMembers.length, MIN_QTY);
@@ -271,7 +278,15 @@ export default function BulkCards() {
 
   const submitQuote = () => {
     if (!company.name || !company.phone) { toast.error("Please add your company name and contact number."); return; }
-    toast.success(`Bulk request for ${billingQty} cards sent! Our team will contact you within 24 hours.`);
+    bulkOrder.mutate({
+      company: company.name.trim() || undefined,
+      phone: company.phone.trim() || undefined,
+      email: company.email.trim() || undefined,
+      quantity: billingQty,
+      pricePerCard: summary.perCard,
+      totalEstimate: Math.round(summary.total),
+      packageName: "Custom",
+    });
   };
 
   // Logged-in visitors create real cards; guests submit a sales quote.
