@@ -99,6 +99,48 @@ try {
   log("• published_cards.slug unique skipped (" + (e.code || e.message) + ")");
 }
 
+// Phase 32: 3-year (triennial) billing support. Additive column + enum widening
+// (enum widening never drops existing 'monthly'/'yearly' values). Then upsert the
+// live INR plan rows so three_year_price is populated. Runs BEFORE the app reload,
+// so the new code that SELECTs three_year_price never hits a missing column.
+{
+  const [tyc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='subscription_packages' AND column_name='three_year_price'");
+  if (tyc[0].n === 0) {
+    await conn.query("ALTER TABLE subscription_packages ADD COLUMN three_year_price DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER yearly_price");
+    log("✓ subscription_packages.three_year_price added");
+  } else {
+    log("• three_year_price already present (skipped)");
+  }
+  // Enum widening — idempotent (same definition = no-op).
+  await conn.query("ALTER TABLE subscriptions MODIFY COLUMN billing_cycle ENUM('monthly','yearly','triennial') NOT NULL DEFAULT 'monthly'");
+  await conn.query("ALTER TABLE payment_orders MODIFY COLUMN billing_cycle ENUM('monthly','yearly','triennial') NOT NULL DEFAULT 'monthly'");
+  log("✓ billing_cycle enum widened to include 'triennial'");
+  // Upsert live INR plans (Trial 7 / Gold 5 / Platinum 6) with 3-year prices.
+  await conn.query(`INSERT INTO subscription_packages
+    (id, name, slug, description, monthly_price, yearly_price, three_year_price, trial_days,
+     max_cards, max_products, max_gallery_images, max_videos, storage_limit_mb,
+     feature_custom_domain, feature_seo, feature_analytics, feature_lead_capture,
+     feature_remove_branding, feature_white_label, feature_priority_support,
+     feature_ai, feature_multilingual, feature_crm, is_active, display_order)
+    VALUES
+     (7,'Trial','trial','Full Gold features, free for 30 days',0.00,0.00,0.00,30,1,25,20,8,100,0,0,1,1,0,0,0,0,0,0,1,0),
+     (5,'Gold','gold','Everything a business needs',99.00,999.00,2499.00,30,1,25,20,8,500,0,0,1,1,0,0,0,0,0,0,1,1),
+     (6,'Platinum','platinum','For brands that want it all',199.00,1999.00,4999.00,30,3,9999,60,25,2000,1,1,1,1,1,0,1,1,1,1,1,2)
+    ON DUPLICATE KEY UPDATE
+     name=VALUES(name), slug=VALUES(slug), description=VALUES(description),
+     monthly_price=VALUES(monthly_price), yearly_price=VALUES(yearly_price), three_year_price=VALUES(three_year_price),
+     trial_days=VALUES(trial_days), max_cards=VALUES(max_cards), max_products=VALUES(max_products),
+     max_gallery_images=VALUES(max_gallery_images), max_videos=VALUES(max_videos), storage_limit_mb=VALUES(storage_limit_mb),
+     feature_custom_domain=VALUES(feature_custom_domain), feature_seo=VALUES(feature_seo), feature_analytics=VALUES(feature_analytics),
+     feature_lead_capture=VALUES(feature_lead_capture), feature_remove_branding=VALUES(feature_remove_branding),
+     feature_white_label=VALUES(feature_white_label), feature_priority_support=VALUES(feature_priority_support),
+     feature_ai=VALUES(feature_ai), feature_multilingual=VALUES(feature_multilingual), feature_crm=VALUES(feature_crm),
+     is_active=VALUES(is_active), display_order=VALUES(display_order)`);
+  await conn.query("UPDATE subscription_packages SET is_active = 0 WHERE id IN (1,2,3,4)");
+  log("✓ live INR plans upserted (Trial/Gold/Platinum + 3-year prices)");
+}
+
 console.log("\n✅  Migration complete — additive only, no existing data touched.\n");
 console.log("   Next: seed products (node db/seed-products.mjs) once the app has");
 console.log("   generated its template presets, then set real INR prices in admin.\n");
