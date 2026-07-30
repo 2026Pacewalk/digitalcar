@@ -55,6 +55,23 @@ export function serveStaticFiles(app: App) {
   // The homepage would otherwise be served as a raw file by serveStatic, so
   // handle it first to inject meta.
   app.get("/", serveHtml);
+
+  // Vite content-hashes every build asset under /assets/, so its contents can
+  // never change under a given URL — cache them for a year (immutable). This is
+  // the biggest safe perf win for repeat visits + Core Web Vitals (Phase 32).
+  app.use("/assets/*", async (c, next) => {
+    await next();
+    c.header("Cache-Control", "public, max-age=31536000, immutable");
+  });
+  // Un-hashed public images/fonts change rarely → a 1-day cache. HTML and the
+  // JSON data files are deliberately left uncached so content stays fresh.
+  app.use("*", async (c, next) => {
+    await next();
+    if (c.res.headers.get("cache-control")) return;
+    if (/\.(png|jpe?g|webp|gif|svg|ico|woff2?|ttf|otf|mp4)$/i.test(new URL(c.req.url).pathname)) {
+      c.header("Cache-Control", "public, max-age=86400");
+    }
+  });
   app.use("*", serveStatic({ root: "./dist/public" }));
   app.notFound((c) => {
     const accept = c.req.header("accept") ?? "";
