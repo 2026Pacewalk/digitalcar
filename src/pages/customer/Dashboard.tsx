@@ -10,7 +10,7 @@ import {
 import type { ComponentType } from "react";
 import { toast } from "sonner";
 import { loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
-import { readCustomer, scopedKey, getAuthUser } from "@/hooks/useCustomer";
+import { readCustomer, scopedKey, getAuthUser, getActiveCardId } from "@/hooks/useCustomer";
 import { useValidityDays } from "@/hooks/useValidityDays";
 import { fetchMyLeads } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
@@ -89,7 +89,7 @@ export default function CustomerDashboard() {
   const { data: program } = trpc.referral.myProgram.useQuery(undefined, { retry: false });
   // Server-verified published card identity — the source of truth for MY link,
   // so copy/share can never surface another account's (or a stale local) slug.
-  const { data: mine } = trpc.publish.mine.useQuery(undefined, { retry: false });
+  const { data: mine } = trpc.publish.mine.useQuery({ cardId: getActiveCardId() }, { retry: false });
   const { data: followUps } = trpc.lead.followUps.useQuery(undefined, { retry: false });
   const dueFollowUps = (followUps ?? []).filter((l) => {
     if (!l.followUpDate) return false;

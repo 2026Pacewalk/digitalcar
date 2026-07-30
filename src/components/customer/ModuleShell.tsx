@@ -4,6 +4,7 @@ import { ImagePlus, Lightbulb } from "lucide-react";
 import { fileToDataUrl } from "@/hooks/useCustomer";
 import NotificationBell from "@/components/NotificationBell";
 import ProfileMenu from "@/components/ProfileMenu";
+import CardSwitcher from "@/components/customer/CardSwitcher";
 import { useMobileChrome } from "@/components/layout/MobileDashboardLayout";
 
 /* Reusable smart-tip banner shown at the top of a module. */
@@ -109,6 +110,7 @@ export default function ModuleShell({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <CardSwitcher />
             {actions}
             <NotificationBell />
             <ProfileMenu />

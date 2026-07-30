@@ -1,6 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
+import { getActiveCardId } from "@/hooks/useCustomer";
 import { useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Eye, UserCheck, MessageSquare, CreditCard, BarChart3, QrCode, Phone, MessageCircle, Mail, Globe, MapPin, UserPlus } from "lucide-react";
@@ -15,7 +16,7 @@ const BAR_COLORS = ["#F7B31C", "#14B8A6", "#3B82F6", "#8B5CF6", "#EC4899", "#647
 
 export default function CustomerAnalytics() {
   const { data, isLoading } = trpc.analytics.myOverview.useQuery();
-  const { data: eng } = trpc.publish.myStats.useQuery(undefined, { retry: false });
+  const { data: eng } = trpc.publish.myStats.useQuery({ cardId: getActiveCardId() }, { retry: false });
 
   const t = eng?.total ?? {};
   const engMetrics = [

@@ -4,13 +4,13 @@ import { trpc } from "@/providers/trpc";
 import { useState } from "react";
 import { Download, QrCode, ExternalLink, Copy, Check, MessageCircle, Share2, ShieldCheck, Printer, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
-import { useCustomer } from "@/hooks/useCustomer";
+import { useCustomer, getActiveCardId } from "@/hooks/useCustomer";
 
 const ORIGIN = "https://digitalcarda.in";
 
 export default function CustomerQR() {
   const { data } = useCustomer();
-  const { data: mine } = trpc.publish.mine.useQuery(undefined, { retry: false });
+  const { data: mine } = trpc.publish.mine.useQuery({ cardId: getActiveCardId() }, { retry: false });
   const slug = String(mine?.slug || data.slug || "");
   // The QR targets the PERMANENT /q/<public_id> link when the card has been
   // published — so re-designing the card never breaks a printed code (§14).

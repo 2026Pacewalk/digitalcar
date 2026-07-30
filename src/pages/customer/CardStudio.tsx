@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
-import { useCustomer, useLocalList } from "@/hooks/useCustomer";
+import { useCustomer, useLocalList, getActiveCardId } from "@/hooks/useCustomer";
 import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
@@ -91,11 +91,16 @@ export default function CardStudio() {
     // Snapshot the card to the server so the PUBLIC /slug page can render it
     // (content otherwise lives only in this browser).
     try {
-      await saveSnapshot.mutateAsync({ slug, data: {
+      await saveSnapshot.mutateAsync({ slug, cardId: getActiveCardId(), data: {
         customer: { ...data, ...formRef.current, referral_code: program?.code || "" },
         products: products.items, gallery: gallery.items, videos: videos.items, offers: offers.items, qrcodes: qrcodes.items,
       } });
-    } catch { /* best-effort — publish still succeeds */ }
+    } catch (e) {
+      // A taken slug is the one error worth surfacing — the public URL must be unique.
+      const msg = (e as { message?: string })?.message || "";
+      if (/taken/i.test(msg)) { toast.error("That card link is already taken — pick another in Settings."); return; }
+      /* otherwise best-effort — publish still succeeds */
+    }
     // The trial clock is authoritative on the server — start it on first publish.
     let trial: TrialInfo;
     try {

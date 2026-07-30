@@ -46,11 +46,13 @@ const TABLES = {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`,
   published_cards: `CREATE TABLE IF NOT EXISTS published_cards (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id BIGINT UNSIGNED NOT NULL UNIQUE,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id BIGINT UNSIGNED NOT NULL,
+    card_id INT NOT NULL DEFAULT 1,
     slug VARCHAR(191) NOT NULL, public_id VARCHAR(16) NULL, data JSON NOT NULL,
     published_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX pubcard_slug_idx (slug), UNIQUE INDEX uq_pubcard_public_id (public_id))`,
+    INDEX pubcard_slug_idx (slug), UNIQUE INDEX uq_pubcard_public_id (public_id),
+    UNIQUE INDEX uq_pubcard_user_card (user_id, card_id))`,
   card_events: `CREATE TABLE IF NOT EXISTS card_events (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, slug VARCHAR(191) NOT NULL, type VARCHAR(32) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX cardev_slug_idx (slug), INDEX cardev_type_idx (type))`,
@@ -97,6 +99,38 @@ try {
   log("✓ published_cards.slug -> UNIQUE");
 } catch (e) {
   log("• published_cards.slug unique skipped (" + (e.code || e.message) + ")");
+}
+
+// Phase 34: multi-card publishing — published_cards goes one-row-per-card so a
+// multi-card plan can publish several. Add card_id (default 1 = primary), drop
+// the single-column user_id UNIQUE, add composite UNIQUE (user_id, card_id).
+// Existing rows are each user's primary card — untouched.
+{
+  const [cc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='published_cards' AND column_name='card_id'");
+  if (cc[0].n === 0) {
+    await conn.query("ALTER TABLE published_cards ADD COLUMN card_id INT NOT NULL DEFAULT 1 AFTER user_id");
+    log("✓ published_cards.card_id added (default 1)");
+  } else { log("• published_cards.card_id present (skipped)"); }
+  // Drop any single-column UNIQUE index on user_id (blocks multi-card publish).
+  const [idx] = await conn.query(
+    `SELECT INDEX_NAME AS name, COUNT(*) AS cols,
+            SUM(CASE WHEN COLUMN_NAME='user_id' THEN 1 ELSE 0 END) AS hasUser
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='published_cards' AND NON_UNIQUE=0 AND INDEX_NAME<>'PRIMARY'
+     GROUP BY INDEX_NAME`);
+  for (const r of idx) {
+    if (Number(r.cols) === 1 && Number(r.hasUser) === 1) {
+      await conn.query("ALTER TABLE published_cards DROP INDEX `" + r.name + "`");
+      log("✓ dropped single-column user_id UNIQUE (" + r.name + ")");
+    }
+  }
+  const [uq] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE table_schema=DATABASE() AND table_name='published_cards' AND index_name='uq_pubcard_user_card'");
+  if (uq[0].n === 0) {
+    try { await conn.query("ALTER TABLE published_cards ADD UNIQUE INDEX uq_pubcard_user_card (user_id, card_id)"); log("✓ published_cards (user_id, card_id) UNIQUE added"); }
+    catch (e) { log("• uq_pubcard_user_card skipped (" + (e.code || e.message) + ")"); }
+  }
 }
 
 // Phase 32: 3-year (triennial) billing support. Additive column + enum widening

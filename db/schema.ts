@@ -11,6 +11,7 @@ import {
   bigint,
   json,
   index,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 // ─── Users ──────────────────────────────────────────────────────
@@ -259,7 +260,10 @@ export type CardTrial = typeof cardTrials.$inferSelect;
 // full card_blocks migration; keyed by user, looked up by slug.
 export const publishedCards = mysqlTable("published_cards", {
   id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().unique(),
+  // One row PER PUBLISHED CARD. A user can publish several (multi-card plans),
+  // so user_id is NOT unique; cardId is the owner's local card id (1 = primary).
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  cardId: int("card_id").notNull().default(1), // owner-scoped local card id (1 = primary)
   slug: varchar("slug", { length: 191 }).notNull(),
   publicId: varchar("public_id", { length: 16 }).unique(), // permanent QR/redirect id
   data: json("data").notNull(),
@@ -267,6 +271,7 @@ export const publishedCards = mysqlTable("published_cards", {
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
 }, (table) => [
   index("pubcard_slug_idx").on(table.slug),
+  uniqueIndex("uq_pubcard_user_card").on(table.userId, table.cardId),
 ]);
 
 export type PublishedCard = typeof publishedCards.$inferSelect;

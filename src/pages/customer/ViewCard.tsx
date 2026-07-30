@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import ModuleShell from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList } from "@/hooks/useCustomer";
+import { useCustomer, useLocalList, getActiveCardId } from "@/hooks/useCustomer";
 import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml, buildPausedHtml } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
@@ -27,7 +27,7 @@ export default function CustomerViewCard() {
   const { data: program } = trpc.referral.myProgram.useQuery();
   const { data: siteConfig } = trpc.template.siteConfig.useQuery();
   // Server-verified published identity — my real public link, per account.
-  const { data: mine } = trpc.publish.mine.useQuery(undefined, { retry: false });
+  const { data: mine } = trpc.publish.mine.useQuery({ cardId: getActiveCardId() }, { retry: false });
   const [copied, setCopied] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [isMobile, setIsMobile] = useState(false);

@@ -4,7 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { publishedCards, cardTrials, subscriptions, appSettings, cardEvents } from "@db/schema";
-import { eq, desc, and, ne } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 const DAY = 86_400_000;
 async function setting(db: ReturnType<typeof getDb>, key: string): Promise<string | null> {
@@ -21,26 +21,59 @@ async function setting(db: ReturnType<typeof getDb>, key: string): Promise<strin
 export const publishRouter = createRouter({
   // Authed: upsert the signed-in user's snapshot; mint public_id once.
   saveSnapshot: authedQuery
-    .input(z.object({ slug: z.string().min(1).max(191), data: z.any() }))
+    .input(z.object({ slug: z.string().min(1).max(191), data: z.any(), cardId: z.number().int().positive().default(1) }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      const cardId = input.cardId || 1;
       // Sanitize to identifier-safe chars (also blocks slug-based XSS in the card).
       const slug = input.slug.trim().replace(/[^a-zA-Z0-9_-]/g, "");
       if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid card URL." });
-      // Reject a slug already owned by ANOTHER user — otherwise a snapshot could be
-      // served on a victim's public URL and steal their enquiries (Phase 31 IDOR).
-      const taken = await db.select({ userId: publishedCards.userId }).from(publishedCards)
-        .where(and(eq(publishedCards.slug, slug), ne(publishedCards.userId, ctx.user.id)));
-      if (taken[0]) throw new TRPCError({ code: "CONFLICT", message: "That card URL is already taken." });
+      // Reject a slug owned by ANY OTHER card (another user, or this user's other
+      // card) — one public URL per card, no hijacking a victim's leads (Phase 31).
+      const taken = await db.select({ userId: publishedCards.userId, cardId: publishedCards.cardId })
+        .from(publishedCards).where(eq(publishedCards.slug, slug));
+      if (taken.some((t) => !(t.userId === ctx.user.id && t.cardId === cardId)))
+        throw new TRPCError({ code: "CONFLICT", message: "That card URL is already taken." });
 
-      const existing = await db.select().from(publishedCards).where(eq(publishedCards.userId, ctx.user.id));
+      const owner = and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId));
+      const existing = await db.select().from(publishedCards).where(owner);
       if (existing[0]) {
-        await db.update(publishedCards).set({ slug, data: input.data }).where(eq(publishedCards.userId, ctx.user.id));
+        await db.update(publishedCards).set({ slug, data: input.data }).where(owner);
         return { ok: true, publicId: existing[0].publicId };
       }
       const publicId = nanoid(10);
-      await db.insert(publishedCards).values({ userId: ctx.user.id, slug, publicId, data: input.data });
+      await db.insert(publishedCards).values({ userId: ctx.user.id, cardId, slug, publicId, data: input.data });
       return { ok: true, publicId };
+    }),
+
+  // Authed: is a slug free for this user's given card? (live check while editing)
+  checkSlug: authedQuery
+    .input(z.object({ slug: z.string(), cardId: z.number().int().positive().default(1) }))
+    .query(async ({ ctx, input }) => {
+      const slug = input.slug.trim().replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
+      if (!slug) return { available: false, slug };
+      const db = getDb();
+      const taken = await db.select({ userId: publishedCards.userId, cardId: publishedCards.cardId })
+        .from(publishedCards).where(eq(publishedCards.slug, slug));
+      const available = !taken.some((t) => !(t.userId === ctx.user.id && t.cardId === (input.cardId || 1)));
+      return { available, slug };
+    }),
+
+  // Authed: every published card this user owns (for the My Cards hub).
+  myCards: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    return db.select({ cardId: publishedCards.cardId, slug: publishedCards.slug, publicId: publishedCards.publicId })
+      .from(publishedCards).where(eq(publishedCards.userId, ctx.user.id)).orderBy(publishedCards.cardId);
+  }),
+
+  // Authed: unpublish one card (used when a card is deleted). Only ever removes
+  // the caller's OWN card row; never touches another user's data.
+  removeCard: authedQuery
+    .input(z.object({ cardId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      await db.delete(publishedCards).where(and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, input.cardId)));
+      return { ok: true };
     }),
 
   // Public: fetch the snapshot for a slug (the public card render source).
@@ -79,9 +112,13 @@ export const publishRouter = createRouter({
   }),
 
   // Authed: real engagement stats for the signed-in user's card (§36).
-  myStats: authedQuery.query(async ({ ctx }) => {
+  myStats: authedQuery
+    .input(z.object({ cardId: z.number().int().positive().default(1) }).optional())
+    .query(async ({ ctx, input }) => {
     const db = getDb();
-    const pc = await db.select({ slug: publishedCards.slug }).from(publishedCards).where(eq(publishedCards.userId, ctx.user.id));
+    const cardId = input?.cardId || 1;
+    const pc = await db.select({ slug: publishedCards.slug }).from(publishedCards)
+      .where(and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId)));
     const slug = pc[0]?.slug;
     if (!slug) return { slug: null, total: {} as Record<string, number>, last30: {} as Record<string, number> };
     const rows = await db.select().from(cardEvents).where(eq(cardEvents.slug, slug));
@@ -96,10 +133,13 @@ export const publishRouter = createRouter({
   }),
 
   // Authed: the signed-in user's public identity (for the QR / share tools).
-  mine: authedQuery.query(async ({ ctx }) => {
-    const db = getDb();
-    const rows = await db.select({ slug: publishedCards.slug, publicId: publishedCards.publicId })
-      .from(publishedCards).where(eq(publishedCards.userId, ctx.user.id));
-    return rows[0] ?? null;
-  }),
+  mine: authedQuery
+    .input(z.object({ cardId: z.number().int().positive().default(1) }).optional())
+    .query(async ({ ctx, input }) => {
+      const db = getDb();
+      const cardId = input?.cardId || 1;
+      const rows = await db.select({ slug: publishedCards.slug, publicId: publishedCards.publicId })
+        .from(publishedCards).where(and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId)));
+      return rows[0] ?? null;
+    }),
 });

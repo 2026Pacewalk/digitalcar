@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { CreditCard, ChevronDown, Plus, Check, Lock, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router";
+import { trpc } from "@/providers/trpc";
 import {
   getCards, getActiveCardId, setActiveCardId, createCard, deleteCard,
   accountPackageId, packageLimit, type CardMeta,
@@ -17,6 +18,10 @@ export default function CardSwitcher() {
   const [activeId, setActiveId] = useState(1);
   const [max, setMax] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Which cards are actually published live (have a public URL).
+  const { data: published } = trpc.publish.myCards.useQuery(undefined, { retry: false });
+  const removePub = trpc.publish.removeCard.useMutation();
+  const liveIds = new Set((published || []).map((p) => Number(p.cardId)));
 
   useEffect(() => {
     setCards(getCards());
@@ -45,6 +50,8 @@ export default function CardSwitcher() {
 
   const removeCard = (id: number, label: string) => {
     if (!confirm(`Delete the card "${label}"? This can't be undone.`)) return;
+    // Take its public URL offline too (best-effort), then drop local content.
+    removePub.mutate({ cardId: id });
     deleteCard(id);
     window.location.reload();
   };
@@ -81,7 +88,7 @@ export default function CardSwitcher() {
                       <span className="block text-xs font-semibold text-[#0F172A] truncate">{c.name}</span>
                       <span className="block text-[10px] text-[#94A3B8] truncate">/{c.slug}</span>
                     </span>
-                    <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${c.id === 1 ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#FEF3C7] text-[#92400E]"}`}>{c.id === 1 ? "Live" : "Draft"}</span>
+                    <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${liveIds.has(c.id) ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#FEF3C7] text-[#92400E]"}`}>{liveIds.has(c.id) ? "Live" : "Draft"}</span>
                     {c.id === activeId && <Check size={14} className="text-[#16A34A] shrink-0" />}
                   </button>
                   {c.id !== 1 && (
@@ -119,7 +126,7 @@ export default function CardSwitcher() {
                 </button>
               )}
             </div>
-            <p className="px-2.5 pt-2 text-[10px] leading-snug text-[#94A3B8]">Your main card is published live. Extra cards are drafts you can build now — one-tap live multi-card is coming soon.</p>
+            <p className="px-2.5 pt-2 text-[10px] leading-snug text-[#94A3B8]">Switch to a card, fill it in <Link to="/dashboard/build" onClick={() => setOpen(false)} className="font-semibold text-[#B45309] hover:underline">Edit Card</Link>, then hit Publish — each card gets its own link &amp; QR. Set a custom link in <Link to="/dashboard/settings" onClick={() => setOpen(false)} className="font-semibold text-[#B45309] hover:underline">Settings</Link>.</p>
           </div>
         </>
       )}
