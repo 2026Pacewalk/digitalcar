@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
@@ -30,6 +30,29 @@ const BUNDLES = [
   { name: "Enterprise", icon: Building2, qty: 100, pricePerCard: 499, tagline: "Large orgs & partners", accent: "#6366F1", popular: false },
 ];
 const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
+
+// Card thumbnails are FULL HTML documents (with their own <style>) — they MUST
+// render inside an iframe, or their global `main{max-width}` CSS leaks into the
+// dashboard layout. Scaled to fill the frame.
+const THUMB_W = 375, THUMB_H = 560;
+function ThumbFrame({ html, title }: { html: string; title: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const measure = () => setScale(el.clientWidth / THUMB_W);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="relative w-full overflow-hidden bg-white pointer-events-none" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }}>
+      <iframe title={title} srcDoc={html} scrolling="no" tabIndex={-1} loading="lazy"
+        style={{ width: `${THUMB_W}px`, height: `${THUMB_H}px`, border: 0, transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
+    </div>
+  );
+}
 
 export default function BulkCreate() {
   const navigate = useNavigate();
@@ -264,7 +287,7 @@ export default function BulkCreate() {
                 return (
                   <button key={t.id} onClick={() => setSelStyle(t.style)} title={t.name}
                     className={`relative rounded-xl overflow-hidden border-2 transition-all ${active ? "border-[#F7B31C] ring-2 ring-[#F7B31C]/25 scale-[1.02]" : "border-[#E2E8F0] hover:border-[#CBD5E1]"}`}>
-                    <div className="aspect-[9/16] bg-white overflow-hidden pointer-events-none" dangerouslySetInnerHTML={{ __html: t.html }} />
+                    <ThumbFrame html={t.html} title={t.name} />
                     {active && <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#F7B31C] text-[#0F172A] flex items-center justify-center shadow"><Check size={12} /></span>}
                     <span className="block text-[9px] font-semibold text-[#475569] truncate px-1 py-1 bg-white">{t.name}</span>
                   </button>
