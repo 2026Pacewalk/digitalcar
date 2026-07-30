@@ -383,6 +383,30 @@ export const leads = mysqlTable("leads", {
 
 export type Lead = typeof leads.$inferSelect;
 
+// ─── Bulk-order requests (buy bulk cards → team invoices) ───────
+// A logged-in user (or guest) asks to buy a bulk-card bundle; the team follows
+// up with an invoice (no upfront payment). Captured here + emailed to the owner.
+export const bulkOrderRequests = mysqlTable("bulk_order_requests", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }), // nullable: guests too
+  company: varchar("company", { length: 255 }),
+  contactName: varchar("contact_name", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  quantity: int("quantity").notNull().default(0),
+  pricePerCard: decimal("price_per_card", { precision: 10, scale: 2 }).notNull().default("0"),
+  totalEstimate: decimal("total_estimate", { precision: 10, scale: 2 }).notNull().default("0"),
+  packageName: varchar("package_name", { length: 50 }),
+  note: text("note"),
+  status: mysqlEnum("status", ["new", "contacted", "won", "lost"]).notNull().default("new"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("bulkreq_user_idx").on(table.userId),
+  index("bulkreq_status_idx").on(table.status),
+]);
+
+export type BulkOrderRequest = typeof bulkOrderRequests.$inferSelect;
+
 // ─── Analytics Events ───────────────────────────────────────────
 export const analyticsEvents = mysqlTable("analytics_events", {
   id: serial("id").primaryKey(),

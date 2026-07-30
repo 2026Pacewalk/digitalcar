@@ -69,6 +69,14 @@ const TABLES = {
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, company_id BIGINT UNSIGNED NOT NULL,
     user_id BIGINT UNSIGNED NOT NULL UNIQUE, role ENUM('admin','employee') NOT NULL DEFAULT 'employee',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX companymember_company_idx (company_id))`,
+  bulk_order_requests: `CREATE TABLE IF NOT EXISTS bulk_order_requests (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id BIGINT UNSIGNED NULL,
+    company VARCHAR(255) NULL, contact_name VARCHAR(255) NULL, phone VARCHAR(50) NULL, email VARCHAR(255) NULL,
+    quantity INT NOT NULL DEFAULT 0, price_per_card DECIMAL(10,2) NOT NULL DEFAULT 0, total_estimate DECIMAL(10,2) NOT NULL DEFAULT 0,
+    package_name VARCHAR(50) NULL, note TEXT NULL,
+    status ENUM('new','contacted','won','lost') NOT NULL DEFAULT 'new',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX bulkreq_user_idx (user_id), INDEX bulkreq_status_idx (status))`,
   ai_generations: `CREATE TABLE IF NOT EXISTS ai_generations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, business_name VARCHAR(120) NULL, profession VARCHAR(80) NULL,
     city VARCHAR(80) NULL, phone VARCHAR(30) NULL, source VARCHAR(16) NULL, ip VARCHAR(64) NULL,

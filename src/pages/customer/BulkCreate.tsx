@@ -4,15 +4,32 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { TEMPLATES } from "@/data/templates";
+import { useCustomer, getAuthUser } from "@/hooks/useCustomer";
 import { toast } from "sonner";
 import {
   Plus, Trash2, FileSpreadsheet, X, Building2, IdCard,
   Rocket, AlertTriangle, ArrowRight, CreditCard, CheckCircle2,
+  Users, Briefcase, ShoppingCart, TrendingDown, Loader2,
 } from "lucide-react";
 
 type Member = { id: string; name: string; designation: string; phone: string; email: string };
 let idCounter = 0;
 const newMember = (): Member => ({ id: `m-${++idCounter}`, name: "", designation: "", phone: "", email: "" });
+
+// Volume pricing — mirrors the public /bulk-cards page (per-card / year).
+const GST_RATE = 0.18;
+const TIERS = [
+  { min: 10, max: 24, price: 799 }, { min: 25, max: 49, price: 699 },
+  { min: 50, max: 99, price: 599 }, { min: 100, max: 249, price: 499 },
+  { min: 250, max: Infinity, price: 399 },
+];
+const resolveTier = (qty: number) => TIERS.find((t) => qty >= t.min && qty <= t.max) ?? TIERS[0];
+const BUNDLES = [
+  { name: "Team", icon: Users, qty: 10, pricePerCard: 799, tagline: "Small teams & startups", accent: "#14B8A6", popular: false },
+  { name: "Business", icon: Briefcase, qty: 25, pricePerCard: 699, tagline: "Growing companies & agencies", accent: "#F7B31C", popular: true },
+  { name: "Enterprise", icon: Building2, qty: 100, pricePerCard: 499, tagline: "Large orgs & partners", accent: "#6366F1", popular: false },
+];
+const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 
 export default function BulkCreate() {
   const navigate = useNavigate();
@@ -20,6 +37,49 @@ export default function BulkCreate() {
 
   const { data: cardsData } = trpc.card.list.useQuery();
   const { data: sub } = trpc.subscription.mySubscription.useQuery();
+  const { data: me } = useCustomer();
+
+  // ── Buy bulk cards (request → team invoices) ──
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [buyQty, setBuyQty] = useState(25);
+  const [buyBundle, setBuyBundle] = useState<string>("Custom");
+  const [buyForm, setBuyForm] = useState({ company: "", contactName: "", phone: "", email: "" });
+  const bulkOrder = trpc.bulkOrder.create.useMutation({
+    onSuccess: (r) => {
+      if ((r as { ok?: boolean; error?: string })?.ok === false) { toast.error((r as { error?: string }).error || "Please add a phone or email."); return; }
+      toast.success("Request sent! Our team will contact you with a quote within 24 hours.");
+      setBuyOpen(false);
+    },
+    onError: () => toast.error("Could not send your request — please try again."),
+  });
+  const openBuy = (bundleName: string, qty: number) => {
+    const au = getAuthUser();
+    setBuyBundle(bundleName);
+    setBuyQty(qty);
+    setBuyForm({
+      company: String(me.company_name || ""),
+      contactName: String(me.name || au?.fullName || ""),
+      phone: String(me.mobile1 || ""),
+      email: String(me.email || au?.email || ""),
+    });
+    setBuyOpen(true);
+  };
+  const buyTier = resolveTier(buyQty);
+  const buySubtotal = buyQty * buyTier.price;
+  const buyTotal = buySubtotal * (1 + GST_RATE);
+  const submitBuy = () => {
+    if (!buyForm.phone.trim() && !buyForm.email.trim()) { toast.error("Add a phone or email so we can reach you."); return; }
+    bulkOrder.mutate({
+      company: buyForm.company.trim() || undefined,
+      contactName: buyForm.contactName.trim() || undefined,
+      phone: buyForm.phone.trim() || undefined,
+      email: buyForm.email.trim() || undefined,
+      quantity: buyQty,
+      pricePerCard: buyTier.price,
+      totalEstimate: Math.round(buyTotal),
+      packageName: buyBundle,
+    });
+  };
 
   // All card designs live in the frontend TEMPLATES data (same source the
   // Templates page uses). Group them by category for the picker.
@@ -111,6 +171,38 @@ export default function BulkCreate() {
             <p className="text-2xl font-extrabold text-[#0F172A]">{filled.length}</p>
             <p className="text-[11px] text-[#94A3B8]">to create now</p>
           </div>
+        </div>
+
+        {/* Buy bulk cards — available to every user (request → team invoices) */}
+        <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-premium border border-[#F1F5F9]">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+            <div className="flex items-center gap-2">
+              <ShoppingCart size={18} className="text-[#F7B31C]" />
+              <h3 className="text-base font-semibold text-[#0F172A]">Buy bulk cards</h3>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"><TrendingDown size={12} /> up to 60% off</span>
+            </div>
+            <p className="text-[12px] text-[#94A3B8]">No upfront payment — we send a quote & invoice.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {BUNDLES.map((b) => (
+              <div key={b.name} className={`rounded-2xl border p-4 flex flex-col ${b.popular ? "border-[#F7B31C] bg-[#FFFBEB]" : "border-[#E2E8F0] bg-white"}`}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${b.accent}1a`, color: b.accent }}><b.icon size={16} /></span>
+                  <div>
+                    <p className="text-sm font-bold text-[#0F172A] leading-none">{b.name}</p>
+                    <p className="text-[10px] text-[#94A3B8] mt-0.5">{b.tagline}</p>
+                  </div>
+                  {b.popular && <span className="ml-auto text-[9px] font-bold text-[#92400E] bg-[#FDE68A] px-1.5 py-0.5 rounded-full">POPULAR</span>}
+                </div>
+                <p className="text-[22px] font-extrabold text-[#0F172A] mt-1">{inr(b.pricePerCard)}<span className="text-[11px] font-medium text-[#94A3B8]"> /card/yr</span></p>
+                <p className="text-[11px] text-[#64748B] mb-3">{b.qty} cards · {inr(b.qty * b.pricePerCard)}/yr</p>
+                <button onClick={() => openBuy(b.name, b.qty)} className={`mt-auto h-10 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-all ${b.popular ? "gradient-gold text-[#0F172A] hover:shadow-gold" : "border border-[#E2E8F0] text-[#334155] hover:bg-[#F8FAFC]"}`}>
+                  Buy {b.name} <ArrowRight size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => openBuy("Custom", 25)} className="mt-3 text-[12px] font-semibold text-[#B45309] hover:underline">Need a custom quantity? Request a quote →</button>
         </div>
 
         {overQuota && (
@@ -230,6 +322,60 @@ export default function BulkCreate() {
           </button>
         </div>
       </div>
+
+      {/* Buy bulk cards — request modal */}
+      {buyOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-[#0F172A]/50 backdrop-blur-sm" onClick={() => setBuyOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-bold text-[#0F172A]">Request bulk cards</h3>
+              <button onClick={() => setBuyOpen(false)} className="text-[#94A3B8] hover:text-[#0F172A]"><X size={18} /></button>
+            </div>
+            <p className="text-xs text-[#64748B] mb-4">Tell us your details — our team confirms and shares an invoice. No payment now.</p>
+
+            {/* Quantity + live price */}
+            <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3.5 mb-4">
+              <label className="block text-[11px] font-medium text-[#64748B] mb-1.5">How many cards?</label>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setBuyQty((q) => Math.max(10, q - 5))} className="w-9 h-9 rounded-lg border border-[#E2E8F0] text-[#64748B] hover:bg-white shrink-0">−</button>
+                <input type="number" min={10} value={buyQty} onChange={(e) => setBuyQty(Math.max(10, Number(e.target.value) || 10))} className="input-premium w-full text-center" />
+                <button onClick={() => setBuyQty((q) => q + 5)} className="w-9 h-9 rounded-lg gradient-gold text-[#0F172A] shrink-0">+</button>
+              </div>
+              <div className="flex items-center justify-between mt-3 text-[13px]">
+                <span className="text-[#64748B]">{inr(buyTier.price)}/card · {buyQty} cards</span>
+                <span className="font-bold text-[#0F172A]">{inr(buyTotal)} <span className="text-[10px] font-normal text-[#94A3B8]">incl. GST</span></span>
+              </div>
+              <p className="text-[10px] text-[#94A3B8] mt-1">Minimum 10 cards. Price drops automatically as quantity grows.</p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-medium text-[#64748B] mb-1">Company</label>
+                <input value={buyForm.company} onChange={(e) => setBuyForm((f) => ({ ...f, company: e.target.value }))} placeholder="Your company" className="input-premium w-full" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-[#64748B] mb-1">Contact name</label>
+                  <input value={buyForm.contactName} onChange={(e) => setBuyForm((f) => ({ ...f, contactName: e.target.value }))} placeholder="Your name" className="input-premium w-full" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[#64748B] mb-1">Phone</label>
+                  <input value={buyForm.phone} onChange={(e) => setBuyForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+91 XXXXX XXXXX" className="input-premium w-full" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#64748B] mb-1">Email</label>
+                <input value={buyForm.email} onChange={(e) => setBuyForm((f) => ({ ...f, email: e.target.value }))} placeholder="you@company.com" type="email" className="input-premium w-full" />
+              </div>
+            </div>
+
+            <button onClick={submitBuy} disabled={bulkOrder.isPending} className="mt-5 w-full h-11 gradient-gold text-[#0F172A] rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all disabled:opacity-60">
+              {bulkOrder.isPending ? <><Loader2 size={16} className="animate-spin" /> Sending…</> : <>Send request for {buyQty} cards <ArrowRight size={15} /></>}
+            </button>
+          </div>
+        </div>
+      )}
     </ResponsiveDashboardLayout>
   );
 }
