@@ -29,6 +29,18 @@ try {
     const [after] = await conn.query("SELECT COUNT(*) AS n FROM products");
     console.log(`✓ Seeded catalogue — ${after[0].n} products @ INR 499.`);
   }
+
+  // Plans (Trial/Gold/Platinum) — idempotent upsert, so it runs EVERY deploy to
+  // keep server-side entitlement rows in sync with the pricing page. Never drops
+  // the old tiers (just sets is_active=0); existing subscriptions are unaffected.
+  try {
+    const plansPath = path.join(process.cwd(), "db", "seed-plans-inr.sql");
+    await conn.query(fs.readFileSync(plansPath, "utf8"));
+    const [pl] = await conn.query("SELECT COUNT(*) AS n FROM subscription_packages WHERE is_active = 1");
+    console.log(`✓ Plans synced — ${pl[0].n} active tiers (Trial/Gold/Platinum).`);
+  } catch (e) {
+    console.log("• Plans seed skipped: " + (e.code || e.message));
+  }
 } finally {
   await conn.end();
 }
