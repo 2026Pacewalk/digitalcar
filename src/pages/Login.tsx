@@ -47,6 +47,24 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     return "/dashboard";
   };
 
+  // Portal gate: super-admins may ONLY sign in from the admin URL, and the admin
+  // URL is admins-only. Clears the just-set session and blocks navigation on a
+  // mismatch. Returns true if the login may proceed.
+  const gateOk = (role: string): boolean => {
+    if (!adminMode && role === "super_admin") {
+      localStorage.removeItem("auth_token"); localStorage.removeItem("digitalcarda_user");
+      toast.error("Administrator accounts must sign in from the admin portal.");
+      return false;
+    }
+    if (adminMode && role !== "super_admin") {
+      localStorage.removeItem("auth_token"); localStorage.removeItem("digitalcarda_user");
+      toast.error("This is the admin portal. Please use the main sign-in page.");
+      setTimeout(() => navigate("/login"), 1400);
+      return false;
+    }
+    return true;
+  };
+
   // Try the real backend; if the DB/server is unavailable, fall back to the
   // built-in demo accounts so the app is fully usable in local dev without MySQL.
   const demoLogin = (mail: string, pass: string) => {
@@ -56,6 +74,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     if (!entry || entry.password !== pass) return false;
     localStorage.setItem("auth_token", "demo_token_" + entry.user.id);
     localStorage.setItem("digitalcarda_user", JSON.stringify(entry.user));
+    if (!gateOk(entry.user.role)) return true; // handled (rejected) — don't fall through
     toast.success("Welcome back! (demo mode)");
     navigate(next || routeFor(entry.user.role));
     return true;
@@ -67,6 +86,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
       const res = await loginMut.mutateAsync({ email: mail.trim(), password: pass });
       localStorage.setItem("auth_token", res.token);
       localStorage.setItem("digitalcarda_user", JSON.stringify(res.user));
+      if (!gateOk(res.user.role)) return;
       toast.success("Welcome back!");
       navigate(next || routeFor(res.user.role));
     } catch (err) {
