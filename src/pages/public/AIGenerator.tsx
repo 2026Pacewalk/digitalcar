@@ -1,182 +1,177 @@
-import { Sparkles, Wand2, Check, ArrowRight, RefreshCw } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router";
+import { Sparkles, Wand2, RefreshCw, ArrowRight, ArrowLeft, Loader2, Check, Palette, Zap } from "lucide-react";
+import { trpc } from "@/providers/trpc";
+import { buildCardHtml } from "@/card-template/buildCard";
 import { toast } from "sonner";
 
-const industries = [
-  "Digital Agency", "Doctor", "Real Estate", "Restaurant", "Freelancer",
-  "Retail Store", "Consultant", "Salon", "Education", "Event Planner",
-  "Coach", "Photographer", "Lawyer", "Startup",
-];
+type AiCard = {
+  tagline: string; about: string; services: { name: string; description: string }[];
+  cta: string; seoTitle: string; seoDescription: string;
+  theme: number; color: string; color2: string; avatarStyle: string; source: "ai" | "smart";
+};
 
-const languages = ["English", "Hindi", "Spanish", "French", "Arabic", "Portuguese", "German", "Chinese"];
-const styles = ["Modern", "Professional", "Creative", "Minimal", "Bold", "Elegant"];
+const PROFESSIONS = ["Real Estate Agent", "Doctor", "Chartered Accountant", "Interior Designer", "Photographer", "Digital Marketer", "Salon & Spa", "Restaurant", "Lawyer", "Fitness Trainer", "Insurance Advisor", "Boutique"];
+const GEN_MSGS = ["Understanding your business…", "Writing your bio & services…", "Matching a design & colours…", "Polishing your card…"];
 
 export default function AIGenerator() {
+  const navigate = useNavigate();
   const [step, setStep] = useState<"form" | "generating" | "result">("form");
-  const [form, setForm] = useState({
-    businessName: "", industry: "", ownerName: "", phone: "",
-    whatsapp: "", email: "", website: "", services: "",
-    city: "", language: "English", style: "Modern",
-  });
+  const [form, setForm] = useState({ businessName: "", profession: "", city: "" });
+  const [gen, setGen] = useState<AiCard | null>(null);
+  const [msgIdx, setMsgIdx] = useState(0);
+  const genMut = trpc.ai.generate.useMutation();
+  const regenMut = trpc.ai.regenerate.useMutation();
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const update = (key: string, val: string) => setForm((p) => ({ ...p, [key]: val }));
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (step === "generating") { timerRef.current = setInterval(() => setMsgIdx((i) => (i + 1) % GEN_MSGS.length), 1100); }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [step]);
 
-  const handleGenerate = () => {
-    if (!form.businessName || !form.industry || !form.ownerName) {
-      toast.error("Please fill in Business Name, Industry, and Owner Name");
-      return;
-    }
-    setStep("generating");
-    setTimeout(() => setStep("result"), 3000);
+  const generate = async () => {
+    if (!form.businessName.trim() || !form.profession.trim()) { toast.error("Add your business name and profession"); return; }
+    setStep("generating"); setMsgIdx(0);
+    try {
+      const res = await genMut.mutateAsync(form);
+      setGen(res as AiCard);
+      setStep("result");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Generation failed"); setStep("form"); }
   };
 
-  const generated = step === "result" ? {
-    headline: `${form.businessName} - ${form.industry} Excellence`,
-    seoTitle: `${form.businessName} | ${form.industry} Services in ${form.city || "Your City"}`,
-    seoDescription: `${form.businessName} offers professional ${form.industry.toLowerCase()} services. Contact ${form.ownerName} for expert solutions.`,
-    about: `${form.businessName} is a leading ${form.industry.toLowerCase()} service provider based in ${form.city || "your city"}. Led by ${form.ownerName}, we specialize in delivering exceptional results tailored to each client's unique needs. Our team combines expertise with innovation to provide solutions that drive growth and success.`,
-    cta: "Get in Touch Today",
-    services: (form.services || "Consulting, Strategy, Implementation, Support").split(",").map((s) => s.trim()).filter(Boolean),
-  } : null;
+  const regenSection = async (section: "tagline" | "about" | "services" | "cta") => {
+    if (!gen) return;
+    try {
+      const r = await regenMut.mutateAsync({ ...form, section });
+      setGen({ ...gen, [section]: r.value as never });
+    } catch { toast.error("Couldn't regenerate — try again"); }
+  };
+
+  const previewHtml = useMemo(() => {
+    if (!gen) return "";
+    const rec = {
+      name: form.businessName || "Your Business", designation: form.profession || "",
+      company_name: form.businessName || "", address: form.city || "", city: form.city || "",
+      about: gen.about, about_on: 1, specialities: gen.services.map((s) => s.name).join(", "),
+      product_on: 1, enquiry_on: 1, theme: gen.theme, color: gen.color, color2: gen.color2,
+      slug: "ai-preview", mobile1: "+91 98765 43210", mobile2: "+91 98765 43210",
+      email: "hello@yourbusiness.in", url: "yourbusiness.in", social_title: gen.tagline,
+    } as unknown as Parameters<typeof buildCardHtml>[0];
+    const products = gen.services.map((s, i) => ({ id: i + 1, name: s.name, description: s.description, filename: "", price: "", offer_price: "", button: "", button_title: gen.cta }));
+    return buildCardHtml(rec, products as unknown as Parameters<typeof buildCardHtml>[1], [], [], [], [], []);
+  }, [gen, form]);
+
+  const saveAndSignup = () => {
+    if (!gen) return;
+    try { localStorage.setItem("dc_ai_draft", JSON.stringify({ form, gen, at: Date.now() })); } catch { /* ignore */ }
+    navigate("/signup?ai=1");
+  };
+
+  const regenBtn = (section: "tagline" | "about" | "services" | "cta") => (
+    <button onClick={() => regenSection(section)} disabled={regenMut.isPending} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#94A3B8] hover:text-[#F7B31C] disabled:opacity-50 transition-colors" title="Regenerate">
+      {regenMut.isPending && regenMut.variables?.section === section ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Regenerate
+    </button>
+  );
 
   return (
-    <div className="pt-24 pb-20">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E] mb-4">
-            <Sparkles size={13} /> AI Powered
-          </span>
-          <h1 className="text-4xl sm:text-5xl font-bold text-[#0F172A]">AI Digital Card Generator</h1>
-          <p className="mt-4 text-base text-[#64748B] max-w-2xl mx-auto">
-            Enter your business details and let DigitalCarda AI generate a professional card structure, content, CTA, SEO title, and design suggestion.
-          </p>
+    <div className="min-h-screen bg-gradient-to-b from-[#FFFBEB] via-white to-white pt-24 pb-20">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="text-center max-w-2xl mx-auto">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0F172A] text-[#F7B31C] text-[11px] font-bold uppercase tracking-wider"><Sparkles size={13} /> AI Powered</span>
+          <h1 className="mt-4 text-4xl sm:text-5xl font-extrabold text-[#0F172A] tracking-tight">Your digital card, written by AI</h1>
+          <p className="mt-4 text-base text-[#64748B]">Tell us three things — our AI writes your bio, services and SEO, and picks a design. Preview it live, then save &amp; publish free.</p>
         </div>
 
         {step === "form" && (
-          <div className="bg-white rounded-3xl p-8 shadow-premium border border-[#F1F5F9]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="mt-10 max-w-xl mx-auto bg-white rounded-3xl shadow-premium-lg border border-[#F1F5F9] p-7">
+            <div className="space-y-5">
               <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Business Name *</label>
-                <input value={form.businessName} onChange={(e) => update("businessName", e.target.value)} placeholder="e.g. PixelCraft Agency" className="input-premium w-full" />
+                <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">Business / your name</label>
+                <input value={form.businessName} onChange={(e) => set("businessName", e.target.value)} placeholder="e.g. Sharma Real Estate" className="h-12 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-4 text-sm outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Industry *</label>
-                <select value={form.industry} onChange={(e) => update("industry", e.target.value)} className="input-premium w-full">
-                  <option value="">Select Industry</option>
-                  {industries.map((ind) => <option key={ind} value={ind}>{ind}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Owner Name *</label>
-                <input value={form.ownerName} onChange={(e) => update("ownerName", e.target.value)} placeholder="e.g. Raj Sharma" className="input-premium w-full" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Phone Number</label>
-                <input value={form.phone} onChange={(e) => update("phone", e.target.value)} placeholder="+91 XXXXX XXXXX" className="input-premium w-full" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">WhatsApp Number</label>
-                <input value={form.whatsapp} onChange={(e) => update("whatsapp", e.target.value)} placeholder="+91 XXXXX XXXXX" className="input-premium w-full" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Email</label>
-                <input value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="hello@business.com" type="email" className="input-premium w-full" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Website</label>
-                <input value={form.website} onChange={(e) => update("website", e.target.value)} placeholder="https://yourbusiness.com" className="input-premium w-full" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Services (comma separated)</label>
-                <input value={form.services} onChange={(e) => update("services", e.target.value)} placeholder="Web Design, SEO, Branding" className="input-premium w-full" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">City</label>
-                <input value={form.city} onChange={(e) => update("city", e.target.value)} placeholder="Mumbai" className="input-premium w-full" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Preferred Language</label>
-                <select value={form.language} onChange={(e) => update("language", e.target.value)} className="input-premium w-full">
-                  {languages.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Design Style</label>
-                <div className="flex flex-wrap gap-2">
-                  {styles.map((s) => (
-                    <button key={s} onClick={() => update("style", s)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${form.style === s ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>
-                      {s}
-                    </button>
+                <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">Profession / industry</label>
+                <input value={form.profession} onChange={(e) => set("profession", e.target.value)} placeholder="e.g. Real Estate Agent" className="h-12 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-4 text-sm outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all" />
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {PROFESSIONS.slice(0, 8).map((p) => (
+                    <button key={p} onClick={() => set("profession", p)} className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${form.profession === p ? "bg-[#FEF3C7] border-[#F7B31C] text-[#92400E]" : "bg-white border-[#E2E8F0] text-[#64748B] hover:border-[#F7B31C]"}`}>{p}</button>
                   ))}
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">City <span className="font-normal text-[#94A3B8]">(optional)</span></label>
+                <input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="e.g. Jaipur" className="h-12 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-4 text-sm outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all" />
+              </div>
+              <button onClick={generate} className="w-full py-3.5 rounded-xl gradient-gold text-[#0F172A] font-bold text-base flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.99]">
+                <Wand2 size={19} /> Generate my card
+              </button>
+              <p className="text-center text-[11px] text-[#94A3B8]">Free · No signup needed to preview · Takes ~5 seconds</p>
             </div>
-            <button onClick={handleGenerate} className="w-full mt-6 h-13 gradient-gold text-[#0F172A] rounded-2xl font-semibold text-base flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.98]">
-              <Wand2 size={20} /> Generate My Card
-            </button>
           </div>
         )}
 
         {step === "generating" && (
-          <div className="bg-white rounded-3xl p-16 shadow-premium border border-[#F1F5F9] text-center">
-            <div className="w-20 h-20 rounded-2xl gradient-gold flex items-center justify-center mx-auto mb-6 animate-pulse">
-              <Sparkles size={32} className="text-[#0F172A]" />
+          <div className="mt-16 flex flex-col items-center text-center">
+            <div className="relative w-24 h-24">
+              <div className="absolute inset-0 rounded-full bg-[#F7B31C]/20 animate-ping" />
+              <div className="relative w-24 h-24 rounded-full gradient-gold flex items-center justify-center"><Sparkles size={38} className="text-[#0F172A] animate-pulse" /></div>
             </div>
-            <h2 className="text-xl font-bold text-[#0F172A] mb-2">Generating Your Card...</h2>
-            <p className="text-sm text-[#94A3B8]">Our AI is crafting the perfect card structure, content, and design for {form.businessName}.</p>
-            <div className="mt-6 max-w-xs mx-auto h-2 bg-[#F1F5F9] rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-[#F7B31C] to-[#14B8A6] rounded-full animate-shimmer" style={{ width: "100%" }} />
-            </div>
+            <h2 className="mt-8 text-xl font-bold text-[#0F172A]">Creating your card…</h2>
+            <p className="mt-2 text-sm text-[#64748B] h-5 transition-all">{GEN_MSGS[msgIdx]}</p>
           </div>
         )}
 
-        {step === "result" && generated && (
-          <div className="space-y-4">
-            <div className="bg-gradient-to-br from-[#0F172A] to-[#1E293B] rounded-3xl p-8 text-center">
-              <div className="w-16 h-16 rounded-2xl gradient-gold flex items-center justify-center mx-auto mb-4">
-                <Check size={32} className="text-[#0F172A]" />
+        {step === "result" && gen && (
+          <div className="mt-10 grid grid-cols-1 lg:grid-cols-[minmax(0,360px)_1fr] gap-8 items-start">
+            <div className="lg:sticky lg:top-24">
+              <div className="mx-auto w-full max-w-[360px] bg-white rounded-[2rem] overflow-hidden shadow-2xl border-[6px] border-[#1E293B]" style={{ height: "min(72vh, 720px)" }}>
+                <iframe srcDoc={previewHtml} title="AI card preview" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads allow-forms allow-modals allow-top-navigation-by-user-activation" className="w-full h-full border-0 bg-white" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Your Card is Ready!</h2>
-              <p className="text-sm text-[#94A3B8]">Here&apos;s what our AI generated for {form.businessName}</p>
+              <p className="text-center text-[11px] text-[#94A3B8] mt-3">Live preview · sample contact details — you'll add yours after signup</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">
-                <span className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider">Headline</span>
-                <p className="text-sm font-semibold text-[#0F172A] mt-1">{generated.headline}</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#16A34A]"><Check size={12} /> {gen.source === "ai" ? "AI-generated" : "Generated"}</span>
+                  <h2 className="text-xl font-bold text-[#0F172A] mt-1">Your card is ready 🎉</h2>
+                </div>
+                <button onClick={generate} className="h-10 px-4 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] flex items-center gap-2"><RefreshCw size={15} /> Regenerate all</button>
               </div>
-              <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">
-                <span className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider">CTA</span>
-                <p className="text-sm font-semibold text-[#0F172A] mt-1">{generated.cta}</p>
+
+              <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
+                <div className="flex items-center justify-between mb-1"><p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Tagline</p>{regenBtn("tagline")}</div>
+                <p className="text-sm font-semibold text-[#0F172A]">{gen.tagline}</p>
               </div>
-              <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9] sm:col-span-2">
-                <span className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider">SEO Title</span>
-                <p className="text-sm font-semibold text-[#0F172A] mt-1">{generated.seoTitle}</p>
-                <span className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider mt-4 block">SEO Description</span>
-                <p className="text-sm text-[#64748B] mt-1">{generated.seoDescription}</p>
+              <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
+                <div className="flex items-center justify-between mb-1"><p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">About</p>{regenBtn("about")}</div>
+                <p className="text-sm text-[#334155] leading-relaxed">{gen.about}</p>
               </div>
-              <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9] sm:col-span-2">
-                <span className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider">About Section</span>
-                <p className="text-sm text-[#64748B] mt-2 leading-relaxed">{generated.about}</p>
-              </div>
-              <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9] sm:col-span-2">
-                <span className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider">Services</span>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {generated.services.map((s, i) => (
-                    <span key={i} className="badge-gold">{s}</span>
+              <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
+                <div className="flex items-center justify-between mb-2"><p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Services ({gen.services.length})</p>{regenBtn("services")}</div>
+                <div className="space-y-2">
+                  {gen.services.map((s, i) => (
+                    <div key={i} className="flex gap-2.5"><span className="w-5 h-5 rounded-md bg-[#FEF3C7] flex items-center justify-center shrink-0 mt-0.5"><Check size={12} className="text-[#F7B31C]" /></span><div><p className="text-sm font-medium text-[#0F172A]">{s.name}</p><p className="text-[12px] text-[#64748B]">{s.description}</p></div></div>
                   ))}
                 </div>
               </div>
-            </div>
+              <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] mb-2 flex items-center gap-1.5"><Palette size={12} /> AI-matched design</p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: gen.color }} /> {gen.color}</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: gen.color2 }} /> {gen.color2}</span>
+                  <span className="text-xs text-[#64748B]">· Design style #{gen.theme}</span>
+                </div>
+                <p className="text-[12px] text-[#64748B] mt-2">{gen.avatarStyle}</p>
+              </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link to="/signup" className="flex-1 h-13 gradient-gold text-[#0F172A] rounded-2xl font-semibold flex items-center justify-center gap-2 hover:shadow-gold transition-all">
-                <ArrowRight size={18} /> Create Your Card Now
-              </Link>
-              <button onClick={() => setStep("form")} className="h-13 px-6 border border-[#E2E8F0] text-[#64748B] rounded-2xl font-medium flex items-center justify-center gap-2 hover:bg-[#F8FAFC] transition-all">
-                <RefreshCw size={18} /> Regenerate
-              </button>
+              <div className="bg-[#0F172A] rounded-2xl p-5 text-center">
+                <p className="text-white font-bold text-lg">Love it? Make it yours.</p>
+                <p className="text-white/60 text-[13px] mt-1">Sign up free — your card is saved, add your real details, and publish. 30-day free trial, no card needed.</p>
+                <button onClick={saveAndSignup} className="mt-4 w-full h-12 rounded-xl gradient-gold text-[#0F172A] font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all"><Zap size={18} /> Save &amp; Sign Up Free <ArrowRight size={17} /></button>
+              </div>
+              <button onClick={() => setStep("form")} className="w-full text-sm text-[#94A3B8] hover:text-[#0F172A] flex items-center justify-center gap-1.5 transition-colors"><ArrowLeft size={14} /> Start over</button>
             </div>
           </div>
         )}

@@ -16,6 +16,7 @@ import { referralRouter } from "./referral-router";
 import { notificationRouter } from "./notification-router";
 import { paymentRouter } from "./payment-router";
 import { resellerRouter } from "./reseller-router";
+import { aiRouter } from "./ai-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -38,6 +39,7 @@ export const appRouter = createRouter({
   notification: notificationRouter,
   payment: paymentRouter,
   reseller: resellerRouter,
+  ai: aiRouter,
 });
 
 export type AppRouter = typeof appRouter;

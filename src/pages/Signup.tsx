@@ -128,6 +128,26 @@ export default function Signup() {
             next.product_id = selectedProduct.id;
             next.product_slug = selectedProduct.slug;
           }
+          // Hydrate the new card from the AI Card Generator draft, if the user
+          // came from there — so their AI-made card is saved to their account.
+          try {
+            const draftRaw = localStorage.getItem("dc_ai_draft");
+            if (draftRaw) {
+              const draft = JSON.parse(draftRaw) as { form?: Record<string, string>; gen?: Record<string, unknown> };
+              const af = draft.form || {}; const g = draft.gen;
+              if (g) {
+                if (af.businessName) { next.name = af.businessName; next.company_name = af.businessName; }
+                if (af.profession) next.designation = af.profession;
+                if (af.city) { next.address = af.city; next.city = af.city; }
+                next.about = g.about; next.about_on = 1;
+                next.specialities = Array.isArray(g.services) ? (g.services as { name: string }[]).map((s) => s.name).join(", ") : next.specialities;
+                next.social_title = g.tagline;
+                next.theme = g.theme; next.color = g.color; next.color2 = g.color2;
+                next.seo_title = g.seoTitle; next.seo_description = g.seoDescription;
+              }
+              localStorage.removeItem("dc_ai_draft");
+            }
+          } catch { /* non-critical */ }
           localStorage.setItem(key, JSON.stringify(next));
         } catch { /* non-critical — dashboard will seed a default */ }
       }
