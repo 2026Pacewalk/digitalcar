@@ -10,11 +10,14 @@
  * rows. Re-running inserts nothing (dedup by user_id + name + created_at).
  * Imported rows carry source='legacy' so they're easy to identify/rollback.
  *
- * Owner resolution for each enquiry's slug (uname), first match wins:
- *   1. cards.slug            → user_id (+ card_id)
- *   2. published_cards.slug  → user_id
- *   3. customers.json slug   → email → users.id
- * Enquiries whose slug maps to no account are skipped (counted, never guessed).
+ * Owner resolution for each enquiry's `uname`, first match wins:
+ *   1. cards.slug              → user_id (+ card_id)
+ *   2. published_cards.slug    → user_id
+ *   3. customers.json username → email → users.id   (the primary legacy key)
+ *   4. customers.json slug     → email → users.id
+ * Enquiries whose uname maps to no account are skipped (counted, never guessed).
+ * The legacy demo/test bucket (uname 'admin' → hundreds of spam submissions on
+ * the demo card) is intentionally excluded so it never floods a real CRM.
  */
 import { readFile } from "node:fs/promises";
 
@@ -27,6 +30,9 @@ async function readJson(file) {
 
 // Legacy status → new CRM enum (leads.status).
 const STATUS_MAP = { new: "new", pending: "contacted", closed: "closed", converted: "converted" };
+
+// Legacy usernames to never import (demo/test buckets that collected spam).
+const SKIP_UNAMES = new Set(["admin"]);
 
 // Normalise legacy created_on to a stable 'YYYY-MM-DD HH:MM:SS' string (tz-free,
 // so dedup is deterministic across runs). Falls back to a fixed date if unusable.
@@ -53,11 +59,14 @@ export async function importLegacyEnquiries(conn, log = (s) => console.log(s)) {
   const emailToUserId = new Map();
   const [userRows] = await conn.query("SELECT id, LOWER(email) AS email FROM users WHERE email IS NOT NULL");
   for (const u of userRows) emailToUserId.set(u.email, u.id);
+  // Legacy enquiries key on the customer's `username` (primary) — also index
+  // `slug` — so uname resolves via customers.json → email → users.id.
   for (const c of customers) {
-    const slug = String(c.slug || "").toLowerCase();
     const email = String(c.email || "").toLowerCase();
-    if (slug && !slugToOwner.has(slug) && emailToUserId.has(email)) {
-      slugToOwner.set(slug, { userId: emailToUserId.get(email), cardId: null });
+    const uid = emailToUserId.get(email);
+    if (!uid) continue;
+    for (const key of [String(c.username || "").toLowerCase(), String(c.slug || "").toLowerCase()]) {
+      if (key && !slugToOwner.has(key)) slugToOwner.set(key, { userId: uid, cardId: null });
     }
   }
 
@@ -66,10 +75,12 @@ export async function importLegacyEnquiries(conn, log = (s) => console.log(s)) {
     "SELECT user_id, full_name, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS cstr FROM leads WHERE source = 'legacy'");
   const seen = new Set(existing.map((r) => `${r.user_id}|${r.full_name}|${r.cstr}`));
 
-  let imported = 0, dup = 0, noOwner = 0;
+  let imported = 0, dup = 0, noOwner = 0, skipped = 0;
   const batch = [];
   for (const e of enquiries) {
-    const owner = slugToOwner.get(String(e.uname || "").toLowerCase());
+    const uname = String(e.uname || "").toLowerCase();
+    if (SKIP_UNAMES.has(uname)) { skipped++; continue; }
+    const owner = slugToOwner.get(uname);
     if (!owner) { noOwner++; continue; }
     const name = (String(e.name || "").trim()) || "Anonymous";
     const dt = normalizeDt(e.created_on);
@@ -93,6 +104,6 @@ export async function importLegacyEnquiries(conn, log = (s) => console.log(s)) {
       "INSERT INTO leads (card_id, user_id, full_name, email, phone, message, source, status, created_at) VALUES ?",
       [batch]);
   }
-  log(`✓ legacy enquiries import — ${imported} imported, ${dup} already present, ${noOwner} skipped (no matching account)`);
-  return { imported, dup, noOwner };
+  log(`✓ legacy enquiries import — ${imported} imported, ${dup} already present, ${noOwner} no matching account, ${skipped} test-bucket skipped`);
+  return { imported, dup, noOwner, skipped };
 }
