@@ -92,7 +92,12 @@ function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allo
     if (!me.data) return;
     try {
       const stored = JSON.parse(localStorage.getItem("digitalcarda_user") || "null");
-      if (!stored || stored.id !== me.data.id || stored.role !== me.data.role) {
+      // Reconcile on ANY identity drift — id, role, email or name. Comparing only
+      // id/role let a renamed or re-emailed account (same id) keep showing a stale
+      // cached identity in the header (e.g. an old "Nipun Garg" for md@pacewalk).
+      const drift = !stored || stored.id !== me.data.id || stored.role !== me.data.role
+        || stored.email !== me.data.email || stored.fullName !== me.data.fullName;
+      if (drift) {
         localStorage.setItem("digitalcarda_user", JSON.stringify({
           id: me.data.id, email: me.data.email, fullName: me.data.fullName,
           role: me.data.role, avatar: me.data.avatar ?? undefined,
