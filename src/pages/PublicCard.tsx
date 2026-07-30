@@ -40,6 +40,8 @@ export default function PublicCard() {
   const { data: snapshot, isLoading: snapLoading } = trpc.publish.bySlug.useQuery({ slug }, { retry: false });
   // Expiry state — pauses an expired card for visitors (never deletes it, §12).
   const { data: pubState, isLoading: stateLoading } = trpc.publish.publicState.useQuery({ slug }, { retry: false });
+  // Template presets — used to colour a relational/bulk card by its templateId.
+  const { data: presetData } = trpc.template.presets.useQuery();
   // Only treat the DB card as usable if it actually has content blocks. Imported
   // (recovery) cards are slug-only with no blocks — those must fall back to the
   // legacy customers.json renderer, not render as an empty card.
@@ -195,6 +197,31 @@ export default function PublicCard() {
       </div>
     );
   }
+  // Bulk/template cards carry a templateId (the chosen design's style number) —
+  // render them with the SAME template engine as every other DigitalCarda card
+  // so the picked design actually applies. Block-builder cards (no templateId)
+  // keep their block layout below.
+  if (card.templateId) {
+    const presets = (presetData?.list ?? []) as Array<{ style: number; primary: string; secondary: string }>;
+    const preset = presets.find((p) => p.style === Number(card.templateId));
+    const cust = {
+      name: profile.name || card.title || "",
+      designation: profile.title || "",
+      company_name: profile.company || "",
+      about_us: profile.bio || "",
+      mobile1: contact.phone || "",
+      mobile2: contact.phone || "",
+      email: contact.email || "",
+      address: contact.address || "",
+      url: contact.website || "",
+      theme: String(card.templateId),
+      color: preset?.primary || "#F7B31C",
+      color2: preset?.secondary || "",
+    } as unknown as Parameters<typeof buildCardHtml>[0];
+    const html = buildCardHtml(cust, [], [], [], [], []);
+    return <iframe srcDoc={html} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" />;
+  }
+
   const about = aboutBlock?.content as Record<string, string> || {};
   const services = servicesBlock?.content as { items?: Array<{name: string; description?: string}> } || {};
   const whatsapp = whatsappBlock?.content as Record<string, string> || {};
