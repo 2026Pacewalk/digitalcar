@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Settings as SettingsIcon, Save, KeyRound, Package as PackageIcon, Check, Info, Calendar, IndianRupee, Eye, Pencil } from "lucide-react";
+import { Settings as SettingsIcon, Save, KeyRound, Package as PackageIcon, Check, Info, Calendar, IndianRupee, Eye, Pencil, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router";
 import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/customer/ModuleShell";
@@ -117,6 +117,29 @@ export default function CustomerSettings() {
     toast.success("Card link updated");
     setForm({});
   };
+
+  // Live availability of the typed card link (debounced) — tell the user it's
+  // taken before they hit save, so they can pick another straight away.
+  const [linkStatus, setLinkStatus] = useState<"idle" | "checking" | "available" | "taken" | "short">("idle");
+  useEffect(() => {
+    const typed = form.username;
+    if (typed === undefined) { setLinkStatus("idle"); return; }
+    const next = slugifyUsername(typed);
+    const current = String(data.username || data.slug || "").toLowerCase();
+    if (next === current || next === "") { setLinkStatus("idle"); return; }
+    if (next.length < 3) { setLinkStatus("short"); return; }
+    setLinkStatus("checking");
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const s = await utils.publish.checkSlug.fetch({ slug: next, cardId: activeCardId });
+        let ok = s.available;
+        if (ok) { try { const a = await utils.auth.checkAvailability.fetch({ username: next }); ok = !a.username; } catch { /* ignore */ } }
+        if (!cancelled) setLinkStatus(ok ? "available" : "taken");
+      } catch { if (!cancelled) setLinkStatus("idle"); }
+    }, 450);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [form.username, data.username, data.slug, activeCardId, utils]);
 
   // Package details — days left from the shared source (server trial clock
   // while on trial, else stored plan expiry) so every page shows the same number.
@@ -239,17 +262,27 @@ export default function CustomerSettings() {
           <hr className="my-6 border-[#F1F5F9]" />
           <div className="grid grid-cols-1 gap-4 max-w-lg">
             <Field label="Your card link (public URL)">
-              <div className="flex items-stretch rounded-xl border border-[#E2E8F0] overflow-hidden focus-within:border-[#F7B31C] focus-within:ring-2 focus-within:ring-[#F7B31C]/20 transition-all">
+              <div className={`flex items-stretch rounded-xl border overflow-hidden focus-within:ring-2 transition-all ${linkStatus === "taken" || linkStatus === "short" ? "border-red-400 focus-within:ring-red-400/20" : linkStatus === "available" ? "border-emerald-400 focus-within:ring-emerald-400/20" : "border-[#E2E8F0] focus-within:border-[#F7B31C] focus-within:ring-[#F7B31C]/20"}`}>
                 <span className="px-3 flex items-center bg-[#F8FAFC] text-[12px] text-[#94A3B8] border-r border-[#E2E8F0] whitespace-nowrap">digitalcarda.in/</span>
                 <input value={val("username")} onChange={(e) => set("username", e.target.value)} placeholder="your-brand" className="flex-1 h-10 px-3 outline-none text-sm bg-transparent" />
+                {linkStatus !== "idle" && (
+                  <span className="px-3 flex items-center shrink-0">
+                    {linkStatus === "checking" ? <Loader2 size={15} className="animate-spin text-[#94A3B8]" />
+                      : linkStatus === "available" ? <Check size={16} className="text-emerald-500" />
+                      : <X size={16} className="text-red-500" />}
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] text-[#94A3B8] mt-1.5">
-                Editing <span className="font-semibold text-[#0F172A]">{activeCard?.name || "this card"}</span>{activeCardId === 1 ? " (primary)" : ""}. Letters, numbers and hyphens only. Your printed QR keeps working even if you change this.
-              </p>
+              {linkStatus === "taken" ? <p className="text-[11px] font-semibold text-red-500 mt-1.5">That link is already taken — please choose another.</p>
+                : linkStatus === "short" ? <p className="text-[11px] font-semibold text-red-500 mt-1.5">A bit too short — use at least 3 characters.</p>
+                : linkStatus === "available" ? <p className="text-[11px] font-semibold text-emerald-600 mt-1.5">Available — this link is free to use.</p>
+                : <p className="text-[11px] text-[#94A3B8] mt-1.5">
+                    Editing <span className="font-semibold text-[#0F172A]">{activeCard?.name || "this card"}</span>{activeCardId === 1 ? " (primary)" : ""}. Letters, numbers and hyphens only. Your printed QR keeps working even if you change this.
+                  </p>}
             </Field>
             <Field label="Email"><input value={val("email")} onChange={(e) => set("email", e.target.value)} className={fieldCls} type="email" /></Field>
           </div>
-          <div className="flex justify-start mt-4"><button onClick={saveAccount} className="h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold flex items-center gap-2"><Pencil size={15} /> Save card link</button></div>
+          <div className="flex justify-start mt-4"><button onClick={saveAccount} disabled={linkStatus === "taken" || linkStatus === "short" || linkStatus === "checking"} className="h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"><Pencil size={15} /> Save card link</button></div>
         </Panel>
       )}
     </ModuleShell>
