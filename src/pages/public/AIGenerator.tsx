@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Sparkles, Wand2, RefreshCw, ArrowRight, ArrowLeft, Loader2, Check, Palette, Zap } from "lucide-react";
 import { trpc } from "@/providers/trpc";
-import { buildCardHtml } from "@/card-template/buildCard";
+import { buildCardHtml, buildCardThumb } from "@/card-template/buildCard";
 import { toast } from "sonner";
 
 type AiCard = {
@@ -10,6 +10,20 @@ type AiCard = {
   cta: string; seoTitle: string; seoDescription: string;
   theme: number; color: string; color2: string; avatarStyle: string; source: "ai" | "smart";
 };
+
+const CARD_STYLES = 31;
+const THUMB_W = 375, THUMB_H = 626;
+
+/* A small, selectable template thumbnail (scaled card front). */
+function TemplateThumb({ html, active, label, onClick }: { html: string; active: boolean; label: number; onClick: () => void }) {
+  const W = 92;
+  return (
+    <button onClick={onClick} title={`Design ${label}`} className={`relative shrink-0 rounded-xl overflow-hidden bg-white transition-all ${active ? "ring-2 ring-[#F7B31C] shadow-gold" : "ring-1 ring-[#E2E8F0] hover:ring-[#F7B31C]/60"}`} style={{ width: W, aspectRatio: `${THUMB_W}/${THUMB_H}` }}>
+      <iframe srcDoc={html} scrolling="no" tabIndex={-1} loading="lazy" title={`Design ${label}`} className="pointer-events-none" style={{ width: THUMB_W, height: THUMB_H, border: 0, transform: `scale(${W / THUMB_W})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
+      {active && <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#F7B31C] flex items-center justify-center"><Check size={10} className="text-[#0F172A]" /></span>}
+    </button>
+  );
+}
 
 const PROFESSIONS = ["Real Estate Agent", "Doctor", "Chartered Accountant", "Interior Designer", "Photographer", "Digital Marketer", "Salon & Spa", "Restaurant", "Lawyer", "Fitness Trainer", "Insurance Advisor", "Boutique"];
 const GEN_MSGS = ["Understanding your business…", "Writing your bio & services…", "Matching a design & colours…", "Polishing your card…"];
@@ -19,6 +33,7 @@ export default function AIGenerator() {
   const [step, setStep] = useState<"form" | "generating" | "result">("form");
   const [form, setForm] = useState({ businessName: "", profession: "", city: "" });
   const [gen, setGen] = useState<AiCard | null>(null);
+  const [theme, setTheme] = useState<number | null>(null); // user's override of the AI-picked design
   const [msgIdx, setMsgIdx] = useState(0);
   const genMut = trpc.ai.generate.useMutation();
   const regenMut = trpc.ai.regenerate.useMutation();
@@ -36,6 +51,7 @@ export default function AIGenerator() {
     try {
       const res = await genMut.mutateAsync(form);
       setGen(res as AiCard);
+      setTheme(null); // adopt the AI's design pick; user can change it below
       setStep("result");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Generation failed"); setStep("form"); }
   };
@@ -48,23 +64,34 @@ export default function AIGenerator() {
     } catch { toast.error("Couldn't regenerate — try again"); }
   };
 
+  const effTheme = theme ?? gen?.theme ?? 1;
+
+  const baseRec = useMemo(() => gen ? ({
+    name: form.businessName || "Your Business", designation: form.profession || "",
+    company_name: form.businessName || "", address: form.city || "", city: form.city || "",
+    about: gen.about, about_on: 1, specialities: gen.services.map((s) => s.name).join(", "),
+    product_on: 1, enquiry_on: 1, color: gen.color, color2: gen.color2,
+    slug: "ai-preview", mobile1: "+91 98765 43210", mobile2: "+91 98765 43210",
+    email: "hello@yourbusiness.in", url: "yourbusiness.in", social_title: gen.tagline,
+  }) : null, [gen, form]);
+
   const previewHtml = useMemo(() => {
-    if (!gen) return "";
-    const rec = {
-      name: form.businessName || "Your Business", designation: form.profession || "",
-      company_name: form.businessName || "", address: form.city || "", city: form.city || "",
-      about: gen.about, about_on: 1, specialities: gen.services.map((s) => s.name).join(", "),
-      product_on: 1, enquiry_on: 1, theme: gen.theme, color: gen.color, color2: gen.color2,
-      slug: "ai-preview", mobile1: "+91 98765 43210", mobile2: "+91 98765 43210",
-      email: "hello@yourbusiness.in", url: "yourbusiness.in", social_title: gen.tagline,
-    } as unknown as Parameters<typeof buildCardHtml>[0];
+    if (!gen || !baseRec) return "";
+    const rec = { ...baseRec, theme: effTheme } as unknown as Parameters<typeof buildCardHtml>[0];
     const products = gen.services.map((s, i) => ({ id: i + 1, name: s.name, description: s.description, filename: "", price: "", offer_price: "", button: "", button_title: gen.cta }));
     return buildCardHtml(rec, products as unknown as Parameters<typeof buildCardHtml>[1], [], [], [], [], []);
-  }, [gen, form]);
+  }, [gen, baseRec, effTheme]);
+
+  const thumbs = useMemo(() => {
+    if (!baseRec) return [];
+    return Array.from({ length: CARD_STYLES }, (_, i) => i + 1).map((sn) => ({
+      style: sn, html: buildCardThumb({ ...baseRec, theme: sn } as unknown as Parameters<typeof buildCardThumb>[0], sn),
+    }));
+  }, [baseRec]);
 
   const saveAndSignup = () => {
     if (!gen) return;
-    try { localStorage.setItem("dc_ai_draft", JSON.stringify({ form, gen, at: Date.now() })); } catch { /* ignore */ }
+    try { localStorage.setItem("dc_ai_draft", JSON.stringify({ form, gen: { ...gen, theme: effTheme }, at: Date.now() })); } catch { /* ignore */ }
     navigate("/signup?ai=1");
   };
 
@@ -140,6 +167,20 @@ export default function AIGenerator() {
                 <button onClick={generate} className="h-10 px-4 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] flex items-center gap-2"><RefreshCw size={15} /> Regenerate all</button>
               </div>
 
+              {/* Design / template picker */}
+              <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] flex items-center gap-1.5"><Palette size={12} /> Choose your design</p>
+                  <span className="text-[11px] font-medium text-[#64748B]">Design #{effTheme}{theme === null ? " · AI pick" : ""}</span>
+                </div>
+                <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-1 px-1">
+                  {thumbs.map((t) => (
+                    <TemplateThumb key={t.style} html={t.html} label={t.style} active={effTheme === t.style} onClick={() => setTheme(t.style)} />
+                  ))}
+                </div>
+                <p className="text-[11px] text-[#94A3B8] mt-1">Tap any design — the preview updates instantly.</p>
+              </div>
+
               <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
                 <div className="flex items-center justify-between mb-1"><p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Tagline</p>{regenBtn("tagline")}</div>
                 <p className="text-sm font-semibold text-[#0F172A]">{gen.tagline}</p>
@@ -161,7 +202,7 @@ export default function AIGenerator() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: gen.color }} /> {gen.color}</span>
                   <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: gen.color2 }} /> {gen.color2}</span>
-                  <span className="text-xs text-[#64748B]">· Design style #{gen.theme}</span>
+                  <span className="text-xs text-[#64748B]">· Design style #{effTheme}</span>
                 </div>
                 <p className="text-[12px] text-[#64748B] mt-2">{gen.avatarStyle}</p>
               </div>
