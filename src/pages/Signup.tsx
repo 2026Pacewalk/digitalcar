@@ -139,6 +139,7 @@ export default function Signup() {
                 if (af.businessName) { next.name = af.businessName; next.company_name = af.businessName; }
                 if (af.profession) next.designation = af.profession;
                 if (af.city) { next.address = af.city; next.city = af.city; }
+                if (af.phone) { next.mobile1 = af.phone; }
                 next.about = g.about; next.about_on = 1;
                 next.specialities = Array.isArray(g.services) ? (g.services as { name: string }[]).map((s) => s.name).join(", ") : next.specialities;
                 next.social_title = g.tagline;

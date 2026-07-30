@@ -60,6 +60,7 @@ const superAdminGroups: NavGroup[] = [
     { label: "Applications", icon: ClipboardList, path: "/admin/reseller-applications" },
     { label: "Customers", icon: UserCircle, path: "/admin/customers" },
     { label: "Leads", icon: MessageSquare, path: "/admin/leads" },
+    { label: "AI Generator", icon: Wand2, path: "/admin/ai-generator" },
   ] },
   { title: "Catalog", items: [
     { label: "Products", icon: ShoppingBag, path: "/admin/products" },

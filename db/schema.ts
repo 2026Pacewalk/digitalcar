@@ -303,6 +303,22 @@ export const funnelEvents = mysqlTable("funnel_events", {
 
 export type FunnelEvent = typeof funnelEvents.$inferSelect;
 
+// ─── AI Card Generator usage log (who's trying the feature) ─────
+export const aiGenerations = mysqlTable("ai_generations", {
+  id: serial("id").primaryKey(),
+  businessName: varchar("business_name", { length: 120 }),
+  profession: varchar("profession", { length: 80 }),
+  city: varchar("city", { length: 80 }),
+  phone: varchar("phone", { length: 30 }),
+  source: varchar("source", { length: 16 }),
+  ip: varchar("ip", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("aigen_created_idx").on(table.createdAt),
+  index("aigen_phone_idx").on(table.phone),
+]);
+export type AiGeneration = typeof aiGenerations.$inferSelect;
+
 // ─── Companies / Teams (corporate accounts) ────────────────────
 // A company buys many cards; a company admin governs branding + approved
 // designs; employees get cards under that identity (§56). Foundation layer.

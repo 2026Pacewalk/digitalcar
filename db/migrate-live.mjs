@@ -67,6 +67,11 @@ const TABLES = {
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, company_id BIGINT UNSIGNED NOT NULL,
     user_id BIGINT UNSIGNED NOT NULL UNIQUE, role ENUM('admin','employee') NOT NULL DEFAULT 'employee',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX companymember_company_idx (company_id))`,
+  ai_generations: `CREATE TABLE IF NOT EXISTS ai_generations (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, business_name VARCHAR(120) NULL, profession VARCHAR(80) NULL,
+    city VARCHAR(80) NULL, phone VARCHAR(30) NULL, source VARCHAR(16) NULL, ip VARCHAR(64) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX aigen_created_idx (created_at), INDEX aigen_phone_idx (phone))`,
 };
 
 for (const [name, sql] of Object.entries(TABLES)) {

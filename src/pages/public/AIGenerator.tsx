@@ -41,9 +41,11 @@ const GEN_MSGS = ["Understanding your business…", "Writing your bio & services
 export default function AIGenerator() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"form" | "generating" | "result">("form");
-  const [form, setForm] = useState({ businessName: "", profession: "", city: "" });
+  const [form, setForm] = useState({ businessName: "", profession: "", city: "", phone: "" });
   const [gen, setGen] = useState<AiCard | null>(null);
   const [theme, setTheme] = useState<number | null>(null); // user's override of the AI-picked design
+  const [customColor, setCustomColor] = useState<string | null>(null);  // user's colour override (null = follow design)
+  const [customColor2, setCustomColor2] = useState<string | null>(null);
   const [msgIdx, setMsgIdx] = useState(0);
   const genMut = trpc.ai.generate.useMutation();
   const regenMut = trpc.ai.regenerate.useMutation();
@@ -62,6 +64,7 @@ export default function AIGenerator() {
       const res = await genMut.mutateAsync(form);
       setGen(res as AiCard);
       setTheme(null); // adopt the AI's design pick; user can change it below
+      setCustomColor(null); setCustomColor2(null); // adopt the AI/design colours
       setStep("result");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Generation failed"); setStep("form"); }
   };
@@ -75,14 +78,20 @@ export default function AIGenerator() {
   };
 
   const effTheme = theme ?? gen?.theme ?? 1;
-  const [effColor, effColor2]: [string, string] = gen ? (theme !== null ? colorForStyle(theme) : [gen.color, gen.color2]) : ["#F7B31C", ""];
+  // Base colours come from the chosen design (or the AI pick); a custom colour overrides.
+  const [autoColor, autoColor2]: [string, string] = gen ? (theme !== null ? colorForStyle(theme) : [gen.color, gen.color2]) : ["#F7B31C", "#0F172A"];
+  const effColor = customColor ?? autoColor;
+  const effColor2 = customColor2 ?? autoColor2;
+
+  // Selecting a design adopts that design's palette (drops any custom colour).
+  const pickTheme = (sn: number) => { setTheme(sn); setCustomColor(null); setCustomColor2(null); };
 
   const contentRec = useMemo(() => gen ? ({
     name: form.businessName || "Your Business", designation: form.profession || "",
     company_name: form.businessName || "", address: form.city || "", city: form.city || "",
     about: gen.about, about_on: 1, specialities: gen.services.map((s) => s.name).join(", "),
     product_on: 1, enquiry_on: 1,
-    slug: "ai-preview", mobile1: "+91 98765 43210", mobile2: "+91 98765 43210",
+    slug: "ai-preview", mobile1: form.phone || "+91 98765 43210", mobile2: "",
     email: "hello@yourbusiness.in", url: "yourbusiness.in", social_title: gen.tagline,
   }) : null, [gen, form]);
 
@@ -138,9 +147,15 @@ export default function AIGenerator() {
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">City <span className="font-normal text-[#94A3B8]">(optional)</span></label>
-                <input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="e.g. Jaipur" className="h-12 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-4 text-sm outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">City <span className="font-normal text-[#94A3B8]">(optional)</span></label>
+                  <input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="e.g. Jaipur" className="h-12 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-4 text-sm outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">Mobile number</label>
+                  <input value={form.phone} onChange={(e) => set("phone", e.target.value.replace(/[^\d+\s-]/g, ""))} inputMode="tel" maxLength={20} placeholder="e.g. +91 98765 43210" className="h-12 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-4 text-sm outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all" />
+                </div>
               </div>
               <button onClick={generate} className="w-full py-3.5 rounded-xl gradient-gold text-[#0F172A] font-bold text-base flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.99]">
                 <Wand2 size={19} /> Generate my card
@@ -180,7 +195,7 @@ export default function AIGenerator() {
               </div>
               <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-1 px-1">
                 {thumbs.map((t) => (
-                  <TemplateThumb key={t.style} html={t.html} label={t.style} active={effTheme === t.style} onClick={() => setTheme(t.style)} />
+                  <TemplateThumb key={t.style} html={t.html} label={t.style} active={effTheme === t.style} onClick={() => pickTheme(t.style)} />
                 ))}
               </div>
               <p className="text-[11px] text-[#94A3B8] mt-1">Scroll & tap any design — the preview and colours update instantly.</p>
@@ -213,13 +228,32 @@ export default function AIGenerator() {
                 </div>
               </div>
               <div className="bg-white rounded-2xl border border-[#F1F5F9] p-4 shadow-premium">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] mb-2 flex items-center gap-1.5"><Palette size={12} /> Design &amp; colours</p>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: effColor }} /> {effColor}</span>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-[#334155]"><span className="w-5 h-5 rounded-md border border-black/5" style={{ background: effColor2 }} /> {effColor2}</span>
-                  <span className="text-xs text-[#64748B]">· Design style #{effTheme}</span>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] flex items-center gap-1.5"><Palette size={12} /> Colours <span className="text-[#CBD5E1] normal-case font-medium">· Design #{effTheme}</span></p>
+                  {(customColor !== null || customColor2 !== null) && (
+                    <button onClick={() => { setCustomColor(null); setCustomColor2(null); }} className="text-[11px] font-semibold text-[#94A3B8] hover:text-[#F7B31C] inline-flex items-center gap-1"><RefreshCw size={11} /> Reset</button>
+                  )}
                 </div>
-                <p className="text-[12px] text-[#64748B] mt-2">{gen.avatarStyle}</p>
+                <div className="flex items-center gap-5">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="relative w-9 h-9 rounded-lg border border-black/10 overflow-hidden shrink-0" style={{ background: effColor }}>
+                      <input type="color" value={effColor} onChange={(e) => setCustomColor(e.target.value)} className="absolute -inset-2 opacity-0 cursor-pointer" title="Primary colour" />
+                    </span>
+                    <span className="text-xs leading-tight"><span className="block font-semibold text-[#0F172A]">Primary</span><span className="block text-[#94A3B8] uppercase">{effColor}</span></span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="relative w-9 h-9 rounded-lg border border-black/10 overflow-hidden shrink-0" style={{ background: effColor2 }}>
+                      <input type="color" value={effColor2} onChange={(e) => setCustomColor2(e.target.value)} className="absolute -inset-2 opacity-0 cursor-pointer" title="Secondary colour" />
+                    </span>
+                    <span className="text-xs leading-tight"><span className="block font-semibold text-[#0F172A]">Secondary</span><span className="block text-[#94A3B8] uppercase">{effColor2}</span></span>
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {PALETTE.map(([c], i) => (
+                    <button key={i} onClick={() => setCustomColor(c)} title={c} aria-label={`Use ${c}`} className={`w-6 h-6 rounded-md transition-transform hover:scale-110 ${effColor.toLowerCase() === c.toLowerCase() ? "ring-2 ring-offset-1 ring-[#0F172A]" : "border border-black/10"}`} style={{ background: c }} />
+                  ))}
+                </div>
+                <p className="text-[12px] text-[#64748B] mt-3">{gen.avatarStyle}</p>
               </div>
 
               <div className="bg-[#0F172A] rounded-2xl p-5 text-center">

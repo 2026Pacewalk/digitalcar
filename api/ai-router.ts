@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, publicQuery } from "./middleware";
+import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
 /* AI Card Generator (public, pre-signup). Generates a full card — content,
@@ -41,7 +41,7 @@ const PALETTES: { match: RegExp; color: string; color2: string; theme: number }[
 ];
 const paletteFor = (profession: string) => PALETTES.find((p) => p.match.test(profession)) || { color: "#F7B31C", color2: "#0F172A", theme: 1 };
 
-type Input = { businessName: string; profession: string; city?: string; about?: string };
+type Input = { businessName: string; profession: string; city?: string; phone?: string; about?: string };
 
 async function claudeGenerate(input: Input): Promise<AiCard | null> {
   const key = process.env.ANTHROPIC_API_KEY;
@@ -137,12 +137,28 @@ export const aiRouter = createRouter({
       businessName: z.string().min(1).max(80),
       profession: z.string().min(1).max(60),
       city: z.string().max(60).optional(),
+      phone: z.string().max(30).optional(),
       about: z.string().max(400).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      enforceRateLimit(`aigen:${clientIp(ctx.req)}`, 20, 60 * 60_000); // 20/hour per IP
+      const ip = clientIp(ctx.req);
+      enforceRateLimit(`aigen:${ip}`, 20, 60 * 60_000); // 20/hour per IP
       const ai = await claudeGenerate(input);
-      return ai || smartGenerate(input);
+      const result = ai || smartGenerate(input);
+      // Log the attempt so admins can track who's trying the feature (best-effort).
+      try {
+        const { getDb } = await import("./queries/connection");
+        const { aiGenerations } = await import("@db/schema");
+        await getDb().insert(aiGenerations).values({
+          businessName: input.businessName.slice(0, 120),
+          profession: input.profession.slice(0, 80),
+          city: input.city?.slice(0, 80) || null,
+          phone: input.phone?.slice(0, 30) || null,
+          source: result.source,
+          ip: ip.slice(0, 64),
+        });
+      } catch { /* logging must never break generation */ }
+      return result;
     }),
 
   // Regenerate a single piece (tagline / about / one service / cta).
@@ -165,4 +181,13 @@ export const aiRouter = createRouter({
         source: full.source,
       };
     }),
+
+  // Admin: recent AI-generator usage — who's trying the feature.
+  list: adminQuery.query(async () => {
+    const { getDb } = await import("./queries/connection");
+    const { aiGenerations } = await import("@db/schema");
+    const { desc } = await import("drizzle-orm");
+    const rows = await getDb().select().from(aiGenerations).orderBy(desc(aiGenerations.createdAt)).limit(300);
+    return rows;
+  }),
 });
