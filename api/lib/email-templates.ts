@@ -290,6 +290,19 @@ export function referralSignupAdminEmail(o: { newUserName?: string; newUserEmail
   };
 }
 
+export function smtpTestEmail(o: { to?: string }): Email {
+  const bodyHtml =
+    p("✅ Your DigitalCarda email delivery is working.") +
+    p("This is a test message sent from your admin panel. If you're reading it, SMTP is configured correctly and your automated emails — welcome, trial lifecycle, referral rewards, payment receipts, and lead alerts — will all send.") +
+    (o.to ? p(`<span style="color:${BRAND.sub};font-size:13px">Sent to: ${esc(o.to)}</span>`) : "") +
+    button("Open dashboard", `${SITE}/dashboard`);
+  return {
+    subject: "✅ DigitalCarda email test — it works!",
+    html: layout({ preheader: "Your SMTP is working — automated emails will send.", badge: "Email test", heading: "Email delivery works 🎉", bodyHtml, accent: "#22C55E" }),
+    text: "Your DigitalCarda email delivery is working. This test message confirms SMTP is configured correctly — automated emails will send.",
+  };
+}
+
 export function referralRewardEmail(o: { name?: string; refereeName?: string; amount: number | string; balance?: number | string }): Email {
   const rows: [string, string][] = [["Reward credited", inr(o.amount)]];
   if (o.balance != null) rows.push(["Wallet balance", inr(o.balance)]);

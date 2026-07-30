@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
+import { sendEmail, smtpConfigured, ownerAddress } from "./lib/mail";
+import { smtpTestEmail } from "./lib/email-templates";
 
 const settingsStore: Record<string, Record<string, unknown>> = {
   general: {
@@ -52,6 +54,24 @@ export const settingsRouter = createRouter({
         ...input.values,
       };
       return { success: true };
+    }),
+
+  // Admin: is SMTP configured on the server? (read-only — SMTP lives in the
+  // server .env, never the DB). No secrets are returned.
+  smtpStatus: adminQuery.query(() => ({
+    configured: smtpConfigured(),
+    host: process.env.SMTP_HOST || null,
+    from: process.env.MAIL_FROM || process.env.SMTP_USER || null,
+    notifyTo: ownerAddress(),
+  })),
+
+  // Admin: send a test email and report whether it actually went out.
+  sendTestEmail: adminQuery
+    .input(z.object({ to: z.string().email().optional() }))
+    .mutation(async ({ input }) => {
+      const to = input.to || ownerAddress();
+      const r = await sendEmail(to, smtpTestEmail({ to }));
+      return { ...r, to };
     }),
 
   getPublic: publicQuery.query(() => {

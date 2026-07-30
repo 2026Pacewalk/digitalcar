@@ -39,19 +39,26 @@ import { classifyLeadSmart } from "./lead-intel";
 
 export const ownerAddress = () => process.env.LEAD_NOTIFY_TO || "hellopacewalk@gmail.com";
 
-/** Send a rendered Email template to a recipient. Never throws. */
-export async function sendEmail(to: string | undefined | null, email: Email, replyTo?: string | null): Promise<void> {
+/** Send a rendered Email template to a recipient. Never throws — returns a
+    status so callers (e.g. the admin test tool) can report success/failure.
+    Existing callers that ignore the return value are unaffected. */
+export async function sendEmail(to: string | undefined | null, email: Email, replyTo?: string | null): Promise<{ ok: boolean; error?: string }> {
   try {
-    if (!to) return;
+    if (!to) return { ok: false, error: "No recipient" };
     const t = transport();
-    if (!t) return;
+    if (!t) return { ok: false, error: "SMTP not configured" };
     const from = process.env.MAIL_FROM || process.env.SMTP_USER;
     await t.sendMail({ from, to, replyTo: replyTo || undefined, subject: email.subject, text: email.text, html: email.html });
     console.log(`[mail] "${email.subject}" sent to ${to}`);
+    return { ok: true };
   } catch (e) {
     console.error(`[mail] failed to send "${email.subject}":`, (e as Error).message);
+    return { ok: false, error: (e as Error).message };
   }
 }
+
+/** True when the three required SMTP env vars are present. */
+export const smtpConfigured = () => !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 
 export interface LeadEmail {
   name: string;

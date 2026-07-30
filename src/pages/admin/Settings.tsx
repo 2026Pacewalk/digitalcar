@@ -1,12 +1,21 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useState } from "react";
-import { Save, Globe, Mail, Palette, Shield, Bell, CreditCard } from "lucide-react";
+import { Save, Globe, Mail, Palette, Shield, Bell, CreditCard, CheckCircle2, XCircle, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { trpc } from "@/providers/trpc";
 
 export default function AdminSettings() {
   const [activeTab, setActiveTab] = useState("general");
   const [saving, setSaving] = useState(false);
+
+  // Email / SMTP status + test tool.
+  const { data: smtp, isLoading: smtpLoading } = trpc.settings.smtpStatus.useQuery();
+  const [testTo, setTestTo] = useState("");
+  const sendTest = trpc.settings.sendTestEmail.useMutation({
+    onSuccess: (r) => r.ok ? toast.success(`Test email sent to ${r.to} 🎉`) : toast.error(r.error || "Send failed"),
+    onError: (e) => toast.error(e.message),
+  });
 
   const tabs = [
     { id: "general", label: "General", icon: Globe },
@@ -107,20 +116,46 @@ export default function AdminSettings() {
             {activeTab === "email" && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-base font-semibold text-[#0F172A]">Email Settings</h3>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">Configure email delivery</p>
+                  <h3 className="text-base font-semibold text-[#0F172A]">Email Delivery</h3>
+                  <p className="text-xs text-[#94A3B8] mt-0.5">SMTP is configured in the server's <code className="text-[#475569]">.env</code> file (never stored here). Check status and send a test below.</p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">SMTP Host</label><input className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">SMTP Port</label><input className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">SMTP User</label><input className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">SMTP Password</label><input type="password" className="input-premium w-full" /></div>
+
+                {/* Status card */}
+                <div className={`rounded-2xl border p-5 ${smtp?.configured ? "bg-[#F0FDF4] border-[#BBF7D0]" : "bg-[#FEF2F2] border-[#FECACA]"}`}>
+                  {smtpLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-[#64748B]"><Loader2 size={16} className="animate-spin" /> Checking…</div>
+                  ) : smtp?.configured ? (
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 size={20} className="text-[#16A34A] shrink-0 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-semibold text-[#166534]">SMTP is configured — emails will send.</p>
+                        <p className="text-[#15803D] mt-0.5 text-xs">Host: <b>{smtp.host}</b> · From: <b>{smtp.from}</b> · Lead alerts → <b>{smtp.notifyTo}</b></p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <XCircle size={20} className="text-[#DC2626] shrink-0 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-semibold text-[#991B1B]">SMTP is not configured — automated emails are skipped.</p>
+                        <p className="text-[#B91C1C] mt-1 text-xs">Add <code>SMTP_HOST</code>, <code>SMTP_USER</code>, <code>SMTP_PASS</code> (and optional <code>SMTP_PORT</code>, <code>MAIL_FROM</code>) to the server <code>.env</code>, then restart the app.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                {/* Test email */}
                 <div>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" defaultChecked className="rounded border-[#E2E8F0]" />
-                    <span className="text-sm text-[#64748B]">Enable email notifications</span>
-                  </label>
+                  <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Send a test email to</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder={smtp?.notifyTo || "you@example.com"} className="input-premium w-full sm:max-w-xs" />
+                    <button
+                      onClick={() => sendTest.mutate({ to: testTo.trim() || undefined })}
+                      disabled={sendTest.isPending}
+                      className="h-11 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center justify-center gap-2 hover:shadow-gold transition-all disabled:opacity-60 shrink-0">
+                      {sendTest.isPending ? <><Loader2 size={16} className="animate-spin" /> Sending…</> : <><Send size={15} /> Send test email</>}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#94A3B8] mt-2">Leave blank to send to the lead-alert address. Check spam if it doesn't arrive.</p>
                 </div>
               </div>
             )}
