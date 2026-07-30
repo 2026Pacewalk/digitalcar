@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
-import { fetchAdminData } from "@/lib/adminData";
+import { fetchAdminData, hideAdminRecords } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import { scopedKey } from "@/hooks/useCustomer";
 
@@ -249,11 +249,15 @@ export default function AdminCustomers() {
     const c = delModal;
     setRows((r) => r.filter((x) => x.id !== c.id));
     setDelModal(null);
+    // Persist the removal from the customers list (survives refresh), and also
+    // deactivate any matching live account so its card is paused.
     try {
-      const res = await deactivateMut.mutateAsync({ email: c.email });
-      if (res.ok) toast.success(`${c.name} deactivated — their card is now paused`);
-      else toast.warning(`Removed from the list; no live account matched ${c.email} to deactivate.`);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not deactivate on the server"); }
+      await hideAdminRecords("customers", [c.id]);
+      const res = await deactivateMut.mutateAsync({ email: c.email }).catch(() => ({ ok: false }));
+      toast.success(res?.ok ? `${c.name} deleted — account deactivated` : `${c.name} deleted`);
+    } catch {
+      toast.error("Removed here, but couldn't save on the server — may return on refresh.");
+    }
   };
   const addCustomer = () => {
     if (!addForm.name || !addForm.email) { toast.error("Name and email are required"); return; }

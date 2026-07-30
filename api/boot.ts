@@ -184,15 +184,57 @@ const readPublicJson = async (file: string): Promise<unknown[]> => {
   return [];
 };
 
+// Persistent "hidden records" overlay: the legacy enquiries/customers live in
+// read-only JSON files, so an admin "delete" is stored as a hidden-id list in
+// app_settings and filtered out on read — deletes now survive a refresh.
+async function getHiddenIds(file: string): Promise<Set<string>> {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { appSettings } = await import("@db/schema");
+    const { eq } = await import("drizzle-orm");
+    const rows = await getDb().select().from(appSettings).where(eq(appSettings.key, `hidden_${file}`));
+    const arr = rows[0]?.value ? JSON.parse(rows[0].value) : [];
+    return new Set((Array.isArray(arr) ? arr : []).map(String));
+  } catch { return new Set(); }
+}
+async function addHiddenIds(file: string, ids: string[]): Promise<number> {
+  const { getDb } = await import("./queries/connection");
+  const { appSettings } = await import("@db/schema");
+  const { eq } = await import("drizzle-orm");
+  const cur = await getHiddenIds(file);
+  ids.forEach((id) => cur.add(String(id)));
+  const value = JSON.stringify([...cur]);
+  await getDb().insert(appSettings).values({ key: `hidden_${file}`, value }).onDuplicateKeyUpdate({ set: { value } });
+  return cur.size;
+}
+
 app.get("/api/admin/data/:file", async (c) => {
   const file = c.req.param("file");
   if (!SENSITIVE.has(file)) return c.json({ error: "Not found" }, 404);
   if (!(await requireSuperAdmin(c))) return c.json({ error: "Unauthorized" }, 401);
-  const { readFile } = await import("node:fs/promises");
-  for (const p of [`./dist/public/${file}.json`, `./public/${file}.json`]) {
-    try { return c.body(await readFile(p, "utf8"), 200, { "content-type": "application/json" }); } catch { /* try next */ }
+  const data = await readPublicJson(file);
+  if ((file === "enquiries" || file === "customers") && Array.isArray(data)) {
+    const hidden = await getHiddenIds(file);
+    if (hidden.size) return c.json((data as Record<string, unknown>[]).filter((r) => !hidden.has(String(r.id))));
   }
-  return c.json({ error: "Not found" }, 404);
+  return c.json(data);
+});
+
+// Super-admin: persist a delete by hiding record ids from the JSON overlay.
+app.post("/api/admin/hide", async (c) => {
+  if (!(await requireSuperAdmin(c))) return c.json({ error: "Unauthorized" }, 401);
+  try {
+    const body = await c.req.json<{ file?: string; ids?: (string | number)[] }>();
+    const file = String(body.file || "");
+    if (file !== "enquiries" && file !== "customers") return c.json({ error: "Invalid file" }, 400);
+    const ids = (Array.isArray(body.ids) ? body.ids : []).map(String).filter(Boolean);
+    if (!ids.length) return c.json({ ok: true, hidden: 0 });
+    const total = await addHiddenIds(file, ids);
+    return c.json({ ok: true, hidden: ids.length, total });
+  } catch (e) {
+    console.error("[admin/hide] error:", (e as Error).message);
+    return c.json({ ok: false }, 500);
+  }
 });
 
 // A customer's OWN leads only — scoped server-side by their card slug(s), so one

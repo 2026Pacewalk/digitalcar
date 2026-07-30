@@ -9,7 +9,7 @@ import {
 import { toast } from "sonner";
 import { classifyLead, type LeadCategory } from "@/lib/leadIntel";
 import { cleanText } from "@/lib/cleanText";
-import { fetchAdminData } from "@/lib/adminData";
+import { fetchAdminData, hideAdminRecords } from "@/lib/adminData";
 
 type Enquiry = {
   id: string; name: string; contact: string; email: string; description: string;
@@ -121,13 +121,21 @@ export default function AdminLeads() {
   const selectAllFiltered = () => setSelected(new Set(filtered.map((r) => r.id)));
 
   const askDelete = (ids: string[]) => { if (ids.length) setConfirmIds(ids); };
-  const doDelete = () => {
+  const doDelete = async () => {
     if (!confirmIds) return;
-    const del = new Set(confirmIds);
+    const ids = confirmIds;
+    const del = new Set(ids);
     setRows((r) => r.filter((e) => !del.has(e.id)));
-    setSelected((s) => { const n = new Set(s); confirmIds.forEach((id) => n.delete(id)); return n; });
-    toast.success(confirmIds.length > 1 ? `${confirmIds.length} enquiries deleted` : "Enquiry deleted");
+    setSelected((s) => { const n = new Set(s); ids.forEach((id) => n.delete(id)); return n; });
     setConfirmIds(null);
+    // Persist the delete server-side so they don't return after a refresh.
+    try {
+      const res = await hideAdminRecords("enquiries", ids);
+      if (res.ok) toast.success(ids.length > 1 ? `${ids.length.toLocaleString("en-IN")} enquiries deleted` : "Enquiry deleted");
+      else throw new Error();
+    } catch {
+      toast.error("Removed here, but the server didn't save it — they may return on refresh.");
+    }
   };
 
   const statCards = [
