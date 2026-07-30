@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import {
   Wand2, User, Building2, Phone, MessageCircle, Mail, Globe, MapPin, Info, Palette,
-  Eye, Check, Loader2, CloudOff, Rocket, X, ChevronRight, Gift, CalendarClock,
+  Eye, Check, Loader2, CloudOff, Rocket, X, ChevronRight, Gift, CalendarClock, Copy, Link2,
 } from "lucide-react";
 import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
@@ -75,6 +75,8 @@ export default function CardStudio() {
   const cur = (k: string) => String((form[k] ?? data[k]) || "").trim();
   const slug = String(data.slug || data.username || "your-card");
   const cardUrl = `https://digitalcarda.in/${slug}`;
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copyLink = async () => { try { await navigator.clipboard.writeText(cardUrl); setLinkCopied(true); toast.success("Card link copied"); setTimeout(() => setLinkCopied(false), 1800); } catch { toast.error("Copy failed"); } };
 
   // First publish is the primary activation event (§34): validate, START THE
   // TRIAL server-side (§5), then celebrate.
@@ -146,6 +148,17 @@ export default function CardStudio() {
               : <span className="inline-flex items-center gap-1.5 text-[#92400E]"><Gift size={14} className="text-[#F7B31C]" /> Free trial active · {trialState.daysLeft} day{trialState.daysLeft === 1 ? "" : "s"} left</span>}
           </div>
         )}
+      </div>
+
+      {/* Card link — the public URL for the card being edited */}
+      <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-3.5 flex items-center gap-3">
+        <span className="w-9 h-9 rounded-xl bg-[#FEF3C7] text-[#B45309] flex items-center justify-center shrink-0"><Link2 size={17} /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] text-[#94A3B8]">Your card link</p>
+          <a href={cardUrl} target="_blank" rel="noreferrer" className="text-[13px] font-semibold text-[#0F172A] truncate block hover:text-[#F7B31C] transition-colors">{cardUrl.replace(/^https?:\/\//, "")}</a>
+        </div>
+        <button onClick={copyLink} className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-[12px] font-semibold text-[#334155] hover:bg-[#F8FAFC] inline-flex items-center gap-1.5 shrink-0">{linkCopied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />} Copy</button>
+        <button onClick={() => navigate("/dashboard/settings?tab=password")} className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-[12px] font-semibold text-[#334155] hover:bg-[#F8FAFC] shrink-0 hidden sm:block">Edit link</button>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-5 items-start">

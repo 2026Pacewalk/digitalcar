@@ -4,11 +4,11 @@ import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router";
 import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/customer/ModuleShell";
 import InvoicePanel from "@/components/customer/InvoicePanel";
-import { useCustomer, scopedKey } from "@/hooks/useCustomer";
+import { useCustomer, scopedKey, getActiveCardId, getCards } from "@/hooks/useCustomer";
 import { useValidityDays } from "@/hooks/useValidityDays";
 import { buildCardThumb, TEMPLATE_COUNT } from "@/card-template/buildCard";
 import { passwordProblems, PASSWORD_HINT } from "@/lib/password";
-import { slugifyUsername, usernameNextChangeDate, fmtDate } from "@/lib/username";
+import { slugifyUsername } from "@/lib/username";
 import { trpc } from "@/providers/trpc";
 
 /* Card sections — labels match the legacy user-module.php */
@@ -91,28 +91,30 @@ export default function CustomerSettings() {
     update({ password: pwd }); toast.success("Password updated"); setPwd(""); setPwd2("");
   };
 
-  // Username can be changed once every 45 days. When was it last changed, and
-  // when can it change again?
-  const usernameLockedUntil = usernameNextChangeDate(data.username_changed_at);
+  // The card link (slug) the user is editing belongs to the ACTIVE card, so
+  // multi-card users customise each card's URL independently.
+  const activeCardId = getActiveCardId();
+  const activeCard = getCards().find((c) => c.id === activeCardId);
   const utils = trpc.useUtils();
   const saveAccount = async () => {
     const current = String(data.username || data.slug || "").toLowerCase();
     const typed = form.username;
-    // Username untouched → save the rest (e.g. email) normally.
+    // Link untouched → save the rest (e.g. email) normally.
     if (typed === undefined || slugifyUsername(typed) === current) { save("Account updated"); return; }
     const next = slugifyUsername(typed);
-    if (next.length < 3) { toast.error("Username must be at least 3 characters (letters, numbers and hyphens only)."); return; }
-    if (usernameLockedUntil) {
-      toast.error(`Username can be changed once every 45 days. You can change it again on ${fmtDate(usernameLockedUntil)}.`);
-      return;
-    }
-    // Must be unique across every profile.
+    if (next.length < 3) { toast.error("Card link must be at least 3 characters (letters, numbers and hyphens only)."); return; }
+    // The card link is a public URL — it must be unique across every published
+    // card (this user's other cards included) AND every account handle.
+    try {
+      const s = await utils.publish.checkSlug.fetch({ slug: next, cardId: activeCardId });
+      if (!s.available) { toast.error("That card link is already taken — please choose another."); return; }
+    } catch { /* checkSlug unreachable — fall through; publish still guards it */ }
     try {
       const avail = await utils.auth.checkAvailability.fetch({ username: next });
-      if (avail.username) { toast.error("That username is already taken — please choose another."); return; }
+      if (avail.username) { toast.error("That card link is already taken — please choose another."); return; }
     } catch { /* if the check is unreachable, allow the local save to proceed */ }
     update({ ...form, username: next, slug: next, username_changed_at: new Date().toISOString() });
-    toast.success("Username updated");
+    toast.success("Card link updated");
     setForm({});
   };
 
@@ -235,16 +237,19 @@ export default function CustomerSettings() {
           <p className="text-[11px] text-[#94A3B8] mt-1.5">Use {PASSWORD_HINT}.</p>
           <div className="flex justify-start mt-4"><button onClick={savePassword} className="h-11 px-5 rounded-xl bg-[#0F172A] text-white text-sm font-semibold hover:bg-[#1E293B] flex items-center gap-2"><KeyRound size={15} /> Update Password</button></div>
           <hr className="my-6 border-[#F1F5F9]" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
-            <Field label="Username">
-              <input value={val("username")} onChange={(e) => set("username", e.target.value)} disabled={!!usernameLockedUntil} className={`${fieldCls} disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] disabled:cursor-not-allowed`} />
-              {usernameLockedUntil
-                ? <p className="text-[11px] text-[#B45309] mt-1">Locked — you can change your username again on {fmtDate(usernameLockedUntil)}.</p>
-                : <p className="text-[11px] text-[#94A3B8] mt-1">This is your card link. You can change it once every 45 days.</p>}
+          <div className="grid grid-cols-1 gap-4 max-w-lg">
+            <Field label="Your card link (public URL)">
+              <div className="flex items-stretch rounded-xl border border-[#E2E8F0] overflow-hidden focus-within:border-[#F7B31C] focus-within:ring-2 focus-within:ring-[#F7B31C]/20 transition-all">
+                <span className="px-3 flex items-center bg-[#F8FAFC] text-[12px] text-[#94A3B8] border-r border-[#E2E8F0] whitespace-nowrap">digitalcarda.in/</span>
+                <input value={val("username")} onChange={(e) => set("username", e.target.value)} placeholder="your-brand" className="flex-1 h-10 px-3 outline-none text-sm bg-transparent" />
+              </div>
+              <p className="text-[11px] text-[#94A3B8] mt-1.5">
+                Editing <span className="font-semibold text-[#0F172A]">{activeCard?.name || "this card"}</span>{activeCardId === 1 ? " (primary)" : ""}. Letters, numbers and hyphens only. Your printed QR keeps working even if you change this.
+              </p>
             </Field>
             <Field label="Email"><input value={val("email")} onChange={(e) => set("email", e.target.value)} className={fieldCls} type="email" /></Field>
           </div>
-          <div className="flex justify-start mt-4"><button onClick={saveAccount} className="h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold flex items-center gap-2"><Pencil size={15} /> Save Account</button></div>
+          <div className="flex justify-start mt-4"><button onClick={saveAccount} className="h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold flex items-center gap-2"><Pencil size={15} /> Save card link</button></div>
         </Panel>
       )}
     </ModuleShell>

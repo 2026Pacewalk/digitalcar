@@ -117,6 +117,15 @@ export default function CustomerViewCard() {
       ) : (
         <p className="text-center text-xs text-[#64748B]">Rendered with the real DigitalCarda card template — updates instantly from your module edits.</p>
       )}
+      {slug && (
+        <div className="flex justify-center">
+          <div className="inline-flex items-center gap-2.5 pl-3.5 pr-2 h-11 rounded-xl bg-white border border-[#E2E8F0] shadow-premium max-w-full">
+            <span className="text-[11px] font-medium text-[#94A3B8] shrink-0">Your card link</span>
+            <a href={url} target="_blank" rel="noreferrer" className="text-[13px] font-semibold text-[#0F172A] truncate hover:text-[#F7B31C] transition-colors">{url.replace(/^https?:\/\//, "")}</a>
+            <button onClick={copy} title="Copy link" className="w-8 h-8 rounded-lg hover:bg-[#F1F5F9] text-[#64748B] flex items-center justify-center shrink-0">{copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}</button>
+          </div>
+        </div>
+      )}
       <div className="flex justify-center">
         <div className="w-full max-w-[400px] h-[760px] rounded-[36px] bg-[#0F172A] p-2.5 shadow-premium-lg shrink-0">
           <iframe key={nonce} srcDoc={html} title="Card preview" className="w-full h-full rounded-[28px] bg-white border-0" />

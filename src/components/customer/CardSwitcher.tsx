@@ -126,7 +126,7 @@ export default function CardSwitcher() {
                 </button>
               )}
             </div>
-            <p className="px-2.5 pt-2 text-[10px] leading-snug text-[#94A3B8]">Switch to a card, fill it in <Link to="/dashboard/build" onClick={() => setOpen(false)} className="font-semibold text-[#B45309] hover:underline">Edit Card</Link>, then hit Publish — each card gets its own link &amp; QR. Set a custom link in <Link to="/dashboard/settings" onClick={() => setOpen(false)} className="font-semibold text-[#B45309] hover:underline">Settings</Link>.</p>
+            <p className="px-2.5 pt-2 text-[10px] leading-snug text-[#94A3B8]">Switch to a card, fill it in <Link to="/dashboard/build" onClick={() => setOpen(false)} className="font-semibold text-[#B45309] hover:underline">Edit Card</Link>, then hit Publish — each card gets its own link &amp; QR. Set a custom link in <Link to="/dashboard/settings?tab=password" onClick={() => setOpen(false)} className="font-semibold text-[#B45309] hover:underline">Settings</Link>.</p>
           </div>
         </>
       )}
