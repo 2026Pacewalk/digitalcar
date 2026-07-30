@@ -1,15 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
-import { TEMPLATES } from "@/data/templates";
+import { buildCardThumb } from "@/card-template/buildCard";
 import { useCustomer, getAuthUser } from "@/hooks/useCustomer";
 import { toast } from "sonner";
 import {
   Plus, Trash2, FileSpreadsheet, X, Building2, IdCard,
   Rocket, AlertTriangle, ArrowRight, CreditCard, CheckCircle2,
-  Users, Briefcase, ShoppingCart, TrendingDown, Loader2,
+  Users, Briefcase, ShoppingCart, TrendingDown, Loader2, Check, Palette, Sparkles,
 } from "lucide-react";
 
 type Member = { id: string; name: string; designation: string; phone: string; email: string };
@@ -83,21 +83,27 @@ export default function BulkCreate() {
 
   // All card designs live in the frontend TEMPLATES data (same source the
   // Templates page uses). Group them by category for the picker.
-  const activeTemplates = useMemo(() => TEMPLATES.filter((t) => t.isActive), []);
-  const templatesByCategory = useMemo(() => {
-    const map: Record<string, typeof activeTemplates> = {};
-    for (const t of [...activeTemplates].sort((a, b) => a.sortOrder - b.sortOrder)) {
-      (map[t.category] ||= []).push(t);
-    }
-    return map;
-  }, [activeTemplates]);
+  // Designs come from the SAME admin-managed template presets as the Templates
+  // page (super-admin controls these) — not a separate hardcoded list.
+  const { data: presetData } = trpc.template.presets.useQuery();
+  const presets = useMemo(() => (presetData?.list ?? []).filter((p) => p.active), [presetData]);
+  const defaultStyle = useMemo(() => {
+    const def = presets.find((p) => p.id === (presetData?.defaultId ?? 1));
+    return def?.style ?? presets[0]?.style ?? null;
+  }, [presets, presetData]);
 
   const used = cardsData?.total ?? 0;
   const maxCards: number = (sub as { package?: { maxCards?: number } } | undefined)?.package?.maxCards ?? 0;
   const remaining = maxCards > 0 ? Math.max(0, maxCards - used) : Infinity;
 
   const [companyName, setCompanyName] = useState("");
-  const [templateId, setTemplateId] = useState<string>("");
+  const [selStyle, setSelStyle] = useState<number | null>(null);
+  useEffect(() => { setSelStyle((cur) => (cur == null ? defaultStyle : cur)); }, [defaultStyle]);
+  // Thumbnails previewed with the user's own details (stable — not per keystroke).
+  const thumbs = useMemo(
+    () => presets.map((p) => ({ ...p, html: buildCardThumb({ ...me, color: p.primary, color2: p.secondary }, p.style) })),
+    [presets, me]
+  );
   const [publish, setPublish] = useState(false);
   const [members, setMembers] = useState<Member[]>([newMember(), newMember(), newMember()]);
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -143,7 +149,7 @@ export default function BulkCreate() {
     if (overQuota) { toast.error("You've exceeded your plan's card limit."); return; }
     bulkCreate.mutate({
       companyName: companyName.trim() || undefined,
-      templateId: templateId ? Number(templateId) : undefined,
+      templateId: selStyle ?? undefined,
       publish,
       members: payload,
     });
@@ -157,7 +163,28 @@ export default function BulkCreate() {
   return (
     <ResponsiveDashboardLayout>
       <div className="hidden md:block"><TopBar title="Bulk Create Cards" subtitle="Create digital cards for your whole team at once" /></div>
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5">
+        {/* How it works */}
+        <div className="rounded-2xl bg-gradient-to-br from-[#0F172A] to-[#1E293B] p-5 sm:p-6 text-white shadow-premium">
+          <h2 className="text-base sm:text-lg font-bold flex items-center gap-2"><Sparkles size={18} className="text-[#F7B31C]" /> Create cards for your whole team in minutes</h2>
+          <p className="text-[12px] text-white/60 mt-1">One shared design & company — each person gets their own personalized card, link & QR.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+            {[
+              { n: 1, icon: Palette, t: "Pick a design", d: "Choose one template — applied to every card." },
+              { n: 2, icon: IdCard, t: "Add your team", d: "Type or paste names, phones & emails." },
+              { n: 3, icon: Rocket, t: "Create & share", d: "We generate every card, ready to edit & send." },
+            ].map((s) => (
+              <div key={s.n} className="rounded-xl bg-white/5 border border-white/10 p-3.5 flex items-start gap-3">
+                <span className="w-8 h-8 rounded-lg bg-[#F7B31C] text-[#0F172A] font-bold flex items-center justify-center shrink-0 text-sm">{s.n}</span>
+                <div>
+                  <p className="text-[13px] font-semibold flex items-center gap-1.5"><s.icon size={13} className="text-[#F7B31C]" /> {s.t}</p>
+                  <p className="text-[11px] text-white/55 mt-0.5 leading-snug">{s.d}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Quota banner */}
         <div className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9] flex items-center gap-4 flex-wrap">
           <div className="w-11 h-11 rounded-xl bg-[#FEF3C7] flex items-center justify-center shrink-0">
@@ -219,42 +246,54 @@ export default function BulkCreate() {
           </div>
         )}
 
-        {/* Company + template */}
-        <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">
-          <h3 className="text-base font-semibold text-[#0F172A] mb-5 flex items-center gap-2">
-            <Building2 size={18} className="text-[#F7B31C]" /> Shared Card Settings
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Step 1 — Choose a design (admin-managed templates) */}
+        <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-premium border border-[#F1F5F9]">
+          <div className="flex items-center gap-2.5 mb-4">
+            <span className="w-7 h-7 rounded-lg bg-[#0F172A] text-white text-xs font-bold flex items-center justify-center shrink-0">1</span>
             <div>
-              <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Company Name</label>
-              <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Appears on every card" className="input-premium w-full" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Template <span className="text-[#94A3B8] font-normal">({activeTemplates.length} designs)</span></label>
-              <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className="input-premium w-full">
-                <option value="">Default (choose later)</option>
-                {Object.entries(templatesByCategory).map(([category, list]) => (
-                  <optgroup key={category} label={category}>
-                    {list.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}{t.isPremium ? " ★" : ""}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              <h3 className="text-[15px] font-semibold text-[#0F172A] flex items-center gap-1.5"><Palette size={16} className="text-[#F7B31C]" /> Choose a design</h3>
+              <p className="text-[11px] text-[#94A3B8]">This template is applied to every card. {presets.length} designs available.</p>
             </div>
           </div>
+          {presets.length === 0 ? (
+            <div className="text-center py-8"><Palette size={24} className="mx-auto text-[#CBD5E1] mb-2" /><p className="text-xs text-[#94A3B8]">Loading designs…</p></div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-2.5">
+              {thumbs.map((t) => {
+                const active = selStyle === t.style;
+                return (
+                  <button key={t.id} onClick={() => setSelStyle(t.style)} title={t.name}
+                    className={`relative rounded-xl overflow-hidden border-2 transition-all ${active ? "border-[#F7B31C] ring-2 ring-[#F7B31C]/25 scale-[1.02]" : "border-[#E2E8F0] hover:border-[#CBD5E1]"}`}>
+                    <div className="aspect-[9/16] bg-white overflow-hidden pointer-events-none" dangerouslySetInnerHTML={{ __html: t.html }} />
+                    {active && <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#F7B31C] text-[#0F172A] flex items-center justify-center shadow"><Check size={12} /></span>}
+                    <span className="block text-[9px] font-semibold text-[#475569] truncate px-1 py-1 bg-white">{t.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Step 2 — Company + publish */}
+        <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-premium border border-[#F1F5F9]">
+          <div className="flex items-center gap-2.5 mb-4">
+            <span className="w-7 h-7 rounded-lg bg-[#0F172A] text-white text-xs font-bold flex items-center justify-center shrink-0">2</span>
+            <h3 className="text-[15px] font-semibold text-[#0F172A] flex items-center gap-1.5"><Building2 size={16} className="text-[#F7B31C]" /> Company details</h3>
+          </div>
+          <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Company name <span className="text-[#94A3B8] font-normal">(appears on every card)</span></label>
+          <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g. Kumar Sweets Pvt. Ltd." className="input-premium w-full sm:max-w-md" />
           <label className="mt-4 flex items-center gap-2.5 cursor-pointer select-none">
             <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} className="w-4 h-4 accent-[#F7B31C]" />
-            <span className="text-sm text-[#334155]">Publish all cards immediately (otherwise saved as drafts)</span>
+            <span className="text-sm text-[#334155]">Publish all cards immediately <span className="text-[#94A3B8]">(otherwise saved as drafts you can edit first)</span></span>
           </label>
         </div>
 
-        {/* Members */}
-        <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">
+        {/* Step 3 — Team members */}
+        <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-premium border border-[#F1F5F9]">
           <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <IdCard size={18} className="text-[#F7B31C]" />
-              <h3 className="text-base font-semibold text-[#0F172A]">Team Members</h3>
+            <div className="flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-lg bg-[#0F172A] text-white text-xs font-bold flex items-center justify-center shrink-0">3</span>
+              <h3 className="text-[15px] font-semibold text-[#0F172A] flex items-center gap-1.5"><IdCard size={16} className="text-[#F7B31C]" /> Add your team</h3>
               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#F1F5F9] text-[#64748B]">{filled.length} ready</span>
             </div>
             <button onClick={() => setPasteOpen((o) => !o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E2E8F0] text-[#334155] hover:bg-[#F8FAFC] transition-colors">
