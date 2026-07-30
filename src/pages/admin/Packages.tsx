@@ -343,6 +343,39 @@ function PackageList() {
   );
 }
 
+// Limited-time upgrade offer (§68) — a site-wide promo % shown to users upgrading
+// to a paid plan. Server-clamped to the hard cap; 0 turns it off.
+function PromoOfferControl() {
+  const { data, refetch } = trpc.subscription.getUpgradeOffer.useQuery();
+  const save = trpc.subscription.setUpgradeOffer.useMutation({
+    onSuccess: (r) => { toast.success(r.percent > 0 ? `Promo live — ${r.percent}% off upgrades` : "Promo turned off"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const [pct, setPct] = useState<number | null>(null);
+  const value = pct ?? data?.percent ?? 0;
+  const max = data?.max ?? 25;
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h3 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2"><Tag size={15} className="text-[#F7B31C]" /> Limited-time upgrade offer</h3>
+          <p className="text-xs text-[#64748B] mt-0.5 max-w-md">A site-wide discount shown to users upgrading to a paid plan. Drag to set, or 0 to turn it off. Capped at {max}%.</p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <input type="range" min={0} max={max} value={value} onChange={(e) => setPct(Number(e.target.value))} className="w-36 accent-[#F7B31C]" aria-label="Offer percent" />
+          <span className="w-12 text-center text-lg font-bold text-[#0F172A] tabular-nums">{value}%</span>
+          <button onClick={() => save.mutate({ percent: value })} disabled={save.isPending} className="h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all disabled:opacity-60 active:scale-[0.98]">
+            {save.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+      {value > 0
+        ? <p className="text-xs text-[#16A34A] mt-3 font-medium">● Promo active — customers see &ldquo;{value}% off&rdquo; when upgrading.</p>
+        : <p className="text-xs text-[#94A3B8] mt-3">No promo running.</p>}
+    </div>
+  );
+}
+
 export default function AdminPackages() {
   const { data: packages, isLoading, refetch } = trpc.package.list.useQuery();
   const deleteMutation = trpc.package.delete.useMutation({
@@ -363,6 +396,8 @@ export default function AdminPackages() {
             <Plus size={16} /> Create Plan
           </button>
         </div>
+
+        <PromoOfferControl />
 
         {showForm && (
           <div className="bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">

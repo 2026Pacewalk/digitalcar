@@ -3,6 +3,7 @@ import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { subscriptions, invoices } from "@db/schema";
 import { eq, desc, sql } from "drizzle-orm";
+import { getUpgradeOfferPercent, setUpgradeOfferPercent, MAX_OFFER_PERCENT } from "./lib/pricing";
 
 export const subscriptionRouter = createRouter({
   mySubscription: authedQuery.query(async ({ ctx }) => {
@@ -79,4 +80,16 @@ export const subscriptionRouter = createRouter({
       with: { subscription: { with: { package: true } } },
     });
   }),
+
+  // Admin: the current limited-time upgrade-offer promo (§68). 0 = no promo.
+  getUpgradeOffer: adminQuery.query(async () => ({
+    percent: await getUpgradeOfferPercent(getDb()),
+    max: MAX_OFFER_PERCENT,
+  })),
+
+  // Admin: run/adjust/stop the promo. Server clamps to [0, MAX] — the discount
+  // can never exceed the cap no matter what's entered.
+  setUpgradeOffer: adminQuery
+    .input(z.object({ percent: z.number().int().min(0).max(MAX_OFFER_PERCENT) }))
+    .mutation(async ({ input }) => ({ ok: true, percent: await setUpgradeOfferPercent(getDb(), input.percent) })),
 });

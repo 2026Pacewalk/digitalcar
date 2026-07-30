@@ -18,3 +18,12 @@ export async function getUpgradeOfferPercent(db: ReturnType<typeof getDb>): Prom
   if (!Number.isFinite(val) || val < 0) return 0;
   return Math.min(val, MAX_OFFER_PERCENT);
 }
+
+/** Set the upgrade-offer percentage (admin). Clamped to [0, MAX] — 0 disables
+    the promo. Even a bad value can never exceed the cap (§68). */
+export async function setUpgradeOfferPercent(db: ReturnType<typeof getDb>, pct: number): Promise<number> {
+  const val = Math.max(0, Math.min(Math.round(num(pct)), MAX_OFFER_PERCENT));
+  await db.insert(appSettings).values({ key: UPGRADE_OFFER_KEY, value: String(val) })
+    .onDuplicateKeyUpdate({ set: { value: String(val) } });
+  return val;
+}
