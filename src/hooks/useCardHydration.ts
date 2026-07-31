@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getAuthUser, scopedKey } from "./useCustomer";
-import { loadMyLegacyProfile, loadCustomerContent, imgUrl, decodeSpecialities } from "@/lib/cardContent";
+import { loadMyLegacyProfile, loadMySnapshot, loadCustomerContent, imgUrl, decodeSpecialities } from "@/lib/cardContent";
 
 const s = (v: unknown) => String(v ?? "");
 
@@ -65,6 +65,10 @@ export function useCardHydration(): boolean {
 
     let cancelled = false;
     (async () => {
+      const put = (base: string, arr: unknown[]) => {
+        localStorage.setItem(scopedKey(base), JSON.stringify(arr || []));
+        localStorage.setItem(scopedKey(base) + "::seeded", "1");
+      };
       try {
         const row = await loadMyLegacyProfile();
         if (row && !cancelled) {
@@ -73,10 +77,6 @@ export function useCardHydration(): boolean {
 
           if (slug) {
             const content = await loadCustomerContent(slug);
-            const put = (base: string, arr: unknown[]) => {
-              localStorage.setItem(scopedKey(base), JSON.stringify(arr));
-              localStorage.setItem(scopedKey(base) + "::seeded", "1");
-            };
             put("dc_products", content.products);
             put("dc_offers", content.offers);
             put("dc_gallery", content.gallery);
@@ -88,6 +88,22 @@ export function useCardHydration(): boolean {
             put("dc_banks", (row.bank_name || row.account_number)
               ? [{ id: 1, holder: s(row.account_holder), bank: s(row.bank_name), account: s(row.account_number), ifsc: s(row.ifsc), type: s(row.account_type) || "current" }]
               : []);
+          }
+        } else if (!cancelled) {
+          // NEW-FLOW user (not in customers.json): hydrate from their published
+          // snapshot so the full mini-website loads on any device — not just the
+          // browser it was built in. This fixes "I only see links, where's my
+          // products/gallery/about" for server-backed cards.
+          const snap = await loadMySnapshot();
+          const d = snap?.data as Record<string, unknown> | undefined;
+          if (d && d.customer && !cancelled) {
+            const cust = { ...(d.customer as Record<string, unknown>), id: u.id, email: (d.customer as Record<string, unknown>).email || u.email, slug: s(snap?.slug) };
+            localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(cust));
+            put("dc_products", (d.products as unknown[]) || []);
+            put("dc_gallery", (d.gallery as unknown[]) || []);
+            put("dc_videos", (d.videos as unknown[]) || []);
+            put("dc_offers", (d.offers as unknown[]) || []);
+            put("dc_qrcode", (d.qrcodes as unknown[]) || []);
           }
         }
       } catch { /* leave whatever's there — never block the dashboard on this */ }

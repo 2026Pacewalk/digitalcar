@@ -206,7 +206,7 @@ export default function CustomerLeads() {
   return (
     <ResponsiveDashboardLayout>
       <div className="hidden md:block"><TopBar title="Leads" subtitle="Your captured enquiries & pipeline" /></div>
-      <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-4xl">
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-5xl mx-auto w-full">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {statCards.map((s) => (

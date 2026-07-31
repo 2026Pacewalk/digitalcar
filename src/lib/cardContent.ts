@@ -104,6 +104,18 @@ export async function loadMyLegacyProfile(): Promise<Record<string, unknown> | n
   } catch { return null; }
 }
 
+/* Fetch the signed-in user's published SNAPSHOT (customer + products + gallery +
+   videos + offers + qrcodes). Used to hydrate new-flow users whose data isn't in
+   the legacy customers.json. Returns { slug, data } or null. */
+export async function loadMySnapshot(): Promise<{ slug?: string; data?: Record<string, unknown> } | null> {
+  try {
+    const token = localStorage.getItem("auth_token") || "";
+    const r = await fetch("/api/my/snapshot", { headers: { "x-auth-token": token } });
+    if (!r.ok) return null;
+    return (await r.json()) as { slug?: string; data?: Record<string, unknown> } | null;
+  } catch { return null; }
+}
+
 export async function loadCustomerContent(slug: string) {
   const j = (u: string) => fetch(u).then((r) => r.json()).catch(() => [] as Raw[]);
   const [prods, gals, vids, offs, qrs, ups] = await Promise.all([

@@ -59,7 +59,7 @@ export default function CustomerSubscription() {
   return (
     <ResponsiveDashboardLayout>
       <div className="hidden md:block"><TopBar title="Subscription" subtitle="Manage your plan" /></div>
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 max-w-6xl mx-auto w-full">
         {/* Current Plan Banner */}
         <div className="bg-gradient-to-r from-[#0F172A] to-[#1E293B] rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
