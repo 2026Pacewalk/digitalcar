@@ -53,7 +53,12 @@ export const adminRouter = createRouter({
     const trialBy = new Map<number, (typeof trials)[number]>();
     for (const t of trials) trialBy.set(Number(t.userId), t);
     const now = Date.now();
-    const iso = (d: unknown) => (d ? new Date(d as string).toISOString().slice(0, 19).replace("T", " ") : null);
+    // Crash-proof: a bad/zero date must never throw and kill the whole list.
+    const iso = (d: unknown) => {
+      if (!d) return null;
+      const t = new Date(d as string | number | Date).getTime();
+      return Number.isNaN(t) ? null : new Date(t).toISOString().slice(0, 19).replace("T", " ");
+    };
     return allUsers
       .filter((u) => u.role !== "super_admin" && !legacyEmails.has(String(u.email).toLowerCase().trim()))
       .map((u) => {
@@ -79,6 +84,45 @@ export const adminRouter = createRouter({
         };
       });
   }),
+
+  // Diagnostic: look up any account by email / phone / name / id and explain
+  // exactly whether (and how) it appears in the Customers list. Super-admin only.
+  lookupAccount: adminQuery
+    .input(z.object({ query: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const q = input.query.trim().toLowerCase();
+      const digits = input.query.replace(/\D/g, "");
+      const legacyEmails = legacyEmailSet();
+      const all = await db.select({ id: users.id, email: users.email, name: users.fullName, phone: users.phone, role: users.role, status: users.status, createdAt: users.createdAt }).from(users);
+      const matches = all.filter((u) => {
+        const email = String(u.email || "").toLowerCase();
+        const phone = String(u.phone || "").replace(/\D/g, "");
+        const name = String(u.name || "").toLowerCase();
+        return email.includes(q) || name.includes(q) || String(u.id) === q || (digits.length >= 6 && phone.includes(digits));
+      }).slice(0, 20);
+      const pubs = matches.length ? await db.select({ userId: publishedCards.userId, slug: publishedCards.slug }).from(publishedCards) : [];
+      const slugBy = new Map<number, string>();
+      for (const p of pubs) if (!slugBy.has(Number(p.userId))) slugBy.set(Number(p.userId), p.slug);
+      const day = (d: unknown) => { const t = d ? new Date(d as string).getTime() : NaN; return Number.isNaN(t) ? null : new Date(t).toISOString().slice(0, 10); };
+      return {
+        found: matches.length,
+        accounts: matches.map((u) => {
+          const inLegacy = legacyEmails.has(String(u.email).toLowerCase().trim());
+          const isSuper = u.role === "super_admin";
+          return {
+            id: Number(u.id), email: u.email, name: u.name, phone: u.phone, role: u.role, status: u.status,
+            slug: slugBy.get(Number(u.id)) || null, createdAt: day(u.createdAt),
+            inLegacy, showsInCustomers: !isSuper,
+            verdict: isSuper
+              ? "Hidden — super-admin accounts aren't listed in Customers."
+              : inLegacy
+                ? "Shows in Customers as a LEGACY entry (also in customers.json)."
+                : "Shows in Customers as a NEW-flow account (green NEW badge).",
+          };
+        }),
+      };
+    }),
 
   // List every snapshot whose slug ALSO belongs to a legacy customers.json card.
   slugConflicts: adminQuery.query(async () => {
