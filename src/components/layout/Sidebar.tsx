@@ -7,7 +7,7 @@ import {
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
   ChevronRight, Store, X, Search, ToggleRight, ReceiptText, KeyRound,
   Home as HomeIcon, Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
-  Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart,
+  Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -74,6 +74,7 @@ const superAdminGroups: NavGroup[] = [
     { label: "Referrals & Payouts", icon: Gift, path: "/admin/referrals" },
   ] },
   { title: "System", items: [
+    { label: "URL Conflicts", icon: Link2, path: "/admin/url-conflicts" },
     { label: "Settings", icon: Settings, path: "/admin/settings" },
   ] },
 ];

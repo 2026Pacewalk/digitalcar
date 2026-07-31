@@ -32,6 +32,7 @@ const AdminPackages = lazy(() => import("./pages/admin/Packages"));
 const AdminTemplates = lazy(() => import("./pages/admin/Templates"));
 const AdminProducts = lazy(() => import("./pages/admin/Products"));
 const AdminMigration = lazy(() => import("./pages/admin/Migration"));
+const AdminUrlConflicts = lazy(() => import("./pages/admin/UrlConflicts"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const AdminLeads = lazy(() => import("./pages/admin/Leads"));
 const AdminBulkOrders = lazy(() => import("./pages/admin/BulkOrders"));
@@ -185,6 +186,7 @@ export default function App() {
         <Route path="/admin/packages" element={<RoleRoute allowedRoles={["super_admin"]}><AdminPackages /></RoleRoute>} />
         <Route path="/admin/templates" element={<RoleRoute allowedRoles={["super_admin"]}><AdminTemplates /></RoleRoute>} />
         <Route path="/admin/migration" element={<RoleRoute allowedRoles={["super_admin"]}><AdminMigration /></RoleRoute>} />
+        <Route path="/admin/url-conflicts" element={<RoleRoute allowedRoles={["super_admin"]}><AdminUrlConflicts /></RoleRoute>} />
         <Route path="/admin/analytics" element={<RoleRoute allowedRoles={["super_admin"]}><AdminAnalytics /></RoleRoute>} />
         <Route path="/admin/leads" element={<RoleRoute allowedRoles={["super_admin"]}><AdminLeads /></RoleRoute>} />
         <Route path="/admin/bulk-orders" element={<RoleRoute allowedRoles={["super_admin"]}><AdminBulkOrders /></RoleRoute>} />

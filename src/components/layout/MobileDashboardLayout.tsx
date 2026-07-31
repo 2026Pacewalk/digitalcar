@@ -5,7 +5,7 @@ import {
   Plus, Eye, Share2, CreditCard, Menu, MessageSquare,
   Settings, LogOut, HelpCircle, ChevronLeft,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Star, Upload, Mail, Layers,
-  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode,
+  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode, Link2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
@@ -80,6 +80,7 @@ const NAV: Record<string, NavConfig> = {
         { icon: Gift, label: "Referrals & Payouts", path: "/admin/referrals" },
       ] },
       { title: "System", items: [
+        { icon: Link2, label: "URL Conflicts", path: "/admin/url-conflicts" },
         { icon: Settings, label: "Settings", path: "/admin/settings" },
       ] },
     ],

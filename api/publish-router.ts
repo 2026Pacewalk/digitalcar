@@ -20,7 +20,7 @@ async function setting(db: ReturnType<typeof getDb>, key: string): Promise<strin
    (snapshot wins over legacy JSON in PublicCard.tsx). Cached 60s like card-og. */
 let legacyCache: Set<string> | null = null;
 let legacyAt = 0;
-function legacySlugSet(): Set<string> {
+export function legacySlugSet(): Set<string> {
   const now = Date.now();
   if (legacyCache && now - legacyAt < 60_000) return legacyCache;
   for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
@@ -38,7 +38,7 @@ function legacySlugSet(): Set<string> {
    Checks ALL THREE card systems the public /slug page can resolve from — legacy
    customers.json, the relational `cards` table, and `published_cards` snapshots —
    so a slug can never be claimed across systems (the pacewalk cross-system leak). */
-async function slugTakenByOther(
+export async function slugTakenByOther(
   db: ReturnType<typeof getDb>, slug: string, ownerUserId: number, ownerCardId: number,
 ): Promise<boolean> {
   // 1) Legacy customers.json (case-insensitive, matching the public resolver).
