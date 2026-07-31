@@ -201,6 +201,7 @@ export default function AdminCustomers() {
   const extendMut = trpc.user.extendValidity.useMutation();
   const deactivateMut = trpc.user.deactivateCustomer.useMutation();
   const setLimitMut = trpc.user.setCardLimit.useMutation();
+  const deleteAppUserMut = trpc.admin.deleteAppUser.useMutation();
   const saveLimit = async (limit: number | null) => {
     if (!limitModal) return;
     const c = limitModal;
@@ -275,12 +276,18 @@ export default function AdminCustomers() {
     const c = delModal;
     setRows((r) => r.filter((x) => x.id !== c.id));
     setDelModal(null);
-    // Persist the removal from the customers list (survives refresh), and also
-    // deactivate any matching live account so its card is paused.
+    // Persist the removal so it survives a refresh — new-flow DB accounts go
+    // through the DB delete (they aren't in customers.json); legacy rows use the
+    // JSON hide-overlay. Both also deactivate the account + take the card offline.
     try {
-      await hideAdminRecords("customers", [c.id]);
-      const res = await deactivateMut.mutateAsync({ email: c.email }).catch(() => ({ ok: false }));
-      toast.success(res?.ok ? `${c.name} deleted — account deactivated` : `${c.name} deleted`);
+      if (c.dbId) {
+        await deleteAppUserMut.mutateAsync({ userId: c.dbId });
+        toast.success(`${c.name} deleted — account deactivated & card offline`);
+      } else {
+        await hideAdminRecords("customers", [c.id]);
+        const res = await deactivateMut.mutateAsync({ email: c.email }).catch(() => ({ ok: false }));
+        toast.success(res?.ok ? `${c.name} deleted — account deactivated` : `${c.name} deleted`);
+      }
     } catch {
       toast.error("Removed here, but couldn't save on the server — may return on refresh.");
     }

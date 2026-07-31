@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, resellerProfiles, referrals, notifications, cards } from "@db/schema";
+import { users, resellerProfiles, referrals, notifications, cards, publishedCards, cardTrials, appSettings } from "@db/schema";
 import { eq, like } from "drizzle-orm";
+import { slugTakenByOther } from "./publish-router";
 import { createToken, createResetToken, verifyResetToken } from "./lib/jwt";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail } from "./lib/email-templates";
@@ -20,6 +22,45 @@ const strongPassword = z
   .regex(/[A-Z]/, "Password must include an uppercase letter")
   .regex(/\d/, "Password must include a number")
   .regex(/[^A-Za-z0-9]/, "Password must include a special character");
+
+/* On signup, give every new account its OWN live card URL + start the trial, so
+   the card link is never empty and never falls back to a leftover/other slug.
+   Best-effort: any failure here must never block registration. */
+async function provisionStarterCard(
+  db: ReturnType<typeof getDb>,
+  user: { id: number; email: string; fullName: string; phone: string | null },
+  companyName?: string,
+): Promise<string | null> {
+  try {
+    // Unique, name-based slug (e.g. "Taniya Xtreme" -> taniya-xtreme, then -2, -3…).
+    const base = (user.fullName || user.email.split("@")[0])
+      .toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "card";
+    let slug = base;
+    for (let n = 2; await slugTakenByOther(db, slug, user.id, 1); n++) {
+      slug = n > 40 ? `${base}-${nanoid(4).toLowerCase()}` : `${base}-${n}`;
+      if (n > 40) break;
+    }
+    // A simple starter card — they fill in the details from the dashboard.
+    const starter = {
+      customer: {
+        id: user.id, name: user.fullName, slug, username: slug,
+        email: user.email, mobile1: user.phone || "", company_name: companyName || "",
+        designation: "", nature: "", about_us: "", theme: 1, color: "#F7B31C", color2: "",
+      },
+      products: [], gallery: [], videos: [], offers: [], qrcodes: [], reviews: [],
+    };
+    await db.insert(publishedCards).values({ userId: user.id, cardId: 1, slug, publicId: nanoid(10), data: starter });
+    // Start the trial (admin-configurable, default 30 days) so the card is live now.
+    const daysRow = await db.select().from(appSettings).where(eq(appSettings.key, "trial_days"));
+    const days = Number(daysRow[0]?.value) || 30;
+    const now = new Date();
+    await db.insert(cardTrials).values({
+      userId: user.id, status: "active", startedAt: now, publishedAt: now,
+      endsAt: new Date(now.getTime() + days * 86_400_000),
+    });
+    return slug;
+  } catch { return null; }
+}
 
 /* Legacy-auth bridge: the old site stored plaintext passwords (some with stray
    trailing/leading spaces), and the DB import either hashed them verbatim or fell
@@ -239,6 +280,9 @@ export const authRouter = createRouter({
           link: "/dashboard/home",
         });
       } catch { /* non-critical */ }
+
+      // Give the new account its own live card URL + start the trial.
+      await provisionStarterCard(db, insertedUser, input.companyName);
 
       const token = await createToken({
         userId: insertedUser.id,

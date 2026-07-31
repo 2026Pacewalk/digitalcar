@@ -4,7 +4,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { publishedCards, users, cardTrials, subscriptions } from "@db/schema";
+import { publishedCards, users, cardTrials, subscriptions, appSettings } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { legacySlugSet, slugTakenByOther } from "./publish-router";
 
@@ -27,6 +27,23 @@ function legacyEmailSet(): Set<string> {
   return legacyEmailCache ?? new Set();
 }
 
+/* Soft-deleted DB accounts: an admin "delete" records the user id here so the
+   account never reappears in the Customers list after a refresh. Reversible —
+   the row is kept; this just hides + deactivates it. */
+async function hiddenAppUserIds(db: ReturnType<typeof getDb>): Promise<Set<number>> {
+  try {
+    const rows = await db.select().from(appSettings).where(eq(appSettings.key, "hidden_app_users"));
+    const arr = rows[0]?.value ? JSON.parse(rows[0].value) : [];
+    return new Set((Array.isArray(arr) ? arr : []).map(Number));
+  } catch { return new Set(); }
+}
+async function addHiddenAppUser(db: ReturnType<typeof getDb>, userId: number): Promise<void> {
+  const cur = await hiddenAppUserIds(db);
+  cur.add(Number(userId));
+  const value = JSON.stringify([...cur]);
+  await db.insert(appSettings).values({ key: "hidden_app_users", value }).onDuplicateKeyUpdate({ set: { value } });
+}
+
 /* Super-admin tools. Today: resolve cross-system card-URL conflicts, where a
    NEW-FLOW snapshot card shares a slug with a LEGACY (customers.json) card and
    — because "snapshot wins over legacy JSON" on the public page — shadows the
@@ -40,6 +57,7 @@ export const adminRouter = createRouter({
   appUsers: adminQuery.query(async () => {
     const db = getDb();
     const legacyEmails = legacyEmailSet();
+    const hidden = await hiddenAppUserIds(db);
     const [allUsers, pubs, subs, trials] = await Promise.all([
       db.select({ id: users.id, email: users.email, name: users.fullName, phone: users.phone, status: users.status, role: users.role, createdAt: users.createdAt }).from(users).orderBy(desc(users.createdAt)),
       db.select({ userId: publishedCards.userId, slug: publishedCards.slug }).from(publishedCards),
@@ -64,7 +82,7 @@ export const adminRouter = createRouter({
     // email against the legacy list. Each row is wrapped so one bad record can
     // never throw and blank the whole list.
     return allUsers
-      .filter((u) => u.role !== "super_admin")
+      .filter((u) => u.role !== "super_admin" && !hidden.has(Number(u.id)))
       .map((u) => {
         try {
           const uid = Number(u.id);
@@ -91,6 +109,21 @@ export const adminRouter = createRouter({
       })
       .filter(Boolean);
   }),
+
+  // Delete a NEW-flow DB account from the Customers list: record it as hidden so
+  // it never reappears after a refresh, take its public card offline (frees the
+  // slug), and deactivate the account. The users row is KEPT (reversible) — this
+  // is a reliable soft delete, not an irreversible wipe.
+  deleteAppUser: adminQuery
+    .input(z.object({ userId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await addHiddenAppUser(db, input.userId);
+      await db.delete(publishedCards).where(eq(publishedCards.userId, input.userId));
+      await db.update(users).set({ status: "inactive" }).where(eq(users.id, input.userId));
+      try { await db.update(cardTrials).set({ status: "cancelled" }).where(eq(cardTrials.userId, input.userId)); } catch { /* no trial row */ }
+      return { ok: true };
+    }),
 
   // Diagnostic: look up any account by email / phone / name / id and explain
   // exactly whether (and how) it appears in the Customers list. Super-admin only.
