@@ -33,6 +33,7 @@ type Customer = {
   slug: string; package_id: number; admin_id: number;
   activated_on: string | null; expired_on: string | null; status: number;
   password: string; company_name?: string; designation?: string; views?: number;
+  isNew?: boolean; dbId?: number; // isNew = new-flow DB account (not in legacy customers.json)
 };
 
 type ActionItem = { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean };
@@ -89,6 +90,7 @@ function pageNumbers(current: number, total: number): (number | "…")[] {
 
 export default function AdminCustomers() {
   const navigate = useNavigate();
+  const utils = trpc.useUtils();
   const [rows, setRows] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -116,11 +118,18 @@ export default function AdminCustomers() {
   const [addForm, setAddForm] = useState({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", admin_id: 0 });
 
   useEffect(() => {
-    fetchAdminData<Customer[]>("customers")
-      // Newest members first (id DESC) — matches the old site's members-list.php order
-      .then((d) => setRows([...d].sort((a, b) => Number(b.id) - Number(a.id))))
-      .catch(() => toast.error("Could not load customers"))
-      .finally(() => setLoading(false));
+    // Merge the legacy customers.json list with NEW-FLOW DB accounts (which the
+    // customers.json admin never saw) so every user shows in one list.
+    (async () => {
+      const [legacy, appUsers] = await Promise.all([
+        fetchAdminData<Customer[]>("customers").catch(() => { toast.error("Could not load customers"); return [] as Customer[]; }),
+        utils.admin.appUsers.fetch().catch(() => [] as Customer[]),
+      ]);
+      // New-flow ids are offset high, so they naturally sort newest-first with the rest.
+      const merged = [...(appUsers as unknown as Customer[]), ...legacy].sort((a, b) => Number(b.id) - Number(a.id));
+      setRows(merged);
+      setLoading(false);
+    })();
   }, []);
 
   // Build the real card preview from customers.json (the public /c/:slug route
@@ -343,7 +352,7 @@ export default function AdminCustomers() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[14px] font-bold text-[#0F172A] truncate">{c.name || "—"}</p>
-            <p className="text-[11px] text-[#94A3B8] truncate">@{c.username || "user"} · #{c.id}</p>
+            <p className="text-[11px] text-[#94A3B8] truncate">@{c.username || "user"} · #{c.isNew ? c.dbId : c.id}{c.isNew && <span className="ml-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full align-middle">NEW</span>}</p>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${PKG_STYLE[packageName(c.package_id)] || PKG_STYLE.Trial}`}>{packageName(c.package_id)}</span>
@@ -499,7 +508,7 @@ export default function AdminCustomers() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-[13px] font-semibold text-[#0F172A] truncate max-w-[170px]">{c.name || "—"}</p>
-                              <p className="text-[11px] text-[#94A3B8] truncate">@{c.username || "user"} · #{c.id}</p>
+                              <p className="text-[11px] text-[#94A3B8] truncate">@{c.username || "user"} · #{c.isNew ? c.dbId : c.id}{c.isNew && <span className="ml-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full align-middle">NEW</span>}</p>
                             </div>
                           </div>
                         </td>
