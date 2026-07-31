@@ -11,6 +11,15 @@ export default function CustomerCards() {
   const deleteMutation = trpc.card.delete.useMutation({
     onSuccess: () => { toast.success("Card deleted"); refetch(); },
   });
+  // Create a card and open it in the TEMPLATE editor (never the old block builder).
+  const createMutation = trpc.card.create.useMutation({
+    onSuccess: (c) => { const id = (c as { id?: number } | null)?.id; if (id) navigate(`/dashboard/builder/${id}`); },
+    onError: (e) => toast.error(e.message || "Could not create card"),
+  });
+  const createCard = () => {
+    const rand = Math.random().toString(36).slice(2, 8);
+    createMutation.mutate({ title: "New Card", slug: `card-${rand}` });
+  };
 
   const cards = cardsData?.cards || [];
 
@@ -31,7 +40,7 @@ export default function CustomerCards() {
               <Layers size={16} /> Bulk Create
             </button>
             <button
-              onClick={() => navigate("/dashboard/builder")}
+              onClick={createCard}
               className="flex items-center gap-2 h-11 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"
             >
               <Plus size={16} /> Create Card
@@ -50,7 +59,7 @@ export default function CustomerCards() {
             <CreditCard size={40} className="text-[#CBD5E1] mx-auto mb-4" />
             <h3 className="text-base font-semibold text-[#0F172A] mb-1">No cards yet</h3>
             <p className="text-sm text-[#94A3B8] mb-4">Create your first digital business card</p>
-            <button onClick={() => navigate("/dashboard/builder")} className="btn-gold">Create Card</button>
+            <button onClick={createCard} className="btn-gold">Create Card</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

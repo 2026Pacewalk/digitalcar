@@ -151,10 +151,18 @@ export const cardRouter = createRouter({
         userId: ctx.user.id,
         title: input.title,
         slug: input.slug,
-        templateId: input.templateId || null,
+        // Default to design 1 so the card renders with the template engine (not
+        // the legacy block layout) and opens in the template editor.
+        templateId: input.templateId || 1,
         status: "draft",
         language: "en",
       }).$returningId();
+
+      // Starter blocks the template editor reads/writes (name/contact).
+      await db.insert(cardBlocks).values([
+        { cardId: result[0].id, type: "profile_header", position: 0, config: {}, content: { name: input.title, title: "", company: "", bio: "" } },
+        { cardId: result[0].id, type: "contact_info", position: 1, config: {}, content: { phone: "", email: "", address: "", website: "" } },
+      ]);
 
       return db.query.cards.findFirst({
         where: eq(cards.id, result[0].id),

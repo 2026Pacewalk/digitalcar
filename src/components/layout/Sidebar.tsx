@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
+import { trpc } from "@/providers/trpc";
 import {
   LayoutDashboard, Palette, Users, UserCircle, Package,
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
@@ -89,6 +90,11 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
   const role = user?.role || "customer";
   const groups = role === "super_admin" ? superAdminGroups : role === "reseller" ? resellerGroups : customerGroups;
   const theme = roleTheme(role);
+  // Live count of new bulk-order requests → badge on the admin "Bulk Orders" item.
+  const { data: bulkNew } = trpc.bulkOrder.newCount.useQuery(undefined, {
+    enabled: role === "super_admin", retry: false, refetchInterval: 60_000,
+  });
+  const badgeFor = (path: string): number => (path === "/admin/bulk-orders" ? (bulkNew?.count ?? 0) : 0);
   const BrandIcon = theme.Icon;
 
   const isActive = (path: string) => {
@@ -152,12 +158,15 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
                       to={item.path}
                       onClick={() => { if (window.innerWidth < 1024) onMobileToggle(); }}
                       title={collapsed ? item.label : undefined}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 group
+                      className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 group
                         ${active ? theme.activeNav : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1E293B]"}
                         ${collapsed ? "lg:justify-center lg:px-2" : ""}`}
                     >
                       <item.icon size={17} className={`shrink-0 ${active ? theme.activeIcon : "text-[#64748B] group-hover:text-[#F8FAFC]"}`} />
-                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {!collapsed && <span className="truncate flex-1">{item.label}</span>}
+                      {badgeFor(item.path) > 0 && (
+                        <span className={`shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-[#F7B31C] text-[#0F172A] text-[10px] font-bold flex items-center justify-center ${collapsed ? "lg:absolute lg:top-1 lg:right-1" : ""}`}>{badgeFor(item.path)}</span>
+                      )}
                     </Link>
                   );
                 })}

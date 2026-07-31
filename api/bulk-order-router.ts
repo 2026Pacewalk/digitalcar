@@ -62,6 +62,13 @@ export const bulkOrderRouter = createRouter({
       return { ok: true };
     }),
 
+  // Admin: how many requests are still 'new' (for the sidebar badge).
+  newCount: adminQuery.query(async () => {
+    const db = getDb();
+    const rows = await db.select({ id: bulkOrderRequests.id }).from(bulkOrderRequests).where(eq(bulkOrderRequests.status, "new"));
+    return { count: rows.length };
+  }),
+
   // Admin: the request pipeline.
   list: adminQuery.query(async () => {
     const db = getDb();
