@@ -1,15 +1,55 @@
+import fs from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { publishedCards, cardTrials, subscriptions, appSettings, cardEvents } from "@db/schema";
+import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEvents } from "@db/schema";
 import { eq, desc, and } from "drizzle-orm";
 
 const DAY = 86_400_000;
 async function setting(db: ReturnType<typeof getDb>, key: string): Promise<string | null> {
   const r = await db.select().from(appSettings).where(eq(appSettings.key, key));
   return r[0]?.value ?? null;
+}
+
+/* Slugs owned by the LEGACY customers.json cards. The public /slug page resolves
+   these case-insensitively (boot.ts `/api/card/:slug`), so a new card must not be
+   allowed to claim one — otherwise its snapshot would override the legacy card
+   (snapshot wins over legacy JSON in PublicCard.tsx). Cached 60s like card-og. */
+let legacyCache: Set<string> | null = null;
+let legacyAt = 0;
+function legacySlugSet(): Set<string> {
+  const now = Date.now();
+  if (legacyCache && now - legacyAt < 60_000) return legacyCache;
+  for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
+    try {
+      const rows = JSON.parse(fs.readFileSync(path.resolve(p), "utf-8")) as { slug?: string }[];
+      legacyCache = new Set(rows.map((r) => String(r.slug || "").toLowerCase().trim()).filter(Boolean));
+      legacyAt = now;
+      return legacyCache;
+    } catch { /* try next path */ }
+  }
+  return legacyCache ?? new Set();
+}
+
+/* True when `slug` is already owned by anyone OTHER than (ownerUserId, ownerCardId).
+   Checks ALL THREE card systems the public /slug page can resolve from — legacy
+   customers.json, the relational `cards` table, and `published_cards` snapshots —
+   so a slug can never be claimed across systems (the pacewalk cross-system leak). */
+async function slugTakenByOther(
+  db: ReturnType<typeof getDb>, slug: string, ownerUserId: number, ownerCardId: number,
+): Promise<boolean> {
+  // 1) Legacy customers.json (case-insensitive, matching the public resolver).
+  if (legacySlugSet().has(slug.toLowerCase().trim())) return true;
+  // 2) Relational cards — cards.slug is globally unique; taken if another user holds it.
+  const rel = await db.select({ userId: cards.userId }).from(cards).where(eq(cards.slug, slug));
+  if (rel.some((r) => Number(r.userId) !== ownerUserId)) return true;
+  // 3) Other snapshots (another user, or this user's other card).
+  const snap = await db.select({ userId: publishedCards.userId, cardId: publishedCards.cardId })
+    .from(publishedCards).where(eq(publishedCards.slug, slug));
+  return snap.some((t) => !(t.userId === ownerUserId && t.cardId === ownerCardId));
 }
 
 /* Published-card snapshots + permanent QR identity.
@@ -28,11 +68,9 @@ export const publishRouter = createRouter({
       // Sanitize to identifier-safe chars (also blocks slug-based XSS in the card).
       const slug = input.slug.trim().replace(/[^a-zA-Z0-9_-]/g, "");
       if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid card URL." });
-      // Reject a slug owned by ANY OTHER card (another user, or this user's other
-      // card) — one public URL per card, no hijacking a victim's leads (Phase 31).
-      const taken = await db.select({ userId: publishedCards.userId, cardId: publishedCards.cardId })
-        .from(publishedCards).where(eq(publishedCards.slug, slug));
-      if (taken.some((t) => !(t.userId === ctx.user.id && t.cardId === cardId)))
+      // Reject a slug owned by ANY OTHER card — across legacy, relational and
+      // snapshot cards — so no card can hijack a victim's URL/leads (Phase 31).
+      if (await slugTakenByOther(db, slug, ctx.user.id, cardId))
         throw new TRPCError({ code: "CONFLICT", message: "That card URL is already taken." });
 
       const owner = and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId));
@@ -53,9 +91,7 @@ export const publishRouter = createRouter({
       const slug = input.slug.trim().replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
       if (!slug) return { available: false, slug };
       const db = getDb();
-      const taken = await db.select({ userId: publishedCards.userId, cardId: publishedCards.cardId })
-        .from(publishedCards).where(eq(publishedCards.slug, slug));
-      const available = !taken.some((t) => !(t.userId === ctx.user.id && t.cardId === (input.cardId || 1)));
+      const available = !(await slugTakenByOther(db, slug, ctx.user.id, input.cardId || 1));
       return { available, slug };
     }),
 
