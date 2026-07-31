@@ -101,7 +101,12 @@ export function accountPackageId(): number {
     Primary card (id 1) → legacy `base__u{id}` keys (no data migration). */
 export function scopedKey(base: string): string {
   const u = getAuthUser();
-  if (!u) return base;
+  // No signed-in user → an isolated anonymous namespace, NEVER the bare `base`.
+  // The un-suffixed `dc_customer`/`dc_products`/… keys are legacy data (a card an
+  // earlier browser owner published); reading them would leak that card into
+  // another session (the "shekhar sir's link for a different user" bug). Keeping
+  // them out of every real code path makes that impossible for present + future.
+  if (!u) return `${base}__anon`;
   const k = `${base}__u${u.id}`;
   const cardId = getActiveCardId();
   return cardId > PRIMARY_CARD_ID ? `${k}__c${cardId}` : k;

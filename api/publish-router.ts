@@ -133,13 +133,20 @@ export const publishRouter = createRouter({
   }),
 
   // Authed: the signed-in user's public identity (for the QR / share tools).
+  // ALWAYS server-scoped to ctx.user (the JWT owner) so copy/share/QR can never
+  // surface another account's link. If the requested card has no published row,
+  // fall back to this user's primary/first published card rather than null —
+  // otherwise the client would fall back to a possibly-stale localStorage slug.
   mine: authedQuery
     .input(z.object({ cardId: z.number().int().positive().default(1) }).optional())
     .query(async ({ ctx, input }) => {
       const db = getDb();
       const cardId = input?.cardId || 1;
-      const rows = await db.select({ slug: publishedCards.slug, publicId: publishedCards.publicId })
-        .from(publishedCards).where(and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId)));
-      return rows[0] ?? null;
+      const mineRows = await db.select({ slug: publishedCards.slug, publicId: publishedCards.publicId, cardId: publishedCards.cardId })
+        .from(publishedCards).where(eq(publishedCards.userId, ctx.user.id)).orderBy(publishedCards.cardId);
+      if (!mineRows.length) return null;
+      const exact = mineRows.find((r) => Number(r.cardId) === cardId);
+      const pick = exact ?? mineRows[0];
+      return { slug: pick.slug, publicId: pick.publicId };
     }),
 });
