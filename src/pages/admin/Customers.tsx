@@ -123,10 +123,14 @@ export default function AdminCustomers() {
     (async () => {
       const [legacy, appUsers] = await Promise.all([
         fetchAdminData<Customer[]>("customers").catch(() => { toast.error("Could not load customers"); return [] as Customer[]; }),
-        utils.admin.appUsers.fetch().catch(() => [] as Customer[]),
+        utils.admin.appUsers.fetch().catch((e) => { console.warn("appUsers failed", e); toast.error("Could not load new-flow accounts"); return [] as Customer[]; }),
       ]);
+      // Add every DB account whose email isn't already in the legacy list (dedupe),
+      // so no app user is hidden and legacy cards keep their content.
+      const legacyEmails = new Set(legacy.map((c) => (c.email || "").toLowerCase().trim()).filter(Boolean));
+      const extra = (appUsers as unknown as Customer[]).filter((u) => !legacyEmails.has((u.email || "").toLowerCase().trim()));
       // New-flow ids are offset high, so they naturally sort newest-first with the rest.
-      const merged = [...(appUsers as unknown as Customer[]), ...legacy].sort((a, b) => Number(b.id) - Number(a.id));
+      const merged = [...extra, ...legacy].sort((a, b) => Number(b.id) - Number(a.id));
       setRows(merged);
       setLoading(false);
     })();

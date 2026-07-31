@@ -59,30 +59,37 @@ export const adminRouter = createRouter({
       const t = new Date(d as string | number | Date).getTime();
       return Number.isNaN(t) ? null : new Date(t).toISOString().slice(0, 19).replace("T", " ");
     };
+    // Return EVERY non-super-admin account (not just those missing from the
+    // legacy list) so no app user can ever be hidden; the frontend dedupes by
+    // email against the legacy list. Each row is wrapped so one bad record can
+    // never throw and blank the whole list.
     return allUsers
-      .filter((u) => u.role !== "super_admin" && !legacyEmails.has(String(u.email).toLowerCase().trim()))
+      .filter((u) => u.role !== "super_admin")
       .map((u) => {
-        const uid = Number(u.id);
-        const sub = subBy.get(uid);
-        const trial = trialBy.get(uid);
-        const subActive = !!sub && sub.status === "active" && (!sub.currentPeriodEnd || new Date(sub.currentPeriodEnd).getTime() > now);
-        return {
-          id: 900_000_000 + uid, // offset so it can't collide with a legacy customer id (React keys / sort)
-          dbId: uid,
-          name: u.name || "—",
-          username: slugBy.get(uid) || String(u.email).split("@")[0],
-          email: u.email,
-          mobile1: u.phone || "",
-          slug: slugBy.get(uid) || "",
-          package_id: subActive && sub?.packageId ? Number(sub.packageId) : 7,
-          admin_id: 0, // new-flow signups = Website
-          activated_on: sub?.currentPeriodStart ? iso(sub.currentPeriodStart) : (trial?.startedAt ? iso(trial.startedAt) : iso(u.createdAt)),
-          expired_on: subActive && sub?.currentPeriodEnd ? iso(sub.currentPeriodEnd) : (trial?.endsAt ? iso(trial.endsAt) : null),
-          status: u.status === "active" ? 1 : 0,
-          password: "",
-          isNew: true as const,
-        };
-      });
+        try {
+          const uid = Number(u.id);
+          const sub = subBy.get(uid);
+          const trial = trialBy.get(uid);
+          const subActive = !!sub && sub.status === "active" && (!sub.currentPeriodEnd || new Date(sub.currentPeriodEnd).getTime() > now);
+          return {
+            id: 900_000_000 + uid, // offset so it can't collide with a legacy customer id (React keys / sort)
+            dbId: uid,
+            name: u.name || "—",
+            username: slugBy.get(uid) || String(u.email).split("@")[0],
+            email: u.email,
+            mobile1: u.phone || "",
+            slug: slugBy.get(uid) || "",
+            package_id: subActive && sub?.packageId ? Number(sub.packageId) : 7,
+            admin_id: 0, // new-flow signups = Website
+            activated_on: sub?.currentPeriodStart ? iso(sub.currentPeriodStart) : (trial?.startedAt ? iso(trial.startedAt) : iso(u.createdAt)),
+            expired_on: subActive && sub?.currentPeriodEnd ? iso(sub.currentPeriodEnd) : (trial?.endsAt ? iso(trial.endsAt) : null),
+            status: u.status === "active" ? 1 : 0,
+            password: "",
+            isNew: !legacyEmails.has(String(u.email).toLowerCase().trim()),
+          };
+        } catch { return null; }
+      })
+      .filter(Boolean);
   }),
 
   // Diagnostic: look up any account by email / phone / name / id and explain
