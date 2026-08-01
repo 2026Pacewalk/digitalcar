@@ -1064,6 +1064,11 @@ function FinalCTA() {
 }
 
 /* ─── Page ─── */
+// Homepage section toggles — Reseller & Pricing are hidden from the homepage
+// (still reachable at /resellers and /pricing). Flip to true to bring back.
+const SHOW_RESELLER_SECTION = false;
+const SHOW_PRICING_SECTION = false;
+
 export default function Home() {
   return (
     <>
@@ -1081,8 +1086,8 @@ export default function Home() {
       <CustomDomainSection />
       <GrowSection />
       <TestimonialsSection />
-      <ResellerSection />
-      <PricingSection />
+      {SHOW_RESELLER_SECTION && <ResellerSection />}
+      {SHOW_PRICING_SECTION && <PricingSection />}
       <FinalCTA />
     </>
   );
