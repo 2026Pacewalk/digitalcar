@@ -312,6 +312,23 @@ app.get("/api/card/:slug", async (c) => {
   return c.json(pub);
 });
 
+// Caddy on-demand-TLS gate: only issue an SSL certificate for domains we
+// actually serve (an ACTIVE custom domain) — stops cert-issuance abuse from
+// arbitrary hosts pointed at the server. Caddy calls GET /api/tls/check?domain=
+app.get("/api/tls/check", async (c) => {
+  const domain = String(c.req.query("domain") || "").toLowerCase().trim().replace(/\.$/, "");
+  if (!domain) return c.json({ error: "no domain" }, 400);
+  if (domain === "digitalcarda.in" || domain.endsWith(".digitalcarda.in")) return c.text("ok");
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { customDomains } = await import("@db/schema");
+    const { and, eq } = await import("drizzle-orm");
+    const row = await getDb().select({ id: customDomains.id }).from(customDomains)
+      .where(and(eq(customDomains.domain, domain), eq(customDomains.status, "active")));
+    return row.length ? c.text("ok") : c.json({ error: "unknown domain" }, 403);
+  } catch { return c.json({ error: "error" }, 500); }
+});
+
 // Real engagement analytics: the public card beacons here on view + every
 // action tap (call/whatsapp/email/website/directions/save-contact). Slug-keyed
 // so it works for snapshot AND legacy cards. Numbers are always real (§36).

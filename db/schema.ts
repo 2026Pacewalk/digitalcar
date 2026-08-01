@@ -632,3 +632,25 @@ export const resellerApplications = mysqlTable("reseller_applications", {
 ]);
 
 export type ResellerApplication = typeof resellerApplications.$inferSelect;
+
+// ─── Custom Domains ─────────────────────────────────────────────
+// Maps a customer/reseller domain (e.g. card.acme.com) to a published card
+// (userId + owner-local cardId → published_cards.slug). One authoritative table
+// so the domain→card resolver, the Caddy on-demand-TLS "ask" endpoint, and the
+// admin/reseller/customer UIs all share one source of truth. Additive & safe.
+export const customDomains = mysqlTable("custom_domains", {
+  id: serial("id").primaryKey(),
+  domain: varchar("domain", { length: 255 }).notNull().unique(), // lower-cased hostname
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  cardId: int("card_id").notNull().default(1), // owner-local card id (1 = primary)
+  status: mysqlEnum("status", ["pending", "active", "disabled"]).notNull().default("pending"),
+  verifyToken: varchar("verify_token", { length: 64 }).notNull(),
+  addedByRole: mysqlEnum("added_by_role", ["admin", "reseller", "customer"]).notNull().default("admin"),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("cd_user_card_idx").on(table.userId, table.cardId),
+  index("cd_status_idx").on(table.status),
+]);
+
+export type CustomDomain = typeof customDomains.$inferSelect;

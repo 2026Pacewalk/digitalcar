@@ -19,6 +19,7 @@ import { resellerRouter } from "./reseller-router";
 import { aiRouter } from "./ai-router";
 import { bulkOrderRouter } from "./bulk-order-router";
 import { adminRouter } from "./admin-router";
+import { domainRouter } from "./domain-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -44,6 +45,7 @@ export const appRouter = createRouter({
   ai: aiRouter,
   bulkOrder: bulkOrderRouter,
   admin: adminRouter,
+  domain: domainRouter,
 });
 
 export type AppRouter = typeof appRouter;

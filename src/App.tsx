@@ -3,6 +3,18 @@ import { Routes, Route, Navigate, useParams } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 import PublicLayout from "@/components/layout/PublicLayout";
+const CustomDomainCard = lazy(() => import("@/components/CustomDomainCard"));
+
+// Hosts that are the DigitalCarda app itself (never treated as a custom card domain).
+function isCustomHost(hostname: string): boolean {
+  const host = (hostname || "").toLowerCase();
+  if (!host || host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost")) return false;
+  if (host === "digitalcarda.in" || host.endsWith(".digitalcarda.in")) return false;
+  // Ignore preview/staging hosts so only real customer domains resolve as cards.
+  if (host.endsWith(".vercel.app") || host.endsWith(".onrender.com") || host.endsWith(".netlify.app")) return false;
+  return host.includes("."); // a real FQDN → treat as a custom card domain
+}
+
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -33,6 +45,7 @@ const AdminTemplates = lazy(() => import("./pages/admin/Templates"));
 const AdminProducts = lazy(() => import("./pages/admin/Products"));
 const AdminMigration = lazy(() => import("./pages/admin/Migration"));
 const AdminUrlConflicts = lazy(() => import("./pages/admin/UrlConflicts"));
+const AdminDomains = lazy(() => import("./pages/admin/Domains"));
 const AdminLeads = lazy(() => import("./pages/admin/Leads"));
 const AdminBulkOrders = lazy(() => import("./pages/admin/BulkOrders"));
 const AdminAiGenerator = lazy(() => import("./pages/admin/AiGenerator"));
@@ -54,6 +67,7 @@ const CustomerSubscription = lazy(() => import("./pages/customer/Subscription"))
 const CustomerSettings = lazy(() => import("./pages/customer/Settings"));
 const CustomerProfile = lazy(() => import("./pages/customer/Profile"));
 const CustomerQR = lazy(() => import("./pages/customer/QR"));
+const CustomerCustomDomain = lazy(() => import("./pages/customer/CustomDomain"));
 const AITools = lazy(() => import("./pages/customer/AITools"));
 const CustomerHome = lazy(() => import("./pages/customer/Home"));
 const CardStudio = lazy(() => import("./pages/customer/CardStudio"));
@@ -134,6 +148,19 @@ function LegacyProductRedirect() {
 }
 
 export default function App() {
+  // On a custom domain (card.acme.com) short-circuit all routing and render the
+  // linked card. digitalcarda.in and localhost fall through to the normal app.
+  const host = typeof window !== "undefined" ? window.location.hostname : "";
+  if (isCustomHost(host)) {
+    return (
+      <>
+        <Toaster position="top-center" />
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]"><div className="w-8 h-8 rounded-full border-2 border-[#E2E8F0] border-t-[#F7B31C] animate-spin" /></div>}>
+          <CustomDomainCard host={host} />
+        </Suspense>
+      </>
+    );
+  }
   return (
     <>
       <Toaster position="top-center" />
@@ -186,6 +213,7 @@ export default function App() {
         <Route path="/admin/templates" element={<RoleRoute allowedRoles={["super_admin"]}><AdminTemplates /></RoleRoute>} />
         <Route path="/admin/migration" element={<RoleRoute allowedRoles={["super_admin"]}><AdminMigration /></RoleRoute>} />
         <Route path="/admin/url-conflicts" element={<RoleRoute allowedRoles={["super_admin"]}><AdminUrlConflicts /></RoleRoute>} />
+        <Route path="/admin/domains" element={<RoleRoute allowedRoles={["super_admin"]}><AdminDomains /></RoleRoute>} />
         {/* Analytics is now merged into the Dashboard — keep the path as a redirect for old links */}
         <Route path="/admin/analytics" element={<Navigate to="/admin" replace />} />
         <Route path="/admin/leads" element={<RoleRoute allowedRoles={["super_admin"]}><AdminLeads /></RoleRoute>} />
@@ -216,6 +244,7 @@ export default function App() {
         <Route path="/dashboard/settings" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSettings /></RoleRoute>} />
         <Route path="/dashboard/profile" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerProfile /></RoleRoute>} />
         <Route path="/dashboard/qr" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerQR /></RoleRoute>} />
+        <Route path="/dashboard/domain" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerCustomDomain /></RoleRoute>} />
         <Route path="/dashboard/ai" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><AITools /></RoleRoute>} />
         <Route path="/dashboard/build" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardStudio /></RoleRoute>} />
         <Route path="/dashboard/home" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerHome /></RoleRoute>} />

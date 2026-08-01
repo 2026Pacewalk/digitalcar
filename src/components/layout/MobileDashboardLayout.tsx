@@ -5,7 +5,7 @@ import {
   Plus, Eye, Share2, CreditCard, Menu, MessageSquare,
   Settings, LogOut, HelpCircle, ChevronLeft,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Star, Upload, Mail, Layers,
-  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode, Link2,
+  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode, Link2, Globe,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
@@ -80,6 +80,7 @@ const NAV: Record<string, NavConfig> = {
       ] },
       { title: "System", items: [
         { icon: Link2, label: "URL Conflicts", path: "/admin/url-conflicts" },
+        { icon: Globe, label: "Custom Domains", path: "/admin/domains" },
         { icon: Settings, label: "Settings", path: "/admin/settings" },
       ] },
     ],
@@ -139,6 +140,7 @@ const NAV: Record<string, NavConfig> = {
       ] },
       { title: "Account", items: [
         { icon: CreditCard, label: "Subscription", path: "/dashboard/subscription" },
+        { icon: Globe, label: "Custom Domain", path: "/dashboard/domain" },
         { icon: Layers, label: "Bulk Create", path: "/dashboard/bulk" },
         { icon: User, label: "Profile", path: "/dashboard/profile" },
         { icon: Settings, label: "Settings", path: "/dashboard/settings?tab=module" },
@@ -174,6 +176,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/dashboard/refer": "Refer & Earn",
   "/dashboard/templates": "Templates",
   "/dashboard/subscription": "Subscription",
+  "/dashboard/domain": "Custom Domain",
   "/dashboard/ai": "AI Tools",
   // Admin
   "/admin": "Dashboard",

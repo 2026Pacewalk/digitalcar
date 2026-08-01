@@ -18,7 +18,7 @@ function slugify(input: string): string {
 
 /** The package of the user's currently-active (non-expired) subscription, or
     null. Used for server-side entitlement + quota checks (Phase 31 §44/§45). */
-async function activeSubPackage(db: ReturnType<typeof getDb>, userId: number) {
+export async function activeSubPackage(db: ReturnType<typeof getDb>, userId: number) {
   const sub = await db.query.subscriptions.findFirst({
     where: and(eq(subscriptions.userId, userId), sql`${subscriptions.status} in ('trial','active')`),
     with: { package: true },

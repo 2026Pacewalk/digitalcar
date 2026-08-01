@@ -7,7 +7,7 @@ import {
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
   ChevronRight, Store, X, Search, ToggleRight, ReceiptText, KeyRound,
   Home as HomeIcon, Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
-  Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2,
+  Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -45,6 +45,7 @@ const customerGroups: NavGroup[] = [
   ] },
   { title: "Account", items: [
     { label: "Subscription", icon: CreditCard, path: "/dashboard/subscription" },
+    { label: "Custom Domain", icon: Globe, path: "/dashboard/domain" },
     { label: "Bulk Create", icon: Layers, path: "/dashboard/bulk" },
     { label: "Profile", icon: UserCircle, path: "/dashboard/profile" },
     { label: "Settings", icon: Settings, path: "/dashboard/settings?tab=module" },
@@ -74,6 +75,7 @@ const superAdminGroups: NavGroup[] = [
   ] },
   { title: "System", items: [
     { label: "URL Conflicts", icon: Link2, path: "/admin/url-conflicts" },
+    { label: "Custom Domains", icon: Globe, path: "/admin/domains" },
     { label: "Settings", icon: Settings, path: "/admin/settings" },
   ] },
 ];

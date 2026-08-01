@@ -30,8 +30,10 @@ function safeUrl(u: unknown): string {
 // on window.parent to SUPPRESS tracking, which sandbox would break.
 const CARD_SANDBOX = "allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads allow-forms allow-modals allow-top-navigation-by-user-activation";
 
-export default function PublicCard() {
-  const { slug = "" } = useParams();
+export default function PublicCard({ slugOverride }: { slugOverride?: string } = {}) {
+  const { slug: slugParam = "" } = useParams();
+  // On a custom domain the slug is resolved from the host, not the URL path.
+  const slug = slugOverride ?? slugParam;
   // retry:false so a missing/errored DB card settles immediately and we fall
   // back to the legacy (customers.json) renderer instead of retry-storming.
   const { data: card, isLoading: cardLoading } = trpc.card.getBySlug.useQuery({ slug }, { retry: false });
