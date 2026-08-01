@@ -1,9 +1,8 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { Search, SlidersHorizontal, Sparkles, X, ArrowRight, Eye } from "lucide-react";
 import { trpc } from "@/providers/trpc";
-import { buildCardThumb } from "@/card-template/buildCard";
-import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
+import TemplateThumb from "@/components/TemplateThumb";
 import { demoForProduct } from "@/lib/demoData";
 
 type Product = {
@@ -13,36 +12,10 @@ type Product = {
 };
 
 const inr = (v?: string | number | null) => "₹" + Number(v || 0).toLocaleString("en-IN");
-const THUMB_W = 375, THUMB_H = 626;   // fixed preview size — matches the Midnight Gold front (looks right in any browser)
 
 /* The industry a card belongs to (from its assigned demo persona), so the
    filter reflects every industry shown — not just the few with a DB category. */
 const industryOf = (p: Product): string => String(demoForProduct(p).customer.nature || "Other");
-
-/* Card-front preview (same engine the real cards use). Every card is rendered at
-   its native width and shown top-aligned in a fixed 375×626 frame — so all
-   designs appear at the same, correct size, never shrunk to fit. */
-function ThumbFrame({ style, primary, secondary, category }: { style: number; primary?: string | null; secondary?: string | null; category?: string | null }) {
-  const html = useMemo(() => {
-    const demo = demoForProduct({ styleNumber: style, category });
-    return buildCardThumb({ ...DEFAULT_CUSTOMER, ...demo.customer, color: primary || "#F7B31C", color2: secondary || "" } as Parameters<typeof buildCardThumb>[0], style);
-  }, [style, primary, secondary, category]);
-  const ref = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-  useEffect(() => {
-    const el = ref.current; if (!el) return;
-    const measure = () => setScale(el.clientWidth / THUMB_W);
-    measure();
-    const ro = new ResizeObserver(measure); ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return (
-    <div ref={ref} className="relative w-full overflow-hidden bg-white pointer-events-none" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }}>
-      <iframe title={`Design ${style}`} srcDoc={html} scrolling="no" tabIndex={-1} loading="lazy"
-        style={{ width: THUMB_W, height: THUMB_H, border: 0, transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }} />
-    </div>
-  );
-}
 
 const SORTS = [
   { id: "popular", label: "Popular" },
@@ -166,7 +139,7 @@ export default function Marketplace() {
                     <Link to={`/digital-business-cards-templates/${p.slug}`} className="relative block active:scale-[0.99] transition-transform">
                       <span className="absolute top-2.5 left-2.5 z-10 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/90 text-[#92400E] shadow-sm backdrop-blur">◷ {p.trialDays}d trial</span>
                       {p.isFeatured && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0F172A] text-[#F7B31C] shadow-sm">★ Featured</span>}
-                      <ThumbFrame style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />
+                      <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />
                       <div className="absolute inset-0 hidden md:flex items-center justify-center bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
                         <span className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0F172A] text-[13px] font-bold shadow-lg"><Eye size={14} /> Live Preview</span>
                       </div>

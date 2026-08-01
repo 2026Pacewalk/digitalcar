@@ -9,6 +9,9 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
+import { trpc } from "@/providers/trpc";
+import TemplateThumb, { THUMB_W, THUMB_H } from "@/components/TemplateThumb";
+import { STANDEE_STYLES, standeeMarkup } from "@/lib/standee";
 
 /* ─────────────────────────────────────────────────────────────
    Scroll-reveal primitives
@@ -602,32 +605,37 @@ function AISection() {
 
 /* ─── Templates ─── */
 function TemplatesSection() {
-  const categories = ["Corporate", "Freelancer", "Doctor", "Real Estate", "Digital Agency", "Retail Store", "Salon & Beauty", "Restaurant", "Consultant", "Education", "Event Planner", "Service Business"];
-  const accents = ["#F7B31C", "#14B8A6", "#8B5CF6", "#3B82F6", "#EC4899", "#0EA5E9"];
+  const { data: products = [], isLoading } = trpc.product.catalogue.useQuery();
+  // Featured first, then curated display order — show the best 8 real designs.
+  const shown = [...products]
+    .sort((a, b) => (Number(b.isFeatured) - Number(a.isFeatured)) || (a.displayOrder - b.displayOrder))
+    .slice(0, 8);
   return (
     <section className="py-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Templates" title="Beautiful, Ready-to-Use Templates" subtitle="Pick a professional design, customize colors, upload your logo, add details, and publish instantly." />
-        <Reveal stagger className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          {categories.map((cat, i) => {
-            const a = accents[i % accents.length];
-            return (
-              <Link to="/digital-business-cards-templates" key={i} className="group">
-                <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden card-hover">
-                  <div className="h-24 bg-gradient-to-br from-[#0F172A] to-[#1E293B] relative overflow-hidden">
-                    <div className="absolute top-2 left-2 w-8 h-8 rounded-full" style={{ background: a, opacity: 0.5 }} />
-                    <div className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-[#14B8A6]/40" />
-                    <div className="absolute inset-x-3 bottom-3 h-2 rounded-full" style={{ background: a }} />
-                    <div className="absolute inset-x-3 bottom-6 h-1.5 w-2/3 rounded-full bg-white/20" />
-                    <div className="absolute inset-0 flex items-center justify-center"><CreditCard size={22} className="text-white/20" /></div>
-                  </div>
-                  <div className="p-3 text-center">
-                    <p className="text-xs font-semibold text-[#0F172A] group-hover:text-[#F7B31C] transition-colors">{cat}</p>
-                  </div>
+        <Reveal stagger className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+          {isLoading
+            ? Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="rounded-2xl bg-white border border-[#F1F5F9] shadow-premium overflow-hidden">
+                  <div className="w-full animate-pulse bg-[#F1F5F9]" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }} />
+                  <div className="p-3.5"><div className="h-3.5 w-2/3 mx-auto bg-[#F1F5F9] rounded-full animate-pulse" /></div>
                 </div>
-              </Link>
-            );
-          })}
+              ))
+            : shown.map((p) => (
+                <article key={p.id} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1.5 transition-all duration-300">
+                  <Link to={`/digital-business-cards-templates/${p.slug}`} className="relative block active:scale-[0.99] transition-transform">
+                    {p.isFeatured && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0F172A] text-[#F7B31C] shadow-sm">★ Featured</span>}
+                    <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />
+                    <div className="absolute inset-0 hidden md:flex items-center justify-center bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
+                      <span className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0F172A] text-[13px] font-bold shadow-lg"><Eye size={14} /> Live Preview</span>
+                    </div>
+                  </Link>
+                  <div className="p-3.5 text-center">
+                    <Link to={`/digital-business-cards-templates/${p.slug}`} className="text-sm font-semibold text-[#0F172A] group-hover:text-[#F7B31C] transition-colors line-clamp-1">{p.name}</Link>
+                  </div>
+                </article>
+              ))}
         </Reveal>
         <div className="text-center mt-10">
           <Link to="/digital-business-cards-templates" className="btn-navy inline-flex items-center gap-2">Browse All Templates <ChevronRight size={16} /></Link>
@@ -768,15 +776,19 @@ function QRNFCSection() {
             <div className="mt-8"><Link to="/signup" className="btn-gold inline-flex items-center gap-2">Get Your QR Code <ArrowRight size={16} /></Link></div>
           </Reveal>
           <Reveal className="flex justify-center">
-            <div className="bg-white rounded-3xl p-8 shadow-premium-lg border border-[#F1F5F9] relative">
-              <div className="absolute -top-3 -right-3 bg-[#14B8A6] text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg">
+            <div className="relative w-full max-w-[420px]">
+              <div className="absolute -top-3 -right-3 z-10 bg-[#14B8A6] text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg">
                 <ScanLine size={12} /> NFC Ready
               </div>
-              <div className="w-52 h-52 bg-[#F8FAFC] rounded-2xl flex items-center justify-center mx-auto mb-4 ring-1 ring-[#E2E8F0]">
-                <QrCode size={92} className="text-[#0F172A]" />
-              </div>
-              <p className="text-center text-sm font-semibold text-[#0F172A]">Scan to View Card</p>
-              <p className="text-center text-xs text-[#94A3B8] mt-1">card.digitalcarda.in/johndoe</p>
+              <style>{STANDEE_STYLES}</style>
+              <div dangerouslySetInnerHTML={{ __html: standeeMarkup({
+                brandName: "Aarav Mehta",
+                subtitle: "Founder · Mehta & Co.",
+                phone: "+91 98765 43210",
+                linkText: "digitalcarda.in/aarav",
+                prompt: "Scan to view my digital card",
+                qrSrc: `https://api.qrserver.com/v1/create-qr-code/?size=440x440&margin=12&format=png&data=${encodeURIComponent("https://digitalcarda.in/digital-business-cards-templates")}&color=0F172A&bgcolor=FFFFFF`,
+              }) }} />
             </div>
           </Reveal>
         </div>
