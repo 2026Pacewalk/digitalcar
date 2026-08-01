@@ -7,7 +7,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { promises as dns } from "node:dns";
 import { activeSubPackage } from "./card-router";
-import { cfEnabled, cfFallbackTarget, cfCreateHostname, cfGetByHostname, cfDeleteByHostname, cfIsActive, type CfHostname } from "./lib/cloudflare";
+import { cfEnabled, cfFallbackTarget, cfCreateHostname, cfGetByHostname, cfDeleteByHostname, cfIsActive, cfHealthCheck, type CfHostname } from "./lib/cloudflare";
 
 const ROOT_HOST = "digitalcarda.in";
 // Manual-mode CNAME target (used only when Cloudflare for SaaS isn't configured).
@@ -92,6 +92,12 @@ export const domainRouter = createRouter({
       if (!row) return null;
       return await resolveSlugFor(db, row.userId, row.cardId);
     } catch { return null; }
+  }),
+
+  // ── ADMIN: is Cloudflare for SaaS wired up? (real token/zone/SaaS check) ──
+  cfStatus: adminQuery.query(async () => {
+    const health = await cfHealthCheck();
+    return { enabled: cfEnabled(), verified: health.ok, error: health.ok ? null : (health.error ?? null), fallback: cfFallbackTarget() };
   }),
 
   // ── ADMIN: manage domains for ANY user ──

@@ -88,3 +88,11 @@ export async function cfDeleteByHostname(hostname: string): Promise<void> {
 export function cfIsActive(h: CfHostname | null): boolean {
   return !!h && h.status === "active" && (h.ssl?.status === "active" || !h.ssl);
 }
+
+/** Live check that the token + zone work AND Cloudflare for SaaS is enabled.
+   Hitting the custom_hostnames endpoint proves all three at once. */
+export async function cfHealthCheck(): Promise<{ ok: boolean; error?: string }> {
+  if (!cfEnabled()) return { ok: false, error: "not configured" };
+  try { await cf("/custom_hostnames?per_page=1"); return { ok: true }; }
+  catch (e) { return { ok: false, error: (e as Error).message }; }
+}

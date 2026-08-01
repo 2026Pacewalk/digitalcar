@@ -34,6 +34,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
 
 export default function AdminDomains() {
   const utils = trpc.useUtils();
+  const { data: cf } = trpc.domain.cfStatus.useQuery(undefined, { retry: false });
   const { data: domains = [], isLoading, refetch } = trpc.domain.list.useQuery();
   const assign = trpc.domain.assign.useMutation();
   const verify = trpc.domain.verify.useMutation();
@@ -85,6 +86,24 @@ export default function AdminDomains() {
     <ResponsiveDashboardLayout>
       <div className="hidden md:block"><TopBar title="Custom Domains" subtitle="Serve any customer's card on their own branded domain" /></div>
       <div className="p-6 space-y-6 max-w-4xl">
+
+        {/* Cloudflare connection status */}
+        {cf?.verified ? (
+          <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5">
+            <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
+            <p className="text-[13px] text-emerald-800"><b>Cloudflare for SaaS connected.</b> SSL is issued &amp; renewed automatically for each domain. Fallback: <code className="font-mono">{cf.fallback}</code></p>
+          </div>
+        ) : cf?.enabled ? (
+          <div className="flex items-center gap-2.5 rounded-xl bg-red-50 border border-red-200 px-4 py-2.5">
+            <AlertTriangle size={17} className="text-red-600 shrink-0" />
+            <p className="text-[13px] text-red-800"><b>Cloudflare token set but not working:</b> {cf.error}. Domains run in manual mode until this is fixed — check the token permissions (Zone · SSL and Certificates · Edit) and that Cloudflare for SaaS is enabled.</p>
+          </div>
+        ) : cf ? (
+          <div className="flex items-center gap-2.5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5">
+            <AlertTriangle size={17} className="text-amber-600 shrink-0" />
+            <p className="text-[13px] text-amber-800"><b>Cloudflare not configured — manual mode.</b> Add CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID &amp; CF_SAAS_FALLBACK to the prod .env (then <code className="font-mono">pm2 restart digitalcarda --update-env</code>) for automatic SSL. See docs/CUSTOM_DOMAINS.md.</p>
+          </div>
+        ) : null}
 
         {/* How it works */}
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
