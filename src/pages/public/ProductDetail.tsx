@@ -9,6 +9,7 @@ import { buildCardThumb, buildCardHtml } from "@/card-template/buildCard";
 import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
 import { demoForProduct } from "@/lib/demoData";
 import { logFunnel } from "@/lib/funnel";
+import MockupGallery from "@/components/MockupGallery";
 
 type Product = {
   id: number; slug: string; name: string; tagline?: string | null; description?: string | null;
@@ -166,6 +167,13 @@ export default function ProductDetail() {
             <p className="text-[12px] text-[#94A3B8] mt-3 text-center sm:text-left">Try → experience the value → keep it active. Cancel anytime during the trial.</p>
           </div>
         </div>
+
+        {/* Template showcase — marketing mockups (movable gallery + click-to-zoom) */}
+        {Array.isArray(product.images) && product.images.length > 0 && (
+          <Section title="See this template in action">
+            <MockupGallery images={product.images as string[]} name={product.name} />
+          </Section>
+        )}
 
         {/* About */}
         {product.description && (
