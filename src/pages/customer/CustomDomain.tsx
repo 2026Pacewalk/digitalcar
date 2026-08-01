@@ -94,10 +94,9 @@ export default function CustomerCustomDomain() {
                   <p className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-emerald-600"><CheckCircle2 size={14} /> Live — your card is served on this domain over HTTPS.</p>
                 ) : (
                   <div className="mt-3 rounded-xl bg-[#F8FAFC] border border-[#F1F5F9] p-3 space-y-2">
-                    <p className="text-[11px] font-semibold text-[#334155]">Add these DNS records at your domain provider:</p>
-                    <CopyRow label="CNAME" value={`${d.dns.cname.host}  →  ${d.dns.cname.value}`} />
-                    <CopyRow label="TXT" value={`${d.dns.txt.host}  →  ${d.dns.txt.value}`} />
-                    <p className="text-[10px] text-[#94A3B8]">Using a root/apex domain that can&apos;t take a CNAME? Point an A record to your server IP instead. DNS can take a few minutes to update, then click Verify.</p>
+                    <p className="text-[11px] font-semibold text-[#334155]">Add these DNS records at your domain provider:{d.dns.sslStatus ? <span className="ml-1.5 text-[10px] font-normal text-[#94A3B8]">SSL: {d.dns.sslStatus}</span> : null}</p>
+                    {d.dns.records.map((r, i) => <CopyRow key={i} label={r.type} value={`${r.host}  →  ${r.value}`} />)}
+                    <p className="text-[10px] text-[#94A3B8]">DNS can take a few minutes to update. {d.dns.mode === "cloudflare" ? "SSL is issued automatically once the records resolve — then click Verify." : "Using a root/apex domain that can't take a CNAME? Point an A record to your server IP instead, then click Verify."}</p>
                   </div>
                 )}
               </div>

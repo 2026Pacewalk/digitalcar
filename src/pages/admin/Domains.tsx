@@ -11,7 +11,7 @@ type Domain = {
   status: "pending" | "active" | "disabled"; addedByRole: string;
   verifiedAt: string | null; createdAt: string | null;
   email: string | null; name: string | null;
-  dns: { cname: DnsRec; txt: DnsRec };
+  dns: { mode: "cloudflare" | "manual"; records: DnsRec[]; sslStatus: string | null; active: boolean };
 };
 
 const STATUS: Record<string, string> = {
@@ -141,10 +141,12 @@ export default function AdminDomains() {
                   <p className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-emerald-600"><CheckCircle2 size={14} /> Live — serving the card over HTTPS on this domain.</p>
                 ) : (
                   <div className="mt-3 rounded-xl bg-[#F8FAFC] border border-[#F1F5F9] p-3 space-y-2">
-                    <p className="text-[11px] font-semibold text-[#334155]">DNS records for the customer to add:</p>
-                    <CopyField label="CNAME" value={`${d.dns.cname.host}  →  ${d.dns.cname.value}`} />
-                    <CopyField label="TXT" value={`${d.dns.txt.host}  →  ${d.dns.txt.value}`} />
-                    <p className="text-[10px] text-[#94A3B8]">Apex domains that can't use CNAME: point an A record to the server IP instead. The TXT record proves ownership.</p>
+                    <p className="text-[11px] font-semibold text-[#334155] flex items-center gap-1.5">DNS records for the customer to add
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${d.dns.mode === "cloudflare" ? "bg-[#FFF0D6] text-[#B45309]" : "bg-[#E2E8F0] text-[#475569]"}`}>{d.dns.mode === "cloudflare" ? "CLOUDFLARE SSL" : "MANUAL"}</span>
+                      {d.dns.sslStatus && <span className="text-[10px] text-[#94A3B8]">· SSL: {d.dns.sslStatus}</span>}
+                    </p>
+                    {d.dns.records.map((r, i) => <CopyField key={i} label={r.type} value={`${r.host}  →  ${r.value}`} />)}
+                    <p className="text-[10px] text-[#94A3B8]">{d.dns.mode === "cloudflare" ? "Cloudflare issues & renews the SSL automatically once these records resolve." : "Apex domains that can't use CNAME: point an A record to the server IP instead."}</p>
                   </div>
                 )}
               </div>

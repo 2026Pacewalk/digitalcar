@@ -3,80 +3,82 @@
 Serve any customer's (or white-label reseller's) card on their own domain —
 e.g. `card.acme.com` shows that customer's DigitalCarda card, over HTTPS.
 
-## How it works
+The app resolves the incoming `Host:` header → the card and renders it. SSL for
+each custom domain is handled by **Cloudflare for SaaS** (the recommended path,
+since digitalcarda.in already sits behind Cloudflare). A manual DNS-TXT fallback
+works when Cloudflare isn't configured.
 
-1. **Admin / reseller / customer adds a domain** (Admin → Custom Domains, or the
-   customer's dashboard). A row is created in `custom_domains` (status `pending`)
-   with a verify token.
-2. **The customer points DNS**:
-   - `CNAME  card.acme.com → cname.digitalcarda.in`  (apex domains: use an A record to the server IP instead)
-   - `TXT    _digitalcarda.card.acme.com → <verify token>`  (proves ownership)
-3. **Verify** — the app checks the TXT record and flips the domain to `active`.
-4. **Caddy** (reverse proxy) issues a free Let's Encrypt certificate the first
-   time the domain is hit, gated by our `ask` endpoint so certs are only issued
-   for registered active domains.
-5. The app resolves the incoming `Host:` → the card's slug and renders it.
+---
 
-Nothing about the card, its normal `digitalcarda.in/<slug>` URL, or its permanent
-QR ever changes.
+## Setup: Cloudflare for SaaS (recommended)
 
-## One-time server setup (VPS)
+No VPS/nginx changes. Cloudflare issues & renews SSL per custom hostname and
+proxies it to your existing origin (nginx → app).
 
-### 1. Apply the DB migration (additive, safe)
+### 1. In the Cloudflare dashboard (one-time)
+
+1. **SSL/TLS → Custom Hostnames → Enable Cloudflare for SaaS.**
+2. **Set a Fallback Origin.** Create a proxied (orange-cloud) DNS record for a
+   hostname on your zone that points to the server, e.g.
+   `ssl.digitalcarda.in → <your origin>` (A/CNAME, proxied), and set it as the
+   Custom Hostnames **fallback origin**. This is the hostname customers CNAME to.
+3. **Create an API token** (My Profile → API Tokens → Create Token):
+   - Permissions: **Zone → SSL and Certificates → Edit** (add **Zone → Zone → Read**).
+   - Zone Resources: **Include → Specific zone → digitalcarda.in**.
+   - Copy the token.
+4. Note your **Zone ID** (zone Overview page, right sidebar).
+
+### 2. On the VPS — add three env vars to the prod `.env`, then restart
 
 ```bash
-mysql <database> < db/add-custom-domains.sql
+# /var/www/digitalcarda/.env   (or wherever the app's .env lives)
+CLOUDFLARE_API_TOKEN=<the token from step 3>
+CLOUDFLARE_ZONE_ID=<your zone id>
+CF_SAAS_FALLBACK=ssl.digitalcarda.in     # the fallback hostname from step 2
+
+# then reload the app so it picks up the new env
+pm2 restart digitalcarda --update-env
 ```
 
-### 2. DNS: create the CNAME target
+That's it. The app auto-detects the token and switches from manual mode to
+Cloudflare mode. Nothing about nginx changes.
 
-Add an **A record** for `cname.digitalcarda.in → <your VPS IP>`. Customers point
-their `CNAME` at this hostname. (You can use any hostname; if you change it,
-update `CNAME_TARGET` in `api/domain-router.ts`.)
+### 3. Using it
 
-### 3. Put Caddy in front of the app (on-demand TLS)
+1. **Admin → Custom Domains** (or the customer's **Dashboard → Custom Domain**):
+   add the domain. The app registers it as a Cloudflare Custom Hostname and shows
+   the exact DNS records to add.
+2. The customer adds those records at their DNS provider (a CNAME to
+   `ssl.digitalcarda.in`, plus any ownership TXT shown).
+3. Cloudflare validates and issues the SSL automatically. Click **Verify** (or
+   just reload the list) — once Cloudflare reports the cert active, the domain
+   flips to **active** and the card serves on it over HTTPS.
 
-Install Caddy and use this `Caddyfile` (the app runs on `localhost:3000`):
+To revoke: **Remove** the domain (deletes the Cloudflare Custom Hostname too).
 
-```caddyfile
-{
-    # Only issue certificates for domains the app approves (active custom domains).
-    on_demand_tls {
-        ask http://localhost:3000/api/tls/check
-    }
-}
+---
 
-# The main app + www.
-digitalcarda.in, www.digitalcarda.in {
-    reverse_proxy localhost:3000
-}
+## Fallback: manual mode (no Cloudflare API)
 
-# The CNAME target customers point at (kept on our own cert).
-cname.digitalcarda.in {
-    reverse_proxy localhost:3000
-}
+If the CF env vars are absent, the module runs in manual mode:
 
-# Every other hostname = a customer custom domain. Caddy fetches a cert
-# on-demand (gated by the ask endpoint) and proxies to the app, which resolves
-# the Host header to the right card.
-https:// {
-    tls {
-        on_demand
-    }
-    reverse_proxy localhost:3000
-}
-```
+1. `mysql <db> < db/add-custom-domains.sql` — or it's auto-created on boot.
+2. Customer adds `CNAME <domain> → cname.digitalcarda.in` (ops must point that
+   A record at the origin) and a `TXT _digitalcarda.<domain> → <token>`.
+3. **Verify** checks the TXT and marks the domain active. (SSL for the domain
+   must be terminated by whatever proxy you run — this mode assumes you handle
+   that, e.g. Caddy on-demand TLS.)
 
-Reload Caddy: `caddy reload` (or `systemctl reload caddy`).
+The Caddy on-demand-TLS `ask` endpoint (`GET /api/tls/check?domain=`) is still
+available for that path — it returns 200 only for active domains.
 
-That's it. When a customer's domain is `active` and pointed at the server, the
-first HTTPS request auto-provisions a certificate and the card loads.
+---
 
 ## Notes
 
-- The `ask` endpoint (`GET /api/tls/check?domain=`) returns 200 only for
-  `active` custom domains (and our own hostnames), so nobody can force cert
-  issuance by pointing a random domain at the server.
 - Custom domains never shadow `digitalcarda.in` — the resolver rejects our own
   root and subdomains.
-- To revoke: set the domain to `disabled` or remove it in Admin → Custom Domains.
+- The `custom_domains` table is created automatically at app boot
+  (`CREATE TABLE IF NOT EXISTS`, additive), so no manual migration is required.
+- Serving resolves the domain → the owner's published card snapshot, so the
+  card's normal `digitalcarda.in/<slug>` URL and permanent QR are unchanged.

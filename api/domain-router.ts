@@ -7,44 +7,53 @@ import { eq, and, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { promises as dns } from "node:dns";
 import { activeSubPackage } from "./card-router";
+import { cfEnabled, cfFallbackTarget, cfCreateHostname, cfGetByHostname, cfDeleteByHostname, cfIsActive, type CfHostname } from "./lib/cloudflare";
 
 const ROOT_HOST = "digitalcarda.in";
-// Where customers point their domain. Ops must create an A record for this
-// hostname → the VPS IP (see docs/CUSTOM_DOMAINS.md). Surfaced in the UI.
+// Manual-mode CNAME target (used only when Cloudflare for SaaS isn't configured).
 export const CNAME_TARGET = "cname.digitalcarda.in";
 
-/** Normalise any user input to a bare lower-case hostname. */
 function normDomain(input: string): string {
   return String(input || "").trim().toLowerCase()
     .replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/:\d+$/, "").replace(/\.$/, "");
 }
-
 function isValidDomain(d: string): boolean {
   if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(d)) return false;
-  // Never let a custom domain shadow our own site.
   if (d === ROOT_HOST || d.endsWith("." + ROOT_HOST)) return false;
   return true;
 }
 
-/** DNS instructions shown to the owner for a given domain + token. */
-function dnsInstructions(domain: string, token: string) {
+type DnsRecord = { type: string; host: string; value: string };
+type OwnerInfo = { mode: "cloudflare" | "manual"; records: DnsRecord[]; sslStatus: string | null; active: boolean };
+
+/** DNS records + SSL status a domain owner needs, from Cloudflare when enabled. */
+async function ownerInfo(domain: string, token: string, cfHost?: CfHostname | null): Promise<OwnerInfo> {
+  if (cfEnabled()) {
+    let h = cfHost;
+    if (h === undefined) { try { h = await cfGetByHostname(domain); } catch { h = null; } }
+    const records: DnsRecord[] = [{ type: "CNAME", host: domain, value: cfFallbackTarget() }];
+    if (h?.ownership_verification?.name && h.ownership_verification.value)
+      records.push({ type: "TXT", host: h.ownership_verification.name, value: h.ownership_verification.value });
+    for (const v of h?.ssl?.validation_records ?? []) if (v.txt_name && v.txt_value) records.push({ type: "TXT", host: v.txt_name, value: v.txt_value });
+    return { mode: "cloudflare", records, sslStatus: h?.ssl?.status || h?.status || "pending", active: cfIsActive(h ?? null) };
+  }
   return {
-    cname: { type: "CNAME", host: domain, value: CNAME_TARGET },
-    // Apex domains can't CNAME — offer an A-record note too (value filled by ops).
-    txt: { type: "TXT", host: `_digitalcarda.${domain}`, value: token },
+    mode: "manual",
+    records: [
+      { type: "CNAME", host: domain, value: CNAME_TARGET },
+      { type: "TXT", host: `_digitalcarda.${domain}`, value: token },
+    ],
+    sslStatus: null, active: false,
   };
 }
 
-/** Resolve a domain's (userId, cardId) → the live published card's slug. */
 async function resolveSlugFor(db: ReturnType<typeof getDb>, userId: number, cardId: number) {
-  const pc = await db.query.publishedCards.findFirst({
-    where: and(eq(publishedCards.userId, userId), eq(publishedCards.cardId, cardId)),
-  });
+  const pc = await db.query.publishedCards.findFirst({ where: and(eq(publishedCards.userId, userId), eq(publishedCards.cardId, cardId)) });
   if (!pc) return null;
   return { slug: pc.slug, publicId: pc.publicId };
 }
 
-/** Ownership check: TXT record _digitalcarda.<domain> must contain the token. */
+/** Manual-mode ownership check: TXT _digitalcarda.<domain> contains the token. */
 async function txtVerified(domain: string, token: string): Promise<boolean> {
   try {
     const records = await dns.resolveTxt(`_digitalcarda.${domain}`);
@@ -52,33 +61,49 @@ async function txtVerified(domain: string, token: string): Promise<boolean> {
   } catch { return false; }
 }
 
+type Row = typeof customDomains.$inferSelect;
+
+/** Live status + records for a stored row; auto-promotes to active once
+   Cloudflare reports the cert is live so the card serves without a manual step. */
+async function enrich(db: ReturnType<typeof getDb>, r: Row) {
+  let info: OwnerInfo;
+  let status = r.status;
+  if (cfEnabled()) {
+    let h: CfHostname | null = null;
+    try { h = await cfGetByHostname(r.domain); } catch { /* offline / not created yet */ }
+    info = await ownerInfo(r.domain, r.verifyToken, h);
+    if (info.active && r.status !== "active") {
+      try { await db.update(customDomains).set({ status: "active", verifiedAt: new Date() }).where(eq(customDomains.id, r.id)); status = "active"; } catch { /* ignore */ }
+    }
+  } else {
+    info = await ownerInfo(r.domain, r.verifyToken, null);
+  }
+  return { id: r.id, domain: r.domain, userId: r.userId, cardId: r.cardId, status, addedByRole: r.addedByRole, verifiedAt: r.verifiedAt, createdAt: r.createdAt, dns: info };
+}
+
 export const domainRouter = createRouter({
-  // ── PUBLIC: host → card slug (used by the client gate on a custom domain) ──
+  // ── PUBLIC: host → card slug (client gate on a custom domain) ──
   resolve: publicQuery.input(z.object({ host: z.string() })).query(async ({ input }) => {
     const db = getDb();
     const domain = normDomain(input.host);
     if (!domain || domain === ROOT_HOST || domain.endsWith("." + ROOT_HOST)) return null;
     try {
-      const row = await db.query.customDomains.findFirst({
-        where: and(eq(customDomains.domain, domain), eq(customDomains.status, "active")),
-      });
+      const row = await db.query.customDomains.findFirst({ where: and(eq(customDomains.domain, domain), eq(customDomains.status, "active")) });
       if (!row) return null;
       return await resolveSlugFor(db, row.userId, row.cardId);
-    } catch { return null; } // table not migrated yet → resolve to nothing
+    } catch { return null; }
   }),
 
   // ── ADMIN: manage domains for ANY user ──
   list: adminQuery.query(async () => {
     const db = getDb();
     try {
-    const rows = await db.select({
-      id: customDomains.id, domain: customDomains.domain, userId: customDomains.userId,
-      cardId: customDomains.cardId, status: customDomains.status, verifyToken: customDomains.verifyToken,
-      addedByRole: customDomains.addedByRole, verifiedAt: customDomains.verifiedAt, createdAt: customDomains.createdAt,
-      email: users.email, name: users.fullName,
-    }).from(customDomains).leftJoin(users, eq(users.id, customDomains.userId)).orderBy(desc(customDomains.createdAt));
-    return rows.map((r) => ({ ...r, dns: dnsInstructions(r.domain, r.verifyToken) }));
-    } catch { return []; } // table not migrated yet
+      const rows = await db.select().from(customDomains).leftJoin(users, eq(users.id, customDomains.userId)).orderBy(desc(customDomains.createdAt));
+      return await Promise.all(rows.map(async (r) => ({
+        ...(await enrich(db, r.custom_domains)),
+        email: r.users?.email ?? null, name: r.users?.fullName ?? null,
+      })));
+    } catch { return []; }
   }),
 
   assign: adminQuery
@@ -94,24 +119,21 @@ export const domainRouter = createRouter({
       if (!userId) throw new TRPCError({ code: "BAD_REQUEST", message: "Provide a user id or email." });
       const domain = normDomain(input.domain);
       if (!isValidDomain(domain)) throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a valid domain like card.yourbusiness.com" });
-      const existing = await db.query.customDomains.findFirst({ where: eq(customDomains.domain, domain) });
-      if (existing) throw new TRPCError({ code: "CONFLICT", message: "That domain is already registered." });
+      if (await db.query.customDomains.findFirst({ where: eq(customDomains.domain, domain) })) throw new TRPCError({ code: "CONFLICT", message: "That domain is already registered." });
       const verifyToken = nanoid(24);
+      let cfHost: CfHostname | null = null;
+      if (cfEnabled()) { try { cfHost = await cfCreateHostname(domain); } catch (e) { throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Cloudflare: ${(e as Error).message}` }); } }
       await db.insert(customDomains).values({ domain, userId, cardId: input.cardId, verifyToken, addedByRole: "admin", status: "pending" });
-      return { ok: true, domain, dns: dnsInstructions(domain, verifyToken) };
+      return { ok: true, domain, dns: await ownerInfo(domain, verifyToken, cfHost) };
     }),
 
   verify: adminQuery.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => {
     const db = getDb();
     const row = await db.query.customDomains.findFirst({ where: eq(customDomains.id, input.id) });
     if (!row) throw new TRPCError({ code: "NOT_FOUND" });
-    const ok = await txtVerified(row.domain, row.verifyToken);
-    if (!ok) return { ok: false, message: "DNS TXT record not found yet — add it and try again in a few minutes." };
-    await db.update(customDomains).set({ status: "active", verifiedAt: new Date() }).where(eq(customDomains.id, input.id));
-    return { ok: true };
+    return verifyRow(db, row);
   }),
 
-  // Admin override — activate/disable without waiting on DNS (e.g. already trusted).
   setStatus: adminQuery.input(z.object({ id: z.number().int().positive(), status: z.enum(["pending", "active", "disabled"]) }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -121,6 +143,8 @@ export const domainRouter = createRouter({
 
   remove: adminQuery.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => {
     const db = getDb();
+    const row = await db.query.customDomains.findFirst({ where: eq(customDomains.id, input.id) });
+    if (row && cfEnabled()) { try { await cfDeleteByHostname(row.domain); } catch { /* best-effort */ } }
     await db.delete(customDomains).where(eq(customDomains.id, input.id));
     return { ok: true };
   }),
@@ -129,14 +153,12 @@ export const domainRouter = createRouter({
   mine: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
     const pkg = await activeSubPackage(db, ctx.user.id);
-    let rows: (typeof customDomains.$inferSelect)[] = [];
-    try { rows = await db.select().from(customDomains).where(eq(customDomains.userId, ctx.user.id)).orderBy(desc(customDomains.createdAt)); }
-    catch { rows = []; } // table not migrated yet
-    return {
-      eligible: !!pkg?.featureCustomDomain,
-      cnameTarget: CNAME_TARGET,
-      domains: rows.map((r) => ({ id: r.id, domain: r.domain, cardId: r.cardId, status: r.status, verifiedAt: r.verifiedAt, dns: dnsInstructions(r.domain, r.verifyToken) })),
-    };
+    let domains: Awaited<ReturnType<typeof enrich>>[] = [];
+    try {
+      const rows = await db.select().from(customDomains).where(eq(customDomains.userId, ctx.user.id)).orderBy(desc(customDomains.createdAt));
+      domains = await Promise.all(rows.map((r) => enrich(db, r)));
+    } catch { domains = []; }
+    return { eligible: !!pkg?.featureCustomDomain, cloudflare: cfEnabled(), cnameTarget: cfEnabled() ? cfFallbackTarget() : CNAME_TARGET, domains };
   }),
 
   add: authedQuery.input(z.object({ domain: z.string().min(3), cardId: z.number().int().positive().default(1) }))
@@ -146,27 +168,45 @@ export const domainRouter = createRouter({
       if (!pkg?.featureCustomDomain) throw new TRPCError({ code: "FORBIDDEN", message: "A custom domain requires an eligible plan." });
       const domain = normDomain(input.domain);
       if (!isValidDomain(domain)) throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a valid domain like card.yourbusiness.com" });
-      const existing = await db.query.customDomains.findFirst({ where: eq(customDomains.domain, domain) });
-      if (existing) throw new TRPCError({ code: "CONFLICT", message: "That domain is already registered." });
+      if (await db.query.customDomains.findFirst({ where: eq(customDomains.domain, domain) })) throw new TRPCError({ code: "CONFLICT", message: "That domain is already registered." });
       const verifyToken = nanoid(24);
+      let cfHost: CfHostname | null = null;
+      if (cfEnabled()) { try { cfHost = await cfCreateHostname(domain); } catch (e) { throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Cloudflare: ${(e as Error).message}` }); } }
       const role = ctx.user.role === "reseller" ? "reseller" : "customer";
       await db.insert(customDomains).values({ domain, userId: ctx.user.id, cardId: input.cardId, verifyToken, addedByRole: role, status: "pending" });
-      return { ok: true, domain, dns: dnsInstructions(domain, verifyToken) };
+      return { ok: true, domain, dns: await ownerInfo(domain, verifyToken, cfHost) };
     }),
 
   verifyMine: authedQuery.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = getDb();
     const row = await db.query.customDomains.findFirst({ where: and(eq(customDomains.id, input.id), eq(customDomains.userId, ctx.user.id)) });
     if (!row) throw new TRPCError({ code: "NOT_FOUND" });
-    const ok = await txtVerified(row.domain, row.verifyToken);
-    if (!ok) return { ok: false, message: "DNS TXT record not found yet — add it and try again in a few minutes." };
-    await db.update(customDomains).set({ status: "active", verifiedAt: new Date() }).where(eq(customDomains.id, input.id));
-    return { ok: true };
+    return verifyRow(db, row);
   }),
 
   removeMine: authedQuery.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = getDb();
+    const row = await db.query.customDomains.findFirst({ where: and(eq(customDomains.id, input.id), eq(customDomains.userId, ctx.user.id)) });
+    if (row && cfEnabled()) { try { await cfDeleteByHostname(row.domain); } catch { /* best-effort */ } }
     await db.delete(customDomains).where(and(eq(customDomains.id, input.id), eq(customDomains.userId, ctx.user.id)));
     return { ok: true };
   }),
 });
+
+/** Shared verify: Cloudflare status when enabled, else a manual TXT check. */
+async function verifyRow(db: ReturnType<typeof getDb>, row: Row) {
+  if (cfEnabled()) {
+    let h: CfHostname | null = null;
+    try { h = await cfGetByHostname(row.domain); } catch (e) { return { ok: false, message: `Cloudflare: ${(e as Error).message}` }; }
+    if (cfIsActive(h)) {
+      await db.update(customDomains).set({ status: "active", verifiedAt: new Date() }).where(eq(customDomains.id, row.id));
+      return { ok: true };
+    }
+    const reason = h?.ssl?.status || h?.status || "pending";
+    return { ok: false, message: `Not live yet (Cloudflare status: ${reason}). Make sure the CNAME record is added; SSL can take a few minutes.` };
+  }
+  const ok = await txtVerified(row.domain, row.verifyToken);
+  if (!ok) return { ok: false, message: "DNS TXT record not found yet — add it and try again in a few minutes." };
+  await db.update(customDomains).set({ status: "active", verifiedAt: new Date() }).where(eq(customDomains.id, row.id));
+  return { ok: true };
+}
