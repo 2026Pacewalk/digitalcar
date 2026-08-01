@@ -5,7 +5,7 @@ import {
   Check, ArrowRight, Zap, Users, Eye, MousePointer,
   Share2, Layers, Shield, Clock, TrendingUp,
   ChevronRight, ChevronLeft, Monitor, Smartphone, Globe, BarChart3,
-  Link2, Leaf, Quote, ScanLine,
+  Link2, Leaf, Quote, ScanLine, Gift, Building2, Plus,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
@@ -766,7 +766,7 @@ function QRNFCSection() {
             <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] mb-4 tracking-tight">Share Faster with <span className="text-gradient-gold">QR and NFC</span></h2>
             <p className="text-base text-[#64748B] leading-relaxed mb-6">Generate a QR code for your card and use it on visiting cards, posters, packaging, brochures, counters, and NFC cards. Customers scan and instantly access your digital presence.</p>
             <div className="space-y-3">
-              {["Print on business cards & brochures", "Display on store counters & packaging", "Share via WhatsApp, email & SMS", "Embed on websites & social media"].map((item, i) => (
+              {["Print on business cards & brochures", "Display on store counters & packaging", "Share via WhatsApp, email & SMS", "Embed on websites & social media", "Permanent link — redesign your card, the QR never breaks"].map((item, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <span className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0"><Check size={12} className="text-emerald-600" /></span>
                   <span className="text-sm text-[#475569]">{item}</span>
@@ -862,6 +862,74 @@ function TestimonialCard({ t }: { t: (typeof TESTIMONIALS)[number] }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ─── Do More — multi-card · refer & earn · bulk teams ─── */
+function GrowSection() {
+  return (
+    <section className="py-20 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHeading eyebrow="Do More" title="More Than a Card — a Growth Engine" subtitle="One login unlocks multiple cards, referral rewards and team-wide bulk ordering — everything you need to scale your presence." />
+        <Reveal stagger className="grid md:grid-cols-3 gap-5 md:auto-rows-fr">
+
+          {/* Multiple cards */}
+          <div className="group relative flex flex-col rounded-3xl bg-white ring-1 ring-black/5 shadow-premium overflow-hidden card-hover">
+            <div className="p-6 pb-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#3B82F6] to-[#1D4ED8] flex items-center justify-center shadow-lg"><Layers size={22} className="text-white" /></div>
+              <h3 className="mt-4 text-lg font-bold text-[#0F172A]">Multiple Cards, One Login</h3>
+              <p className="mt-1.5 text-sm text-[#64748B] leading-relaxed">Run a separate card for each role, brand or location. Switch designs anytime — your URL &amp; QR never change.</p>
+            </div>
+            <div className="relative mx-6 my-6 h-32 rounded-2xl bg-[#F8FAFC] ring-1 ring-black/[0.04] overflow-hidden">
+              <div className="absolute left-1/2 -translate-x-1/2 top-9 w-40 h-20 rounded-xl bg-[#CBD5E1] rotate-[-9deg] shadow-md" />
+              <div className="absolute left-1/2 -translate-x-1/2 top-6 w-40 h-20 rounded-xl bg-[#94A3B8] rotate-[5deg] shadow-md" />
+              <div className="absolute left-1/2 -translate-x-1/2 top-4 w-40 h-20 rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#1D4ED8] shadow-xl p-3 flex flex-col justify-between">
+                <div className="w-7 h-7 rounded-full bg-white/25" />
+                <div className="space-y-1"><div className="h-1.5 w-2/3 rounded-full bg-white/50" /><div className="h-1.5 w-1/2 rounded-full bg-white/30" /></div>
+              </div>
+              <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 text-[10px] font-bold text-[#1D4ED8] bg-white rounded-full px-2 py-1 shadow-sm"><Plus size={11} /> New card</div>
+            </div>
+            <div className="px-6 pb-6 mt-auto"><Link to="/pricing" className="text-sm font-bold text-[#2563EB] inline-flex items-center gap-1 group-hover:gap-2 transition-all">See plans <ArrowRight size={15} /></Link></div>
+          </div>
+
+          {/* Refer & Earn */}
+          <div className="group relative flex flex-col rounded-3xl bg-white ring-1 ring-black/5 shadow-premium overflow-hidden card-hover">
+            <div className="p-6 pb-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#F7B31C] to-[#D97706] flex items-center justify-center shadow-lg"><Gift size={22} className="text-white" /></div>
+              <h3 className="mt-4 text-lg font-bold text-[#0F172A]">Refer &amp; Earn</h3>
+              <p className="mt-1.5 text-sm text-[#64748B] leading-relaxed">Share your code, earn real wallet rewards on every paid signup, and withdraw straight to UPI or bank.</p>
+            </div>
+            <div className="relative mx-6 my-6 h-32 rounded-2xl bg-[#F8FAFC] ring-1 ring-black/[0.04] flex items-center justify-center">
+              <div className="w-44 rounded-xl bg-gradient-to-br from-[#0F172A] to-[#1E293B] p-3.5 shadow-xl">
+                <div className="flex items-center justify-between"><span className="text-[10px] text-white/60 font-medium">My Wallet</span><Wallet size={13} className="text-[#F7B31C]" /></div>
+                <p className="text-white font-extrabold text-xl mt-1 tabular-nums">₹2,450</p>
+                <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-[#0F172A] bg-[#F7B31C] rounded-full px-2 py-0.5"><TrendingUp size={11} /> +₹250 referral</div>
+              </div>
+            </div>
+            <div className="px-6 pb-6 mt-auto"><Link to="/signup" className="text-sm font-bold text-[#D97706] inline-flex items-center gap-1 group-hover:gap-2 transition-all">Start earning <ArrowRight size={15} /></Link></div>
+          </div>
+
+          {/* Bulk / Teams */}
+          <div className="group relative flex flex-col rounded-3xl bg-white ring-1 ring-black/5 shadow-premium overflow-hidden card-hover">
+            <div className="p-6 pb-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#14B8A6] to-[#0D9488] flex items-center justify-center shadow-lg"><Building2 size={22} className="text-white" /></div>
+              <h3 className="mt-4 text-lg font-bold text-[#0F172A]">Bulk Cards for Teams</h3>
+              <p className="mt-1.5 text-sm text-[#64748B] leading-relaxed">Outfit your whole team — up to 500 branded cards from one account, consistent design, one dashboard.</p>
+            </div>
+            <div className="relative mx-6 my-6 h-32 rounded-2xl bg-[#F8FAFC] ring-1 ring-black/[0.04] flex flex-col items-center justify-center gap-2.5">
+              <div className="grid grid-cols-6 gap-1.5">
+                {Array.from({ length: 18 }).map((_, i) => (
+                  <span key={i} className="w-5 h-5 rounded-full bg-gradient-to-br from-[#14B8A6] to-[#0D9488] flex items-center justify-center" style={{ opacity: 0.35 + (i % 6) * 0.11 }}><Users size={10} className="text-white" /></span>
+                ))}
+              </div>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0F766E] bg-[#CCFBF1] rounded-full px-2.5 py-1">Up to 500 cards</span>
+            </div>
+            <div className="px-6 pb-6 mt-auto"><Link to="/bulk-cards" className="text-sm font-bold text-[#0D9488] inline-flex items-center gap-1 group-hover:gap-2 transition-all">Get a bulk quote <ArrowRight size={15} /></Link></div>
+          </div>
+
+        </Reveal>
+      </div>
+    </section>
   );
 }
 
@@ -1011,6 +1079,7 @@ export default function Home() {
       <AnalyticsSection />
       <QRNFCSection />
       <CustomDomainSection />
+      <GrowSection />
       <TestimonialsSection />
       <ResellerSection />
       <PricingSection />
