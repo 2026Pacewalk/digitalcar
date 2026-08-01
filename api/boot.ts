@@ -170,6 +170,37 @@ if (process.env.NODE_ENV === "production") {
   setInterval(runIfDue, 6 * 60 * 60 * 1000); // and every 6 hours
 }
 
+// One-time, idempotent schema ensure for the custom_domains table — lets the
+// custom-domains module go live without manual SQL access. Runs with the app's
+// own DB credentials on boot; CREATE TABLE IF NOT EXISTS is a no-op once the
+// table exists. Additive only — never drops or alters existing data.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    await getDb().execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS custom_domains (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        domain varchar(255) NOT NULL,
+        user_id bigint unsigned NOT NULL,
+        card_id int NOT NULL DEFAULT 1,
+        status enum('pending','active','disabled') NOT NULL DEFAULT 'pending',
+        verify_token varchar(64) NOT NULL,
+        added_by_role enum('admin','reseller','customer') NOT NULL DEFAULT 'admin',
+        verified_at timestamp NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY custom_domains_domain_unique (domain),
+        KEY cd_user_card_idx (user_id, card_id),
+        KEY cd_status_idx (status)
+      )
+    `));
+    console.log("[schema] custom_domains table ensured");
+  } catch (e) {
+    console.error("[schema] ensure custom_domains failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be
