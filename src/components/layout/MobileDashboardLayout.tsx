@@ -58,12 +58,11 @@ const NAV: Record<string, NavConfig> = {
       { icon: LayoutDashboard, label: "Home", path: "/admin" },
       { icon: Store, label: "Resellers", path: "/admin/resellers" },
       { icon: UserCircle, label: "Customers", path: "/admin/customers" },
-      { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
+      { icon: MessageSquare, label: "Leads", path: "/admin/leads" },
     ],
     drawer: [
       { title: "Overview", items: [
         { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
-        { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
       ] },
       { title: "Manage", items: [
         { icon: Store, label: "Resellers", path: "/admin/resellers" },

@@ -44,6 +44,43 @@ async function addHiddenAppUser(db: ReturnType<typeof getDb>, userId: number): P
   await db.insert(appSettings).values({ key: "hidden_app_users", value }).onDuplicateKeyUpdate({ set: { value } });
 }
 
+/* Legacy customers.json rows (cached). */
+let legacyRowsCache: { id?: unknown; email?: string }[] | null = null;
+let legacyRowsAt = 0;
+function legacyCustomers(): { id?: unknown; email?: string }[] {
+  const now = Date.now();
+  if (legacyRowsCache && now - legacyRowsAt < 60_000) return legacyRowsCache;
+  for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
+    try { legacyRowsCache = JSON.parse(fs.readFileSync(path.resolve(p), "utf-8")); legacyRowsAt = now; return legacyRowsCache!; } catch { /* try next */ }
+  }
+  return legacyRowsCache ?? [];
+}
+async function hiddenIdSet(db: ReturnType<typeof getDb>, key: string): Promise<Set<string>> {
+  try {
+    const rows = await db.select().from(appSettings).where(eq(appSettings.key, `hidden_${key}`));
+    const arr = rows[0]?.value ? JSON.parse(rows[0].value) : [];
+    return new Set((Array.isArray(arr) ? arr : []).map(String));
+  } catch { return new Set(); }
+}
+
+/* The SAME unique-customer total the /admin/customers page shows: legacy
+   customers.json (minus hidden) + new-flow DB accounts not already in the legacy
+   list (minus hidden/super-admin). Shared so the Dashboard cards match. */
+export async function mergedCustomerCount(db: ReturnType<typeof getDb>): Promise<{ total: number; superAdmins: number; resellers: number }> {
+  const rows = legacyCustomers();
+  const [hiddenCust, hiddenApp, dbUsers] = await Promise.all([
+    hiddenIdSet(db, "customers"),
+    hiddenAppUserIds(db),
+    db.select({ id: users.id, email: users.email, role: users.role }).from(users),
+  ]);
+  const legacyEmails = new Set(rows.map((r) => String(r.email || "").toLowerCase().trim()).filter(Boolean));
+  const legacyCount = rows.filter((r) => !hiddenCust.has(String((r as { id?: unknown }).id))).length;
+  const newFlow = dbUsers.filter((u) => u.role !== "super_admin" && !hiddenApp.has(Number(u.id)) && !legacyEmails.has(String(u.email).toLowerCase().trim())).length;
+  const superAdmins = dbUsers.filter((u) => u.role === "super_admin").length;
+  const resellers = dbUsers.filter((u) => u.role === "reseller").length;
+  return { total: legacyCount + newFlow, superAdmins, resellers };
+}
+
 /* Super-admin tools. Today: resolve cross-system card-URL conflicts, where a
    NEW-FLOW snapshot card shares a slug with a LEGACY (customers.json) card and
    — because "snapshot wins over legacy JSON" on the public page — shadows the

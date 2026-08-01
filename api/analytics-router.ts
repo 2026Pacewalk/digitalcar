@@ -3,6 +3,7 @@ import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { analyticsEvents, cards, users, subscriptions, invoices, leads, funnelEvents, products } from "@db/schema";
 import { eq, and, sql, gte, desc, inArray, isNotNull } from "drizzle-orm";
+import { mergedCustomerCount } from "./admin-router";
 
 export const analyticsRouter = createRouter({
   // Admin: per-product funnel — which designs drive views → try → publish (§61).
@@ -282,10 +283,13 @@ export const analyticsRouter = createRouter({
       .sort((a, b) => new Date(b.at as Date).getTime() - new Date(a.at as Date).getTime())
       .slice(0, 5);
 
+    // Match the /admin/customers list exactly: legacy customers.json + new-flow
+    // DB accounts (deduped, minus hidden), so the Dashboard cards never diverge.
+    const merged = await mergedCustomerCount(db);
     return {
-      totalUsers: roleCounts.reduce((s, r) => s + Number(r.count), 0),
-      customers: roleMap["customer"] || 0,
-      resellers: roleMap["reseller"] || 0,
+      totalUsers: merged.total + merged.superAdmins,
+      customers: merged.total,
+      resellers: merged.resellers || roleMap["reseller"] || 0,
       activeCards: Number(cardCount[0]?.count || 0),
       paidPlans: subMap["active"] || 0,
       trialPlans: subMap["trial"] || 0,

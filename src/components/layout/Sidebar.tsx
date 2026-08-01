@@ -54,7 +54,6 @@ const customerGroups: NavGroup[] = [
 const superAdminGroups: NavGroup[] = [
   { title: "Overview", items: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/admin" },
-    { label: "Analytics", icon: BarChart3, path: "/admin/analytics" },
   ] },
   { title: "Manage", items: [
     { label: "Resellers", icon: Store, path: "/admin/resellers" },
