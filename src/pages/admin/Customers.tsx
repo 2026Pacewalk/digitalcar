@@ -346,10 +346,10 @@ export default function AdminCustomers() {
   ];
 
   const statCards = [
-    { label: "Total Customers", value: stats.total, icon: Users, tint: "#F7B31C", bg: "#FEF3C7" },
-    { label: "Active", value: stats.active, icon: UserCheck, tint: "#22C55E", bg: "#DCFCE7" },
-    { label: "Expired", value: stats.expired, icon: Clock, tint: "#EF4444", bg: "#FEE2E2" },
-    { label: "Retailers", value: stats.retailers, icon: Building2, tint: "#8B5CF6", bg: "#EDE9FE" },
+    { label: "Total Customers", value: stats.total, icon: Users, tint: "#F7B31C", bg: "#FEF3C7", onClick: () => setStatus("all"), active: status === "all", hint: "Show all" },
+    { label: "Active", value: stats.active, icon: UserCheck, tint: "#22C55E", bg: "#DCFCE7", onClick: () => setStatus("active"), active: status === "active", hint: "Filter active" },
+    { label: "Expired", value: stats.expired, icon: Clock, tint: "#EF4444", bg: "#FEE2E2", onClick: () => setStatus("expired"), active: status === "expired", hint: "Filter expired" },
+    { label: "Retailers", value: stats.retailers, icon: Building2, tint: "#8B5CF6", bg: "#EDE9FE", onClick: () => navigate("/admin/resellers"), active: false, hint: "Open resellers" },
   ];
 
   // One customer card — shared by the mobile list and the desktop grid view.
@@ -359,13 +359,15 @@ export default function AdminCustomers() {
     return (
       <div key={c.id} className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-4 hover:shadow-premium-lg transition-shadow">
         <div className="flex items-start gap-3">
-          <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarGrad(c.name || c.email)} flex items-center justify-center shrink-0 shadow-sm ring-2 ring-white`}>
-            <span className="text-white text-sm font-bold">{initials(c.name)}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[14px] font-bold text-[#0F172A] truncate">{c.name || "—"}</p>
-            <p className="text-[11px] text-[#94A3B8] truncate">@{c.username || "user"} · #{c.isNew ? c.dbId : c.id}{c.isNew && <span className="ml-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full align-middle">NEW</span>}</p>
-          </div>
+          <button type="button" onClick={() => setCardModal(c)} title="View card" className="flex items-start gap-3 flex-1 min-w-0 text-left group">
+            <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarGrad(c.name || c.email)} flex items-center justify-center shrink-0 shadow-sm ring-2 ring-white`}>
+              <span className="text-white text-sm font-bold">{initials(c.name)}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-bold text-[#0F172A] group-hover:text-[#F7B31C] transition-colors truncate">{c.name || "—"}</p>
+              <p className="text-[11px] text-[#94A3B8] truncate">@{c.username || "user"} · #{c.isNew ? c.dbId : c.id}{c.isNew && <span className="ml-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full align-middle">NEW</span>}</p>
+            </div>
+          </button>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${PKG_STYLE[packageName(c.package_id)] || PKG_STYLE.Trial}`}>{packageName(c.package_id)}</span>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}</span>
@@ -401,14 +403,20 @@ export default function AdminCustomers() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map((s) => (
-            <div key={s.label} className="relative bg-white rounded-2xl p-4 pl-5 shadow-premium border border-[#F1F5F9] overflow-hidden flex items-center gap-3.5 hover:shadow-premium-lg transition-shadow">
+            <button
+              key={s.label}
+              type="button"
+              onClick={s.onClick}
+              title={s.hint}
+              className={`relative bg-white rounded-2xl p-4 pl-5 shadow-premium border overflow-hidden flex items-center gap-3.5 text-left transition-all hover:shadow-premium-lg hover:-translate-y-0.5 ${s.active ? "border-[#F7B31C] ring-2 ring-[#F7B31C]/30" : "border-[#F1F5F9]"}`}
+            >
               <span className="absolute left-0 top-0 bottom-0 w-1.5 rounded-r" style={{ background: s.tint }} />
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: s.bg }}><s.icon size={20} style={{ color: s.tint }} /></div>
               <div>
                 <p className="text-2xl font-extrabold text-[#0F172A] tabular-nums leading-none">{loading ? "—" : s.value.toLocaleString("en-IN")}</p>
                 <p className="text-xs text-[#64748B] mt-1.5">{s.label}</p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
@@ -514,15 +522,15 @@ export default function AdminCustomers() {
                       <tr key={c.id} className="hover:bg-[#FAFBFC] transition-colors">
                         {/* Customer */}
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
+                          <button type="button" onClick={() => setCardModal(c)} title="View card" className="flex items-center gap-3 text-left group">
                             <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${avatarGrad(c.name || c.email)} flex items-center justify-center shrink-0 shadow-sm ring-2 ring-white`}>
                               <span className="text-white text-[11px] font-bold">{initials(c.name)}</span>
                             </div>
                             <div className="min-w-0">
-                              <p className="text-[13px] font-semibold text-[#0F172A] truncate max-w-[170px]">{c.name || "—"}</p>
+                              <p className="text-[13px] font-semibold text-[#0F172A] group-hover:text-[#F7B31C] transition-colors truncate max-w-[170px]">{c.name || "—"}</p>
                               <p className="text-[11px] text-[#94A3B8] truncate">@{c.username || "user"} · #{c.isNew ? c.dbId : c.id}{c.isNew && <span className="ml-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full align-middle">NEW</span>}</p>
                             </div>
-                          </div>
+                          </button>
                         </td>
                         {/* Contact */}
                         <td className="px-4 py-3">
