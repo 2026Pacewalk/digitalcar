@@ -10,34 +10,53 @@ const SITE = "https://digitalcarda.in";
 
 // Server-side meta + Product/Breadcrumb JSON-LD for product pages (§50, §52),
 // so a product landing page is indexable with structured data even without JS.
-async function productMeta(pathname: string): Promise<CardMeta | null> {
+// Cached briefly so repeated crawler hits don't re-query the DB every time.
+const metaCache = new Map<string, { meta: CardMeta | null; at: number }>();
+const META_TTL = 5 * 60_000;
+
+async function productMeta(pathname: string, distPath: string): Promise<CardMeta | null> {
   const m = pathname.match(/^\/digital-business-cards-templates\/([^/]+)\/?$/);
   if (!m) return null;
   const slug = decodeURIComponent(m[1]).toLowerCase();
+  const hit = metaCache.get(slug);
+  if (hit && Date.now() - hit.at < META_TTL) return hit.meta;
+
+  let result: CardMeta | null = null;
   try {
     const { getDb } = await import("../queries/connection");
     const { products } = await import("@db/schema");
     const { eq } = await import("drizzle-orm");
     const rows = await getDb().select().from(products).where(eq(products.slug, slug));
     const p = rows[0];
-    if (!p || p.status !== "published") return null;
-    const url = `${SITE}/digital-business-cards-templates/${slug}`;
-    const title = p.seoTitle || `${p.name} — DigitalCarda`;
-    const description = p.seoDescription || p.tagline || `${p.name} — try it free for ${p.trialDays} days. No app, no printing.`;
-    // OG/Twitter/Merchant need ABSOLUTE image URLs. Product images may be stored
-    // as site-relative paths (/products/…) — absolutize them here.
-    const abs = (u: string) => (/^https?:/i.test(u) ? u : `${SITE}${u.startsWith("/") ? "" : "/"}${u}`);
-    const imgs = ((p.images as string[] | null) || []).filter(Boolean).map(abs);
-    const image = imgs[0] || `${SITE}/why-businessman.png`;
-    const price = Number(p.salePrice || p.price).toFixed(2);
-    const product = { "@context": "https://schema.org", "@type": "Product", name: p.name, description, brand: { "@type": "Brand", name: "DigitalCarda" }, ...(imgs.length ? { image: imgs } : { image }), offers: { "@type": "Offer", priceCurrency: p.currency || "INR", price, availability: "https://schema.org/InStock", url } };
-    const breadcrumb = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: SITE },
-      { "@type": "ListItem", position: 2, name: "Digital Business Cards", item: `${SITE}/digital-business-cards-templates` },
-      { "@type": "ListItem", position: 3, name: p.name, item: url },
-    ] };
-    return { title, description, image, url, ogType: "product", jsonLd: JSON.stringify([product, breadcrumb]) };
-  } catch { return null; }
+    if (p && p.status === "published") {
+      const url = `${SITE}/digital-business-cards-templates/${slug}`;
+      const title = p.seoTitle || `${p.name} — DigitalCarda`;
+      const description = p.seoDescription || p.tagline || `${p.name} — try it free for ${p.trialDays} days. No app, no printing.`;
+      // OG/Twitter/Merchant need ABSOLUTE image URLs. Product images may be stored
+      // as site-relative paths (/products/…) — absolutize them here.
+      const abs = (u: string) => (/^https?:/i.test(u) ? u : `${SITE}${u.startsWith("/") ? "" : "/"}${u}`);
+      const rawImgs = ((p.images as string[] | null) || []).filter(Boolean);
+      const imgs = rawImgs.map(abs);
+      // Prefer the 1200×630 og.jpg banner (correct social size) sitting next to the
+      // feature image; fall back to the feature image, then the site default.
+      let image = imgs[0] || `${SITE}/why-businessman.png`;
+      let imageW: number | undefined, imageH: number | undefined, imageType: string | undefined;
+      if (rawImgs[0]) {
+        const ogRel = rawImgs[0].replace(/[^/]+$/, "og.jpg");
+        if (fs.existsSync(path.join(distPath, ogRel))) { image = abs(ogRel); imageW = 1200; imageH = 630; imageType = "image/jpeg"; }
+      }
+      const price = Number(p.salePrice || p.price).toFixed(2);
+      const product = { "@context": "https://schema.org", "@type": "Product", name: p.name, description, brand: { "@type": "Brand", name: "DigitalCarda" }, ...(imgs.length ? { image: imgs } : { image }), offers: { "@type": "Offer", priceCurrency: p.currency || "INR", price, availability: "https://schema.org/InStock", url } };
+      const breadcrumb = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: SITE },
+        { "@type": "ListItem", position: 2, name: "Digital Business Cards", item: `${SITE}/digital-business-cards-templates` },
+        { "@type": "ListItem", position: 3, name: p.name, item: url },
+      ] };
+      result = { title, description, image, url, ogType: "product", jsonLd: JSON.stringify([product, breadcrumb]), imageW, imageH, imageType, imageAlt: `${p.name} — digital business card`, h1: p.name, locale: "en_IN" };
+    }
+  } catch { result = null; }
+  metaCache.set(slug, { meta: result, at: Date.now() });
+  return result;
 }
 
 export function serveStaticFiles(app: App) {
@@ -50,7 +69,7 @@ export function serveStaticFiles(app: App) {
     let content = fs.readFileSync(indexPath, "utf-8");
     try {
       const pathname = new URL(c.req.url).pathname;
-      const meta = (await productMeta(pathname)) || metaFor(pathname, distPath);
+      const meta = (await productMeta(pathname, distPath)) || metaFor(pathname, distPath);
       if (meta) content = injectCardMeta(content, meta);
     } catch { /* fall back to plain index.html */ }
     return c.html(content);

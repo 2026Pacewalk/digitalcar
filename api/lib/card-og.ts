@@ -28,7 +28,7 @@ function customers(distPath: string): Row[] {
   return cache ?? [];
 }
 
-export interface CardMeta { title: string; description: string; image: string; url: string; jsonLd?: string; ogType?: string }
+export interface CardMeta { title: string; description: string; image: string; url: string; jsonLd?: string; ogType?: string; imageW?: number; imageH?: number; imageType?: string; imageAlt?: string; h1?: string; locale?: string }
 
 const OG_IMAGE = `${SITE}/why-businessman.png`;
 
@@ -51,7 +51,7 @@ const MARKETING: Record<string, { title: string; description: string }> = {
 export function metaFor(pathname: string, distPath: string): CardMeta | null {
   const clean = pathname.replace(/\/+$/, "") || "/";
   const mk = MARKETING[clean];
-  if (mk) return { ...mk, image: OG_IMAGE, url: `${SITE}${clean === "/" ? "" : clean}` };
+  if (mk) return { ...mk, image: OG_IMAGE, url: `${SITE}${clean === "/" ? "" : clean}`, h1: mk.title, locale: "en_IN" };
   return cardMetaFor(pathname, distPath);
 }
 
@@ -79,27 +79,42 @@ export function cardMetaFor(pathname: string, distPath: string): CardMeta | null
     ...(row.company_name ? { worksFor: { "@type": "Organization", name: String(row.company_name) } } : {}),
     ...(logo ? { image } : {}),
   });
-  return { title, description, image, url, jsonLd, ogType: "profile" };
+  return { title, description, image, url, jsonLd, ogType: "profile", h1: name, locale: "en_IN" };
 }
 
 /** Inject the meta (+ optional JSON-LD) into an index.html string. */
 export function injectCardMeta(html: string, meta: CardMeta): string {
+  const alt = meta.imageAlt || meta.title;
   const tags = [
     `<meta name="description" content="${esc(meta.description)}">`,
     `<link rel="canonical" href="${esc(meta.url)}">`,
     `<meta property="og:type" content="${esc(meta.ogType || "website")}">`,
     `<meta property="og:site_name" content="DigitalCarda">`,
+    `<meta property="og:locale" content="${esc(meta.locale || "en_IN")}">`,
     `<meta property="og:title" content="${esc(meta.title)}">`,
     `<meta property="og:description" content="${esc(meta.description)}">`,
-    `<meta property="og:image" content="${esc(meta.image)}">`,
     `<meta property="og:url" content="${esc(meta.url)}">`,
+    `<meta property="og:image" content="${esc(meta.image)}">`,
+    `<meta property="og:image:secure_url" content="${esc(meta.image)}">`,
+    `<meta property="og:image:alt" content="${esc(alt)}">`,
+    ...(meta.imageW ? [`<meta property="og:image:width" content="${meta.imageW}">`] : []),
+    ...(meta.imageH ? [`<meta property="og:image:height" content="${meta.imageH}">`] : []),
+    ...(meta.imageType ? [`<meta property="og:image:type" content="${esc(meta.imageType)}">`] : []),
     `<meta name="twitter:card" content="summary_large_image">`,
     `<meta name="twitter:title" content="${esc(meta.title)}">`,
     `<meta name="twitter:description" content="${esc(meta.description)}">`,
     `<meta name="twitter:image" content="${esc(meta.image)}">`,
+    `<meta name="twitter:image:alt" content="${esc(alt)}">`,
     ...(meta.jsonLd ? [`<script type="application/ld+json">${meta.jsonLd.replace(/</g, "\\u003c")}</script>`] : []),
   ].join("\n    ");
-  return html
+  let out = html
     .replace(/<title>.*?<\/title>/, `<title>${esc(meta.title)}</title>`)
     .replace("</head>", `    ${tags}\n  </head>`);
+  // Inject a crawler-visible H1 (SPA shells otherwise have none). It sits inside
+  // #root as sr-only, so React replaces it on mount — no duplicate, no flash.
+  if (meta.h1) {
+    out = out.replace(/<div id="root">\s*<\/div>/,
+      `<div id="root"><h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">${esc(meta.h1)}</h1></div>`);
+  }
+  return out;
 }
