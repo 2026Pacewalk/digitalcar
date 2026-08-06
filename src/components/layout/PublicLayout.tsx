@@ -83,6 +83,11 @@ export default function PublicLayout() {
 
   const seo = seoMap[location.pathname] || defaultSEO;
 
+  // On a product page, carry the product into signup so the trial starts on that
+  // exact card (e.g. /signup?product=ocean-blue-card); otherwise plain /signup.
+  const productMatch = location.pathname.match(/^\/digital-business-cards-templates\/([^/]+)\/?$/);
+  const signupHref = productMatch ? `/signup?product=${encodeURIComponent(decodeURIComponent(productMatch[1]))}` : "/signup";
+
   useEffect(() => {
     document.title = seo.title;
     const metaDesc = document.querySelector('meta[name="description"]');
@@ -419,7 +424,7 @@ export default function PublicLayout() {
           <a href="https://wa.me/919517722444?text=Hi%20DigitalCarda" target="_blank" rel="noreferrer" aria-label="WhatsApp" className="w-12 h-12 shrink-0 rounded-xl bg-[#DCFCE7] text-[#166534] flex items-center justify-center active:scale-95 transition-transform">
             <MessageCircle size={20} />
           </a>
-          <Link to="/signup" className="btn-gold flex-1 h-12 flex items-center justify-center gap-2 text-base">
+          <Link to={signupHref} className="btn-gold flex-1 h-12 flex items-center justify-center gap-2 text-base">
             30 Days Free Cardless Trial <ArrowRight size={18} />
           </Link>
         </div>

@@ -51,6 +51,34 @@ try {
   } catch (e) {
     console.log("• Plans seed skipped: " + (e.code || e.message));
   }
+
+  // Marketing media (mockup gallery + SEO) for launch templates. Non-destructive:
+  // only fills products whose images are still empty, so admin edits are never
+  // overwritten and later deploys become a no-op. Image files ship in public/.
+  try {
+    const media = (dir, files) => files.map((f) => `/products/${dir}/${f}`);
+    const MEDIA = [
+      { slug: "ocean-blue-card", title: "Ocean Blue Digital Business Card - Free 30-Day Trial",
+        desc: "Ocean Blue smart digital business card: one-tap call, WhatsApp, QR code, Google Maps & lead capture. Works on any phone, no app. Try free for 30 days.",
+        imgs: media("ocean-blue", ["ocean-blue-digital-business-card.png", "ocean-blue-digital-business-card-features.png", "ocean-blue-digital-business-card-preview.png", "ocean-blue-digital-business-card-services.png"]) },
+      { slug: "midnight-gold-card", title: "Midnight Gold Digital Business Card - Free 30-Day Trial",
+        desc: "Midnight Gold smart digital business card: one-tap call, WhatsApp, QR code, Google Maps & lead capture. Works on any phone, no app. Try free for 30 days.",
+        imgs: media("midnight-gold", ["midnight-gold-digital-business-card.png", "midnight-gold-digital-business-card-features.png", "midnight-gold-digital-business-card-preview.png", "midnight-gold-digital-business-card-services.png"]) },
+      { slug: "emerald-card", title: "Emerald Green Digital Business Card - Free 30-Day Trial",
+        desc: "Emerald Green smart digital business card: one-tap call, WhatsApp, QR code, Google Maps & lead capture. Works on any phone, no app. Try free for 30 days.",
+        imgs: media("emerald", ["emerald-digital-business-card.png", "emerald-digital-business-card-features.png", "emerald-digital-business-card-preview.png", "emerald-digital-business-card-showcase.png"]) },
+    ];
+    let n = 0;
+    for (const m of MEDIA) {
+      const [r] = await conn.query(
+        "UPDATE products SET images = CAST(? AS JSON), seo_title = COALESCE(NULLIF(seo_title,''), ?), seo_description = COALESCE(NULLIF(seo_description,''), ?) WHERE slug = ? AND (images IS NULL OR JSON_LENGTH(images) = 0)",
+        [JSON.stringify(m.imgs), m.title, m.desc, m.slug]);
+      n += r.affectedRows || 0;
+    }
+    console.log(n ? `✓ Seeded marketing media for ${n} product(s).` : "• Product media already set — skipped.");
+  } catch (e) {
+    console.log("• Product media seed skipped: " + (e.code || e.message));
+  }
 } finally {
   await conn.end();
 }

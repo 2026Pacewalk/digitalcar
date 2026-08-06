@@ -24,9 +24,13 @@ async function productMeta(pathname: string): Promise<CardMeta | null> {
     const url = `${SITE}/digital-business-cards-templates/${slug}`;
     const title = p.seoTitle || `${p.name} — DigitalCarda`;
     const description = p.seoDescription || p.tagline || `${p.name} — try it free for ${p.trialDays} days. No app, no printing.`;
-    const image = ((p.images as string[] | null)?.[0]) || `${SITE}/why-businessman.png`;
+    // OG/Twitter/Merchant need ABSOLUTE image URLs. Product images may be stored
+    // as site-relative paths (/products/…) — absolutize them here.
+    const abs = (u: string) => (/^https?:/i.test(u) ? u : `${SITE}${u.startsWith("/") ? "" : "/"}${u}`);
+    const imgs = ((p.images as string[] | null) || []).filter(Boolean).map(abs);
+    const image = imgs[0] || `${SITE}/why-businessman.png`;
     const price = Number(p.salePrice || p.price).toFixed(2);
-    const product = { "@context": "https://schema.org", "@type": "Product", name: p.name, description, brand: { "@type": "Brand", name: "DigitalCarda" }, ...(image ? { image } : {}), offers: { "@type": "Offer", priceCurrency: p.currency || "INR", price, availability: "https://schema.org/InStock", url } };
+    const product = { "@context": "https://schema.org", "@type": "Product", name: p.name, description, brand: { "@type": "Brand", name: "DigitalCarda" }, ...(imgs.length ? { image: imgs } : { image }), offers: { "@type": "Offer", priceCurrency: p.currency || "INR", price, availability: "https://schema.org/InStock", url } };
     const breadcrumb = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: SITE },
       { "@type": "ListItem", position: 2, name: "Digital Business Cards", item: `${SITE}/digital-business-cards-templates` },
