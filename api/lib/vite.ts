@@ -91,7 +91,9 @@ export function serveStaticFiles(app: App) {
   app.use("*", async (c, next) => {
     await next();
     if (c.res.headers.get("cache-control")) return;
-    if (/\.(png|jpe?g|webp|gif|svg|ico|woff2?|ttf|otf|mp4)$/i.test(new URL(c.req.url).pathname)) {
+    // Only cache SUCCESSFUL asset responses — never a 404, or a missing file's
+    // error page gets cached by the CDN for a day (e.g. /favicon.ico before it existed).
+    if (c.res.status === 200 && /\.(png|jpe?g|webp|gif|svg|ico|woff2?|ttf|otf|mp4)$/i.test(new URL(c.req.url).pathname)) {
       c.header("Cache-Control", "public, max-age=86400");
     }
   });
