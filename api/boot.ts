@@ -498,6 +498,47 @@ app.get("/feed/products.xml", async (c) => {
   return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
 });
 
+// Google Merchant Center product feed (RSS 2.0 + g: namespace) for Google
+// Shopping ads on the digital-card templates, generated from the published
+// catalogue. Field values follow Google's Merchant Center spec exactly
+// (e.g. g:availability is "in stock", not "in_stock").
+app.get("/merchant-feed.xml", async (c) => {
+  const base = "https://digitalcarda.in";
+  const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch] || ch));
+  const abs = (u: string) => (/^https?:/i.test(u) ? u : `${base}${u.startsWith("/") ? "" : "/"}${u}`);
+  let items = "";
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { products } = await import("@db/schema");
+    const { eq } = await import("drizzle-orm");
+    const rows = await getDb().select().from(products).where(eq(products.status, "published"));
+    items = rows.map((p) => {
+      const link = `${base}/digital-business-cards-templates/${encodeURIComponent(p.slug)}`;
+      const rawImgs = ((p.images as string[] | null) || []).filter(Boolean);
+      const image = rawImgs[0] ? abs(rawImgs[0]) : `${base}/why-businessman.png`;
+      const description = p.seoDescription || p.tagline || p.name;
+      const price = Number(p.salePrice ?? p.price).toFixed(2);
+      return [
+        "  <item>",
+        `    <g:id>${esc(p.slug)}</g:id>`,
+        `    <title>${esc(p.name)}</title>`,
+        `    <description>${esc(description)}</description>`,
+        `    <link>${esc(link)}</link>`,
+        `    <g:image_link>${esc(image)}</g:image_link>`,
+        `    <g:price>${price} INR</g:price>`,
+        `    <g:availability>in stock</g:availability>`,
+        `    <g:condition>new</g:condition>`,
+        `    <g:brand>DigitalCarda</g:brand>`,
+        `    <g:identifier_exists>no</g:identifier_exists>`,
+        `    <g:google_product_category>Business &amp; Industrial &gt; Advertising &amp; Marketing</g:google_product_category>`,
+        "  </item>",
+      ].join("\n");
+    }).join("\n");
+  } catch { /* products table may not exist yet */ }
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n<channel>\n  <title>DigitalCarda — Digital Business Cards</title>\n  <link>${base}/digital-business-cards-templates</link>\n  <description>Digital business card products by DigitalCarda</description>\n${items}\n</channel>\n</rss>`;
+  return c.body(body, 200, { "content-type": "application/xml" });
+});
+
 // Block every sensitive dump at the web root — otherwise serveStatic serves
 // them verbatim. Admins fetch these only via the token-gated /api/admin/data/:file.
 for (const f of SENSITIVE) app.get(`/${f}.json`, (c) => c.json({ error: "Forbidden" }, 403));
