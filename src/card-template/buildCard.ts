@@ -430,15 +430,15 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-save-contact:active{transform:scale(.99);}
 .dc-sent{color:#12a150;font-weight:600;text-align:center;padding:16px 0;}
 /* Card footer — compact CTAs + powered-by */
-.dc-foot{margin:16px -15px 0;padding:14px 15px 18px;background:linear-gradient(180deg,#ffffff,#f7f8fa);border-top:1px solid #eef0f3;}
-.dc-foot-actions{display:flex;gap:10px;max-width:400px;margin:0 auto;}
-.dc-foot-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;height:44px;border-radius:12px;font-weight:700;font-size:13.5px;text-decoration:none;transition:transform .1s,box-shadow .2s,filter .15s;}
+.dc-foot{margin:12px -15px 0;padding:10px 15px 11px;background:linear-gradient(180deg,#ffffff,#f7f8fa);border-top:1px solid #eef0f3;}
+.dc-foot-actions{display:flex;gap:8px;max-width:400px;margin:0 auto;}
+.dc-foot-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;border-radius:10px;font-weight:700;font-size:12.5px;text-decoration:none;transition:transform .1s,box-shadow .2s,filter .15s;}
 .dc-foot-btn:active{transform:scale(.97);}
 .dc-foot-login{background:#fff;color:#0f172a;border:1.5px solid #e2e6ec;}
 .dc-foot-login:hover{border-color:${accent};color:${accentDark};}
-.dc-foot-create{background:linear-gradient(135deg,${accent},${accentDark});color:#0f172a;box-shadow:0 5px 14px ${accent}55;}
+.dc-foot-create{background:linear-gradient(135deg,${accent},${accentDark});color:#0f172a;box-shadow:0 4px 11px ${accent}4d;}
 .dc-foot-create:hover{filter:brightness(1.05);}
-.dc-foot-powered{text-align:center;margin:12px 0 0;font-size:12px;color:#98a1b0;}
+.dc-foot-powered{text-align:center;margin:8px 0 0;font-size:11px;color:#98a1b0;}
 .dc-foot-powered a{color:#0f172a;font-weight:700;text-decoration:none;}
 .dc-copied{color:#12a150;}
 /* Small copy button after a UPI id / pay number */
