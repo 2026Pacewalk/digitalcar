@@ -71,3 +71,6 @@ scratchpad/
 
 # Local-only: contains the VPS SSH endpoint — never commit (public repo)
 connect-live-db.cmd
+
+# Legacy customer media (uploaded to server directly, never committed)
+media/

@@ -484,7 +484,20 @@ export default app;
 
 if (env.isProduction) {
   const { serve } = await import("@hono/node-server");
+  const { serveStatic } = await import("@hono/node-server/serve-static");
   const { serveStaticFiles } = await import("./lib/vite");
+
+  // Legacy customer media (logos, gallery, products, QR codes, offers) migrated
+  // from the old PHP site's /otdo-panel/uploads/. Served from ./media so it
+  // PERSISTS across deploys (dist/public is rebuilt each time) and stays OUT of
+  // git (uploaded to the server directly). Files live at
+  // ./media/otdo-panel/uploads/<home|gallery|product|qrcode|offer>/... Cached 7d.
+  app.use("/otdo-panel/uploads/*", async (c, next) => {
+    await next();
+    if (c.res.status === 200) c.header("Cache-Control", "public, max-age=604800");
+  });
+  app.use("/otdo-panel/uploads/*", serveStatic({ root: "./media" }));
+
   serveStaticFiles(app);
 
   const port = parseInt(process.env.PORT || "3000");
