@@ -459,44 +459,20 @@ app.get("/sitemap.xml", async (c) => {
 // published catalogue (§48). Prices match the product pages (§49); every item
 // is honestly described as a DIGITAL service — no physical/NFC claims (§47).
 // Note: this only makes the feed eligible; Google approval is never guaranteed.
-app.get("/feed/products.xml", async (c) => {
-  const base = "https://digitalcarda.in";
-  const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch] || ch));
-  let items = "";
+const serveMerchantFeed = async (c: import("hono").Context) => {
+  let rows: import("./lib/merchant-feed").FeedProduct[] = [];
   try {
     const { getDb } = await import("./queries/connection");
     const { products } = await import("@db/schema");
     const { eq } = await import("drizzle-orm");
-    const rows = await getDb().select().from(products).where(eq(products.status, "published"));
-    items = rows.map((p) => {
-      const link = `${base}/digital-business-cards-templates/${encodeURIComponent(p.slug)}`;
-      const price = Number(p.price).toFixed(2);
-      const sale = p.salePrice != null ? Number(p.salePrice).toFixed(2) : null;
-      const image = ((p.images as string[] | null)?.[0]) || `${base}/why-businessman.png`;
-      const desc = (p.description || p.tagline || `${p.name}: a personalised digital business card you share online.`) +
-        ` Digital service — instant activation, no app, no physical delivery. Includes a ${p.trialDays}-day free trial, then 1 year of access.`;
-      return [
-        "  <item>",
-        `    <g:id>${esc(p.slug)}</g:id>`,
-        `    <g:title>${esc(p.name)} — 1 Year Access</g:title>`,
-        `    <g:description>${esc(desc)}</g:description>`,
-        `    <g:link>${esc(link)}</g:link>`,
-        `    <g:image_link>${esc(image)}</g:image_link>`,
-        `    <g:availability>in_stock</g:availability>`,
-        `    <g:price>${price} INR</g:price>`,
-        ...(sale && Number(sale) < Number(price) ? [`    <g:sale_price>${sale} INR</g:sale_price>`] : []),
-        `    <g:brand>DigitalCarda</g:brand>`,
-        `    <g:condition>new</g:condition>`,
-        `    <g:identifier_exists>no</g:identifier_exists>`,
-        `    <g:product_type>Digital Business Cards${p.category ? " &gt; " + esc(p.category) : ""}</g:product_type>`,
-        ...(p.category ? [`    <g:custom_label_0>${esc(p.category)}</g:custom_label_0>`] : []),
-        "  </item>",
-      ].join("\n");
-    }).join("\n");
+    rows = await getDb().select().from(products).where(eq(products.status, "published")) as unknown as import("./lib/merchant-feed").FeedProduct[];
   } catch { /* products table may not exist yet */ }
-  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n<channel>\n  <title>DigitalCarda — Digital Business Cards</title>\n  <link>${base}/digital-business-cards-templates</link>\n  <description>Digital business card products by DigitalCarda</description>\n${items}\n</channel>\n</rss>`;
-  return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
-});
+  const { buildProductFeedXml } = await import("./lib/merchant-feed");
+  return c.body(buildProductFeedXml(rows), 200, { "content-type": "application/xml; charset=utf-8" });
+};
+// Canonical Merchant Center feed URL + legacy alias.
+app.get("/merchant-feed.xml", serveMerchantFeed);
+app.get("/feed/products.xml", serveMerchantFeed);
 
 // Block every sensitive dump at the web root — otherwise serveStatic serves
 // them verbatim. Admins fetch these only via the token-gated /api/admin/data/:file.

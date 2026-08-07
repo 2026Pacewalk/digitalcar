@@ -101,6 +101,8 @@ export function injectCardMeta(html: string, meta: CardMeta): string {
     ...(meta.imageH ? [`<meta property="og:image:height" content="${meta.imageH}">`] : []),
     ...(meta.imageType ? [`<meta property="og:image:type" content="${esc(meta.imageType)}">`] : []),
     `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:site" content="@DigitalCarda">`,
+    `<meta name="twitter:creator" content="@DigitalCarda">`,
     `<meta name="twitter:title" content="${esc(meta.title)}">`,
     `<meta name="twitter:description" content="${esc(meta.description)}">`,
     `<meta name="twitter:image" content="${esc(meta.image)}">`,
