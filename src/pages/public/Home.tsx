@@ -136,20 +136,33 @@ function CardContactSlider() {
     return () => clearInterval(timer);
   }, [isAutoPlaying, nextSlide]);
 
-  const card = SLIDER_CARDS[current];
+  const total = SLIDER_CARDS.length + 1; // slide 0 = product mockup image, rest = live cards
+  const isImage = current === 0;
+  const card = SLIDER_CARDS[Math.max(0, current - 1)];
 
   return (
-    <div className="relative flex justify-center">
+    <div className="relative flex flex-col items-center" onMouseEnter={() => setIsAutoPlaying(false)} onMouseLeave={() => setIsAutoPlaying(true)}>
+      <div className="relative flex justify-center w-full">
       {/* Glow behind the phone */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-[300px] h-[440px] rounded-[48px] bg-gradient-to-b from-[#F7B31C]/25 via-[#F7B31C]/5 to-transparent blur-2xl" />
       </div>
 
-      <div
-        className="relative w-[340px] bg-white rounded-[28px] shadow-premium-lg overflow-hidden border border-[#F1F5F9] ring-1 ring-black/5"
-        onMouseEnter={() => setIsAutoPlaying(false)}
-        onMouseLeave={() => setIsAutoPlaying(true)}
-      >
+      {isImage ? (
+        <div className="relative w-[340px] min-h-[470px] flex items-center justify-center">
+          <picture>
+            <source srcSet="/hero/digital-business-card-app-mockup.webp" type="image/webp" />
+            <img
+              src="/hero/digital-business-card-app-mockup.png"
+              width="1000" height="1403"
+              alt="Two smartphones showing DigitalCarda digital business cards — a marketing consultant and an event & wedding planner profile with call, WhatsApp, email and QR sharing"
+              loading="eager"
+              className="w-[300px] sm:w-[330px] h-auto drop-shadow-2xl"
+            />
+          </picture>
+        </div>
+      ) : (
+      <div className="relative w-[340px] bg-white rounded-[28px] shadow-premium-lg overflow-hidden border border-[#F1F5F9] ring-1 ring-black/5">
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-[#F7B31C]">
           <div className="flex items-center gap-1.5">
@@ -161,20 +174,8 @@ function CardContactSlider() {
           </button>
         </div>
 
-        {/* Dots */}
-        <div className="flex items-center justify-center gap-1 py-2 bg-white">
-          {SLIDER_CARDS.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrent(i)}
-              aria-label={`Show card ${i + 1}`}
-              className={`h-1.5 rounded-full transition-all duration-300 ${i === current ? "w-6 bg-[#F7B31C]" : "w-1.5 bg-[#E2E8F0] hover:bg-[#CBD5E1]"}`}
-            />
-          ))}
-        </div>
-
         {/* Name banner */}
-        <div className="relative mx-5">
+        <div className="relative mx-5 mt-3">
           <div className="bg-[#F7B31C] py-3 px-6 text-center relative" style={{ clipPath: "polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)" }}>
             <p className="text-sm font-bold text-white tracking-wide">{card.name}</p>
             <p className="text-[10px] text-white/80 font-medium mt-0.5">{card.title}</p>
@@ -216,6 +217,7 @@ function CardContactSlider() {
           <span className="text-[9px] font-bold text-white">Save Contact</span>
         </div>
       </div>
+      )}
 
       {/* Floating chips */}
       <div className="hidden sm:flex absolute -left-4 top-16 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-premium-lg border border-[#F1F5F9] animate-float">
@@ -240,6 +242,14 @@ function CardContactSlider() {
       <button onClick={nextSlide} aria-label="Next card" className="absolute -right-2 sm:right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white shadow-premium border border-[#F1F5F9] flex items-center justify-center hover:bg-[#F8FAFC] transition-colors text-[#64748B] hover:text-[#F7B31C]">
         <ChevronRight size={18} />
       </button>
+      </div>
+
+      {/* Dots — one per slide (mockup image + live cards) */}
+      <div className="flex items-center justify-center gap-1.5 mt-4">
+        {Array.from({ length: total }).map((_, i) => (
+          <button key={i} onClick={() => setCurrent(i)} aria-label={`Show slide ${i + 1}`} className={`h-1.5 rounded-full transition-all duration-300 ${i === current ? "w-6 bg-[#F7B31C]" : "w-1.5 bg-[#E2E8F0] hover:bg-[#CBD5E1]"}`} />
+        ))}
+      </div>
     </div>
   );
 }
