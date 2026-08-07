@@ -429,11 +429,18 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-save-contact:hover{filter:brightness(1.15);}
 .dc-save-contact:active{transform:scale(.99);}
 .dc-sent{color:#12a150;font-weight:600;text-align:center;padding:16px 0;}
-/* Bottom login / signup bar */
-.dc-bottom-bar{display:flex;background:#fdf0d5;border-top:2px solid #f3d9a0;margin-top:16px;border-radius:8px;overflow:hidden;}
-.dc-bottom-bar a{flex:1;text-align:center;font-weight:700;font-size:14px;color:#14243E;text-decoration:none;padding:15px 8px;transition:background .15s;}
-.dc-bottom-bar a:first-child{border-right:1px solid #e6c98a;}
-.dc-bottom-bar a:hover{background:#fbe6b8;}
+/* Card footer — compact CTAs + powered-by */
+.dc-foot{margin:16px -15px 0;padding:14px 15px 18px;background:linear-gradient(180deg,#ffffff,#f7f8fa);border-top:1px solid #eef0f3;}
+.dc-foot-actions{display:flex;gap:10px;max-width:400px;margin:0 auto;}
+.dc-foot-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;height:44px;border-radius:12px;font-weight:700;font-size:13.5px;text-decoration:none;transition:transform .1s,box-shadow .2s,filter .15s;}
+.dc-foot-btn:active{transform:scale(.97);}
+.dc-foot-login{background:#fff;color:#0f172a;border:1.5px solid #e2e6ec;}
+.dc-foot-login:hover{border-color:${accent};color:${accentDark};}
+.dc-foot-create{background:linear-gradient(135deg,${accent},${accentDark});color:#0f172a;box-shadow:0 5px 14px ${accent}55;}
+.dc-foot-create:hover{filter:brightness(1.05);}
+.dc-foot-powered{text-align:center;margin:12px 0 0;font-size:12px;color:#98a1b0;}
+.dc-foot-powered a{color:#0f172a;font-weight:700;text-decoration:none;}
+.dc-copied{color:#12a150;}
 /* Small copy button after a UPI id / pay number */
 .dc-copy{background:none;border:none;cursor:pointer;color:#9aa1ab;margin-left:8px;font-size:12px;padding:2px 5px;vertical-align:middle;line-height:1;}
 .dc-copy:hover{color:var(--theme-color);}
@@ -498,10 +505,12 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
     ${videoSection}
     ${enquirySection}
     ${shareSection}
-    <div class="copyright-wrapper" style="margin-top:0;margin-bottom:0"><p>Powered by <a href="https://digitalcarda.in" target="_blank">DigitalCarda</a></p></div>
-    <div class="dc-bottom-bar" style="margin-top:0">
-      <a href="/login" target="_top">Customer Login</a>
-      <a href="/signup${(s(c.referral_code) || slug) ? `?ref=${encodeURIComponent(s(c.referral_code) || slug)}` : ""}" target="_top">Create Your Free Card</a>
+    <div class="dc-foot">
+      <div class="dc-foot-actions">
+        <a href="/login" target="_top" class="dc-foot-btn dc-foot-login"><i class="fa fa-user"></i> Customer Login</a>
+        <a href="/signup${(s(c.referral_code) || slug) ? `?ref=${encodeURIComponent(s(c.referral_code) || slug)}` : ""}" target="_top" class="dc-foot-btn dc-foot-create"><i class="fa fa-bolt"></i> Create Free Card</a>
+      </div>
+      <p class="dc-foot-powered">Powered by <a href="https://digitalcarda.in" target="_blank">DigitalCarda</a></p>
     </div>
   </div>
 </main>
@@ -583,9 +592,13 @@ function dcSendEnquiry(form){
 function openShare(){ try{ if(navigator.share){ navigator.share({title:(document.title||'Digital Card'), url:'${cardUrl}'}).catch(function(){}); return; } }catch(_){} document.getElementById('shareModal').style.display='flex'; }
 function closeShare(){ document.getElementById('shareModal').style.display='none'; }
 function copyShare(){ var u='${cardUrl}'; if(navigator.clipboard){navigator.clipboard.writeText(u).then(function(){alert('Link copied');});}else{alert(u);} }
-function dcCopy(b){ var t=(b.getAttribute('data-copy')||''); var ok=false; try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t); ok=true; } }catch(_){}
-  if(!ok){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){} }
-  var i=b.querySelector('i'); if(i){ var o=i.className; i.className='fa fa-check'; b.style.color='#12a150'; setTimeout(function(){ i.className=o; b.style.color=''; },1200); } }
+function dcCopy(b){ var t=(b.getAttribute('data-copy')||''); var i=b.querySelector('i');
+  function flash(){ if(i){ var o=i.className; i.className='fa fa-check'; b.classList.add('dc-copied'); setTimeout(function(){ i.className=o; b.classList.remove('dc-copied'); },1300); } }
+  function exec(){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.top='0'; ta.style.left='0'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); try{ta.setSelectionRange(0,t.length);}catch(_){} var ok=document.execCommand('copy'); document.body.removeChild(ta); return ok; }catch(_){ return false; } }
+  // clipboard API often rejects (async) inside the sandboxed card iframe, so fall
+  // back to execCommand on rejection; only show the tick when a copy truly succeeds.
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(flash, function(){ if(exec()) flash(); }); }
+  else { if(exec()) flash(); } }
 document.getElementById('shareModal').addEventListener('click', function(e){ if(e.target.id==='shareModal') closeShare(); });
 function saveVCard(){
   var v = ${jsq(vcard)};
