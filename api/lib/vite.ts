@@ -62,16 +62,33 @@ async function productMeta(pathname: string, distPath: string): Promise<CardMeta
 export function serveStaticFiles(app: App) {
   const distPath = path.resolve(import.meta.dirname, "../dist/public");
   const indexPath = path.resolve(distPath, "index.html");
+  // Read the shell once (it only changes on deploy) instead of per request.
+  let indexShell = "";
+  const readShell = () => (indexShell ||= fs.readFileSync(indexPath, "utf-8"));
+
+  // Cache the fully-injected HTML per URL so repeat crawler/visitor hits skip the
+  // meta build + string work (origin TTFB drops from ~200ms to ~few ms). Bounded
+  // and short-lived so content stays fresh.
+  const htmlCache = new Map<string, { html: string; at: number }>();
+  const HTML_TTL = 5 * 60_000;
 
   // Serve index.html with per-page OG/meta + JSON-LD injected (marketing pages,
   // cards, products) so social shares and crawlers get proper previews + schema.
   const serveHtml = async (c: Context<{ Bindings: HttpBindings }>) => {
-    let content = fs.readFileSync(indexPath, "utf-8");
+    const pathname = new URL(c.req.url).pathname;
+    const hit = htmlCache.get(pathname);
+    if (hit && Date.now() - hit.at < HTML_TTL) return c.html(hit.html);
+    let content = readShell();
+    let cacheable = false;
     try {
-      const pathname = new URL(c.req.url).pathname;
       const meta = (await productMeta(pathname, distPath)) || metaFor(pathname, distPath);
-      if (meta) content = injectCardMeta(content, meta);
+      if (meta) { content = injectCardMeta(content, meta); cacheable = true; }
     } catch { /* fall back to plain index.html */ }
+    // Only cache real pages (meta matched); never cache arbitrary 404 paths.
+    if (cacheable) {
+      if (htmlCache.size > 500) htmlCache.clear();
+      htmlCache.set(pathname, { html: content, at: Date.now() });
+    }
     return c.html(content);
   };
 
