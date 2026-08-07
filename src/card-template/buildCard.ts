@@ -194,28 +194,41 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     </div>` : "";
 
   const payIcon = (name: string) => `https://digitalcarda.in/images/${name}.png`;
-  const payRow = (cls: string, icon: string, v: string) =>
-    v ? `<tr class="table-row ${cls}"><td class="lable" style="text-align:center;width:35%"><img src="${payIcon(icon)}" style="height:34px;max-width:100%;object-fit:contain" ${IMG} onerror="this.replaceWith(document.createTextNode('${cls.toUpperCase()}'))"></td><td class="lable-text" style="font-weight:bold;padding:12px">${esc(v)}<button type="button" class="dc-copy" data-copy="${esc(v)}" onclick="dcCopy(this)" title="Copy" aria-label="Copy"><i class="fa fa-copy"></i></button></td></tr>` : "";
+  const payMeta: Record<string, { n: string; short: string; c: string }> = {
+    bhim: { n: "BHIM UPI", short: "BHIM", c: "#5f259f" },
+    paytm: { n: "Paytm", short: "Paytm", c: "#00b9f1" },
+    phonepe: { n: "PhonePe", short: "PhonePe", c: "#673ab7" },
+    gpay: { n: "Google Pay", short: "GPay", c: "#1a73e8" },
+  };
+  const payRow = (icon: string, v: string) => {
+    if (!v) return "";
+    const m = payMeta[icon] || { n: icon.toUpperCase(), short: icon.toUpperCase(), c: accent };
+    return `<div class="dc-pay-item">
+      <span class="dc-pay-ic"><img src="${payIcon(icon)}" alt="${m.n}" ${IMG} onerror="var p=this.parentNode;p.style.background='${m.c}';p.textContent='${m.short}'"></span>
+      <div class="dc-pay-mid"><span class="dc-pay-name">${m.n}</span><span class="dc-pay-val">${esc(v)}</span></div>
+      <button type="button" class="dc-pay-copy" data-copy="${esc(v)}" onclick="dcCopy(this)" title="Copy" aria-label="Copy ${m.n}"><i class="fa fa-copy"></i><span>Copy</span></button>
+    </div>`;
+  };
   const hasPay = s(c.upi) || s(c.paytm_number) || s(c.phone_pe) || s(c.google_pay);
   const hasBank = s(c.account_number) || s(c.bank_name);
+  const bankRow = (icon: string, k: string, v: string, copy = false) =>
+    v ? `<div class="dc-bank-row"><span class="k"><i class="fa ${icon}"></i>${k}</span><span class="v">${esc(v)}${copy ? `<button type="button" class="dc-copy" data-copy="${esc(v)}" onclick="dcCopy(this)" title="Copy" aria-label="Copy"><i class="fa fa-copy"></i></button>` : ""}</span></div>` : "";
   const paymentSection = on(c.payment_on) && (hasPay || hasBank) ? `
     <div id="payment-section" class="section-container">
       <div class="section-header">Payment Details</div>
-      ${hasPay ? `<table class="payment-table" style="width:100%">
-        ${payRow("bhim", "bhim", s(c.upi))}
-        ${payRow("paytm", "paytm", s(c.paytm_number))}
-        ${payRow("phonepe", "phonepe", s(c.phone_pe))}
-        ${payRow("gpay", "gpay", s(c.google_pay))}
-      </table>` : ""}
-      ${hasBank ? `<div class="heading-2" style="margin-top:16px"><h5>Bank Account Details</h5></div>
-      <div class="bank-detail-box">
-        <table class="bank-detail-card">
-          ${s(c.bank_name) ? `<tr><td><i class="fa fa-university"></i>Bank Name</td><td>:</td><td>${esc(c.bank_name)}</td></tr>` : ""}
-          ${s(c.ifsc) ? `<tr><td><i class="fa fa-hashtag"></i>IFSC Code</td><td>:</td><td>${esc(c.ifsc)}</td></tr>` : ""}
-          ${s(c.account_holder) ? `<tr><td><i class="fa fa-user"></i>A/c Holder</td><td>:</td><td>${esc(c.account_holder)}</td></tr>` : ""}
-          ${s(c.account_number) ? `<tr><td><i class="fa fa-credit-card"></i>Account No.</td><td>:</td><td>${esc(c.account_number)}</td></tr>` : ""}
-          ${s(c.account_type) ? `<tr><td><i class="fa fa-wallet"></i>Account Type</td><td>:</td><td>${esc(c.account_type)}</td></tr>` : ""}
-        </table>
+      ${hasPay ? `<div class="dc-pay-list">
+        ${payRow("bhim", s(c.upi))}
+        ${payRow("paytm", s(c.paytm_number))}
+        ${payRow("phonepe", s(c.phone_pe))}
+        ${payRow("gpay", s(c.google_pay))}
+      </div>` : ""}
+      ${hasBank ? `<p class="dc-bank-title"><i class="fa fa-university"></i>Bank Account Details</p>
+      <div class="dc-bank">
+        ${bankRow("fa-university", "Bank Name", s(c.bank_name))}
+        ${bankRow("fa-hashtag", "IFSC Code", s(c.ifsc), true)}
+        ${bankRow("fa-user", "A/c Holder", s(c.account_holder))}
+        ${bankRow("fa-credit-card", "Account No.", s(c.account_number), true)}
+        ${bankRow("fa-wallet", "Account Type", s(c.account_type))}
       </div>` : ""}
     </div>` : "";
 
@@ -405,6 +418,28 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-copy{background:none;border:none;cursor:pointer;color:#9aa1ab;margin-left:8px;font-size:12px;padding:2px 5px;vertical-align:middle;line-height:1;}
 .dc-copy:hover{color:var(--theme-color);}
 .dc-copy i{pointer-events:none;}
+/* Payment methods — modern cards */
+.dc-pay-list{display:flex;flex-direction:column;gap:10px;}
+.dc-pay-item{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #eceef1;border-radius:14px;padding:10px 12px;box-shadow:0 1px 3px rgba(16,24,40,.04);transition:box-shadow .2s,border-color .2s;}
+.dc-pay-item:hover{border-color:${accent}66;box-shadow:0 5px 16px rgba(16,24,40,.09);}
+.dc-pay-ic{width:46px;height:46px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:#f6f7f9;overflow:hidden;color:#fff;font-weight:800;font-size:10px;letter-spacing:.3px;text-align:center;}
+.dc-pay-ic img{width:100%;height:100%;object-fit:contain;padding:6px;box-sizing:border-box;}
+.dc-pay-mid{flex:1;min-width:0;}
+.dc-pay-name{display:block;font-size:10.5px;font-weight:700;color:#8a93a3;text-transform:uppercase;letter-spacing:.5px;}
+.dc-pay-val{display:block;font-size:14.5px;font-weight:800;color:#111827;word-break:break-all;line-height:1.3;margin-top:1px;}
+.dc-pay-copy{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border:1px solid ${accent}66;background:${accent}14;color:${accentDark};font-weight:700;font-size:12px;border-radius:10px;padding:7px 12px;cursor:pointer;transition:background .15s,transform .1s;}
+.dc-pay-copy:hover{background:${accent}26;}
+.dc-pay-copy:active{transform:scale(.95);}
+/* Bank account details card */
+.dc-bank-title{font-size:14px;font-weight:800;color:#374151;margin:18px 0 9px;display:flex;align-items:center;gap:8px;}
+.dc-bank-title i{color:${accent};}
+.dc-bank{border:1px solid #eceef1;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(16,24,40,.04);}
+.dc-bank-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 14px;font-size:13.5px;border-top:1px solid #f1f3f5;}
+.dc-bank-row:first-child{border-top:none;}
+.dc-bank-row .k{color:#8a93a3;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap;}
+.dc-bank-row .k i{color:${accent};width:15px;text-align:center;}
+.dc-bank-row .v{color:#111827;font-weight:700;text-align:right;word-break:break-all;}
+@media(max-width:360px){.dc-pay-copy span{display:none;}}
 /* Floating Save Contact button (small) */
 .dc-save-fab{position:fixed;right:14px;bottom:150px;width:44px;height:44px;border-radius:50%;background:#14243E;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.28);z-index:1000;color:#fff;font-size:17px;text-decoration:none;transition:transform .15s;}
 .dc-save-fab:hover{transform:scale(1.08);}
