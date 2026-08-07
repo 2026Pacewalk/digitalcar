@@ -540,7 +540,16 @@ function WhyDigitalCardaSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <Reveal className="relative flex justify-center">
-            <img src="/why-businessman.png" alt="Professional sharing a digital business card" className="w-full max-w-md drop-shadow-2xl" />
+            <picture>
+              <source srcSet="/hero/digital-business-card-nfc-professional.webp" type="image/webp" />
+              <img
+                src="/hero/digital-business-card-nfc-professional.jpg"
+                width="1537" height="1023"
+                alt="Businessman holding a smartphone showing a DigitalCarda digital business card and an NFC smart card"
+                loading="lazy"
+                className="w-full max-w-md rounded-3xl shadow-2xl ring-1 ring-white/10"
+              />
+            </picture>
             <div className="absolute bottom-8 left-0 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-3">
               <p className="text-2xl font-bold text-[#F7B31C]">5,173+</p>
               <p className="text-[10px] text-[#94A3B8]">Active Digital Cards</p>
