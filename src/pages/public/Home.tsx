@@ -543,11 +543,11 @@ function WhyDigitalCardaSection() {
             <picture>
               <source srcSet="/hero/digital-business-card-nfc-professional.webp" type="image/webp" />
               <img
-                src="/hero/digital-business-card-nfc-professional.jpg"
-                width="1537" height="1023"
+                src="/hero/digital-business-card-nfc-professional.png"
+                width="1082" height="993"
                 alt="Businessman holding a smartphone showing a DigitalCarda digital business card and an NFC smart card"
                 loading="lazy"
-                className="w-full max-w-md rounded-3xl shadow-2xl ring-1 ring-white/10"
+                className="w-full max-w-md drop-shadow-2xl"
               />
             </picture>
             <div className="absolute bottom-8 left-0 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-3">
