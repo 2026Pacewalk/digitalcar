@@ -165,7 +165,7 @@ export default function PublicLayout() {
                 <img
                   src="/logo.png"
                   alt="DigitalCarda"
-                  className="h-8 w-auto object-contain"
+                  className="h-10 w-auto object-contain"
                   onError={() => setLogoOk(false)}
                 />
               ) : (
