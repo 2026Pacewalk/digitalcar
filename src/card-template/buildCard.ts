@@ -79,6 +79,15 @@ type Review = { id: number; name: string; rating: number | string; text: string;
 const s = (v: unknown) => String(v ?? "").trim();
 const on = (v: unknown) => Number(v ?? 1) === 1;
 const esc = (v: unknown) => s(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Legacy rich-text fields (product/offer descriptions, about) are stored as HTML
+// from a WYSIWYG editor. Render them as HTML but strip anything executable so the
+// sandboxed card can't be abused: scripts, event handlers, and javascript: URLs.
+const sanitizeHtml = (v: unknown) =>
+  s(v)
+    .replace(/<(script|style|iframe|object|embed)\b[\s\S]*?<\/\1>/gi, "")
+    .replace(/<\/?(script|style|iframe|object|embed|link|meta|form|input|base)\b[^>]*>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, "$1=$2#$2");
 // Safe interpolation of user data inside an inline <script> — quotes it as a JS
 // string literal and neutralises "</script>" so it can't break out (Phase 31 XSS).
 const jsq = (v: unknown) => JSON.stringify(String(v ?? "")).replace(/</g, "\\u003c");
@@ -144,7 +153,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       <div class="section-header">${esc(s(c.about) || "About Us")}</div>
       <div class="about-modern">
         ${aboutInfo ? `<div class="about-info">${aboutInfo}</div>` : ""}
-        ${s(c.about_us) ? `<div class="about-text"><i class="fa fa-quote-left about-quote"></i><p>${esc(c.about_us)}</p></div>` : ""}
+        ${s(c.about_us) ? `<div class="about-text"><i class="fa fa-quote-left about-quote"></i><p>${sanitizeHtml(fixMojibake(c.about_us))}</p></div>` : ""}
         ${specs.length ? `<p class="about-spec-title"><i class="fa fa-star"></i> ${esc(s(c.specialties_title) || "Our Specialties")}</p>
           <div class="about-chips">${specs.map((x) => `<span class="about-chip"><i class="fa fa-check"></i>${esc(x)}</span>`).join("")}</div>` : ""}
       </div>
@@ -178,7 +187,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
           <div class="heading-2"><h5>${esc(p.name)}</h5></div>
           ${(p.price || p.offer_price) ? `<div style="padding:2px 0 6px" class="heading-2">Price ${p.price && p.offer_price ? `<strike style="color:#666"> ₹${esc(p.price)}</strike>` : ""} <strong> ₹${esc(p.offer_price || p.price)}</strong></div>` : ""}
           ${p.filename ? `<img src="${esc(p.filename)}" class="img-fluid" style="width:100%;border-radius:4px" ${IMG} onerror="this.style.display='none'">` : ""}
-          ${p.description ? `<div class="heading-2" style="margin-top:14px"><h5>Other Detail</h5></div><div style="font-size:13px">${esc(fixMojibake(p.description))}</div>` : ""}
+          ${p.description ? `<div class="heading-2" style="margin-top:14px"><h5>Other Detail</h5></div><div style="font-size:13px">${sanitizeHtml(fixMojibake(p.description))}</div>` : ""}
           <div class="text-right" style="margin-top:12px"><a href="${b.href}" class="product-enquiry-btn" target="${b.target}" rel="noopener"><i class="${b.icon}" style="margin-right:6px"></i>${esc(p.button_title || "Send Enquiry")}</a></div>
         </div>`;
       }).join("")}
@@ -270,7 +279,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
         ${o.filename ? `<img src="${esc(o.filename)}" class="img-fluid" style="width:100%;border-radius:4px" ${IMG} onerror="this.style.display='none'">` : ""}
         ${o.title ? `<h5 style="font-weight:700;margin-top:8px">${esc(o.title)}</h5>` : ""}
         ${o.valid ? `<p style="font-size:12px;color:#666;margin-top:2px"><i class="fa fa-clock"></i> Valid till: ${esc(o.valid)}</p>` : ""}
-        ${o.description ? `<p style="font-size:13px;margin-top:4px">${esc(o.description)}</p>` : ""}
+        ${o.description ? `<p style="font-size:13px;margin-top:4px">${sanitizeHtml(fixMojibake(o.description))}</p>` : ""}
       </div>`).join("")}
     </div>` : "";
 
