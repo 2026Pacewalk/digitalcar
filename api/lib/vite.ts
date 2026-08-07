@@ -88,6 +88,10 @@ export function serveStaticFiles(app: App) {
     if (cacheable) {
       if (htmlCache.size > 500) htmlCache.clear();
       htmlCache.set(pathname, { html: content, at: Date.now() });
+      // Let a CDN edge-cache the (public, non-personalised) page for 2 min while
+      // keeping browsers revalidating. With a Cloudflare "Eligible for cache" rule
+      // this makes crawler/social TTFB ~edge speed globally; a no-op without it.
+      c.header("Cache-Control", "public, max-age=0, s-maxage=120, stale-while-revalidate=600");
     }
     return c.html(content);
   };
