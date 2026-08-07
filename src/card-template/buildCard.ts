@@ -210,7 +210,17 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     </div>`;
   };
   const hasPay = s(c.upi) || s(c.paytm_number) || s(c.phone_pe) || s(c.google_pay);
-  const hasBank = s(c.account_number) || s(c.bank_name);
+  const hasBank = s(c.account_number) || s(c.bank_name) || s(c.gst);
+  // Clean, shareable "copy all" message for the bank details.
+  const bankCopyText = [
+    `Bank Account Details${s(c.company_name) ? " — " + s(c.company_name) : ""}`,
+    s(c.bank_name) ? `Bank: ${s(c.bank_name)}` : "",
+    s(c.account_holder) ? `A/c Holder: ${s(c.account_holder)}` : "",
+    s(c.account_number) ? `A/c No.: ${s(c.account_number)}` : "",
+    s(c.ifsc) ? `IFSC: ${s(c.ifsc)}` : "",
+    s(c.account_type) ? `Account Type: ${s(c.account_type)}` : "",
+    s(c.gst) ? `GST: ${s(c.gst)}` : "",
+  ].filter(Boolean).join("\n");
   const bankRow = (icon: string, k: string, v: string) =>
     v ? `<div class="dc-bank-row"><span class="dc-bank-ic"><i class="fa ${icon}"></i></span><div class="dc-bank-kv"><span class="k">${k}</span><span class="v">${esc(v)}</span></div></div>` : "";
   const paymentSection = on(c.payment_on) && (hasPay || hasBank) ? `
@@ -223,13 +233,14 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
         ${payRow("gpay", s(c.google_pay))}
       </div>` : ""}
       ${hasBank ? `<div class="dc-bank">
-        <div class="dc-bank-head"><i class="fa fa-university"></i>Bank Account Details</div>
+        <div class="dc-bank-head"><span class="dc-bank-title"><i class="fa fa-university"></i>Bank Account Details</span><button type="button" class="dc-bank-copy" data-copy="${esc(bankCopyText).replace(/\n/g, "&#10;")}" onclick="dcCopy(this)" title="Copy bank details"><i class="fa fa-copy"></i><span>Copy</span></button></div>
         <div class="dc-bank-body">
           ${bankRow("fa-university", "Bank Name", s(c.bank_name))}
-          ${bankRow("fa-hashtag", "IFSC Code", s(c.ifsc))}
           ${bankRow("fa-user", "A/c Holder", s(c.account_holder))}
           ${bankRow("fa-credit-card", "Account No.", s(c.account_number))}
+          ${bankRow("fa-hashtag", "IFSC Code", s(c.ifsc))}
           ${bankRow("fa-wallet", "Account Type", s(c.account_type))}
+          ${bankRow("fa-file-invoice", "GST No.", s(c.gst))}
         </div>
       </div>` : ""}
     </div>` : "";
@@ -332,16 +343,12 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const shareSection = `
     <div class="section-container dc-share">
       <div class="section-header">Share with others on WhatsApp</div>
-      <form onsubmit="var n=this.num.value.replace(/[^0-9]/g,'');if(n)window.open('https://wa.me/'+ (n.length===10?'91'+n:n) +'/?text=' + encodeURIComponent('${cardUrl}'),'_blank');return false;">
-        <div class="dc-phone" style="max-width:340px;margin:0 auto 8px">
-          <span class="cc"><i class="fas fa-mobile-alt" style="color:var(--theme-color)"></i> +91</span>
-          <input name="num" placeholder="Enter WhatsApp number" inputmode="numeric" required>
-        </div>
-        <div style="max-width:340px;margin:0 auto"><button type="submit" class="dc-btn dc-btn-wa"><i class="fab fa-whatsapp" style="font-size:16px"></i> Share</button></div>
+      <form class="dc-wa-form" onsubmit="var n=this.num.value.replace(/[^0-9]/g,'');if(n)window.open('https://wa.me/'+ (n.length===10?'91'+n:n) +'/?text=' + encodeURIComponent('${cardUrl}'),'_blank');return false;">
+        <span class="dc-wa-cc"><i class="fas fa-mobile-alt"></i>+91</span>
+        <input name="num" class="dc-wa-input" placeholder="WhatsApp number" inputmode="numeric" required>
+        <button type="submit" class="dc-wa-btn"><i class="fab fa-whatsapp"></i><span>Share</span></button>
       </form>
-      <div style="max-width:340px;margin:8px auto 0">
-        <a href="javascript:void(0)" onclick="saveVCard()" class="dc-btn dc-btn-dark"><i class="fa fa-download"></i> Save Contact in Your Phonebook</a>
-      </div>
+      <a href="javascript:void(0)" onclick="saveVCard()" class="dc-save-contact"><i class="fa fa-download"></i> Save Contact in Your Phonebook</a>
     </div>`;
 
   // Footer icons mirror the sections that are actually on the card — disable a
@@ -405,11 +412,22 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-phone:focus-within{border-color:${accent};background:#fff;box-shadow:0 0 0 3px ${accent}30;}
 .dc-phone .cc{display:flex;align-items:center;gap:5px;padding:0 14px;background:#f1f3f5;font-weight:700;font-size:14px;color:#333;border-right:1px solid #e6e8eb;}
 .dc-phone input{flex:1;min-width:0;border:none;outline:none;padding:0 14px;height:48px;font-size:14px;background:transparent;color:#111;}
-/* Compact Share section */
-.dc-share{padding-top:12px;padding-bottom:12px;}
+/* Compact Share section — inline number + Share, slim Save-Contact */
+.dc-share{padding-top:14px;padding-bottom:14px;}
 .dc-share .section-header{margin-bottom:12px;}
-.dc-share .dc-phone .cc,.dc-share .dc-phone input{height:40px;}
-.dc-share .dc-btn{height:40px;font-size:14px;border-radius:10px;}
+.dc-wa-form{display:flex;align-items:stretch;max-width:400px;margin:0 auto;border-radius:12px;box-shadow:0 3px 10px rgba(16,24,40,.06);}
+.dc-wa-cc{display:flex;align-items:center;gap:5px;padding:0 12px;background:#f1f3f5;border:1.5px solid #e6e8eb;border-right:none;border-radius:12px 0 0 12px;font-weight:700;font-size:13px;color:#333;white-space:nowrap;}
+.dc-wa-cc i{color:var(--theme-color);}
+.dc-wa-input{flex:1;min-width:0;border:1.5px solid #e6e8eb;border-left:none;border-right:none;outline:none;padding:0 12px;height:46px;font-size:14px;background:#fafbfc;color:#111;}
+.dc-wa-form:focus-within .dc-wa-cc,.dc-wa-form:focus-within .dc-wa-input{border-color:${accent};}
+.dc-wa-input:focus{background:#fff;}
+.dc-wa-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:none;background:linear-gradient(135deg,#2bd576,#1faa55);color:#fff;font-weight:700;font-size:14px;border-radius:0 12px 12px 0;padding:0 18px;height:46px;cursor:pointer;box-shadow:0 4px 12px rgba(37,211,102,.3);transition:filter .15s,transform .1s;}
+.dc-wa-btn i{font-size:17px;}
+.dc-wa-btn:hover{filter:brightness(1.06);}
+.dc-wa-btn:active{transform:scale(.98);}
+.dc-save-contact{display:flex;align-items:center;justify-content:center;gap:8px;max-width:400px;margin:10px auto 0;height:44px;border-radius:12px;background:linear-gradient(135deg,#1e2536,#0f1420);color:#fff;font-weight:700;font-size:13.5px;text-decoration:none;box-shadow:0 4px 12px rgba(15,20,32,.28);transition:filter .15s,transform .1s;}
+.dc-save-contact:hover{filter:brightness(1.15);}
+.dc-save-contact:active{transform:scale(.99);}
 .dc-sent{color:#12a150;font-weight:600;text-align:center;padding:16px 0;}
 /* Bottom login / signup bar */
 .dc-bottom-bar{display:flex;background:#fdf0d5;border-top:2px solid #f3d9a0;margin-top:16px;border-radius:8px;overflow:hidden;}
@@ -432,17 +450,21 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-pay-copy{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border:1px solid ${accent}66;background:${accent}14;color:${accentDark};font-weight:700;font-size:12px;border-radius:10px;padding:7px 12px;cursor:pointer;transition:background .15s,transform .1s;}
 .dc-pay-copy:hover{background:${accent}26;}
 .dc-pay-copy:active{transform:scale(.95);}
-/* Bank account details — premium card */
-.dc-bank{margin-top:18px;border-radius:16px;overflow:hidden;border:1px solid #edeff2;box-shadow:0 8px 24px rgba(16,24,40,.10);}
-.dc-bank-head{display:flex;align-items:center;gap:10px;padding:13px 16px;background:linear-gradient(135deg,${accent},${accentDark});color:#fff;font-weight:800;font-size:14px;letter-spacing:.3px;}
-.dc-bank-head i{font-size:15px;opacity:.95;}
+/* Bank account details — premium compact card */
+.dc-bank{margin-top:16px;border-radius:14px;overflow:hidden;border:1px solid #edeff2;box-shadow:0 6px 18px rgba(16,24,40,.09);}
+.dc-bank-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;background:linear-gradient(135deg,${accent},${accentDark});color:#fff;font-weight:800;font-size:13.5px;letter-spacing:.3px;}
+.dc-bank-title{display:flex;align-items:center;gap:9px;}
+.dc-bank-title i{font-size:14px;opacity:.95;}
+.dc-bank-copy{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;font-weight:700;font-size:11.5px;border-radius:8px;padding:5px 10px;cursor:pointer;transition:background .15s,transform .1s;}
+.dc-bank-copy:hover{background:rgba(255,255,255,.34);}
+.dc-bank-copy:active{transform:scale(.95);}
 .dc-bank-body{background:#fff;}
-.dc-bank-row{display:flex;align-items:center;gap:12px;padding:12px 16px;}
+.dc-bank-row{display:flex;align-items:center;gap:11px;padding:8px 14px;}
 .dc-bank-row + .dc-bank-row{border-top:1px solid #f2f4f7;}
-.dc-bank-ic{width:34px;height:34px;flex:0 0 auto;border-radius:9px;background:${accent}16;color:${accent};display:flex;align-items:center;justify-content:center;font-size:13px;}
+.dc-bank-ic{width:28px;height:28px;flex:0 0 auto;border-radius:8px;background:${accent}16;color:${accent};display:flex;align-items:center;justify-content:center;font-size:12px;}
 .dc-bank-kv{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;gap:12px;}
-.dc-bank-kv .k{font-size:11px;font-weight:600;color:#98a1b0;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
-.dc-bank-kv .v{font-size:14px;font-weight:800;color:#101828;text-align:right;word-break:break-all;}
+.dc-bank-kv .k{font-size:10.5px;font-weight:600;color:#98a1b0;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
+.dc-bank-kv .v{font-size:13.5px;font-weight:800;color:#101828;text-align:right;word-break:break-all;}
 @media(max-width:360px){.dc-pay-copy span{display:none;}}
 /* Floating Save Contact button (small) */
 .dc-save-fab{position:fixed;right:14px;bottom:150px;width:44px;height:44px;border-radius:50%;background:#14243E;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.28);z-index:1000;color:#fff;font-size:17px;text-decoration:none;transition:transform .15s;}
