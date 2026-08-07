@@ -195,7 +195,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 
   const payIcon = (name: string) => `https://digitalcarda.in/images/${name}.png`;
   const payRow = (cls: string, icon: string, v: string) =>
-    v ? `<tr class="table-row ${cls}"><td class="lable" style="text-align:center;width:35%"><img src="${payIcon(icon)}" style="height:34px;max-width:100%;object-fit:contain" ${IMG} onerror="this.replaceWith(document.createTextNode('${cls.toUpperCase()}'))"></td><td class="lable-text" style="font-weight:bold;padding:12px">${esc(v)}</td></tr>` : "";
+    v ? `<tr class="table-row ${cls}"><td class="lable" style="text-align:center;width:35%"><img src="${payIcon(icon)}" style="height:34px;max-width:100%;object-fit:contain" ${IMG} onerror="this.replaceWith(document.createTextNode('${cls.toUpperCase()}'))"></td><td class="lable-text" style="font-weight:bold;padding:12px">${esc(v)}<button type="button" class="dc-copy" data-copy="${esc(v)}" onclick="dcCopy(this)" title="Copy" aria-label="Copy"><i class="fa fa-copy"></i></button></td></tr>` : "";
   const hasPay = s(c.upi) || s(c.paytm_number) || s(c.phone_pe) || s(c.google_pay);
   const hasBank = s(c.account_number) || s(c.bank_name);
   const paymentSection = on(c.payment_on) && (hasPay || hasBank) ? `
@@ -262,7 +262,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 
   const qrSection = on(c.qrcode_on) && (qrcodes.length || slug) ? `
     <div id="qrcode-section" class="section-container" style="text-align:center">
-      <div class="section-header" style="text-align:left">QR Code</div>
+      <div class="section-header" style="text-align:left">Payment QR Code</div>
       ${qrcodes.length ? qrcodes.map((q) => `<div class="qrcode-card" style="text-align:center;margin-bottom:16px">
         <img src="${esc(q.filename)}" style="max-width:240px;width:100%;border-radius:6px" ${IMG} onerror="this.style.display='none'">
         <div><a href="${cardUrl}" class="qrcode-enquiry-btn" target="_blank">${esc(q.name) || "Pay Online"}</a></div>
@@ -337,7 +337,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     { id: "products-section", icon: "fas fa-box-open", label: s(c.product) || "Services", show: !!servicesSection },
     { id: "offers-section", icon: "fas fa-tags", label: s(c.offer) || "Offers", show: !!offersSection },
     { id: "payment-section", icon: "fas fa-money-bill-alt", label: s(c.payment) || "Payment", show: !!paymentSection },
-    { id: "qrcode-section", icon: "fas fa-qrcode", label: "QR Code", show: !!qrSection },
+    { id: "qrcode-section", icon: "fas fa-qrcode", label: "Payment QR", show: !!qrSection },
     { id: "review-section", icon: "fab fa-google", label: "Reviews", show: !!googleReviewSection },
     { id: "gallery-section", icon: "fa fa-photo-video", label: s(c.gallery) || "Gallery", show: !!gallerySection },
     { id: "video-section", icon: "fa fa-video", label: s(c.video) || "Video", show: !!videoSection },
@@ -401,6 +401,10 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-bottom-bar a{flex:1;text-align:center;font-weight:700;font-size:14px;color:#14243E;text-decoration:none;padding:15px 8px;transition:background .15s;}
 .dc-bottom-bar a:first-child{border-right:1px solid #e6c98a;}
 .dc-bottom-bar a:hover{background:#fbe6b8;}
+/* Small copy button after a UPI id / pay number */
+.dc-copy{background:none;border:none;cursor:pointer;color:#9aa1ab;margin-left:8px;font-size:12px;padding:2px 5px;vertical-align:middle;line-height:1;}
+.dc-copy:hover{color:var(--theme-color);}
+.dc-copy i{pointer-events:none;}
 /* Floating Save Contact button (small) */
 .dc-save-fab{position:fixed;right:14px;bottom:150px;width:44px;height:44px;border-radius:50%;background:#14243E;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.28);z-index:1000;color:#fff;font-size:17px;text-decoration:none;transition:transform .15s;}
 .dc-save-fab:hover{transform:scale(1.08);}
@@ -433,8 +437,8 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
     ${videoSection}
     ${enquirySection}
     ${shareSection}
-    <div class="copyright-wrapper"><p>Powered by <a href="https://digitalcarda.in" target="_blank">DigitalCarda</a></p></div>
-    <div class="dc-bottom-bar">
+    <div class="copyright-wrapper" style="margin-top:0;margin-bottom:0"><p>Powered by <a href="https://digitalcarda.in" target="_blank">DigitalCarda</a></p></div>
+    <div class="dc-bottom-bar" style="margin-top:0">
       <a href="/login" target="_top">Customer Login</a>
       <a href="/signup${(s(c.referral_code) || slug) ? `?ref=${encodeURIComponent(s(c.referral_code) || slug)}` : ""}" target="_top">Create Your Free Card</a>
     </div>
@@ -518,6 +522,9 @@ function dcSendEnquiry(form){
 function openShare(){ try{ if(navigator.share){ navigator.share({title:(document.title||'Digital Card'), url:'${cardUrl}'}).catch(function(){}); return; } }catch(_){} document.getElementById('shareModal').style.display='flex'; }
 function closeShare(){ document.getElementById('shareModal').style.display='none'; }
 function copyShare(){ var u='${cardUrl}'; if(navigator.clipboard){navigator.clipboard.writeText(u).then(function(){alert('Link copied');});}else{alert(u);} }
+function dcCopy(b){ var t=(b.getAttribute('data-copy')||''); var ok=false; try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t); ok=true; } }catch(_){}
+  if(!ok){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){} }
+  var i=b.querySelector('i'); if(i){ var o=i.className; i.className='fa fa-check'; b.style.color='#12a150'; setTimeout(function(){ i.className=o; b.style.color=''; },1200); } }
 document.getElementById('shareModal').addEventListener('click', function(e){ if(e.target.id==='shareModal') closeShare(); });
 function saveVCard(){
   var v = ${jsq(vcard)};
