@@ -120,8 +120,14 @@ export function serveStaticFiles(app: App) {
   });
   app.use("*", serveStatic({ root: "./dist/public" }));
   app.notFound((c) => {
-    const accept = c.req.header("accept") ?? "";
-    if (!accept.includes("text/html")) return c.json({ error: "Not Found" }, 404);
-    return serveHtml(c);
+    const pathname = new URL(c.req.url).pathname;
+    // Serve the SPA HTML (with OG/meta injected) for any page-like GET — no file
+    // extension, not an /api/ path — REGARDLESS of the Accept header, so social
+    // crawlers (WhatsApp, Facebook, LinkedIn, Telegram) that send "Accept: */*"
+    // still get the preview tags. Only asset misses / API paths return JSON 404.
+    if (c.req.method === "GET" && !pathname.startsWith("/api/") && !/\.[a-z0-9]+$/i.test(pathname)) {
+      return serveHtml(c);
+    }
+    return c.json({ error: "Not Found" }, 404);
   });
 }
