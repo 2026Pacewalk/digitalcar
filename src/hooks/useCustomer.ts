@@ -1,4 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
+import { healUploadUrl } from "@/lib/img";
+
+/* Re-point stored image URLs (baked with a possibly-stale host at hydration
+   time) to the current image base, so dashboard tiles never break when the
+   base changes. See healUploadUrl. Applied when reading stored data back. */
+function healItemImgs<T>(arr: T[]): T[] {
+  return arr.map((it) =>
+    it && typeof (it as { filename?: unknown }).filename === "string"
+      ? { ...it, filename: healUploadUrl((it as { filename?: unknown }).filename) }
+      : it,
+  );
+}
+function healCustomerImgs<T extends Record<string, unknown>>(rec: T): T {
+  return typeof rec.logo === "string" ? { ...rec, logo: healUploadUrl(rec.logo) } : rec;
+}
 
 /* Fire a debounce-able signal whenever the owner edits card content, so an
    auto-publish listener can re-snapshot a live card to its public page.
@@ -212,7 +227,7 @@ export function readCustomer(): CustomerRecord {
   const u = getAuthUser();
   try {
     const raw = localStorage.getItem(scopedKey("dc_customer"));
-    if (raw) return { ...DEFAULT_CUSTOMER, ...JSON.parse(raw) };
+    if (raw) return healCustomerImgs({ ...DEFAULT_CUSTOMER, ...JSON.parse(raw) });
   } catch { /* fall through to seed */ }
   return u && !isShowcase(u) ? seedFromAuth(u) : DEFAULT_CUSTOMER;
 }
@@ -225,7 +240,7 @@ export function useCustomer() {
     const key = scopedKey("dc_customer");
     try {
       const raw = localStorage.getItem(key);
-      if (raw) { setData({ ...DEFAULT_CUSTOMER, ...JSON.parse(raw) }); return; }
+      if (raw) { setData(healCustomerImgs({ ...DEFAULT_CUSTOMER, ...JSON.parse(raw) })); return; }
     } catch { /* seed below */ }
     // First visit for this user → seed from their own account (or the showcase sample).
     const seed = u && !isShowcase(u) ? seedFromAuth(u) : DEFAULT_CUSTOMER;
@@ -280,7 +295,7 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
         .finally(() => { if (!cancelled) setReady(true); });
       return () => { cancelled = true; };
     }
-    if (parsed) setItems(parsed);
+    if (parsed) setItems(healItemImgs(parsed));
     else setItems([]);
     setReady(true);
     return () => { cancelled = true; };

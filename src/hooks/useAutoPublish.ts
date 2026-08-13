@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { trpc } from "@/providers/trpc";
 import { readCustomer, scopedKey, getActiveCardId } from "@/hooks/useCustomer";
+import { healUploadUrl } from "@/lib/img";
 
 // Remember the last slug we did an initial sync for, so navigating between
 // dashboard pages doesn't re-snapshot on every mount — only once per card.
@@ -18,14 +19,29 @@ let initialSyncedSlug: string | null = null;
    Mount once, high in the dashboard tree (ResponsiveDashboardLayout). */
 export function useAutoPublish(): void {
   const saveSnapshot = trpc.publish.saveSnapshot.useMutation();
+  // `useMutation()` returns a NEW object every render, so it must NOT be an effect
+  // dependency — otherwise every re-render tears the effect down and clears the
+  // pending debounce timer, cancelling the save. Editing content inherently
+  // re-renders (state change + toast), so a `[saveSnapshot]` dep meant the
+  // debounced auto-publish was almost always cancelled before it fired (a card
+  // edit never reached the public page). Keep the latest `mutate` in a ref and
+  // set the listener up ONCE (empty deps) instead.
+  const saveRef = useRef(saveSnapshot);
+  saveRef.current = saveSnapshot;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Cache of "is this slug a live legacy card?" (undefined = not yet checked).
   const legacyLive = useRef<boolean | undefined>(undefined);
 
   useEffect(() => {
     const readList = (base: string) => {
-      try { return JSON.parse(localStorage.getItem(scopedKey(base)) || "[]"); }
-      catch { return []; }
+      try {
+        const arr = JSON.parse(localStorage.getItem(scopedKey(base)) || "[]");
+        // Heal stale image hosts so the published snapshot never carries a dead
+        // (e.g. old dev-host) URL — see healUploadUrl.
+        return Array.isArray(arr)
+          ? arr.map((it) => (it && typeof it.filename === "string" ? { ...it, filename: healUploadUrl(it.filename) } : it))
+          : [];
+      } catch { return []; }
     };
 
     const isLive = async (data: Record<string, unknown>, slug: string): Promise<boolean> => {
@@ -45,7 +61,7 @@ export function useAutoPublish(): void {
       const slug = String(data.slug || data.username || "").trim().toLowerCase();
       if (slug.length < 3) return;
       if (!(await isLive(data, slug))) return; // never auto-activate a fresh card
-      saveSnapshot.mutate({
+      saveRef.current.mutate({
         slug,
         cardId: getActiveCardId(),
         data: {
@@ -80,8 +96,13 @@ export function useAutoPublish(): void {
 
     return () => {
       window.removeEventListener("dc:content-changed", onChange);
-      if (timer.current) clearTimeout(timer.current);
+      // Flush a pending debounced save instead of dropping it, so an edit made
+      // right before navigating away (e.g. leaving the dashboard to view the
+      // public card) still reaches the server.
+      if (timer.current) { clearTimeout(timer.current); void run(); }
       clearTimeout(initial);
     };
-  }, [saveSnapshot]);
+    // Mount-once: the listener + debounce must survive re-renders (see saveRef).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }
