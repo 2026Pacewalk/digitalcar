@@ -58,6 +58,9 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
   const [leadPhone, setLeadPhone] = useState("");
   const [leadMessage, setLeadMessage] = useState("");
   const [leadSubmitted, setLeadSubmitted] = useState(false);
+  // Video lightbox: the sandboxed card iframe can't play a nested YouTube/IG
+  // player, so it postMessages an id here and we play it outside the sandbox.
+  const [videoPlay, setVideoPlay] = useState<{ src: string; vertical: boolean } | null>(null);
 
   useEffect(() => {
     if (slug) {
@@ -66,6 +69,24 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
       trackView.mutate({ slug, visitorId });
     }
   }, [slug]);
+
+  // Listen for play requests from the sandboxed card. We reconstruct the embed
+  // URL ourselves from a validated id/provider (never trust a raw URL from the
+  // frame), so a malicious card can only ever open a YouTube/Instagram embed.
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      const d = (e.data && (e.data as { __dcVideo?: { id?: string; provider?: string; vertical?: boolean } }).__dcVideo);
+      if (!d) return;
+      const id = String(d.id ?? "");
+      const provider = String(d.provider ?? "");
+      let src = "";
+      if (provider === "youtube" && /^[\w-]{11}$/.test(id)) src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
+      else if (provider === "instagram" && /^[\w-]+$/.test(id)) src = `https://www.instagram.com/reel/${id}/embed/`;
+      if (src) setVideoPlay({ src, vertical: !!d.vertical });
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
 
   // Real customers live in customers.json (the DB has no card for them yet), so
   // when the DB has nothing, render their actual card via the legacy renderer.
@@ -120,6 +141,18 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
     );
   }
 
+  // Full-screen player, opened when the sandboxed card asks to play a video.
+  const videoLightbox = videoPlay ? (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4" onClick={() => setVideoPlay(null)}>
+      <button aria-label="Close video" onClick={() => setVideoPlay(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center"><X size={20} /></button>
+      <div className={`relative w-full ${videoPlay.vertical ? "max-w-[420px]" : "max-w-3xl"}`} onClick={(e) => e.stopPropagation()}>
+        <div className="relative w-full" style={{ paddingBottom: videoPlay.vertical ? "177.78%" : "56.25%" }}>
+          <iframe src={videoPlay.src} title="Video" className="absolute inset-0 w-full h-full rounded-xl bg-black" allow="autoplay; encrypted-media; fullscreen" allowFullScreen />
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // New-flow card rendered from its server snapshot (Phase 15), with expiry
   // handling (Phase 18): a paused card is never deleted — the URL stays, the
   // visitor just sees the configured expiry view. Reactivating (paying) makes
@@ -142,12 +175,12 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
         (s.qrcodes ?? []) as Parameters<typeof buildCardHtml>[5],
       );
     }
-    return <iframe srcDoc={html} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" />;
+    return <>{videoLightbox}<iframe srcDoc={html} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" /></>;
   }
 
   // Real customer card rendered from customers.json (the common case today).
   if (!dbHasContent && legacyHtml) {
-    return <iframe srcDoc={legacyHtml} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" />;
+    return <>{videoLightbox}<iframe srcDoc={legacyHtml} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" /></>;
   }
 
   // No usable DB card and not in the legacy data → genuinely not found.
@@ -221,7 +254,7 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
       color2: preset?.secondary || "",
     } as unknown as Parameters<typeof buildCardHtml>[0];
     const html = buildCardHtml(cust, [], [], [], [], []);
-    return <iframe srcDoc={html} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" />;
+    return <>{videoLightbox}<iframe srcDoc={html} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" /></>;
   }
 
   const about = aboutBlock?.content as Record<string, string> || {};

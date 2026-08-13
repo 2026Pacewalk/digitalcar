@@ -631,7 +631,14 @@ function lbClose(){ document.getElementById('lightbox').style.display='none'; }
 function lbPrev(e){ if(e&&e.stopPropagation)e.stopPropagation(); lbI=(lbI-1+galImgs.length)%galImgs.length; lbShow(); }
 function lbNext(e){ if(e&&e.stopPropagation)e.stopPropagation(); lbI=(lbI+1)%galImgs.length; lbShow(); }
 function dcVidScroll(btn,dir){ var w=btn.parentNode.querySelector('.dc-vid-swipe'); if(w) w.scrollBy({left:dir*w.clientWidth*0.9,behavior:'smooth'}); }
-function playVid(el,id,provider,vertical){ var ig=provider==='instagram'; var src=ig?'https://www.instagram.com/reel/'+id+'/embed/':'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&playsinline=1'; var pad=ig?'125%':(vertical?'177.78%':'56.25%'); el.outerHTML='<div style="position:relative;padding-bottom:'+pad+';height:0;border-radius:12px;overflow:hidden;background:#000"><iframe src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe></div>'; }
+function playVid(el,id,provider,vertical){ var ig=provider==='instagram';
+  // In the PUBLIC card the iframe is sandboxed without allow-same-origin, so a
+  // nested YouTube/Instagram player can't run. Detect that (opaque origin) and
+  // ask the trusted parent page to play it in a lightbox instead. Non-sandboxed
+  // preview contexts (dashboard/demo) fall through and play inline.
+  var sandboxed=false; try{ sandboxed=(window.origin==='null'); }catch(e){ sandboxed=true; }
+  if(sandboxed){ try{ window.parent.postMessage({__dcVideo:{id:id,provider:provider,vertical:!!vertical}},'*'); return; }catch(e){} }
+  var src=ig?'https://www.instagram.com/reel/'+id+'/embed/':'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&playsinline=1'; var pad=ig?'125%':(vertical?'177.78%':'56.25%'); el.outerHTML='<div style="position:relative;padding-bottom:'+pad+';height:0;border-radius:12px;overflow:hidden;background:#000"><iframe src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe></div>'; }
 document.getElementById('lightbox').addEventListener('click', function(e){ if(e.target.id==='lightbox') lbClose(); });
 document.addEventListener('keydown', function(e){ var lb=document.getElementById('lightbox'); if(lb&&lb.style.display==='flex'){ if(e.key==='Escape')lbClose(); else if(e.key==='ArrowLeft')lbPrev(); else if(e.key==='ArrowRight')lbNext(); } });
 function goSection(id){ var el=document.getElementById(id); if(!el) return; var h=document.documentElement, b=document.body, prev=h.style.scrollBehavior; h.style.scrollBehavior='auto'; var y=el.getBoundingClientRect().top+(window.pageYOffset||h.scrollTop||b.scrollTop||0); window.scrollTo(0,y); h.style.scrollBehavior=prev; }
