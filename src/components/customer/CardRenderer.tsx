@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Phone, MessageCircle, Mail, MapPin, Download, Globe, Eye, Share2, Star,
-  Facebook, Twitter, Instagram, Youtube, Linkedin, Play, User, ChevronRight,
+  Facebook, Twitter, Instagram, Youtube, Linkedin, Play, User, ChevronRight, ChevronLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CustomerRecord } from "@/hooks/useCustomer";
@@ -210,12 +210,20 @@ export default function CardRenderer({ c, products, gallery, videos }: {
               <Head title={s(c.video) || "Video Portfolio"} accent={accent} />
               {swipe ? (
                 <>
-                  <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {videos.map((v) => (
-                      <div key={v.id} className="shrink-0 basis-[88%] snap-center"><VideoTile v={v} /></div>
-                    ))}
+                  <div className="relative">
+                    {videos.length > 1 && (
+                      <button type="button" aria-label="Previous video" onClick={(e) => { const t = e.currentTarget.parentElement; const w = t?.querySelector<HTMLElement>("[data-vid-scroll]"); if (w) w.scrollBy({ left: -w.clientWidth * 0.9, behavior: "smooth" }); }} className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/95 shadow-md hidden sm:flex items-center justify-center text-[#0F172A]"><ChevronLeft size={16} /></button>
+                    )}
+                    <div data-vid-scroll className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {videos.map((v) => (
+                        <div key={v.id} className="shrink-0 basis-[88%] snap-center"><VideoTile v={v} /></div>
+                      ))}
+                    </div>
+                    {videos.length > 1 && (
+                      <button type="button" aria-label="Next video" onClick={(e) => { const t = e.currentTarget.parentElement; const w = t?.querySelector<HTMLElement>("[data-vid-scroll]"); if (w) w.scrollBy({ left: w.clientWidth * 0.9, behavior: "smooth" }); }} className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/95 shadow-md hidden sm:flex items-center justify-center text-[#0F172A]"><ChevronRight size={16} /></button>
+                    )}
                   </div>
-                  {videos.length > 1 && <p className="text-center text-[11px] text-[#94A3B8] -mt-1">Swipe to see more →</p>}
+                  {videos.length > 1 && <p className="text-center text-[11px] text-[#94A3B8] -mt-1">Swipe or use the arrows</p>}
                 </>
               ) : (
                 <div className="space-y-2.5">

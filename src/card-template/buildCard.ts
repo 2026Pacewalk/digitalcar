@@ -352,7 +352,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     <div id="video-section" class="section-container">
       <div class="section-header">${esc(s(c.video) || "Video Portfolio")}</div>
       ${vidLayout === "swipe"
-        ? `<div class="dc-vid-swipe">${videos.map((v) => `<div class="dc-vid-slide">${videoCard(v)}</div>`).join("")}</div>${videos.length > 1 ? `<div class="dc-vid-hint"><i class="fa fa-arrows-alt-h"></i> Swipe to see more</div>` : ""}`
+        ? `<div class="dc-vid-swipe-wrap">${videos.length > 1 ? `<button type="button" class="dc-vid-nav prev" onclick="dcVidScroll(this,-1)" aria-label="Previous video"><i class="fa fa-chevron-left"></i></button>` : ""}<div class="dc-vid-swipe">${videos.map((v) => `<div class="dc-vid-slide">${videoCard(v)}</div>`).join("")}</div>${videos.length > 1 ? `<button type="button" class="dc-vid-nav next" onclick="dcVidScroll(this,1)" aria-label="Next video"><i class="fa fa-chevron-right"></i></button>` : ""}</div>${videos.length > 1 ? `<div class="dc-vid-hint"><i class="fa fa-arrows-alt-h"></i> Swipe or use the arrows</div>` : ""}`
         : `<div class="dc-vid-stack">${videos.map(videoCard).join("")}</div>`}
     </div>` : "";
 
@@ -422,9 +422,15 @@ main{padding-bottom:78px;box-shadow:none;}
 /* Video Portfolio layouts */
 .dc-vid-stack .dc-vid-item{margin-bottom:14px;}
 .dc-vid-stack .dc-vid-item:last-child{margin-bottom:0;}
+.dc-vid-swipe-wrap{position:relative;}
 .dc-vid-swipe{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 0 8px;scrollbar-width:none;}
 .dc-vid-swipe::-webkit-scrollbar{display:none;}
 .dc-vid-swipe .dc-vid-slide{flex:0 0 88%;scroll-snap-align:center;}
+/* Desktop navigation arrows (touch devices swipe instead) */
+.dc-vid-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:34px;height:34px;border-radius:50%;border:none;background:rgba(255,255,255,.96);box-shadow:0 2px 10px rgba(0,0,0,.28);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#111;font-size:14px;}
+.dc-vid-nav.prev{left:2px;} .dc-vid-nav.next{right:2px;}
+.dc-vid-nav:active{transform:translateY(-50%) scale(.92);}
+@media (hover:none){.dc-vid-nav{display:none;}}
 .dc-vid-hint{text-align:center;font-size:11px;color:#9aa0a6;margin-top:2px;}
 .dc-vid-hint i{margin-right:5px;color:var(--theme-color);}
 .dc-vid-media img{width:100%;display:block;}
@@ -611,6 +617,7 @@ function lbOpen(i){ lbI=i; document.getElementById('lightbox').style.display='fl
 function lbClose(){ document.getElementById('lightbox').style.display='none'; }
 function lbPrev(e){ if(e&&e.stopPropagation)e.stopPropagation(); lbI=(lbI-1+galImgs.length)%galImgs.length; lbShow(); }
 function lbNext(e){ if(e&&e.stopPropagation)e.stopPropagation(); lbI=(lbI+1)%galImgs.length; lbShow(); }
+function dcVidScroll(btn,dir){ var w=btn.parentNode.querySelector('.dc-vid-swipe'); if(w) w.scrollBy({left:dir*w.clientWidth*0.9,behavior:'smooth'}); }
 function playVid(el,id,provider){ var ig=provider==='instagram'; var src=ig?'https://www.instagram.com/reel/'+id+'/embed/':'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&playsinline=1'; var pad=ig?'125%':'56.25%'; el.outerHTML='<div style="position:relative;padding-bottom:'+pad+';height:0;border-radius:6px;overflow:hidden"><iframe src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe></div>'; }
 document.getElementById('lightbox').addEventListener('click', function(e){ if(e.target.id==='lightbox') lbClose(); });
 document.addEventListener('keydown', function(e){ var lb=document.getElementById('lightbox'); if(lb&&lb.style.display==='flex'){ if(e.key==='Escape')lbClose(); else if(e.key==='ArrowLeft')lbPrev(); else if(e.key==='ArrowRight')lbNext(); } });

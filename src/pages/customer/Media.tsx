@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image as ImageIcon, Video, Trash2, Plus, Play, ImagePlus, Instagram } from "lucide-react";
+import { Image as ImageIcon, Video, Trash2, Plus, Play, ImagePlus, Instagram, Check } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { fieldCls, LimitBar, Tip } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
@@ -10,7 +10,8 @@ type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
 
 export default function CustomerMedia() {
-  const { data } = useCustomer();
+  const { data, update } = useCustomer();
+  const videoLayout = String(data.video_layout ?? "stack").toLowerCase() === "swipe" ? "swipe" : "stack";
   const gLimit = packageLimit(Number(data.package_id), "gallery");
   const vLimit = packageLimit(Number(data.package_id), "video");
   const [tab, setTab] = useState<"gallery" | "video">("gallery");
@@ -80,6 +81,46 @@ export default function CustomerMedia() {
               <button onClick={addVideo} className="h-11 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 shrink-0"><Plus size={15} /> Add</button>
             </div>
           </div>
+
+          {/* How the Video Portfolio appears on the public card link */}
+          {videos.items.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5">
+              <p className="text-sm font-semibold text-[#0F172A]">Video Portfolio layout</p>
+              <p className="text-xs text-[#64748B] mt-0.5 mb-3">How your videos appear on your public card link — changes go live automatically.</p>
+              <div className="grid grid-cols-2 gap-3 max-w-lg">
+                {[
+                  { key: "stack", name: "Stacked", desc: "One below another (full width)" },
+                  { key: "swipe", name: "Swipe (compact)", desc: "Swipe sideways, one at a time" },
+                ].map((opt) => {
+                  const selected = videoLayout === opt.key;
+                  return (
+                    <button key={opt.key} type="button" onClick={() => update({ video_layout: opt.key })}
+                      className={`text-left rounded-xl border-2 p-3 transition-all ${selected ? "border-[#F7B31C] bg-[#FEF3C7]/40 shadow-gold" : "border-[#E2E8F0] bg-white hover:border-[#F7B31C]/50"}`}>
+                      <span className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-[#0F172A]">{opt.name}</span>
+                        {selected && <Check size={15} className="text-[#F7B31C]" />}
+                      </span>
+                      <span className="flex gap-1.5 mt-2.5 mb-2">
+                        {opt.key === "stack" ? (
+                          <span className="flex flex-col gap-1 w-full">
+                            <span className="h-3 rounded bg-[#CBD5E1] w-full" />
+                            <span className="h-3 rounded bg-[#CBD5E1] w-full" />
+                          </span>
+                        ) : (
+                          <span className="flex gap-1 w-full items-center">
+                            <span className="h-6 rounded bg-[#CBD5E1] w-4/5" />
+                            <span className="h-6 rounded bg-[#E2E8F0] w-1/5" />
+                          </span>
+                        )}
+                      </span>
+                      <span className="block text-[11px] text-[#64748B] leading-snug">{opt.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {videos.items.map((v) => {
               const info = parseVideo(v.url);

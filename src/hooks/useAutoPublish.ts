@@ -2,6 +2,10 @@ import { useEffect, useRef } from "react";
 import { trpc } from "@/providers/trpc";
 import { readCustomer, scopedKey, getActiveCardId } from "@/hooks/useCustomer";
 
+// Remember the last slug we did an initial sync for, so navigating between
+// dashboard pages doesn't re-snapshot on every mount — only once per card.
+let initialSyncedSlug: string | null = null;
+
 /* Auto-publish: keep a LIVE card's public page in step with dashboard edits.
 
    When the owner of an already-live card (a published new-flow card, or a legacy
@@ -61,9 +65,23 @@ export function useAutoPublish(): void {
     };
 
     window.addEventListener("dc:content-changed", onChange);
+
+    // Initial sync: push whatever is already in the dashboard for a live card,
+    // so content added before this ran (or in another browser) reaches the
+    // public page without needing a fresh edit. Delayed so first-load hydration
+    // finishes first; guarded to run once per card per page-load.
+    const initial = setTimeout(() => {
+      const slug = String(readCustomer().slug || readCustomer().username || "").trim().toLowerCase();
+      if (slug.length >= 3 && initialSyncedSlug !== slug) {
+        initialSyncedSlug = slug;
+        void run();
+      }
+    }, 2500);
+
     return () => {
       window.removeEventListener("dc:content-changed", onChange);
       if (timer.current) clearTimeout(timer.current);
+      clearTimeout(initial);
     };
   }, [saveSnapshot]);
 }
