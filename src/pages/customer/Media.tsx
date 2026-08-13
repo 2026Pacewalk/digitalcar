@@ -1,17 +1,13 @@
 import { useState } from "react";
-import { Image as ImageIcon, Video, Trash2, Plus, Play, ImagePlus } from "lucide-react";
+import { Image as ImageIcon, Video, Trash2, Plus, Play, ImagePlus, Instagram } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { fieldCls, LimitBar, Tip } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
 import { contentSeeder } from "@/lib/cardContent";
+import { parseVideo, isVideoUrl } from "@/lib/video";
 
 type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
-
-const ytId = (url: string) => {
-  const m = url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/);
-  return m ? m[1] : "";
-};
 
 export default function CustomerMedia() {
   const { data } = useCustomer();
@@ -35,7 +31,7 @@ export default function CustomerMedia() {
   };
   const addVideo = () => {
     if (videoFull) { toast.error("Video limit reached — upgrade your package."); return; }
-    if (!vu.trim() || !ytId(vu)) { toast.error("Enter a valid YouTube URL"); return; }
+    if (!isVideoUrl(vu)) { toast.error("Paste a valid video link — YouTube, YouTube Shorts or Instagram."); return; }
     videos.add({ title: vt.trim() || "Video", url: vu.trim() }); setVt(""); setVu(""); toast.success("Video added");
   };
 
@@ -45,7 +41,7 @@ export default function CustomerMedia() {
   ];
 
   return (
-    <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube videos" icon={ImageIcon}
+    <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube, Shorts & Instagram videos" icon={ImageIcon}
       actions={
         <div className="relative flex rounded-xl bg-[#F1F5F9] p-1">
           <span className="absolute top-1 bottom-1 rounded-lg bg-white shadow-sm transition-all duration-300" style={{ width: "calc((100% - 0.5rem) / 2)", left: `calc(0.25rem + ${tab === "video" ? 1 : 0} * ((100% - 0.5rem) / 2))` }} />
@@ -79,25 +75,37 @@ export default function CustomerMedia() {
           <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5">
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_auto] gap-3">
               <input value={vt} onChange={(e) => setVt(e.target.value)} className={fieldCls} placeholder="Video title" />
-              <input value={vu} onChange={(e) => setVu(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addVideo(); }} className={fieldCls} placeholder="YouTube URL (https://youtu.be/…)" />
+              <input value={vu} onChange={(e) => setVu(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addVideo(); }} className={fieldCls} placeholder="Paste a YouTube, Shorts or Instagram link" />
               <button onClick={addVideo} className="h-11 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 shrink-0"><Plus size={15} /> Add</button>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {videos.items.map((v) => (
+            {videos.items.map((v) => {
+              const info = parseVideo(v.url);
+              const isIg = info?.provider === "instagram";
+              return (
               <div key={v.id} className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
                 <div className="relative aspect-video bg-black">
-                  <img src={`https://img.youtube.com/vi/${ytId(v.url)}/hqdefault.jpg`} alt={v.title} className="w-full h-full object-cover" />
-                  <a href={v.url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></a>
+                  {info?.thumb ? (
+                    <img src={info.thumb} alt={v.title} className="w-full h-full object-cover" />
+                  ) : (
+                    /* Instagram / other links have no fetchable frame — show a branded tile */
+                    <div className={`w-full h-full flex flex-col items-center justify-center gap-1 ${isIg ? "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF]" : "bg-gradient-to-br from-[#334155] to-[#0F172A]"}`}>
+                      {isIg && <Instagram size={26} className="text-white/90" />}
+                      <span className="text-[11px] font-semibold text-white/90">{isIg ? "Instagram video" : "Video link"}</span>
+                    </div>
+                  )}
+                  <a href={v.url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></a>
                 </div>
                 <div className="p-3 flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-[#0F172A] truncate">{v.title}</p>
                   <button onClick={() => videos.remove(v.id)} className="w-8 h-8 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 flex items-center justify-center shrink-0"><Trash2 size={14} /></button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
-          {videos.items.length === 0 && <p className="text-center text-xs text-[#94A3B8]">Add YouTube videos to embed them on your card.</p>}
+          {videos.items.length === 0 && <p className="text-center text-xs text-[#94A3B8]">Add YouTube, Shorts or Instagram videos to feature them on your card.</p>}
         </div>
       )}
     </ModuleShell>

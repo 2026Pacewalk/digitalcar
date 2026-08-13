@@ -5,12 +5,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CustomerRecord } from "@/hooks/useCustomer";
+import { parseVideo } from "@/lib/video";
 
 type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
 type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
-
-const ytId = (url: string) => (url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/) || [])[1] || "";
 const s = (v: unknown) => String(v ?? "").trim();
 const on = (v: unknown) => Number(v ?? 1) === 1;
 
@@ -188,13 +187,23 @@ export default function CardRenderer({ c, products, gallery, videos }: {
         {/* Videos — "swipe" is a compact horizontal carousel, "stack" (default) is vertical */}
         {on(c.video_on) && videos.length > 0 && (() => {
           const swipe = String(c.video_layout ?? "stack").toLowerCase() === "swipe";
-          const VideoTile = ({ v }: { v: Vid }) => (
-            <a href={v.url} target="_blank" rel="noreferrer" className="block relative rounded-xl overflow-hidden aspect-video bg-black">
-              <img src={`https://img.youtube.com/vi/${ytId(v.url)}/hqdefault.jpg`} alt={v.title} className="w-full h-full object-cover opacity-90" />
-              <span className="absolute inset-0 flex items-center justify-center"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></span>
-              <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-white text-xs font-medium p-2">{v.title}</span>
-            </a>
-          );
+          const VideoTile = ({ v }: { v: Vid }) => {
+            const info = parseVideo(v.url);
+            const isIg = info?.provider === "instagram";
+            return (
+              <a href={v.url} target="_blank" rel="noreferrer" className="block relative rounded-xl overflow-hidden aspect-video bg-black">
+                {info?.thumb ? (
+                  <img src={info.thumb} alt={v.title} className="w-full h-full object-cover opacity-90" />
+                ) : (
+                  <span className={`absolute inset-0 flex items-center justify-center ${isIg ? "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF]" : "bg-gradient-to-br from-[#334155] to-[#0F172A]"}`}>
+                    {isIg && <Instagram size={22} className="text-white/90 absolute top-2 left-2" />}
+                  </span>
+                )}
+                <span className="absolute inset-0 flex items-center justify-center"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></span>
+                <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-white text-xs font-medium p-2">{v.title}</span>
+              </a>
+            );
+          };
           return (
             <section>
               <Head title={s(c.video) || "Video Portfolio"} accent={accent} />

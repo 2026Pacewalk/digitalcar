@@ -1,6 +1,7 @@
 import mainCss from "./main.css?raw";
 import type { CustomerRecord } from "@/hooks/useCustomer";
 import { fixMojibake } from "@/lib/cardContent";
+import { parseVideo } from "@/lib/video";
 import { buildLinkBioHtml, LINKBIO_START, LINKBIO_COUNT } from "./linkbio";
 
 /* All 31 legacy templates (style1.css … style31.css) loaded as raw strings. */
@@ -91,7 +92,6 @@ const sanitizeHtml = (v: unknown) =>
 // Safe interpolation of user data inside an inline <script> — quotes it as a JS
 // string literal and neutralises "</script>" so it can't break out (Phase 31 XSS).
 const jsq = (v: unknown) => JSON.stringify(String(v ?? "")).replace(/</g, "\\u003c");
-const ytId = (url: string) => (url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/) || [])[1] || "";
 const IMG = 'referrerpolicy="no-referrer"';
 const darken = (hex: string, f: number) => {
   const m = hex.replace("#", "").match(/.{2}/g);
@@ -317,13 +317,33 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>
     </div>` : "";
 
-  // A single video thumbnail card (shared by both layouts).
-  const videoCard = (v: Vid) => { const vid = ytId(v.url); return `<div class="dc-vid-item">
-        <div class="video-thumb" onclick="playVid(this,'${vid}')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden;background:#000">
-          <img src="https://img.youtube.com/vi/${vid}/hqdefault.jpg" style="width:100%;display:block" ${IMG}>
-          <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="width:54px;height:54px;border-radius:50%;background:rgba(255,0,0,.88);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)"><i class="fa fa-play" style="color:#fff;font-size:20px;margin-left:3px"></i></span></span>
-        </div>
-        <p style="font-size:13px;margin-top:4px">${esc(v.title)}</p></div>`; };
+  // A single video thumbnail card (shared by both layouts). Supports YouTube
+  // (real thumbnail + inline embed), Instagram (branded tile → inline reel embed)
+  // and any other link (branded tile → opens in a new tab).
+  const playBtn = (bg: string) => `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="width:54px;height:54px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)"><i class="fa fa-play" style="color:#fff;font-size:20px;margin-left:3px"></i></span></span>`;
+  const videoCard = (v: Vid) => {
+    const info = parseVideo(v.url);
+    const title = `<p style="font-size:13px;margin-top:4px">${esc(v.title)}</p>`;
+    if (info?.provider === "youtube") {
+      return `<div class="dc-vid-item">
+        <div class="video-thumb" onclick="playVid(this,'${info.id}','youtube')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden;background:#000">
+          <img src="${info.thumb}" style="width:100%;display:block" ${IMG}>
+          ${playBtn("rgba(255,0,0,.88)")}
+        </div>${title}</div>`;
+    }
+    if (info?.provider === "instagram") {
+      return `<div class="dc-vid-item">
+        <div class="video-thumb dc-ig-thumb" onclick="playVid(this,'${info.id}','instagram')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden">
+          <span class="dc-ig-badge"><i class="fab fa-instagram"></i> Instagram</span>
+          ${playBtn("rgba(0,0,0,.5)")}
+        </div>${title}</div>`;
+    }
+    // Any other link — a branded tile that opens the video in a new tab.
+    return `<div class="dc-vid-item">
+        <a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer" class="video-thumb dc-other-thumb" style="position:relative;display:block;border-radius:6px;overflow:hidden">
+          ${playBtn("rgba(0,0,0,.5)")}
+        </a>${title}</div>`;
+  };
   // Owner chooses how the portfolio reads on the public card: "swipe" is a compact
   // horizontal carousel (one video at a time); "stack" (default) lists them vertically.
   const vidLayout = String(c.video_layout ?? "stack").toLowerCase() === "swipe" ? "swipe" : "stack";
@@ -406,6 +426,12 @@ main{padding-bottom:78px;box-shadow:none;}
 .dc-vid-swipe .dc-vid-slide{flex:0 0 88%;scroll-snap-align:center;}
 .dc-vid-hint{text-align:center;font-size:11px;color:#9aa0a6;margin-top:2px;}
 .dc-vid-hint i{margin-right:5px;color:var(--theme-color);}
+/* Branded tiles for links with no fetchable thumbnail (Instagram / other) */
+.dc-ig-thumb,.dc-other-thumb{aspect-ratio:16/9;}
+.dc-ig-thumb{background:linear-gradient(135deg,#F58529 0%,#DD2A7B 55%,#8134AF 100%);}
+.dc-other-thumb{background:linear-gradient(135deg,#334155,#0f172a);}
+.dc-ig-badge{position:absolute;top:8px;left:8px;z-index:1;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#fff;background:rgba(0,0,0,.28);padding:3px 8px;border-radius:999px;}
+.dc-ig-badge i{font-size:13px;}
 .speciality-list li i{color:var(--theme-color);}
 #shareModal .popup-share-icons ul{list-style:none;display:flex;justify-content:center;flex-wrap:wrap;padding:0;margin:0 0 8px;}
 #shareModal .popup-share-icons ul li a i{height:46px;width:46px;line-height:46px;min-width:46px;border-radius:8px;font-size:17px;margin:4px;}
@@ -580,7 +606,7 @@ function lbOpen(i){ lbI=i; document.getElementById('lightbox').style.display='fl
 function lbClose(){ document.getElementById('lightbox').style.display='none'; }
 function lbPrev(e){ if(e&&e.stopPropagation)e.stopPropagation(); lbI=(lbI-1+galImgs.length)%galImgs.length; lbShow(); }
 function lbNext(e){ if(e&&e.stopPropagation)e.stopPropagation(); lbI=(lbI+1)%galImgs.length; lbShow(); }
-function playVid(el,id){ el.outerHTML='<div style="position:relative;padding-bottom:56.25%;height:0;border-radius:6px;overflow:hidden"><iframe src="https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&playsinline=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe></div>'; }
+function playVid(el,id,provider){ var ig=provider==='instagram'; var src=ig?'https://www.instagram.com/reel/'+id+'/embed/':'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&playsinline=1'; var pad=ig?'125%':'56.25%'; el.outerHTML='<div style="position:relative;padding-bottom:'+pad+';height:0;border-radius:6px;overflow:hidden"><iframe src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe></div>'; }
 document.getElementById('lightbox').addEventListener('click', function(e){ if(e.target.id==='lightbox') lbClose(); });
 document.addEventListener('keydown', function(e){ var lb=document.getElementById('lightbox'); if(lb&&lb.style.display==='flex'){ if(e.key==='Escape')lbClose(); else if(e.key==='ArrowLeft')lbPrev(); else if(e.key==='ArrowRight')lbNext(); } });
 function goSection(id){ var el=document.getElementById(id); if(!el) return; var h=document.documentElement, b=document.body, prev=h.style.scrollBehavior; h.style.scrollBehavior='auto'; var y=el.getBoundingClientRect().top+(window.pageYOffset||h.scrollTop||b.scrollTop||0); window.scrollTo(0,y); h.style.scrollBehavior=prev; }
