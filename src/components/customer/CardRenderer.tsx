@@ -187,21 +187,27 @@ export default function CardRenderer({ c, products, gallery, videos }: {
         {/* Videos — "swipe" is a compact horizontal carousel, "stack" (default) is vertical */}
         {on(c.video_on) && videos.length > 0 && (() => {
           const swipe = String(c.video_layout ?? "stack").toLowerCase() === "swipe";
+          // In swipe, every tile is a uniform 9:16 "reel" (shorts fill, landscape
+          // centered over a blurred fill) so heights match and there are no gaps.
           const VideoTile = ({ v }: { v: Vid }) => {
             const info = parseVideo(v.url);
             const isIg = info?.provider === "instagram";
             const vertical = !!info?.vertical;
+            const ratio = swipe ? "aspect-[9/16] w-full" : vertical ? "aspect-[9/16] max-w-[220px]" : "aspect-video w-full";
             return (
-              <a href={v.url} target="_blank" rel="noreferrer" className={`block relative rounded-xl overflow-hidden bg-black mx-auto ${vertical ? "aspect-[9/16] max-w-[220px]" : "aspect-video w-full"}`}>
+              <a href={v.url} target="_blank" rel="noreferrer" className={`group block relative rounded-2xl overflow-hidden bg-[#0b0b0f] mx-auto shadow-md ${ratio}`}>
                 {info?.thumb ? (
-                  <img src={info.thumb} alt={v.title} className="w-full h-full object-cover opacity-90" />
+                  <>
+                    <span className="absolute inset-0 bg-cover bg-center blur-lg brightness-50 scale-110" style={{ backgroundImage: `url(${info.thumb})` }} />
+                    <img src={info.thumb} alt={v.title} className="absolute inset-0 w-full h-full object-contain z-[1]" />
+                  </>
                 ) : (
                   <span className={`absolute inset-0 flex items-center justify-center ${isIg ? "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF]" : "bg-gradient-to-br from-[#334155] to-[#0F172A]"}`}>
-                    {isIg && <Instagram size={22} className="text-white/90 absolute top-2 left-2" />}
+                    {isIg && <span className="absolute top-2.5 left-2.5 z-[3] inline-flex items-center gap-1 text-[10px] font-bold text-white bg-black/30 px-2 py-0.5 rounded-full"><Instagram size={12} /> Instagram</span>}
                   </span>
                 )}
-                <span className="absolute inset-0 flex items-center justify-center"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></span>
-                <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-white text-xs font-medium p-2">{v.title}</span>
+                <span className="absolute inset-0 z-[2] flex items-center justify-center"><span className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg transition-transform group-hover:scale-110"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></span>
+                <span className="absolute bottom-0 inset-x-0 z-[3] bg-gradient-to-t from-black/75 to-transparent text-white text-xs font-semibold px-3 pt-6 pb-2.5 truncate">{v.title}</span>
               </a>
             );
           };
@@ -216,7 +222,7 @@ export default function CardRenderer({ c, products, gallery, videos }: {
                     )}
                     <div data-vid-scroll className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {videos.map((v) => (
-                        <div key={v.id} className="shrink-0 basis-[88%] snap-center"><VideoTile v={v} /></div>
+                        <div key={v.id} className="shrink-0 basis-[74%] snap-center"><VideoTile v={v} /></div>
                       ))}
                     </div>
                     {videos.length > 1 && (

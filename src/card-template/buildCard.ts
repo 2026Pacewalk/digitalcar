@@ -317,33 +317,34 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>
     </div>` : "";
 
-  // A single video thumbnail card (shared by both layouts). Supports YouTube
-  // (real thumbnail + inline embed), Instagram (branded tile → inline reel embed)
-  // and any other link (branded tile → opens in a new tab).
-  const playBtn = (bg: string) => `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="width:54px;height:54px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)"><i class="fa fa-play" style="color:#fff;font-size:20px;margin-left:3px"></i></span></span>`;
+  // A single video card (shared by both layouts). YouTube shows a real frame with
+  // a blurred fill behind it (so any aspect ratio fills the tile cleanly — no gaps),
+  // Instagram / other links show a branded tile. Title sits in a gradient overlay.
+  const playBtn = (bg: string) => `<span class="dc-vid-play"><span style="background:${bg}"><i class="fa fa-play"></i></span></span>`;
+  const titleOverlay = (t: string) => `<span class="dc-vid-title">${esc(t)}</span>`;
   const videoCard = (v: Vid) => {
     const info = parseVideo(v.url);
-    const vert = info?.vertical ? " vertical" : ""; // Shorts / reels → portrait tile
-    const title = `<p style="font-size:13px;margin-top:4px">${esc(v.title)}</p>`;
+    const vert = info?.vertical ? " vertical" : ""; // Shorts / reels
     if (info?.provider === "youtube") {
       return `<div class="dc-vid-item${vert}">
-        <div class="video-thumb dc-vid-media" onclick="playVid(this,'${info.id}','youtube')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden;background:#000">
-          <img src="${info.thumb}" ${IMG}>
-          ${playBtn("rgba(255,0,0,.88)")}
-        </div>${title}</div>`;
+        <div class="video-thumb dc-vid-media" onclick="playVid(this,'${info.id}','youtube',${info.vertical ? 1 : 0})">
+          <span class="dc-vid-bg" style="background-image:url('${info.thumb}')"></span>
+          <img class="dc-vid-fg" src="${info.thumb}" ${IMG}>
+          ${playBtn("rgba(255,0,0,.9)")}${titleOverlay(v.title)}
+        </div></div>`;
     }
     if (info?.provider === "instagram") {
       return `<div class="dc-vid-item${vert}">
-        <div class="video-thumb dc-vid-media dc-ig-thumb" onclick="playVid(this,'${info.id}','instagram')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden">
+        <div class="video-thumb dc-vid-media dc-ig-thumb" onclick="playVid(this,'${info.id}','instagram',1)">
           <span class="dc-ig-badge"><i class="fab fa-instagram"></i> Instagram</span>
-          ${playBtn("rgba(0,0,0,.5)")}
-        </div>${title}</div>`;
+          ${playBtn("rgba(0,0,0,.55)")}${titleOverlay(v.title)}
+        </div></div>`;
     }
     // Any other link — a branded tile that opens the video in a new tab.
     return `<div class="dc-vid-item${vert}">
-        <a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer" class="video-thumb dc-vid-media dc-other-thumb" style="position:relative;display:block;border-radius:6px;overflow:hidden">
-          ${playBtn("rgba(0,0,0,.5)")}
-        </a>${title}</div>`;
+        <a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer" class="video-thumb dc-vid-media dc-other-thumb">
+          ${playBtn("rgba(0,0,0,.55)")}${titleOverlay(v.title)}
+        </a></div>`;
   };
   // Owner chooses how the portfolio reads on the public card: "swipe" is a compact
   // horizontal carousel (one video at a time); "stack" (default) lists them vertically.
@@ -419,30 +420,42 @@ main{padding-bottom:78px;box-shadow:none;}
 .footer-menu-link i{font-size:15px;}
 .footer-menu-link p{font-size:8px;line-height:1.1;margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 1px;}
 .section-header{font-size:19px;}
-/* Video Portfolio layouts */
-.dc-vid-stack .dc-vid-item{margin-bottom:14px;}
+/* ── Video Portfolio ─────────────────────────────────────────────
+   Each tile: a blurred fill of the frame behind the frame itself, so any
+   aspect ratio (landscape or vertical short/reel) fills the tile cleanly
+   with no white gaps. Title sits in a gradient overlay at the bottom. */
+.dc-vid-media{position:relative;display:block;overflow:hidden;border-radius:14px;background:#0b0b0f;cursor:pointer;box-shadow:0 6px 20px rgba(15,20,32,.14);}
+.dc-vid-bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(22px) brightness(.5);transform:scale(1.18);}
+.dc-vid-fg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;}
+.dc-vid-play{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;}
+.dc-vid-play > span{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.45);transition:transform .18s;}
+.dc-vid-media:hover .dc-vid-play > span{transform:scale(1.08);}
+.dc-vid-play i{color:#fff;font-size:21px;margin-left:3px;}
+.dc-vid-title{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:26px 12px 11px;font-size:13px;font-weight:600;line-height:1.3;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.72));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* Stack: full-width tiles (landscape 16:9; vertical capped & centered) */
+.dc-vid-stack .dc-vid-item{margin-bottom:16px;}
 .dc-vid-stack .dc-vid-item:last-child{margin-bottom:0;}
+.dc-vid-stack .dc-vid-media{aspect-ratio:16/9;}
+.dc-vid-stack .dc-vid-item.vertical .dc-vid-media{aspect-ratio:9/16;max-width:260px;margin:0 auto;}
+/* Swipe: uniform portrait "reels" tiles → shorts fill, landscape centered on blur,
+   one consistent height so there are never white gaps between slides. */
 .dc-vid-swipe-wrap{position:relative;}
-.dc-vid-swipe{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 0 8px;scrollbar-width:none;}
+.dc-vid-swipe{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;scrollbar-width:none;}
 .dc-vid-swipe::-webkit-scrollbar{display:none;}
-.dc-vid-swipe .dc-vid-slide{flex:0 0 88%;scroll-snap-align:center;}
+.dc-vid-swipe .dc-vid-slide{flex:0 0 74%;scroll-snap-align:center;}
+.dc-vid-swipe .dc-vid-media{aspect-ratio:9/16;}
 /* Desktop navigation arrows (touch devices swipe instead) */
-.dc-vid-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:34px;height:34px;border-radius:50%;border:none;background:rgba(255,255,255,.96);box-shadow:0 2px 10px rgba(0,0,0,.28);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#111;font-size:14px;}
-.dc-vid-nav.prev{left:2px;} .dc-vid-nav.next{right:2px;}
+.dc-vid-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:4;width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.97);box-shadow:0 3px 12px rgba(0,0,0,.3);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#111;font-size:14px;}
+.dc-vid-nav.prev{left:-4px;} .dc-vid-nav.next{right:-4px;}
 .dc-vid-nav:active{transform:translateY(-50%) scale(.92);}
 @media (hover:none){.dc-vid-nav{display:none;}}
 .dc-vid-hint{text-align:center;font-size:11px;color:#9aa0a6;margin-top:2px;}
 .dc-vid-hint i{margin-right:5px;color:var(--theme-color);}
-.dc-vid-media img{width:100%;display:block;}
 /* Branded tiles for links with no fetchable thumbnail (Instagram / other) */
-.dc-ig-thumb,.dc-other-thumb{aspect-ratio:16/9;}
 .dc-ig-thumb{background:linear-gradient(135deg,#F58529 0%,#DD2A7B 55%,#8134AF 100%);}
 .dc-other-thumb{background:linear-gradient(135deg,#334155,#0f172a);}
-.dc-ig-badge{position:absolute;top:8px;left:8px;z-index:1;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#fff;background:rgba(0,0,0,.28);padding:3px 8px;border-radius:999px;}
+.dc-ig-badge{position:absolute;top:10px;left:10px;z-index:3;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#fff;background:rgba(0,0,0,.32);padding:4px 9px;border-radius:999px;}
 .dc-ig-badge i{font-size:13px;}
-/* Vertical (Shorts / reels): show the tile in portrait, centered and width-capped */
-.dc-vid-item.vertical .dc-vid-media{aspect-ratio:9/16;max-width:230px;margin:0 auto;}
-.dc-vid-item.vertical .dc-vid-media img{height:100%;object-fit:cover;}
 .speciality-list li i{color:var(--theme-color);}
 #shareModal .popup-share-icons ul{list-style:none;display:flex;justify-content:center;flex-wrap:wrap;padding:0;margin:0 0 8px;}
 #shareModal .popup-share-icons ul li a i{height:46px;width:46px;line-height:46px;min-width:46px;border-radius:8px;font-size:17px;margin:4px;}
@@ -618,7 +631,7 @@ function lbClose(){ document.getElementById('lightbox').style.display='none'; }
 function lbPrev(e){ if(e&&e.stopPropagation)e.stopPropagation(); lbI=(lbI-1+galImgs.length)%galImgs.length; lbShow(); }
 function lbNext(e){ if(e&&e.stopPropagation)e.stopPropagation(); lbI=(lbI+1)%galImgs.length; lbShow(); }
 function dcVidScroll(btn,dir){ var w=btn.parentNode.querySelector('.dc-vid-swipe'); if(w) w.scrollBy({left:dir*w.clientWidth*0.9,behavior:'smooth'}); }
-function playVid(el,id,provider){ var ig=provider==='instagram'; var src=ig?'https://www.instagram.com/reel/'+id+'/embed/':'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&playsinline=1'; var pad=ig?'125%':'56.25%'; el.outerHTML='<div style="position:relative;padding-bottom:'+pad+';height:0;border-radius:6px;overflow:hidden"><iframe src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe></div>'; }
+function playVid(el,id,provider,vertical){ var ig=provider==='instagram'; var src=ig?'https://www.instagram.com/reel/'+id+'/embed/':'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&playsinline=1'; var pad=ig?'125%':(vertical?'177.78%':'56.25%'); el.outerHTML='<div style="position:relative;padding-bottom:'+pad+';height:0;border-radius:12px;overflow:hidden;background:#000"><iframe src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe></div>'; }
 document.getElementById('lightbox').addEventListener('click', function(e){ if(e.target.id==='lightbox') lbClose(); });
 document.addEventListener('keydown', function(e){ var lb=document.getElementById('lightbox'); if(lb&&lb.style.display==='flex'){ if(e.key==='Escape')lbClose(); else if(e.key==='ArrowLeft')lbPrev(); else if(e.key==='ArrowRight')lbNext(); } });
 function goSection(id){ var el=document.getElementById(id); if(!el) return; var h=document.documentElement, b=document.body, prev=h.style.scrollBehavior; h.style.scrollBehavior='auto'; var y=el.getBoundingClientRect().top+(window.pageYOffset||h.scrollTop||b.scrollTop||0); window.scrollTo(0,y); h.style.scrollBehavior=prev; }
