@@ -19,6 +19,8 @@ export default function CustomerMedia() {
   const videos = useLocalList<Vid>("dc_videos", [], contentSeeder("videos"));
   const [vt, setVt] = useState(""); const [vu, setVu] = useState("");
   const [playing, setPlaying] = useState<number | null>(null); // video played inline in the dashboard
+  const [secTitle, setSecTitle] = useState<string | null>(null); // local edit of the section heading
+  const secTitleVal = secTitle !== null ? secTitle : String(data.video ?? "");
   const videoFull = videos.items.length >= vLimit;
 
   const onPickImages = async (files: FileList | null) => {
@@ -85,6 +87,16 @@ export default function CustomerMedia() {
           {/* How the Video Portfolio appears on the public card link */}
           {videos.items.length > 0 && (
             <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5">
+              {/* Rename the section heading shown on the public card */}
+              <p className="text-sm font-semibold text-[#0F172A]">Section name</p>
+              <p className="text-xs text-[#64748B] mt-0.5 mb-2">The heading shown above your videos on the public card.</p>
+              <input value={secTitleVal} onChange={(e) => setSecTitle(e.target.value)}
+                onBlur={() => { if (secTitle !== null) { update({ video: secTitle.trim() }); toast.success("Section name updated"); } }}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                className={`${fieldCls} max-w-lg`} placeholder="Video Portfolio" />
+
+              <div className="h-px bg-[#F1F5F9] my-4" />
+
               <p className="text-sm font-semibold text-[#0F172A]">Video Portfolio layout</p>
               <p className="text-xs text-[#64748B] mt-0.5 mb-3">How your videos appear on your public card link — changes go live automatically.</p>
               <div className="grid grid-cols-2 gap-3 max-w-lg">
