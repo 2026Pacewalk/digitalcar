@@ -19,19 +19,35 @@ async function setting(db: ReturnType<typeof getDb>, key: string): Promise<strin
    allowed to claim one — otherwise its snapshot would override the legacy card
    (snapshot wins over legacy JSON in PublicCard.tsx). Cached 60s like card-og. */
 let legacyCache: Set<string> | null = null;
+let legacyOwnerCache: Map<string, string> | null = null;
 let legacyAt = 0;
-export function legacySlugSet(): Set<string> {
+function loadLegacy(): void {
   const now = Date.now();
-  if (legacyCache && now - legacyAt < 60_000) return legacyCache;
+  if (legacyCache && legacyOwnerCache && now - legacyAt < 60_000) return;
   for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
     try {
-      const rows = JSON.parse(fs.readFileSync(path.resolve(p), "utf-8")) as { slug?: string }[];
-      legacyCache = new Set(rows.map((r) => String(r.slug || "").toLowerCase().trim()).filter(Boolean));
+      const rows = JSON.parse(fs.readFileSync(path.resolve(p), "utf-8")) as { slug?: string; email?: string }[];
+      const owners = new Map<string, string>();
+      for (const r of rows) {
+        const slug = String(r.slug || "").toLowerCase().trim();
+        if (slug) owners.set(slug, String(r.email || "").toLowerCase().trim());
+      }
+      legacyOwnerCache = owners;
+      legacyCache = new Set(owners.keys());
       legacyAt = now;
-      return legacyCache;
+      return;
     } catch { /* try next path */ }
   }
+}
+export function legacySlugSet(): Set<string> {
+  loadLegacy();
   return legacyCache ?? new Set();
+}
+/* slug → owner email for the legacy customers.json cards, so the LEGITIMATE
+   owner (same email) can publish/reclaim their own legacy slug. */
+export function legacySlugOwners(): Map<string, string> {
+  loadLegacy();
+  return legacyOwnerCache ?? new Map();
 }
 
 /* True when `slug` is already owned by anyone OTHER than (ownerUserId, ownerCardId).
@@ -40,9 +56,19 @@ export function legacySlugSet(): Set<string> {
    so a slug can never be claimed across systems (the pacewalk cross-system leak). */
 export async function slugTakenByOther(
   db: ReturnType<typeof getDb>, slug: string, ownerUserId: number, ownerCardId: number,
+  ownerEmail?: string,
 ): Promise<boolean> {
+  const key = slug.toLowerCase().trim();
   // 1) Legacy customers.json (case-insensitive, matching the public resolver).
-  if (legacySlugSet().has(slug.toLowerCase().trim())) return true;
+  //    Taken by "other" UNLESS the caller is the legitimate legacy owner (same
+  //    email) reclaiming their own slug — that owner is allowed to publish over
+  //    their legacy card (their snapshot then becomes the live version).
+  const legacyOwner = legacySlugOwners().get(key);
+  if (legacyOwner !== undefined) {
+    const email = String(ownerEmail || "").toLowerCase().trim();
+    if (!email || legacyOwner !== email) return true;
+    // owner match → fall through to the relational/snapshot checks below.
+  }
   // 2) Relational cards — cards.slug is globally unique; taken if another user holds it.
   const rel = await db.select({ userId: cards.userId }).from(cards).where(eq(cards.slug, slug));
   if (rel.some((r) => Number(r.userId) !== ownerUserId)) return true;
@@ -70,7 +96,7 @@ export const publishRouter = createRouter({
       if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid card URL." });
       // Reject a slug owned by ANY OTHER card — across legacy, relational and
       // snapshot cards — so no card can hijack a victim's URL/leads (Phase 31).
-      if (await slugTakenByOther(db, slug, ctx.user.id, cardId))
+      if (await slugTakenByOther(db, slug, ctx.user.id, cardId, ctx.user.email))
         throw new TRPCError({ code: "CONFLICT", message: "That card URL is already taken." });
 
       const owner = and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId));
@@ -91,7 +117,7 @@ export const publishRouter = createRouter({
       const slug = input.slug.trim().replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
       if (!slug) return { available: false, slug };
       const db = getDb();
-      const available = !(await slugTakenByOther(db, slug, ctx.user.id, input.cardId || 1));
+      const available = !(await slugTakenByOther(db, slug, ctx.user.id, input.cardId || 1, ctx.user.email));
       return { available, slug };
     }),
 

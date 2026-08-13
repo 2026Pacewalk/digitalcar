@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 
+/* Fire a debounce-able signal whenever the owner edits card content, so an
+   auto-publish listener can re-snapshot a live card to its public page.
+   (Bulk hydration writes localStorage directly and does NOT call this, so
+   loading a card never triggers a publish — only real edits do.) */
+export function signalContentChanged(): void {
+  try { window.dispatchEvent(new CustomEvent("dc:content-changed")); } catch { /* SSR / no window */ }
+}
+
 export type CustomerRecord = Record<string, unknown> & {
   id: number; name: string; username: string; slug: string; email: string;
   package_id: number; views: number;
@@ -233,6 +241,7 @@ export function useCustomer() {
       if (patch.name !== undefined || patch.company_name !== undefined || patch.slug !== undefined) {
         syncCardMeta({ name: String(next.company_name || next.name || "My Card"), slug: String(next.slug || "card") });
       }
+      signalContentChanged();
       return next;
     });
   }, []);
@@ -281,6 +290,7 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
   const persist = useCallback((next: T[]) => {
     setItems(next);
     try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
+    signalContentChanged();
   }, [key]);
 
   const add = useCallback((item: Omit<T, "id">) => {
@@ -290,6 +300,7 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
       try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
+    signalContentChanged();
   }, [key]);
 
   const update = useCallback((id: number, patch: Partial<T>) => {
@@ -298,6 +309,7 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
       try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
+    signalContentChanged();
   }, [key]);
 
   const remove = useCallback((id: number) => {
@@ -306,6 +318,7 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
       try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
+    signalContentChanged();
   }, [key]);
 
   return { items, ready, add, update, remove, persist };

@@ -44,6 +44,22 @@ function mapProfile(row: Record<string, unknown>, u: { id: number; fullName: str
     package_id: Number(row.package_id) || 7,
     views: Number(row.views) || 0,
     email_verify: Number(row.email_verify) || 0,
+    // Legacy "live" flag — a status:1 card is already public, so the auto-publish
+    // listener may keep its snapshot in sync with dashboard edits.
+    status: Number(row.status) || 0,
+    // Appearance + section visibility, so a published snapshot renders identically
+    // to the legacy card (theme, colour, which sections show, their titles).
+    theme: s(row.theme) || "1",
+    color: s(row.color) || "#F7B31C",
+    video_layout: s(row.video_layout),
+    about_on: Number(row.about_on ?? 1), product_on: Number(row.product_on ?? 1),
+    payment_on: Number(row.payment_on ?? 1), gallery_on: Number(row.gallery_on ?? 1),
+    video_on: Number(row.video_on ?? 1), qrcode_on: Number(row.qrcode_on ?? 1),
+    offer_on: Number(row.offer_on ?? 0), uploads_on: Number(row.uploads_on ?? 0),
+    enquiry_on: Number(row.enquiry_on ?? 1), feedback_on: Number(row.feedback_on ?? 0),
+    about: s(row.about), product: s(row.product), payment: s(row.payment),
+    gallery: s(row.gallery), video: s(row.video), qrcode: s(row.qrcode),
+    offer: s(row.offer), uploads: s(row.uploads), enquiry: s(row.enquiry),
   };
 }
 

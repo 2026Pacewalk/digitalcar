@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import DashboardLayout from "./DashboardLayout";
 import MobileDashboardLayout from "./MobileDashboardLayout";
 import { useCardHydration } from "@/hooks/useCardHydration";
+import { useAutoPublish } from "@/hooks/useAutoPublish";
 
 /* ─── Responsive Dashboard Layout
  * Desktop: Sidebar + TopBar (DashboardLayout)
@@ -24,6 +25,8 @@ export default function ResponsiveDashboardLayout({
   // First load: pull the signed-in customer's real card into local storage so
   // the dashboard shows their actual profile/products instead of a blank seed.
   const hydrated = useCardHydration();
+  // Keep a live card's public page in sync as the owner edits (auto-publish).
+  useAutoPublish();
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);

@@ -36,7 +36,7 @@ async function provisionStarterCard(
     const base = (user.fullName || user.email.split("@")[0])
       .toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "card";
     let slug = base;
-    for (let n = 2; await slugTakenByOther(db, slug, user.id, 1); n++) {
+    for (let n = 2; await slugTakenByOther(db, slug, user.id, 1, user.email); n++) {
       slug = n > 40 ? `${base}-${nanoid(4).toLowerCase()}` : `${base}-${n}`;
       if (n > 40) break;
     }
