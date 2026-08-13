@@ -317,15 +317,22 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>
     </div>` : "";
 
-  const videoSection = on(c.video_on) && videos.length ? `
-    <div id="video-section" class="section-container">
-      <div class="section-header">${esc(s(c.video) || "Video Portfolio")}</div>
-      ${videos.map((v) => { const vid = ytId(v.url); return `<div style="margin-bottom:14px">
+  // A single video thumbnail card (shared by both layouts).
+  const videoCard = (v: Vid) => { const vid = ytId(v.url); return `<div class="dc-vid-item">
         <div class="video-thumb" onclick="playVid(this,'${vid}')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden;background:#000">
           <img src="https://img.youtube.com/vi/${vid}/hqdefault.jpg" style="width:100%;display:block" ${IMG}>
           <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="width:54px;height:54px;border-radius:50%;background:rgba(255,0,0,.88);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)"><i class="fa fa-play" style="color:#fff;font-size:20px;margin-left:3px"></i></span></span>
         </div>
-        <p style="font-size:13px;margin-top:4px">${esc(v.title)}</p></div>`; }).join("")}
+        <p style="font-size:13px;margin-top:4px">${esc(v.title)}</p></div>`; };
+  // Owner chooses how the portfolio reads on the public card: "swipe" is a compact
+  // horizontal carousel (one video at a time); "stack" (default) lists them vertically.
+  const vidLayout = String(c.video_layout ?? "stack").toLowerCase() === "swipe" ? "swipe" : "stack";
+  const videoSection = on(c.video_on) && videos.length ? `
+    <div id="video-section" class="section-container">
+      <div class="section-header">${esc(s(c.video) || "Video Portfolio")}</div>
+      ${vidLayout === "swipe"
+        ? `<div class="dc-vid-swipe">${videos.map((v) => `<div class="dc-vid-slide">${videoCard(v)}</div>`).join("")}</div>${videos.length > 1 ? `<div class="dc-vid-hint"><i class="fa fa-arrows-alt-h"></i> Swipe to see more</div>` : ""}`
+        : `<div class="dc-vid-stack">${videos.map(videoCard).join("")}</div>`}
     </div>` : "";
 
   const enquirySection = on(c.enquiry_on) ? `
@@ -391,6 +398,14 @@ main{padding-bottom:78px;box-shadow:none;}
 .footer-menu-link i{font-size:15px;}
 .footer-menu-link p{font-size:8px;line-height:1.1;margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 1px;}
 .section-header{font-size:19px;}
+/* Video Portfolio layouts */
+.dc-vid-stack .dc-vid-item{margin-bottom:14px;}
+.dc-vid-stack .dc-vid-item:last-child{margin-bottom:0;}
+.dc-vid-swipe{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 0 8px;scrollbar-width:none;}
+.dc-vid-swipe::-webkit-scrollbar{display:none;}
+.dc-vid-swipe .dc-vid-slide{flex:0 0 88%;scroll-snap-align:center;}
+.dc-vid-hint{text-align:center;font-size:11px;color:#9aa0a6;margin-top:2px;}
+.dc-vid-hint i{margin-right:5px;color:var(--theme-color);}
 .speciality-list li i{color:var(--theme-color);}
 #shareModal .popup-share-icons ul{list-style:none;display:flex;justify-content:center;flex-wrap:wrap;padding:0;margin:0 0 8px;}
 #shareModal .popup-share-icons ul li a i{height:46px;width:46px;line-height:46px;min-width:46px;border-radius:8px;font-size:17px;margin:4px;}

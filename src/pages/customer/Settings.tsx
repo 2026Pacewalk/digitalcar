@@ -169,6 +169,47 @@ export default function CustomerSettings() {
               </div>
             ))}
           </div>
+
+          {/* Video Portfolio layout — only relevant while the Videos section is on */}
+          {isOn("video_on") && (
+            <div className="mt-5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
+              <p className="text-sm font-semibold text-[#0F172A]">Video Portfolio layout</p>
+              <p className="text-xs text-[#64748B] mt-0.5 mb-3">Choose how your videos appear on your public card link.</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { key: "stack", name: "Stacked", desc: "One below another (full width)", rows: 2 },
+                  { key: "swipe", name: "Swipe (compact)", desc: "Swipe sideways, one at a time", rows: 1 },
+                ].map((opt) => {
+                  const selected = val("video_layout", "stack") === opt.key;
+                  return (
+                    <button key={opt.key} type="button" onClick={() => set("video_layout", opt.key)}
+                      className={`text-left rounded-xl border-2 p-3 transition-all ${selected ? "border-[#F7B31C] bg-[#FEF3C7]/40 shadow-gold" : "border-[#E2E8F0] bg-white hover:border-[#F7B31C]/50"}`}>
+                      <span className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-[#0F172A]">{opt.name}</span>
+                        {selected && <Check size={15} className="text-[#F7B31C]" />}
+                      </span>
+                      {/* tiny visual: stacked = two bars, swipe = one wide bar + peek */}
+                      <span className="flex gap-1.5 mt-2.5 mb-2">
+                        {opt.key === "stack" ? (
+                          <span className="flex flex-col gap-1 w-full">
+                            <span className="h-3 rounded bg-[#CBD5E1] w-full" />
+                            <span className="h-3 rounded bg-[#CBD5E1] w-full" />
+                          </span>
+                        ) : (
+                          <span className="flex gap-1 w-full items-center">
+                            <span className="h-6 rounded bg-[#CBD5E1] w-4/5" />
+                            <span className="h-6 rounded bg-[#E2E8F0] w-1/5" />
+                          </span>
+                        )}
+                      </span>
+                      <span className="block text-[11px] text-[#64748B] leading-snug">{opt.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end mt-4"><button onClick={() => save("Modules updated")} className="flex items-center gap-2 h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold"><Save size={15} /> Submit</button></div>
         </Panel>
       )}

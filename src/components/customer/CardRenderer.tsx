@@ -185,21 +185,36 @@ export default function CardRenderer({ c, products, gallery, videos }: {
           </section>
         )}
 
-        {/* Videos */}
-        {on(c.video_on) && videos.length > 0 && (
-          <section>
-            <Head title={s(c.video) || "Video Portfolio"} accent={accent} />
-            <div className="space-y-2.5">
-              {videos.map((v) => (
-                <a key={v.id} href={v.url} target="_blank" rel="noreferrer" className="block relative rounded-xl overflow-hidden aspect-video bg-black">
-                  <img src={`https://img.youtube.com/vi/${ytId(v.url)}/hqdefault.jpg`} alt={v.title} className="w-full h-full object-cover opacity-90" />
-                  <span className="absolute inset-0 flex items-center justify-center"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></span>
-                  <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-white text-xs font-medium p-2">{v.title}</span>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Videos — "swipe" is a compact horizontal carousel, "stack" (default) is vertical */}
+        {on(c.video_on) && videos.length > 0 && (() => {
+          const swipe = String(c.video_layout ?? "stack").toLowerCase() === "swipe";
+          const VideoTile = ({ v }: { v: Vid }) => (
+            <a href={v.url} target="_blank" rel="noreferrer" className="block relative rounded-xl overflow-hidden aspect-video bg-black">
+              <img src={`https://img.youtube.com/vi/${ytId(v.url)}/hqdefault.jpg`} alt={v.title} className="w-full h-full object-cover opacity-90" />
+              <span className="absolute inset-0 flex items-center justify-center"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></span>
+              <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-white text-xs font-medium p-2">{v.title}</span>
+            </a>
+          );
+          return (
+            <section>
+              <Head title={s(c.video) || "Video Portfolio"} accent={accent} />
+              {swipe ? (
+                <>
+                  <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {videos.map((v) => (
+                      <div key={v.id} className="shrink-0 basis-[88%] snap-center"><VideoTile v={v} /></div>
+                    ))}
+                  </div>
+                  {videos.length > 1 && <p className="text-center text-[11px] text-[#94A3B8] -mt-1">Swipe to see more →</p>}
+                </>
+              ) : (
+                <div className="space-y-2.5">
+                  {videos.map((v) => <VideoTile key={v.id} v={v} />)}
+                </div>
+              )}
+            </section>
+          );
+        })()}
 
         {/* Social */}
         {hasSocial && (
