@@ -190,8 +190,9 @@ export default function CardRenderer({ c, products, gallery, videos }: {
           const VideoTile = ({ v }: { v: Vid }) => {
             const info = parseVideo(v.url);
             const isIg = info?.provider === "instagram";
+            const vertical = !!info?.vertical;
             return (
-              <a href={v.url} target="_blank" rel="noreferrer" className="block relative rounded-xl overflow-hidden aspect-video bg-black">
+              <a href={v.url} target="_blank" rel="noreferrer" className={`block relative rounded-xl overflow-hidden bg-black mx-auto ${vertical ? "aspect-[9/16] max-w-[220px]" : "aspect-video w-full"}`}>
                 {info?.thumb ? (
                   <img src={info.thumb} alt={v.title} className="w-full h-full object-cover opacity-90" />
                 ) : (

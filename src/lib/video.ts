@@ -14,6 +14,7 @@ export type VideoInfo = {
   url: string;       // the original watch/reel/page URL (safe to open in a new tab)
   embedUrl: string;  // iframe src for inline playback ("" when not embeddable)
   thumb: string;     // thumbnail image URL ("" when there is no fetchable image)
+  vertical: boolean; // portrait/short (YouTube Shorts, Instagram reels/IGTV) → tall tile
 };
 
 /* Parse any pasted link. Returns null only when the input is not a usable URL. */
@@ -33,25 +34,28 @@ export function parseVideo(raw: unknown): VideoInfo | null {
       url,
       embedUrl: `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1`,
       thumb: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
+      vertical: /\/shorts\//i.test(url), // a Shorts link is vertical
     };
   }
 
-  // Instagram — reels, posts and IGTV.
-  const ig = url.match(/instagram\.com\/(?:reels?|p|tv)\/([\w-]+)/i);
+  // Instagram — reels, posts and IGTV. Reels/IGTV are vertical; a /p/ post is not.
+  const ig = url.match(/instagram\.com\/(reels?|p|tv)\/([\w-]+)/i);
   if (ig) {
-    const id = ig[1];
+    const kind = ig[1].toLowerCase();
+    const id = ig[2];
     return {
       provider: "instagram",
       id,
       url,
       embedUrl: `https://www.instagram.com/reel/${id}/embed/`,
       thumb: "", // no reliable logged-out thumbnail — the UI shows a branded tile
+      vertical: kind !== "p",
     };
   }
 
   // Any other http(s) link — accept it, open it in a new tab (no inline embed).
   if (/^https?:\/\/[^\s.]+\.[^\s]+/i.test(url)) {
-    return { provider: "other", id: "", url, embedUrl: "", thumb: "" };
+    return { provider: "other", id: "", url, embedUrl: "", thumb: "", vertical: false };
   }
 
   return null;

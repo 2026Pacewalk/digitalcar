@@ -323,24 +323,25 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const playBtn = (bg: string) => `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="width:54px;height:54px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)"><i class="fa fa-play" style="color:#fff;font-size:20px;margin-left:3px"></i></span></span>`;
   const videoCard = (v: Vid) => {
     const info = parseVideo(v.url);
+    const vert = info?.vertical ? " vertical" : ""; // Shorts / reels → portrait tile
     const title = `<p style="font-size:13px;margin-top:4px">${esc(v.title)}</p>`;
     if (info?.provider === "youtube") {
-      return `<div class="dc-vid-item">
-        <div class="video-thumb" onclick="playVid(this,'${info.id}','youtube')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden;background:#000">
-          <img src="${info.thumb}" style="width:100%;display:block" ${IMG}>
+      return `<div class="dc-vid-item${vert}">
+        <div class="video-thumb dc-vid-media" onclick="playVid(this,'${info.id}','youtube')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden;background:#000">
+          <img src="${info.thumb}" ${IMG}>
           ${playBtn("rgba(255,0,0,.88)")}
         </div>${title}</div>`;
     }
     if (info?.provider === "instagram") {
-      return `<div class="dc-vid-item">
-        <div class="video-thumb dc-ig-thumb" onclick="playVid(this,'${info.id}','instagram')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden">
+      return `<div class="dc-vid-item${vert}">
+        <div class="video-thumb dc-vid-media dc-ig-thumb" onclick="playVid(this,'${info.id}','instagram')" style="position:relative;cursor:pointer;border-radius:6px;overflow:hidden">
           <span class="dc-ig-badge"><i class="fab fa-instagram"></i> Instagram</span>
           ${playBtn("rgba(0,0,0,.5)")}
         </div>${title}</div>`;
     }
     // Any other link — a branded tile that opens the video in a new tab.
-    return `<div class="dc-vid-item">
-        <a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer" class="video-thumb dc-other-thumb" style="position:relative;display:block;border-radius:6px;overflow:hidden">
+    return `<div class="dc-vid-item${vert}">
+        <a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer" class="video-thumb dc-vid-media dc-other-thumb" style="position:relative;display:block;border-radius:6px;overflow:hidden">
           ${playBtn("rgba(0,0,0,.5)")}
         </a>${title}</div>`;
   };
@@ -426,12 +427,16 @@ main{padding-bottom:78px;box-shadow:none;}
 .dc-vid-swipe .dc-vid-slide{flex:0 0 88%;scroll-snap-align:center;}
 .dc-vid-hint{text-align:center;font-size:11px;color:#9aa0a6;margin-top:2px;}
 .dc-vid-hint i{margin-right:5px;color:var(--theme-color);}
+.dc-vid-media img{width:100%;display:block;}
 /* Branded tiles for links with no fetchable thumbnail (Instagram / other) */
 .dc-ig-thumb,.dc-other-thumb{aspect-ratio:16/9;}
 .dc-ig-thumb{background:linear-gradient(135deg,#F58529 0%,#DD2A7B 55%,#8134AF 100%);}
 .dc-other-thumb{background:linear-gradient(135deg,#334155,#0f172a);}
 .dc-ig-badge{position:absolute;top:8px;left:8px;z-index:1;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#fff;background:rgba(0,0,0,.28);padding:3px 8px;border-radius:999px;}
 .dc-ig-badge i{font-size:13px;}
+/* Vertical (Shorts / reels): show the tile in portrait, centered and width-capped */
+.dc-vid-item.vertical .dc-vid-media{aspect-ratio:9/16;max-width:230px;margin:0 auto;}
+.dc-vid-item.vertical .dc-vid-media img{height:100%;object-fit:cover;}
 .speciality-list li i{color:var(--theme-color);}
 #shareModal .popup-share-icons ul{list-style:none;display:flex;justify-content:center;flex-wrap:wrap;padding:0;margin:0 0 8px;}
 #shareModal .popup-share-icons ul li a i{height:46px;width:46px;line-height:46px;min-width:46px;border-radius:8px;font-size:17px;margin:4px;}

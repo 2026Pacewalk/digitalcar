@@ -17,6 +17,7 @@ export default function CustomerMedia() {
   const gallery = useLocalList<Gallery>("dc_gallery", [], contentSeeder("gallery"));
   const videos = useLocalList<Vid>("dc_videos", [], contentSeeder("videos"));
   const [vt, setVt] = useState(""); const [vu, setVu] = useState("");
+  const [playing, setPlaying] = useState<number | null>(null); // video played inline in the dashboard
   const videoFull = videos.items.length >= vLimit;
 
   const onPickImages = async (files: FileList | null) => {
@@ -83,19 +84,32 @@ export default function CustomerMedia() {
             {videos.items.map((v) => {
               const info = parseVideo(v.url);
               const isIg = info?.provider === "instagram";
+              const vertical = !!info?.vertical;
+              const canEmbed = !!info?.embedUrl;
+              const isPlaying = playing === v.id && canEmbed;
               return (
               <div key={v.id} className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
-                <div className="relative aspect-video bg-black">
-                  {info?.thumb ? (
-                    <img src={info.thumb} alt={v.title} className="w-full h-full object-cover" />
-                  ) : (
-                    /* Instagram / other links have no fetchable frame — show a branded tile */
-                    <div className={`w-full h-full flex flex-col items-center justify-center gap-1 ${isIg ? "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF]" : "bg-gradient-to-br from-[#334155] to-[#0F172A]"}`}>
-                      {isIg && <Instagram size={26} className="text-white/90" />}
-                      <span className="text-[11px] font-semibold text-white/90">{isIg ? "Instagram video" : "Video link"}</span>
-                    </div>
-                  )}
-                  <a href={v.url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></a>
+                {/* Short/reel thumbnails are portrait; regular videos stay 16:9 */}
+                <div className={`relative bg-black mx-auto ${vertical ? "aspect-[9/16] max-w-[220px]" : "aspect-video w-full"}`}>
+                  {isPlaying ? (
+                    /* Play inline right here in the dashboard (YouTube / Instagram embed) */
+                    <iframe src={info!.embedUrl} title={v.title} className="absolute inset-0 w-full h-full" allow="autoplay; encrypted-media; fullscreen" allowFullScreen />
+                  ) : (<>
+                    {info?.thumb ? (
+                      <img src={info.thumb} alt={v.title} className="w-full h-full object-cover" />
+                    ) : (
+                      /* Instagram / other links have no fetchable frame — show a branded tile */
+                      <div className={`w-full h-full flex flex-col items-center justify-center gap-1 ${isIg ? "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF]" : "bg-gradient-to-br from-[#334155] to-[#0F172A]"}`}>
+                        {isIg && <Instagram size={26} className="text-white/90" />}
+                        <span className="text-[11px] font-semibold text-white/90">{isIg ? "Instagram video" : "Video link"}</span>
+                      </div>
+                    )}
+                    {canEmbed ? (
+                      <button type="button" onClick={() => setPlaying(v.id)} aria-label={`Play ${v.title}`} className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></button>
+                    ) : (
+                      <a href={v.url} target="_blank" rel="noreferrer" aria-label={`Open ${v.title}`} className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors"><span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center"><Play size={18} className="text-[#0F172A] ml-0.5" /></span></a>
+                    )}
+                  </>)}
                 </div>
                 <div className="p-3 flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-[#0F172A] truncate">{v.title}</p>
