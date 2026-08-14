@@ -125,6 +125,7 @@ export default function AdminCustomers() {
   const [addOpen, setAddOpen] = useState(false);
   const [pwdValue, setPwdValue] = useState("");
   const [pkgValue, setPkgValue] = useState("Trial");
+  const [pkgCycle, setPkgCycle] = useState<"monthly" | "yearly" | "triennial">("yearly");
   const [expDays, setExpDays] = useState(30);
   const [addForm, setAddForm] = useState({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", admin_id: 0 });
 
@@ -261,8 +262,12 @@ export default function AdminCustomers() {
   const savePackage = () => {
     if (!pkgModal) return;
     const id = pkgs.find((p) => p.name === pkgValue)?.id ?? 7;
-    setRows((r) => r.map((c) => (c.id === pkgModal.id ? { ...c, package_id: id } : c)));
-    toast.success(`Package changed to ${pkgValue} for ${pkgModal.name}`);
+    // Validity from the chosen term (Trial is always 30 days).
+    const days = pkgValue === "Trial" ? 30 : pkgCycle === "triennial" ? 1095 : pkgCycle === "monthly" ? 30 : 365;
+    const newExp = new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+    setRows((r) => r.map((c) => (c.id === pkgModal.id ? { ...c, package_id: id, expired_on: newExp, status: 1 } : c)));
+    const term = pkgValue === "Trial" ? "" : pkgCycle === "triennial" ? " · 3 Years" : pkgCycle === "monthly" ? " · Monthly" : " · Yearly";
+    toast.success(`${pkgModal.name} set to ${pkgValue}${term} — valid till ${fmtDate(newExp)}`);
     setPkgModal(null);
   };
   const saveExtend = async () => {
@@ -638,6 +643,19 @@ export default function AdminCustomers() {
         <select value={pkgValue} onChange={(e) => setPkgValue(e.target.value)} className="h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]">
           {pkgOptions.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
+        {pkgValue !== "Trial" && (
+          <>
+            <label className="block text-xs font-semibold text-[#334155] mb-1.5 mt-4">Billing term</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([["monthly", "Monthly"], ["yearly", "Yearly"], ["triennial", "3 Years"]] as const).map(([val, label]) => (
+                <button key={val} type="button" onClick={() => setPkgCycle(val)}
+                  className={`h-10 rounded-xl text-[13px] font-semibold border-2 transition-all ${pkgCycle === val ? "border-[#F7B31C] bg-[#FEF3C7]/50 text-[#92400E]" : "border-[#E2E8F0] text-[#334155] hover:border-[#F7B31C]/50"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <div className="flex gap-3 mt-6">
           <button onClick={() => setPkgModal(null)} className="flex-1 h-11 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]">Cancel</button>
           <button onClick={savePackage} className="flex-1 h-11 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold hover:shadow-gold">Save</button>
