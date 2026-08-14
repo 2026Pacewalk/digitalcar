@@ -144,7 +144,7 @@ export default function CustomerSettings() {
   // Package details — days left from the shared source (server trial clock
   // while on trial, else stored plan expiry) so every page shows the same number.
   const pkg = PKG[Number(data.package_id)] || PKG[7];
-  const { days: daysLeft, active, endsAt } = useValidityDays(data.expired_on, pkg.days);
+  const { days: daysLeft, active, endsAt } = useValidityDays(data.expired_on, pkg.days, [5, 6].includes(Number(data.package_id)));
 
   const showTopSave = tab === "module" || tab === "theme" || tab === "seo";
 

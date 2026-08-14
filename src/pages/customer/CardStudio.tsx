@@ -41,7 +41,7 @@ export default function CardStudio() {
   // matching the Profile page. Days-left comes from the shared validity source.
   const pkgId = Number(data.package_id);
   const paidPlanName = pkgId === 6 ? "Platinum" : pkgId === 5 ? "Gold" : null;
-  const { days: validityDays, active: validityActive } = useValidityDays(data.expired_on, pkgId === 7 ? 30 : 365);
+  const { days: validityDays, active: validityActive } = useValidityDays(data.expired_on, pkgId === 7 ? 30 : 365, !!paidPlanName);
 
   const [form, setForm] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");

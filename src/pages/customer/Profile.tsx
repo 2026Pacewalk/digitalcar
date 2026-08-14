@@ -42,7 +42,7 @@ export default function CustomerProfile() {
   const pkg = PKG[Number(data.package_id)] || PKG[7];
   // Server trial clock while on trial, else stored plan expiry — matches the
   // Dashboard & Card Builder so "days left" is identical everywhere.
-  const { days: daysLeft, active } = useValidityDays(data.expired_on, pkg.days);
+  const { days: daysLeft, active } = useValidityDays(data.expired_on, pkg.days, [5, 6].includes(Number(data.package_id)));
   const pctLeft = Math.min(100, Math.round((daysLeft / pkg.days) * 100));
   // Staff accounts (super-admin / reseller) aren't card customers — send them to
   // their own area instead of the customer card profile. (Impersonated clients

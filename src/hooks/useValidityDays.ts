@@ -9,8 +9,13 @@ import { trpc } from "@/providers/trpc";
  * `expired_on` (e.g. an imported multi-year value) can never override an
  * active 30-day trial. Only once the trial is converted (a real paid plan) do
  * we fall back to the stored plan expiry.
+ *
+ * `isPaidPlan` short-circuits all of that: a Gold/Platinum account uses its real
+ * plan expiry, never the trial clock — legacy accounts can carry BOTH a paid
+ * plan and a leftover active trial row, and the plan must win (else the Card
+ * Builder would say "30 days left" while the plan is valid for years).
  */
-export function useValidityDays(storedExpiredOn: unknown, fallbackDays: number) {
+export function useValidityDays(storedExpiredOn: unknown, fallbackDays: number, isPaidPlan = false) {
   const { data: trial } = trpc.trial.me.useQuery(undefined, { retry: false });
 
   const stored = (() => {
@@ -21,9 +26,10 @@ export function useValidityDays(storedExpiredOn: unknown, fallbackDays: number) 
   })();
 
   const s = trial?.status;
-  const onTrial = s === "active" || s === "expiring_soon" || s === "grace";
-  const days =
-    s === "active" || s === "expiring_soon" ? trial!.daysLeft
+  const onTrial = !isPaidPlan && (s === "active" || s === "expiring_soon" || s === "grace");
+  const days = isPaidPlan
+    ? stored // paid plan → always the real expiry, ignore any leftover trial clock
+    : s === "active" || s === "expiring_soon" ? trial!.daysLeft
     : s === "grace" ? trial!.graceDaysLeft
     : s === "expired" ? 0
     : stored; // not_started / converted (paid) / still loading

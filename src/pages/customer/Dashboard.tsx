@@ -133,7 +133,7 @@ export default function CustomerDashboard() {
 
   // Single source of truth (server trial clock while on trial, else stored plan
   // expiry) — keeps the Dashboard, Card Builder, Profile & Settings all in sync.
-  const { days: daysPending, active, onTrial } = useValidityDays(customer.expired_on, pkg.days);
+  const { days: daysPending, active, onTrial } = useValidityDays(customer.expired_on, pkg.days, [5, 6].includes(Number(customer.package_id)));
 
   // live enquiries count = historical + card submissions − deleted
   useEffect(() => {
