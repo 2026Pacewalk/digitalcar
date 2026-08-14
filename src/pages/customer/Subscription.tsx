@@ -7,7 +7,7 @@ import { Link } from "react-router";
 import { toast } from "sonner";
 import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
 import { useCustomer } from "@/hooks/useCustomer";
-import { planFeatures, planRank, type PlanPkg } from "@/lib/planFeatures";
+import { planFeatures, planRank, isFreePlan, type PlanPkg } from "@/lib/planFeatures";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
 const inr = (v: number) => "₹" + (Number(v) || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -44,7 +44,15 @@ export default function CustomerSubscription() {
   // Don't offer a downgrade to an ACTIVE member (current + higher tiers only) —
   // but once expired, show every plan so they can renew or switch down.
   const currentRank = currentPlan && !planExpired ? planRank(currentPlan as unknown as PlanPkg) : -1;
-  const visiblePackages = (packages || []).filter((p) => planRank(p as unknown as PlanPkg) >= currentRank);
+  // The free trial is a first-time offer for NEW users only — never re-show it to
+  // anyone who has already been on a paid plan (active OR expired).
+  const hasHadPaidPlan = [5, 6].includes(Number(currentPkgId));
+  const visiblePackages = (packages || []).filter((p) => {
+    const pp = p as unknown as PlanPkg;
+    if (planRank(pp) < currentRank) return false; // no downgrade for an active member
+    if (isFreePlan(pp) && hasHadPaidPlan) return false; // trial is first-time-only
+    return true;
+  });
   // An active top-tier (Platinum) member has nothing to buy, so a "buy now"
   // discount is irrelevant to them — show an appropriate message instead.
   const topPlanActive = currentPkgId === 6 && !planExpired;
