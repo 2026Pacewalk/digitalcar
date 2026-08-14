@@ -3,6 +3,7 @@ import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2, BadgePercent, Copy, X, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
 import { useCustomer } from "@/hooks/useCustomer";
@@ -35,10 +36,18 @@ export default function CustomerSubscription() {
   const currentPlan = (packages || []).find((p) => p.id === currentPkgId);
   const currentPlanName = subscription?.package?.name || currentPlan?.name || "Free";
   const currentPaid = Number(subscription?.amount) || 0;
-  // Never offer a downgrade: only show the current plan and higher tiers. A
-  // Platinum member sees only Platinum; a Gold member sees Gold + Platinum.
-  const currentRank = currentPlan ? planRank(currentPlan as unknown as PlanPkg) : -1;
+  // Is the current plan past its validity? An expired member may pick ANY plan
+  // (including a downgrade, e.g. Platinum → Gold) to re-subscribe.
+  const expiryRaw = subscription?.currentPeriodEnd || (customer?.expired_on as string | undefined);
+  const planExpired = !!currentPkgId && !!expiryRaw &&
+    new Date(String(expiryRaw).replace(" ", "T")).getTime() < Date.now();
+  // Don't offer a downgrade to an ACTIVE member (current + higher tiers only) —
+  // but once expired, show every plan so they can renew or switch down.
+  const currentRank = currentPlan && !planExpired ? planRank(currentPlan as unknown as PlanPkg) : -1;
   const visiblePackages = (packages || []).filter((p) => planRank(p as unknown as PlanPkg) >= currentRank);
+  // An active top-tier (Platinum) member has nothing to buy, so a "buy now"
+  // discount is irrelevant to them — show an appropriate message instead.
+  const topPlanActive = currentPkgId === 6 && !planExpired;
   const hasPaid = currentPaid > 0;
   // Referral discount only applies to the first paid plan (never on later upgrades).
   const dPct = discount?.eligible && !hasPaid ? discount.percent : 0;
@@ -63,8 +72,10 @@ export default function CustomerSubscription() {
             <div className="w-14 h-14 rounded-2xl gradient-gold flex items-center justify-center"><Zap size={24} className="text-[#0F172A]" /></div>
             <div>
               <p className="text-xs text-[#94A3B8]">Current Plan</p>
-              <p className="text-xl font-bold text-white">{currentPlanName}</p>
-              {subscription?.currentPeriodEnd ? (
+              <p className="text-xl font-bold text-white">{currentPlanName}{planExpired ? " (expired)" : ""}</p>
+              {planExpired ? (
+                <p className="text-xs text-[#FCA5A5] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Expired on {new Date(String(expiryRaw).replace(" ", "T")).toLocaleDateString()} — choose a plan below to reactivate</p>
+              ) : subscription?.currentPeriodEnd ? (
                 <p className="text-xs text-[#94A3B8] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Renews on {new Date(subscription.currentPeriodEnd).toLocaleDateString()}</p>
               ) : customer?.expired_on ? (
                 <p className="text-xs text-[#94A3B8] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Valid till {new Date(String(customer.expired_on)).toLocaleDateString()}</p>
@@ -95,8 +106,10 @@ export default function CustomerSubscription() {
           </div>
         )}
 
-        {/* Limited-time offer banner */}
-        {offerActive && (
+        {/* Limited-time discount — only for members who can actually buy (a first
+            purchase, an upgrade, or a renewal). Not shown to an active Platinum
+            member, who has nothing to purchase. */}
+        {offerActive && !topPlanActive && (
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#7f1d1d] to-[#c2410c] px-4 py-3.5 flex items-center gap-3">
             <span className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0"><BadgePercent size={19} className="text-white" /></span>
             <div className="flex-1 min-w-0">
@@ -104,6 +117,18 @@ export default function CustomerSubscription() {
               <p className="text-[12px] text-white/70">Applied automatically at checkout below. Don't miss it!</p>
             </div>
             <span className="text-[12px] font-bold text-white bg-white/15 rounded-lg px-2.5 py-1.5 tabular-nums shrink-0">{offerH}h {String(offerM).padStart(2, "0")}m left</span>
+          </div>
+        )}
+
+        {/* Active top-tier member — celebrate instead of up-selling a discount. */}
+        {topPlanActive && (
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0F172A] to-[#334155] px-4 py-3.5 flex items-center gap-3">
+            <span className="w-10 h-10 rounded-xl gradient-gold flex items-center justify-center shrink-0"><Check size={19} className="text-[#0F172A]" /></span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white">You're on Platinum — our top plan 🎉</p>
+              <p className="text-[12px] text-white/70">Everything's unlocked. Enjoy free custom-domain setup on the 3-Year plan.</p>
+            </div>
+            <Link to="/dashboard/domain" className="text-[12px] font-bold text-[#0F172A] bg-white rounded-lg px-3 py-1.5 shrink-0 hover:bg-[#F1F5F9]">Custom domain</Link>
           </div>
         )}
 
@@ -127,7 +152,7 @@ export default function CustomerSubscription() {
         {/* Plans Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {visiblePackages.map((plan, idx) => {
-            const isCurrent = currentPkgId === plan.id;
+            const isCurrent = currentPkgId === plan.id && !planExpired;
             const Icon = PLAN_ICONS[idx % PLAN_ICONS.length];
             const base = Number(cycle === "triennial" ? plan.threeYearPrice : cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice);
             const isPaid = base > 0;
