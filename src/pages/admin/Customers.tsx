@@ -25,9 +25,12 @@ const RETAILERS: Record<number, string> = {
 };
 const retailerName = (id: number) => RETAILERS[id] ?? (id === 0 ? "Website" : `Retailer #${id}`);
 
-const PACKAGES: Record<number, string> = { 5: "Gold", 6: "Platinum", 7: "Trial" };
-const PACKAGE_OPTIONS = ["Trial", "Gold", "Platinum"];
-const packageName = (id: number) => PACKAGES[id] || "Trial";
+// Fallback used only until the live package list loads. The dropdowns below are
+// driven by the ACTIVE packages from the DB (trpc.package.list), so activating or
+// adding a plan in Admin → Packages makes it appear here automatically.
+const DEFAULT_PKGS: { id: number; name: string }[] = [
+  { id: 7, name: "Trial" }, { id: 5, name: "Gold" }, { id: 6, name: "Platinum" },
+];
 
 type Customer = {
   id: number; name: string; username: string; email: string; mobile1: string;
@@ -103,6 +106,12 @@ export default function AdminCustomers() {
   const [view, setView] = useState<"table" | "grid">("table");
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
+
+  // Assignable plans come from the live ACTIVE package list, not a hardcoded set.
+  const { data: pkgList } = trpc.package.list.useQuery();
+  const pkgs = pkgList && pkgList.length ? pkgList.map((p) => ({ id: Number(p.id), name: p.name })) : DEFAULT_PKGS;
+  const packageName = (id: number) => pkgs.find((p) => p.id === Number(id))?.name || "Trial";
+  const pkgOptions = pkgs.map((p) => p.name);
 
   // modals
   const [cardModal, setCardModal] = useState<Customer | null>(null);
@@ -251,7 +260,7 @@ export default function AdminCustomers() {
   };
   const savePackage = () => {
     if (!pkgModal) return;
-    const id = Number(Object.entries(PACKAGES).find(([, n]) => n === pkgValue)?.[0]) || 7;
+    const id = pkgs.find((p) => p.name === pkgValue)?.id ?? 7;
     setRows((r) => r.map((c) => (c.id === pkgModal.id ? { ...c, package_id: id } : c)));
     toast.success(`Package changed to ${pkgValue} for ${pkgModal.name}`);
     setPkgModal(null);
@@ -297,7 +306,7 @@ export default function AdminCustomers() {
   const addCustomer = () => {
     if (!addForm.name || !addForm.email) { toast.error("Name and email are required"); return; }
     const id = Math.max(0, ...rows.map((r) => r.id)) + 1;
-    const pid = Number(Object.entries(PACKAGES).find(([, n]) => n === addForm.pkg)?.[0]) || 7;
+    const pid = pkgs.find((p) => p.name === addForm.pkg)?.id ?? 7;
     const now = new Date();
     const exp = new Date(now); exp.setDate(exp.getDate() + 7);
     setRows((r) => [{
@@ -436,7 +445,7 @@ export default function AdminCustomers() {
             </select>
             <select value={pkg} onChange={(e) => setPkg(e.target.value)} className="h-10 bg-white rounded-lg px-3 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
               <option value="all">All Plans</option>
-              {PACKAGE_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+              {pkgOptions.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
             {/* Status filter */}
             <div className="relative">
@@ -627,7 +636,7 @@ export default function AdminCustomers() {
       {pkgModal && <Modal onClose={() => setPkgModal(null)} icon={<Database size={20} className="text-[#3B82F6]" />} iconBg="bg-[#DBEAFE]" title="Change Package" subtitle={pkgModal.name}>
         <label className="block text-xs font-semibold text-[#334155] mb-1.5">Package</label>
         <select value={pkgValue} onChange={(e) => setPkgValue(e.target.value)} className="h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]">
-          {PACKAGE_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+          {pkgOptions.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <div className="flex gap-3 mt-6">
           <button onClick={() => setPkgModal(null)} className="flex-1 h-11 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]">Cancel</button>
@@ -692,7 +701,7 @@ export default function AdminCustomers() {
           ))}
           <div>
             <label className="block text-xs font-semibold text-[#334155] mb-1.5">Package</label>
-            <select value={addForm.pkg} onChange={(e) => setAddForm((f) => ({ ...f, pkg: e.target.value }))} className="h-10 w-full rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]">{PACKAGE_OPTIONS.map((p) => <option key={p}>{p}</option>)}</select>
+            <select value={addForm.pkg} onChange={(e) => setAddForm((f) => ({ ...f, pkg: e.target.value }))} className="h-10 w-full rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]">{pkgOptions.map((p) => <option key={p}>{p}</option>)}</select>
           </div>
           <div>
             <label className="block text-xs font-semibold text-[#334155] mb-1.5">Retailer</label>
