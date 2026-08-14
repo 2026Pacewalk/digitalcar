@@ -10,7 +10,7 @@ import { useCustomer } from "@/hooks/useCustomer";
 import { planFeatures, planRank, isFreePlan, type PlanPkg } from "@/lib/planFeatures";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
-const inr = (v: number) => "₹" + (Number(v) || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const inr = (v: number) => "₹" + Math.round(Number(v) || 0).toLocaleString("en-IN");
 
 export default function CustomerSubscription() {
   const utils = trpc.useUtils();
@@ -168,7 +168,7 @@ export default function CustomerSubscription() {
             const isUpgrade = hasPaid && !isCurrent && isPaid;
             const discounted = dPct > 0 && isPaid ? Math.round(base * (1 - dPct / 100) * 100) / 100 : base;
             const payable = isUpgrade ? Math.max(0, Math.round((base - currentPaid) * 100) / 100) : discounted;
-            const finalPrice = isPaid ? applyOffer(payable) : base; // limited-time offer on top
+            const finalPrice = Math.round(isPaid ? applyOffer(payable) : base); // whole rupees
             const popular = plan.name === "Gold";
 
             return (

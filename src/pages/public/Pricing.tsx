@@ -71,7 +71,7 @@ const PLANS: Plan[] = [
   },
 ];
 
-const inr = (n: number) => "₹" + n.toLocaleString("en-IN");
+const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 /* Effective per-month + savings vs paying monthly */
 const perMonth = (p: Plan, period: Period) =>
   period === "monthly" ? p.price.monthly : period === "yearly" ? Math.round(p.price.yearly / 12) : Math.round(p.price["3year"] / 36);

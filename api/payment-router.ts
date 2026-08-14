@@ -41,7 +41,9 @@ async function computeAmount(
 ) {
   const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, packageId) });
   if (!pkg) throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
-  const round2 = (v: number) => Math.round(v * 100) / 100;
+  // Prices are shown and charged in whole rupees — round every discounted amount
+  // to the nearest ₹1 (e.g. ₹99 − 10% = ₹89, not ₹89.10).
+  const round2 = (v: number) => Math.round(v);
   const base = n(cycle === "triennial" ? pkg.threeYearPrice : cycle === "yearly" ? pkg.yearlyPrice : pkg.monthlyPrice);
   const existingPaid = await db.query.subscriptions.findFirst({
     where: and(eq(subscriptions.userId, user.id), gt(subscriptions.amount, "0")),
