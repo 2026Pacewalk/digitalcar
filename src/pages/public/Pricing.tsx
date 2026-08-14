@@ -2,6 +2,7 @@ import { Check, ArrowRight, HelpCircle, Sparkles, Zap, Crown, IdCard, QrCode, Im
 import { Link } from "react-router";
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
+import { planFeatures, type PlanPkg } from "@/lib/planFeatures";
 
 /* ── Billing periods ──────────────────────────────────────────── */
 type Period = "monthly" | "yearly" | "3year";
@@ -98,26 +99,6 @@ const ICON_BY: Record<string, typeof IdCard> = { Trial: Sparkles, Gold: Star, Pl
 const ACCENT_BY: Record<string, string> = { Trial: "#14B8A6", Gold: "#F7B31C", Platinum: "#8B5CF6" };
 const num = (v: unknown) => Number(v ?? 0);
 
-function planBullets(p: DbPkg): { text: string }[] {
-  const b: string[] = [];
-  const cards = p.maxCards ?? 1;
-  b.push(cards <= 1 ? "1 digital card + personal link & QR" : `Up to ${cards} digital cards`);
-  b.push(num(p.maxProducts) >= 9999 ? "Unlimited products & services" : `Up to ${p.maxProducts} products / services`);
-  b.push(`${p.maxGalleryImages}-photo gallery + ${p.maxVideos} videos`);
-  if (p.featureLeadCapture) b.push("Enquiry form — capture every lead");
-  b.push("Google reviews + payment links");
-  b.push("All 31 designs + link-in-bio styles");
-  b.push(p.featureCustomDomain ? "Advanced analytics + export" : "Visit & tap analytics");
-  if (p.featureCustomDomain) b.push("Custom domain (yourbrand.com)");
-  if (p.featureRemoveBranding) b.push("Remove DigitalCarda branding");
-  if (p.featureAI) b.push("AI writes your card content");
-  if (p.featureMultilingual) b.push("Multi-language card");
-  if (p.featureSEO) b.push("Full SEO controls");
-  if (p.featureWhiteLabel) b.push("White-label reseller panel");
-  if (p.featurePrioritySupport) b.push("Priority support");
-  return b.map((text) => ({ text }));
-}
-
 function buildPlans(pkgs: DbPkg[]): Plan[] {
   return pkgs.map((p) => {
     const monthly = num(p.monthlyPrice), yearly = num(p.yearlyPrice);
@@ -131,15 +112,8 @@ function buildPlans(pkgs: DbPkg[]): Plan[] {
       price: { monthly, yearly, "3year": Math.round(yearly * 2.5) },
       cta: isFree ? "Start Free Trial" : `Get ${p.name}`,
       headline: isFree ? "Everything, free for 30 days:" : `Your ${p.name} plan includes:`,
-      features: isFree
-        ? [
-            { text: "Your live digital card in minutes" },
-            { text: "All premium features unlocked" },
-            { text: "Custom QR code + shareable link" },
-            { text: "Call, WhatsApp & Save-Contact buttons" },
-            { text: "No credit card required" },
-          ]
-        : planBullets(p),
+      // Shared with the dashboard Subscription module so the two never drift.
+      features: planFeatures(p as unknown as PlanPkg).map((text) => ({ text })),
     };
   });
 }

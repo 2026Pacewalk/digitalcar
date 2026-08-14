@@ -5,31 +5,17 @@ import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2, BadgePercent,
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
+import { useCustomer } from "@/hooks/useCustomer";
+import { planFeatures, planRank, type PlanPkg } from "@/lib/planFeatures";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
 const inr = (v: number) => "₹" + (Number(v) || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-
-/** Build a short feature list from a DB package's flags/limits. */
-function featuresFor(p: {
-  maxCards: number; maxProducts: number; featureAnalytics: boolean; featureCustomDomain: boolean;
-  featureAI: boolean; featureLeadCapture: boolean; featurePrioritySupport: boolean; featureWhiteLabel: boolean;
-}): string[] {
-  return [
-    `${p.maxCards} Digital Card${p.maxCards > 1 ? "s" : ""}`,
-    p.maxProducts > 0 ? `${p.maxProducts} Products / Services` : "",
-    p.featureCustomDomain ? "Custom Domain" : "",
-    p.featureLeadCapture ? "Lead Capture" : "",
-    p.featureAnalytics ? "Advanced Analytics" : "Basic Analytics",
-    p.featureAI ? "AI Assistant" : "",
-    p.featureWhiteLabel ? "White-label" : "",
-    p.featurePrioritySupport ? "Priority Support" : "Email Support",
-  ].filter(Boolean);
-}
 
 export default function CustomerSubscription() {
   const utils = trpc.useUtils();
   const { data: subscription } = trpc.subscription.mySubscription.useQuery();
   const { data: packages } = trpc.package.list.useQuery();
+  const { data: customer } = useCustomer();
   const { data: discount } = trpc.referral.myDiscount.useQuery();
   const { data: orders } = trpc.payment.myOrders.useQuery();
   const pendingOrder = (orders || []).find((o) => o.status === "pending");
@@ -40,8 +26,19 @@ export default function CustomerSubscription() {
   const [offerExp, setOfferExp] = useState<number>(0);
   useEffect(() => { setOfferExp(getOfferExpiry()); const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
-  const currentPkgId = subscription?.package?.id;
+  // Legacy customers (migrated from the old site) have a real plan on their card
+  // record (package_id: 5=Gold, 6=Platinum, 7=Trial — same ids as the packages
+  // table) but no row in the new `subscriptions` table. Fall back to it so the
+  // Subscription page shows the SAME plan as the Profile page instead of "Free".
+  const legacyPkgId = Number(customer?.package_id) || 0;
+  const currentPkgId = subscription?.package?.id ?? (legacyPkgId || undefined);
+  const currentPlan = (packages || []).find((p) => p.id === currentPkgId);
+  const currentPlanName = subscription?.package?.name || currentPlan?.name || "Free";
   const currentPaid = Number(subscription?.amount) || 0;
+  // Never offer a downgrade: only show the current plan and higher tiers. A
+  // Platinum member sees only Platinum; a Gold member sees Gold + Platinum.
+  const currentRank = currentPlan ? planRank(currentPlan as unknown as PlanPkg) : -1;
+  const visiblePackages = (packages || []).filter((p) => planRank(p as unknown as PlanPkg) >= currentRank);
   const hasPaid = currentPaid > 0;
   // Referral discount only applies to the first paid plan (never on later upgrades).
   const dPct = discount?.eligible && !hasPaid ? discount.percent : 0;
@@ -66,10 +63,12 @@ export default function CustomerSubscription() {
             <div className="w-14 h-14 rounded-2xl gradient-gold flex items-center justify-center"><Zap size={24} className="text-[#0F172A]" /></div>
             <div>
               <p className="text-xs text-[#94A3B8]">Current Plan</p>
-              <p className="text-xl font-bold text-white">{subscription?.package?.name || "Free"}</p>
-              {subscription?.currentPeriodEnd && (
+              <p className="text-xl font-bold text-white">{currentPlanName}</p>
+              {subscription?.currentPeriodEnd ? (
                 <p className="text-xs text-[#94A3B8] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Renews on {new Date(subscription.currentPeriodEnd).toLocaleDateString()}</p>
-              )}
+              ) : customer?.expired_on ? (
+                <p className="text-xs text-[#94A3B8] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Valid till {new Date(String(customer.expired_on)).toLocaleDateString()}</p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -127,7 +126,7 @@ export default function CustomerSubscription() {
 
         {/* Plans Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {(packages || []).map((plan, idx) => {
+          {visiblePackages.map((plan, idx) => {
             const isCurrent = currentPkgId === plan.id;
             const Icon = PLAN_ICONS[idx % PLAN_ICONS.length];
             const base = Number(cycle === "triennial" ? plan.threeYearPrice : cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice);
@@ -137,7 +136,7 @@ export default function CustomerSubscription() {
             const discounted = dPct > 0 && isPaid ? Math.round(base * (1 - dPct / 100) * 100) / 100 : base;
             const payable = isUpgrade ? Math.max(0, Math.round((base - currentPaid) * 100) / 100) : discounted;
             const finalPrice = isPaid ? applyOffer(payable) : base; // limited-time offer on top
-            const popular = idx === 1;
+            const popular = plan.name === "Gold";
 
             return (
               <div key={plan.id} className={`bg-white rounded-2xl p-6 shadow-premium border-2 transition-all ${isCurrent ? "border-[#F7B31C]" : popular ? "border-[#F7B31C]/50" : "border-[#F1F5F9]"} card-hover relative`}>
@@ -163,7 +162,7 @@ export default function CustomerSubscription() {
                   </span>
                 </div>
                 <div className="space-y-2.5 mb-6">
-                  {featuresFor(plan).map((f, i) => (
+                  {planFeatures(plan as unknown as PlanPkg).map((f, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm text-[#64748B]"><Check size={14} className="text-emerald-500 shrink-0" /> {f}</div>
                   ))}
                 </div>
