@@ -124,6 +124,15 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const initial = (s(c.name)[0] || "D").toUpperCase();
   const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='12' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
 
+  // Paid-plan trust badge next to the name — Gold (pkg 5) and Platinum (pkg 6)
+  // get distinct badges; Trial/Free show none.
+  const pkgId = Number(c.package_id);
+  const planBadge = pkgId === 6
+    ? `<span class="dc-plan-badge dc-plan-platinum" title="Platinum member" aria-label="Platinum member"><i class="fa fa-gem"></i></span>`
+    : pkgId === 5
+    ? `<span class="dc-plan-badge dc-plan-gold" title="Gold member" aria-label="Gold member"><i class="fa fa-crown"></i></span>`
+    : "";
+
   const social = Object.keys(SOCIAL_FA).filter((k) => s(c[k]))
     .map((k) => `<li><a href="${esc(c[k])}" target="_blank"><i class="${SOCIAL_FA[k]}"></i></a></li>`).join("");
 
@@ -494,6 +503,11 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-save-contact:hover{filter:brightness(1.15);}
 .dc-save-contact:active{transform:scale(.99);}
 .dc-sent{color:#12a150;font-weight:600;text-align:center;padding:16px 0;}
+/* Paid-plan trust badge — floating corner seal (Gold / Platinum) */
+.dc-plan-badge{position:absolute;top:7px;right:41px;z-index:999;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;font-size:13px;line-height:1;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.dc-plan-badge i{font-size:13px;}
+.dc-plan-gold{background:linear-gradient(135deg,#F9D77E,#E8A317);color:#5b3d00;border:1.5px solid rgba(255,255,255,.6);}
+.dc-plan-platinum{background:linear-gradient(135deg,#9AA7BE,#5B6B8C);border:1.5px solid rgba(255,255,255,.55);}
 /* Card footer — compact CTAs + powered-by */
 .dc-foot{margin:12px -15px 0;padding:10px 15px 11px;background:linear-gradient(180deg,#ffffff,#f7f8fa);border-top:1px solid #eef0f3;}
 .dc-foot-actions{display:flex;gap:8px;max-width:400px;margin:0 auto;}
@@ -547,6 +561,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
   <div class="page-wrapper">
     <section id="home-section">
       <a href="javascript:void(0)" id="home-card-share" onclick="openShare()"><i class="fa fa-share-alt"></i></a>
+      ${planBadge}
       <div class="home-section-content">
         <div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p>${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>
         <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" alt="${esc(c.name)}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'"></div></div>
