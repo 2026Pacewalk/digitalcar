@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import superjson from "superjson";
 import type { AppRouter } from "../../api/router";
 import type { ReactNode } from "react";
+import { getToken } from "@/lib/session";
 
 export const trpc = createTRPCReact<AppRouter>();
 
@@ -14,7 +15,9 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       headers() {
-        const token = localStorage.getItem("auth_token");
+        // Send the token for the portal the current URL belongs to, so admin
+        // (/admin*) and customer requests each carry their own session.
+        const token = getToken();
         return {
           ...(token ? { "x-auth-token": token } : {}),
         };

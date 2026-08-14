@@ -3,7 +3,9 @@
  * server verifies the JWT and scopes what it returns — so sensitive data
  * (passwords, bank details, other users' leads) is never publicly downloadable.
  */
-const authHeaders = () => ({ "x-auth-token": localStorage.getItem("auth_token") || "" });
+import { getToken } from "@/lib/session";
+
+const authHeaders = () => ({ "x-auth-token": getToken("admin") });
 
 /** Super-admin-only files (customers / enquiries). */
 export function fetchAdminData<T = unknown>(file: "customers" | "enquiries"): Promise<T> {

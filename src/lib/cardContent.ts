@@ -2,6 +2,7 @@
    and decode the quirks of the legacy schema. */
 import { scopedKey } from "@/hooks/useCustomer";
 import { IMG_BASE, healUploadUrl } from "@/lib/img";
+import { getToken } from "@/lib/session";
 
 export function imgUrl(folder: string, f: unknown): string {
   const name = String(f ?? "").trim();
@@ -95,7 +96,7 @@ export function contentSeeder<K extends keyof Awaited<ReturnType<typeof loadCust
    or null if the user has no legacy card / isn't signed in. */
 export async function loadMyLegacyProfile(): Promise<Record<string, unknown> | null> {
   try {
-    const token = localStorage.getItem("auth_token") || "";
+    const token = getToken("main");
     const r = await fetch("/api/my/card", { headers: { "x-auth-token": token } });
     if (!r.ok) return null;
     return (await r.json()) as Record<string, unknown>;
@@ -107,7 +108,7 @@ export async function loadMyLegacyProfile(): Promise<Record<string, unknown> | n
    the legacy customers.json. Returns { slug, data } or null. */
 export async function loadMySnapshot(): Promise<{ slug?: string; data?: Record<string, unknown> } | null> {
   try {
-    const token = localStorage.getItem("auth_token") || "";
+    const token = getToken("main");
     const r = await fetch("/api/my/snapshot", { headers: { "x-auth-token": token } });
     if (!r.ok) return null;
     return (await r.json()) as { slug?: string; data?: Record<string, unknown> } | null;

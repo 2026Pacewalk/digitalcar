@@ -2,6 +2,7 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import TopBar from "@/components/layout/TopBar";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { getToken } from "@/lib/session";
 import {
   Upload, Download, Database, Users, CheckCircle2,
   FileSpreadsheet, Trash2, RefreshCw, Search, ChevronLeft, ChevronRight,
@@ -48,7 +49,7 @@ export default function AdminMigration() {
     try {
       // Authed super-admin endpoint (the raw file is blocked publicly — it's PII).
       const res = await fetch("/api/admin/data/members_migration", {
-        headers: { "x-auth-token": localStorage.getItem("auth_token") || "" },
+        headers: { "x-auth-token": getToken("admin") },
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();

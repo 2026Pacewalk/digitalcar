@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { getSessionUser, setSession, clearSession } from "@/lib/session";
 
 interface AuthUser {
   id: number;
@@ -32,11 +33,7 @@ export const DEMO_USERS: Record<string, { password: string; user: AuthUser }> = 
 };
 
 function getStoredUser(): AuthUser | null {
-  try {
-    const stored = localStorage.getItem("digitalcarda_user");
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return null;
+  return getSessionUser<AuthUser>();
 }
 
 export function useAuth() {
@@ -52,8 +49,7 @@ export function useAuth() {
   const login = useCallback((email: string, password: string): boolean => {
     const entry = DEMO_USERS[email.toLowerCase().trim()];
     if (entry && entry.password === password) {
-      localStorage.setItem("digitalcarda_user", JSON.stringify(entry.user));
-      localStorage.setItem("auth_token", "demo_token_" + entry.user.id);
+      setSession("demo_token_" + entry.user.id, entry.user, "main");
       setUser(entry.user);
       return true;
     }
@@ -61,8 +57,8 @@ export function useAuth() {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("digitalcarda_user");
-    localStorage.removeItem("auth_token");
+    // Sign out of the CURRENT portal only, leaving the other session intact.
+    clearSession();
     setUser(null);
     window.location.href = "/login";
   }, []);

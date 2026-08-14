@@ -2,6 +2,7 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import TopBar from "@/components/layout/TopBar";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
+import { getSessionUser, setSessionUser } from "@/lib/session";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -47,14 +48,9 @@ export default function AdminProfile() {
 
   const updateProfile = trpc.auth.updateProfile.useMutation({
     onSuccess: (res) => {
-      // Keep the locally-stored session in sync so the UI reflects the change.
-      try {
-        const raw = localStorage.getItem("digitalcarda_user");
-        if (raw) {
-          const u = JSON.parse(raw);
-          localStorage.setItem("digitalcarda_user", JSON.stringify({ ...u, fullName: res.fullName, email: res.email }));
-        }
-      } catch {}
+      // Keep the locally-stored admin session in sync so the UI reflects the change.
+      const u = getSessionUser("admin");
+      if (u) setSessionUser({ ...u, fullName: res.fullName, email: res.email }, "admin");
       me.refetch();
       refetch();
       toast.success("Profile saved!");

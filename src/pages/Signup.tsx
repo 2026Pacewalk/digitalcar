@@ -12,6 +12,7 @@ import { slugifyUsername } from "@/lib/username";
 import { scopedKey, DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { logFunnel } from "@/lib/funnel";
+import { setSession } from "@/lib/session";
 
 function GoogleIcon({ size = 18 }: { size?: number }) {
   return (
@@ -108,8 +109,7 @@ export default function Signup() {
         companyName: form.businessName.trim() || undefined,
         referralCode: referralCode || undefined,
       });
-      localStorage.setItem("auth_token", res.token);
-      localStorage.setItem("digitalcarda_user", JSON.stringify(res.user));
+      setSession(res.token, res.user, "main");
       logFunnel("registration", productSlug || undefined, res.user?.id);
       // Auto-derive the card username from the business name (fall back to full
       // name, then email). The user can change it later from their dashboard.

@@ -14,6 +14,7 @@ import { buildCardHtml } from "@/card-template/buildCard";
 import { fetchAdminData, hideAdminRecords } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import { scopedKey } from "@/hooks/useCustomer";
+import { setSession } from "@/lib/session";
 
 /* Retailer (admin_id) → name, from superadmin table */
 const RETAILERS: Record<number, string> = {
@@ -225,9 +226,9 @@ export default function AdminCustomers() {
       authUser = res.user;
       token = res.token;
     } catch { /* no DB account — preview-only */ }
-    // Set the impersonated identity first so scopedKey() targets the client's namespace.
-    localStorage.setItem("digitalcarda_user", JSON.stringify(authUser));
-    localStorage.setItem("auth_token", token);
+    // Set the impersonated identity in the MAIN portal (keeping the admin's own
+    // session intact) so scopedKey() targets the client's namespace.
+    setSession(token, authUser, "main");
     localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(rec));
     try {
       const content = await loadCustomerContent(String(c.slug));

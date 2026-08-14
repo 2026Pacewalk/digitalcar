@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, Navigate, useParams } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
+import { getToken, getSessionUser, setSessionUser, clearSession } from "@/lib/session";
 import PublicLayout from "@/components/layout/PublicLayout";
 const CustomDomainCard = lazy(() => import("@/components/CustomDomainCard"));
 
@@ -93,7 +94,7 @@ const Spinner = () => (
 
 function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
   const { user, isLoading } = useAuth();
-  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("auth_token");
+  const hasToken = typeof window !== "undefined" && !!getToken();
 
   // Verify the session against the server. The stored role in localStorage is
   // user-editable, so access is gated on the role the backend reports for the
@@ -105,17 +106,17 @@ function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allo
   useEffect(() => {
     if (!me.data) return;
     try {
-      const stored = JSON.parse(localStorage.getItem("digitalcarda_user") || "null");
+      const stored = getSessionUser() as { id?: number; role?: string; email?: string; fullName?: string } | null;
       // Reconcile on ANY identity drift — id, role, email or name. Comparing only
       // id/role let a renamed or re-emailed account (same id) keep showing a stale
       // cached identity in the header (e.g. an old "Nipun Garg" for md@pacewalk).
       const drift = !stored || stored.id !== me.data.id || stored.role !== me.data.role
         || stored.email !== me.data.email || stored.fullName !== me.data.fullName;
       if (drift) {
-        localStorage.setItem("digitalcarda_user", JSON.stringify({
+        setSessionUser({
           id: me.data.id, email: me.data.email, fullName: me.data.fullName,
           role: me.data.role, avatar: me.data.avatar ?? undefined,
-        }));
+        });
         window.location.reload();
       }
     } catch { /* ignore */ }
@@ -124,7 +125,7 @@ function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allo
   // Invalid / expired token → clear the session and send to login.
   const errData = me.error?.data as { code?: string; httpStatus?: number } | null | undefined;
   if (hasToken && me.error && (errData?.code === "UNAUTHORIZED" || errData?.httpStatus === 401)) {
-    try { localStorage.removeItem("auth_token"); localStorage.removeItem("digitalcarda_user"); } catch { /* ignore */ }
+    clearSession();
     return <Navigate to="/login" replace />;
   }
 

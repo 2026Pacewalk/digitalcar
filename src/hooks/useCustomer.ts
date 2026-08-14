@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { healUploadUrl } from "@/lib/img";
+import { getSessionUser } from "@/lib/session";
 
 /* Re-point stored image URLs (baked with a possibly-stale host at hydration
    time) to the current image base, so dashboard tiles never break when the
@@ -72,10 +73,10 @@ type AuthUserLite = { id: number; email: string; fullName: string; role: string 
 const SHOWCASE_EMAIL = "demo@digitalcarda.com";
 
 export function getAuthUser(): AuthUserLite | null {
-  try {
-    const raw = localStorage.getItem("digitalcarda_user");
-    return raw ? (JSON.parse(raw) as AuthUserLite) : null;
-  } catch { return null; }
+  // The card owner is always the MAIN-portal session (admin impersonation also
+  // writes the customer there), so card data scopes to the right account even
+  // while a separate admin session is open in another tab.
+  return getSessionUser<AuthUserLite>("main");
 }
 
 function isShowcase(u: AuthUserLite | null): boolean {

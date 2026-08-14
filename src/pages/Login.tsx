@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import AuthBrandPanel from "@/components/AuthBrandPanel";
 import { DEMO_USERS } from "@/hooks/useAuth";
+import { getToken, getSessionUser, setSession, clearSession } from "@/lib/session";
 
 function GoogleIcon({ size = 18 }: { size?: number }) {
   return (
@@ -30,10 +31,11 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
   const nextPath = searchParams.get("next");
   const next = nextPath && nextPath.startsWith("/") ? nextPath : "";
   const loginMut = trpc.auth.login.useMutation();
+  const slot = adminMode ? "admin" : "main"; // this login page's portal
 
   // Already signed in and sent here to reactivate → go straight to the target.
   useEffect(() => {
-    if (next && localStorage.getItem("auth_token") && localStorage.getItem("digitalcarda_user")) navigate(next);
+    if (next && getToken(slot) && getSessionUser(slot)) navigate(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [showPassword, setShowPassword] = useState(false);
@@ -52,12 +54,12 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
   // mismatch. Returns true if the login may proceed.
   const gateOk = (role: string): boolean => {
     if (!adminMode && role === "super_admin") {
-      localStorage.removeItem("auth_token"); localStorage.removeItem("digitalcarda_user");
+      clearSession("main");
       toast.error("Administrator accounts must sign in from the admin portal.");
       return false;
     }
     if (adminMode && role !== "super_admin") {
-      localStorage.removeItem("auth_token"); localStorage.removeItem("digitalcarda_user");
+      clearSession("admin");
       toast.error("This is the admin portal. Please use the main sign-in page.");
       setTimeout(() => navigate("/login"), 1400);
       return false;
@@ -72,8 +74,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     if (!import.meta.env.DEV) return false;
     const entry = DEMO_USERS[mail.toLowerCase().trim()];
     if (!entry || entry.password !== pass) return false;
-    localStorage.setItem("auth_token", "demo_token_" + entry.user.id);
-    localStorage.setItem("digitalcarda_user", JSON.stringify(entry.user));
+    setSession("demo_token_" + entry.user.id, entry.user, slot);
     if (!gateOk(entry.user.role)) return true; // handled (rejected) — don't fall through
     toast.success("Welcome back! (demo mode)");
     navigate(next || routeFor(entry.user.role));
@@ -84,8 +85,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     setLoading(true);
     try {
       const res = await loginMut.mutateAsync({ email: mail.trim(), password: pass });
-      localStorage.setItem("auth_token", res.token);
-      localStorage.setItem("digitalcarda_user", JSON.stringify(res.user));
+      setSession(res.token, res.user, slot);
       if (!gateOk(res.user.role)) return;
       toast.success("Welcome back!");
       navigate(next || routeFor(res.user.role));
