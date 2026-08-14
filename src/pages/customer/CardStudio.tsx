@@ -8,6 +8,7 @@ import {
 import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
 import { useCustomer, useLocalList, getActiveCardId } from "@/hooks/useCustomer";
+import { useValidityDays } from "@/hooks/useValidityDays";
 import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
@@ -35,6 +36,12 @@ export default function CardStudio() {
   const startTrial = trpc.trial.start.useMutation();
   const saveSnapshot = trpc.publish.saveSnapshot.useMutation();
   const utils = trpc.useUtils();
+
+  // A paid-plan account (Gold/Platinum) shows its plan, not the trial banner —
+  // matching the Profile page. Days-left comes from the shared validity source.
+  const pkgId = Number(data.package_id);
+  const paidPlanName = pkgId === 6 ? "Platinum" : pkgId === 5 ? "Gold" : null;
+  const { days: validityDays, active: validityActive } = useValidityDays(data.expired_on, pkgId === 7 ? 30 : 365);
 
   const [form, setForm] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -141,13 +148,19 @@ export default function CardStudio() {
         <div className="h-2 rounded-full bg-[#F1F5F9] overflow-hidden">
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#F7B31C,#D97706)" }} />
         </div>
-        {trialState && trialState.status !== "not_started" && (
+        {paidPlanName ? (
+          <div className="mt-3 pt-3 border-t border-[#F1F5F9] text-[12px] font-semibold">
+            {validityActive
+              ? <span className="inline-flex items-center gap-1.5 text-[#92400E]"><Gift size={14} className="text-[#F7B31C]" /> {paidPlanName} plan active · {validityDays} day{validityDays === 1 ? "" : "s"} left</span>
+              : <span className="inline-flex items-center gap-1.5 text-red-600"><CalendarClock size={14} /> {paidPlanName} plan expired — renew to keep your card live</span>}
+          </div>
+        ) : trialState && trialState.status !== "not_started" ? (
           <div className="mt-3 pt-3 border-t border-[#F1F5F9] text-[12px] font-semibold">
             {trialState.status === "expired"
               ? <span className="inline-flex items-center gap-1.5 text-red-600"><CalendarClock size={14} /> Free trial ended — activate your plan to keep your card live</span>
               : <span className="inline-flex items-center gap-1.5 text-[#92400E]"><Gift size={14} className="text-[#F7B31C]" /> Free trial active · {trialState.daysLeft} day{trialState.daysLeft === 1 ? "" : "s"} left</span>}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Card link — the public URL for the card being edited */}
