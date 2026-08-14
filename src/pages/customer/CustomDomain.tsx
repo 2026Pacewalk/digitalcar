@@ -134,7 +134,7 @@ export default function CustomerCustomDomain() {
 
               <button onClick={getAddon} disabled={paying}
                 className="mt-5 w-full sm:w-auto inline-flex items-center justify-center gap-2 h-12 px-8 rounded-xl gradient-gold text-[#0F172A] font-bold text-sm hover:shadow-gold transition-all disabled:opacity-60">
-                {paying ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Get Custom Domain — {inr(price)}
+                {paying ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />} Add Custom Domain
               </button>
 
               {/* Free for Platinum 3-year */}

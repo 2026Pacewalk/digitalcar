@@ -119,11 +119,13 @@ function buildPlans(pkgs: DbPkg[]): Plan[] {
 }
 
 const faqs = [
-  { q: "What happens after the 30-day free trial?", a: "You get the full card — every premium feature — free for 30 days, no credit card needed. When it ends, simply pick a plan to keep your card live. Nothing is charged automatically." },
-  { q: "What's the difference between Monthly, Yearly and 3-Year?", a: "Same card, cheaper the longer you commit. Yearly saves ~16% (about 2 months free) over monthly, and the 3-Year plan works out to just ₹69/month for Gold — our best value." },
-  { q: "Can I upgrade from Gold to Platinum later?", a: "Yes, anytime. Your card, link and QR stay exactly the same — you just unlock more features and higher limits instantly. The difference is prorated." },
-  { q: "What payment methods do you accept?", a: "UPI, credit/debit cards, net banking, Paytm and GPay. For yearly and 3-year plans you pay once and you're set." },
-  { q: "Do I need to buy cards for my whole team?", a: "For 10+ people use Bulk Cards — the more you add, the lower the per-card price (down to ₹399/card/year), with one shared company template and branding." },
+  { q: "Is the 30-day trial really free?", a: "Yes — completely free, no credit card. You get the full card with every premium feature unlocked for 30 days. When it ends, pick a plan to keep your card live; nothing is ever charged automatically." },
+  { q: "What do I actually get on a paid plan?", a: "Your live digital card on a personal link and QR, with lead capture, Google reviews, payment links, gallery and video, and all 31 designs. Gold covers one card and up to 25 products; Platinum adds up to 3 cards, unlimited products, a bigger 60-photo gallery, AI content, multi-language and priority support." },
+  { q: "Monthly, Yearly or 3-Year — which should I pick?", a: "The same card, cheaper the longer you commit. Yearly saves about 16% (roughly two months free) over monthly, and the 3-Year plan is the best value — and it includes the custom-domain setup free." },
+  { q: "Can I upgrade later?", a: "Anytime. Your card, link and QR stay exactly the same — you just unlock more features and higher limits instantly. We never make you rebuild anything." },
+  { q: "How does the custom domain work?", a: "It's a one-time ₹499 add-on (free on the Platinum 3-Year plan). Buy a domain from any registrar or use one you already own — you keep full ownership — and our team connects it to your card with HTTPS, usually within 24–48 hours. The domain's own registration fee is separate." },
+  { q: "What payment methods do you accept?", a: "UPI, credit/debit cards, net banking, Paytm and GPay. On yearly and 3-year plans you pay once and you're set for the whole term." },
+  { q: "Cards for a whole team?", a: "Use Bulk Cards for 10+ people — the more you add, the lower the per-card price (down to ₹399/card/year), with one shared company template and branding." },
   { q: "Can I get a refund?", a: "Yes — a 7-day money-back guarantee on all paid plans, no questions asked." },
 ];
 
@@ -189,7 +191,7 @@ export default function Pricing() {
                         {sv > 0 && <span className="ml-2 text-[11px] font-bold text-[#166534] bg-[#DCFCE7] px-1.5 py-0.5 rounded-full">Save {sv}%</span>}
                       </p>
                     )}
-                    {isFree && <p className="text-[12px] text-[#64748B]">then from ₹99/mo — cancel anytime</p>}
+                    {isFree && <p className="text-[12px] text-[#64748B]">Then just ₹99/mo. Cancel anytime.</p>}
                     {!isFree && period === "monthly" && <p className="text-[12px] text-[#94A3B8]">billed monthly</p>}
                   </div>
 
@@ -211,6 +213,21 @@ export default function Pricing() {
                       );
                     })}
                   </div>
+
+                  {/* Custom-domain add-on — free on Platinum 3-year, else a ₹499 add-on */}
+                  {plan.name === "Platinum" && (
+                    period === "3year" ? (
+                      <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#F0FDF4] to-[#ECFDF5] border border-[#BBF7D0] px-3 py-2.5">
+                        <span className="w-6 h-6 rounded-lg bg-[#16A34A] flex items-center justify-center shrink-0"><Globe size={13} className="text-white" /></span>
+                        <span className="text-[12.5px] leading-tight text-[#166534]"><span className="font-bold">Custom domain included FREE</span> — worth ₹499</span>
+                      </div>
+                    ) : (
+                      <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#F5F3FF] to-[#FAF5FF] border border-[#E9D5FF] px-3 py-2.5">
+                        <span className="w-6 h-6 rounded-lg bg-[#8B5CF6] flex items-center justify-center shrink-0"><Globe size={13} className="text-white" /></span>
+                        <span className="text-[12.5px] leading-tight text-[#5B21B6]"><span className="font-bold">Add-on: Custom domain</span> — worth ₹499 <span className="text-[#8B5CF6]">(free on 3-Year)</span></span>
+                      </div>
+                    )
+                  )}
                 </div>
               </div>
             );
@@ -233,6 +250,28 @@ export default function Pricing() {
 
         {/* Trust line */}
         <p className="mt-6 text-center text-[13px] text-[#94A3B8]">7-day money-back guarantee · Cancel anytime · UPI, Cards, Net Banking, Paytm & GPay</p>
+
+        {/* Custom Domain add-on */}
+        <div className="mt-16 max-w-5xl mx-auto">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0F172A] to-[#1E293B] p-7 sm:p-9 ring-1 ring-white/5">
+            <div className="absolute -top-16 -right-10 w-64 h-64 bg-[#8B5CF6]/15 rounded-full blur-3xl" />
+            <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6">
+              <div className="flex-1">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#8B5CF6]/20 text-[#C4B5FD] mb-3"><Globe size={12} /> ADD-ON</span>
+                <h2 className="text-xl sm:text-2xl font-bold text-white">Your card on your own domain</h2>
+                <p className="mt-2 text-[13.5px] text-[#94A3B8] leading-relaxed max-w-xl">Turn <span className="font-mono text-[#CBD5E1]">digitalcarda.in/you</span> into <span className="font-mono text-white font-semibold">card.yourbrand.com</span>. Bring a domain you own (or buy one from any registrar — billed separately) and our team connects it with HTTPS. A one-time <span className="text-white font-semibold">₹499</span> setup — <span className="text-[#C4B5FD] font-semibold">free on the Platinum 3-Year plan</span>.</p>
+              </div>
+              <div className="shrink-0 text-center sm:text-right">
+                <div className="flex items-baseline gap-1.5 justify-center sm:justify-end">
+                  <span className="text-3xl font-extrabold text-white">₹499</span>
+                  <span className="text-[12px] text-[#94A3B8]">one-time</span>
+                </div>
+                <p className="text-[11px] text-[#64748B] mt-0.5">or free with Platinum 3-Year</p>
+                <Link to="/signup" className="mt-3 inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-white text-[#0F172A] text-[13px] font-bold hover:bg-[#F1F5F9] transition-all">Get started <ArrowRight size={14} /></Link>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Everything included — dynamic, admin-managed feature list */}
         {includedFeatures.length > 0 && (

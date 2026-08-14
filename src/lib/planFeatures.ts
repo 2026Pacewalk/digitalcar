@@ -51,7 +51,8 @@ export function planBullets(p: PlanPkg): string[] {
   b.push("Google reviews + payment links");
   b.push("All 31 designs + link-in-bio styles");
   b.push(p.featureCustomDomain ? "Advanced analytics + export" : "Visit & tap analytics");
-  if (p.featureCustomDomain) b.push("Custom domain — free on 3-year (else ₹499 add-on)");
+  // Custom domain is a paid add-on (free on Platinum 3-year), surfaced on its own
+  // highlighted row — not a plain feature bullet here.
   if (p.featureRemoveBranding) b.push("Remove DigitalCarda branding");
   if (p.featureAI) b.push("AI writes your card content");
   if (p.featureMultilingual) b.push("Multi-language card");
