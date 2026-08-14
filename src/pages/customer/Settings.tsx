@@ -169,17 +169,6 @@ export default function CustomerSettings() {
               </div>
             ))}
           </div>
-          {(Number(data.package_id) === 5 || Number(data.package_id) === 6) && (
-            <div className="flex items-center gap-3 py-3 mt-2 border-t border-[#F1F5F9]">
-              <button onClick={() => toggle("badge_on")} className={`w-11 h-6 rounded-full transition-colors shrink-0 relative ${isOn("badge_on") ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`} aria-label="Toggle plan badge">
-                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${isOn("badge_on") ? "left-[22px]" : "left-0.5"}`} />
-              </button>
-              <div>
-                <span className="text-sm font-medium text-[#0F172A]">Plan badge</span>
-                <p className="text-[11px] text-[#94A3B8]">Show your {PKG[Number(data.package_id)]?.name || "member"} badge on the logo of your public card.</p>
-              </div>
-            </div>
-          )}
           <div className="flex justify-end mt-4"><button onClick={() => save("Modules updated")} className="flex items-center gap-2 h-10 px-5 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold"><Save size={15} /> Submit</button></div>
         </Panel>
       )}

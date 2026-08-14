@@ -199,6 +199,17 @@ export default function CardStudio() {
               ))}
               <button onClick={() => navigate("/dashboard/templates")} className="h-9 px-3 rounded-xl border border-[#E2E8F0] text-[13px] font-semibold text-[#334155] hover:bg-[#F8FAFC] inline-flex items-center gap-1.5">More designs <ChevronRight size={14} /></button>
             </div>
+            {(Number(data.package_id) === 5 || Number(data.package_id) === 6) && (
+              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#F1F5F9]">
+                <button onClick={() => set("badge_on", val("badge_on") === "0" ? "1" : "0")} className={`w-11 h-6 rounded-full transition-colors shrink-0 relative ${val("badge_on") !== "0" ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`} aria-label="Toggle plan badge">
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${val("badge_on") !== "0" ? "left-[22px]" : "left-0.5"}`} />
+                </button>
+                <div>
+                  <span className="text-sm font-medium text-[#0F172A]">Plan badge</span>
+                  <p className="text-[11px] text-[#94A3B8]">Show your {Number(data.package_id) === 6 ? "Platinum" : "Gold"} badge on your card logo.</p>
+                </div>
+              </div>
+            )}
           </Panel>
         </div>
 

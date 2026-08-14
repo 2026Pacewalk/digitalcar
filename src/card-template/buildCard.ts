@@ -391,17 +391,28 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 
   // Footer icons mirror the sections that are actually on the card — disable a
   // module in Settings and its section string is empty, so its icon drops out.
+  // Bottom-nav labels must stay short: a renamed section title (e.g. a long
+  // tagline like "Human Strategy. AI Speed. Real Growth.") otherwise truncates to
+  // something meaningless ("Huma…"). Use the first word of the title, capped,
+  // falling back to a short default. The full title still shows as the section
+  // header inside the card.
+  const navLabel = (custom: unknown, def: string) => {
+    const t = s(custom).trim();
+    if (!t) return def;
+    const first = t.split(/\s+/)[0].replace(/[.,;:!|/–—-]+$/, "");
+    return first.length > 11 ? first.slice(0, 10) + "…" : first;
+  };
   const footerItems = [
     { id: "home-section", icon: "fa fa-home", label: "Home", show: true },
-    { id: "about-section", icon: "fas fa-briefcase", label: s(c.about) || "About Us", show: !!aboutSection },
-    { id: "products-section", icon: "fas fa-box-open", label: s(c.product) || "Services", show: !!servicesSection },
-    { id: "offers-section", icon: "fas fa-tags", label: s(c.offer) || "Offers", show: !!offersSection },
-    { id: "payment-section", icon: "fas fa-money-bill-alt", label: s(c.payment) || "Payment", show: !!paymentSection },
-    { id: "qrcode-section", icon: "fas fa-qrcode", label: "Payment QR", show: !!qrSection },
+    { id: "about-section", icon: "fas fa-briefcase", label: navLabel(c.about, "About"), show: !!aboutSection },
+    { id: "products-section", icon: "fas fa-box-open", label: navLabel(c.product, "Services"), show: !!servicesSection },
+    { id: "offers-section", icon: "fas fa-tags", label: navLabel(c.offer, "Offers"), show: !!offersSection },
+    { id: "payment-section", icon: "fas fa-money-bill-alt", label: navLabel(c.payment, "Payment"), show: !!paymentSection },
+    { id: "qrcode-section", icon: "fas fa-qrcode", label: "Pay QR", show: !!qrSection },
     { id: "review-section", icon: "fab fa-google", label: "Reviews", show: !!googleReviewSection },
-    { id: "gallery-section", icon: "fa fa-photo-video", label: s(c.gallery) || "Gallery", show: !!gallerySection },
-    { id: "video-section", icon: "fa fa-video", label: s(c.video) || "Video", show: !!videoSection },
-    { id: "enquiry-section", icon: "fas fa-comment-alt", label: s(c.enquiry) || "Enquiry", show: !!enquirySection },
+    { id: "gallery-section", icon: "fa fa-photo-video", label: navLabel(c.gallery, "Gallery"), show: !!gallerySection },
+    { id: "video-section", icon: "fa fa-video", label: navLabel(c.video, "Video"), show: !!videoSection },
+    { id: "enquiry-section", icon: "fas fa-comment-alt", label: navLabel(c.enquiry, "Enquiry"), show: !!enquirySection },
   ].filter((f) => f.show);
   const footer = `<div class="footer"><ul class="footer-menu">${footerItems.map((f) =>
     `<li><a href="javascript:void(0)" onclick="goSection('${f.id}')" class="footer-menu-link"><i class="${f.icon}"></i><p>${f.label}</p></a></li>`).join("")}</ul></div>`;
@@ -503,6 +514,14 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-save-contact:hover{filter:brightness(1.15);}
 .dc-save-contact:active{transform:scale(.99);}
 .dc-sent{color:#12a150;font-weight:600;text-align:center;padding:16px 0;}
+/* Bottom nav: keep each tab a fixed width and let the bar scroll sideways (it
+   already has edge-fade shadows for this) instead of squeezing 9–10 tabs into
+   the width and truncating every label. Smaller, single-line labels. */
+#body-content .footer-menu,.footer-menu{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.footer-menu li{flex:0 0 auto;min-width:62px;}
+.footer-menu-link{padding:8px 6px;}
+.footer-menu-link i{font-size:20px;}
+.footer-menu-link p{font-size:10px;white-space:nowrap;margin-top:3px;line-height:1.2;}
 /* Paid-plan trust badge — small golden seal on the logo (Gold=crown, Platinum=gem) */
 #home-section .home-brand-img{position:relative;display:inline-block;}
 .dc-plan-badge{position:absolute;top:0;right:0;transform:translate(38%,-30%);z-index:6;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;font-size:8px;line-height:1;background:linear-gradient(135deg,#FCE4A0,#E8A317);color:#5b3d00;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);}
