@@ -76,6 +76,37 @@ try {
       n += r.affectedRows || 0;
     }
     console.log(n ? `✓ Seeded marketing media for ${n} product(s).` : "• Product media already set — skipped.");
+
+    // The 37 remaining launch templates: 4-image mockup galleries imported from
+    // the design batch. Same folder/naming convention (folder = slug without
+    // "-card", 4th image = "-services"). Names come from the DB so seo copy reads
+    // naturally. Same non-destructive guard — images-empty only. Files ship in public/.
+    const BATCH = [
+      "royal-purple-card", "crimson-card", "sunset-card", "rose-pink-card", "slate-pro-card",
+      "forest-card", "ruby-card", "violet-card", "cyan-wave-card", "tangerine-card",
+      "magenta-card", "steel-blue-card", "lime-card", "coral-card", "deep-sea-card",
+      "bronze-card", "plum-card", "scarlet-card", "aqua-card", "marigold-card",
+      "sapphire-card", "fuchsia-card", "pine-card", "onyx-gold-card", "ivory-bloom-bio-card",
+      "aurora-glass-bio-card", "midnight-neon-bio-card", "sunset-warm-bio-card", "ocean-frost-bio-card",
+      "noir-bold-bio-card", "peach-soft-bio-card", "gold-luxe-bio-card", "neon-cyber-bio-card",
+      "retro-groove-bio-card", "editorial-bio-card", "mint-fresh-bio-card", "lavender-dream-bio-card",
+    ];
+    const [pn] = await conn.query("SELECT slug, name FROM products WHERE slug IN (?)", [BATCH]);
+    const nameBySlug = Object.fromEntries(pn.map((r) => [r.slug, r.name]));
+    let n2 = 0;
+    for (const slug of BATCH) {
+      const folder = slug.replace(/-card$/, "");
+      const base = `${folder}-digital-business-card`;
+      const imgs = media(folder, [`${base}.png`, `${base}-features.png`, `${base}-preview.png`, `${base}-services.png`]);
+      const name = nameBySlug[slug] || slug;
+      const title = `${name} - Free 30-Day Trial`;
+      const desc = `${name}: one-tap call, WhatsApp, QR code, Google Maps & lead capture. Works on any phone, no app. Try free for 30 days.`;
+      const [r] = await conn.query(
+        "UPDATE products SET images = CAST(? AS JSON), seo_title = COALESCE(NULLIF(seo_title,''), ?), seo_description = COALESCE(NULLIF(seo_description,''), ?) WHERE slug = ? AND (images IS NULL OR JSON_LENGTH(images) = 0)",
+        [JSON.stringify(imgs), title, desc, slug]);
+      n2 += r.affectedRows || 0;
+    }
+    console.log(n2 ? `✓ Seeded marketing media for ${n2} more product(s).` : "• Batch product media already set — skipped.");
   } catch (e) {
     console.log("• Product media seed skipped: " + (e.code || e.message));
   }
