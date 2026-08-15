@@ -5,8 +5,8 @@ import { trpc } from "@/providers/trpc";
 import {
   LayoutDashboard, Palette, Users, UserCircle, Package,
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
-  ChevronRight, Store, X, Search, ToggleRight, ReceiptText, KeyRound,
-  Home as HomeIcon, Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
+  ChevronRight, Store, X, ReceiptText,
+  Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
   Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe,
 } from "lucide-react";
 
@@ -45,6 +45,7 @@ const customerGroups: NavGroup[] = [
   ] },
   { title: "Account", items: [
     { label: "Subscription", icon: CreditCard, path: "/dashboard/subscription" },
+    { label: "Billing", icon: ReceiptText, path: "/dashboard/billing" },
     { label: "Custom Domain", icon: Globe, path: "/dashboard/domain" },
     { label: "Bulk Create", icon: Layers, path: "/dashboard/bulk" },
     { label: "Profile", icon: UserCircle, path: "/dashboard/profile" },
@@ -70,7 +71,7 @@ const superAdminGroups: NavGroup[] = [
     { label: "Templates", icon: Palette, path: "/admin/templates" },
   ] },
   { title: "Growth", items: [
-    { label: "Payments", icon: Wallet, path: "/admin/payments" },
+    { label: "Payment Orders", icon: ReceiptText, path: "/admin/payment-orders" },
     { label: "Referrals & Payouts", icon: Gift, path: "/admin/referrals" },
   ] },
   { title: "System", items: [
@@ -82,7 +83,10 @@ const superAdminGroups: NavGroup[] = [
 
 const resellerGroups: NavGroup[] = [
   { title: "Overview", items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/reseller" }] },
-  { title: "Manage", items: [{ label: "My Customers", icon: Users, path: "/reseller/customers" }] },
+  { title: "Manage", items: [
+    { label: "My Customers", icon: Users, path: "/reseller/customers" },
+    { label: "Payment Orders", icon: ReceiptText, path: "/reseller/payments" },
+  ] },
 ];
 
 export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggle }: SidebarProps) {

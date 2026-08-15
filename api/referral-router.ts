@@ -9,7 +9,7 @@ import {
 import { eq, desc, and, gt, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
-import { payoutRequestAdminEmail } from "./lib/email-templates";
+import { payoutRequestAdminEmail, payoutCompletedEmail } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
 const COMMISSION_KEY = "referral_commission_percent";
@@ -373,6 +373,11 @@ export const referralRouter = createRouter({
         message: `Your payout of ₹${money(n(wr.amount))} has been paid via ${wr.method.toUpperCase()}.`,
         link: "/dashboard/refer",
       });
+      // Email the recipient that their payout was processed (non-blocking).
+      try {
+        const payee = await db.query.users.findFirst({ where: eq(users.id, wr.userId), columns: { email: true, fullName: true } });
+        void sendEmail(payee?.email, payoutCompletedEmail({ name: payee?.fullName, amount: n(wr.amount), method: wr.method, reference: input.reference?.trim() }));
+      } catch { /* non-critical */ }
       return { ok: true };
     }),
 

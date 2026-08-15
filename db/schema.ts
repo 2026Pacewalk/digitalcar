@@ -591,7 +591,12 @@ export const paymentOrders = mysqlTable("payment_orders", {
   billingCycle: mysqlEnum("billing_cycle", ["monthly", "yearly", "triennial"]).notNull().default("monthly"),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   method: mysqlEnum("method", ["upi", "bank"]).notNull(),
-  reference: varchar("reference", { length: 255 }).notNull(), // UTR / txn id
+  // How the order was paid: "manual" = user-submitted UPI/bank proof (admin verifies);
+  // "razorpay" = online checkout (auto-verified by signature). Added for the Payment
+  // Orders module so revenue can be split by gateway. Defaults to manual so every
+  // pre-existing row is correct without a backfill.
+  gateway: mysqlEnum("gateway", ["manual", "razorpay"]).notNull().default("manual"),
+  reference: varchar("reference", { length: 255 }).notNull(), // UTR / txn id (or razorpay payment id)
   status: mysqlEnum("status", ["pending", "verified", "rejected"]).notNull().default("pending"),
   adminNote: varchar("admin_note", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),

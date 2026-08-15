@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { sendEmail, smtpConfigured, ownerAddress } from "./lib/mail";
-import { smtpTestEmail } from "./lib/email-templates";
+import { smtpTestEmail, marketingIntroEmail } from "./lib/email-templates";
 
 const settingsStore: Record<string, Record<string, unknown>> = {
   general: {
     platformName: "DigitalCarda",
     platformUrl: "https://digitalcarda.com",
-    supportEmail: "support@digitalcarda.in",
+    supportEmail: "hello@digitalcarda.in",
     defaultLanguage: "en",
     defaultCurrency: "USD",
     timezone: "UTC",
@@ -72,6 +72,16 @@ export const settingsRouter = createRouter({
       const to = input.to || ownerAddress();
       const r = await sendEmail(to, smtpTestEmail({ to }));
       return { ...r, to };
+    }),
+
+  // Admin: send the cold-outreach / marketing intro email to one recipient (for
+  // one-off prospecting or previewing it in your own inbox). For bulk campaigns,
+  // use the same template HTML in ZeptoMail's campaign tool instead.
+  sendMarketingEmail: adminQuery
+    .input(z.object({ to: z.string().email(), name: z.string().optional(), businessName: z.string().optional() }))
+    .mutation(async ({ input }) => {
+      const r = await sendEmail(input.to, marketingIntroEmail({ name: input.name, businessName: input.businessName }));
+      return { ...r, to: input.to };
     }),
 
   getPublic: publicQuery.query(() => {

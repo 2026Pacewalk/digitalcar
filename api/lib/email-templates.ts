@@ -46,9 +46,11 @@ function detailTable(rows: [string, string][], opts: { accentLast?: boolean } = 
   </table>`;
 }
 
-/** Wrap content in the branded shell. `accent` sets the header strip mood. */
-function layout(opts: { preheader: string; badge?: string; heading: string; bodyHtml: string; accent?: string }): string {
+/** Wrap content in the branded shell. `accent` sets the header strip mood.
+    `footer` overrides the default account-email footer line (e.g. for cold outreach). */
+function layout(opts: { preheader: string; badge?: string; heading: string; bodyHtml: string; accent?: string; footer?: string }): string {
   const accent = opts.accent || BRAND.gold;
+  const footerLine = opts.footer ?? "You're receiving this because you have a DigitalCarda account.";
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting"></head>
 <body style="margin:0;padding:0;background:${BRAND.soft}">
@@ -75,7 +77,7 @@ function layout(opts: { preheader: string; badge?: string; heading: string; body
         <tr><td style="padding:24px 32px 30px">
           <div style="border-top:1px solid ${BRAND.line};padding-top:18px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#94a3b8">
             <a href="${SITE}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:bold">digitalcarda.in</a> &nbsp;·&nbsp; Your all-in-one digital business card.<br>
-            You're receiving this because you have a DigitalCarda account.
+            ${footerLine}
           </div>
         </td></tr>
       </table>
@@ -529,5 +531,119 @@ export function trialEndedEmail(o: { name?: string }): Email {
     subject: "Your trial ended — reactivate your card anytime",
     html: layout({ preheader: "Your card is paused. Upgrade to bring it back online.", badge: "Trial ended", heading: "Your trial has ended", bodyHtml, accent: "#EF4444" }),
     text: `Hi ${o.name || "there"},\n\nYour trial ended and your card is paused. Your data is safe — upgrade to reactivate: ${SITE}/dashboard/subscription`,
+  };
+}
+
+/* ── Paid-subscription lifecycle ─────────────────────────────────────── */
+
+export function subscriptionRenewalReminderEmail(o: { name?: string; planName: string; daysLeft: number; validTill: string }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p(`Your <strong>${esc(o.planName)}</strong> plan renews in <strong style="color:${BRAND.goldDark}">${o.daysLeft} day${o.daysLeft === 1 ? "" : "s"}</strong> (valid till ${esc(o.validTill)}). Renew now so your card stays live and every feature keeps working without a break.`) +
+    button("Renew my plan", `${SITE}/dashboard/subscription`);
+  return {
+    subject: `Your ${o.planName} plan renews in ${o.daysLeft} day${o.daysLeft === 1 ? "" : "s"}`,
+    html: layout({ preheader: `Renew your ${o.planName} plan to stay live.`, badge: "Renewal reminder", heading: "Time to renew ⏳", bodyHtml }),
+    text: `Hi ${o.name || "there"},\n\nYour ${o.planName} plan renews in ${o.daysLeft} day(s) (valid till ${o.validTill}). Renew: ${SITE}/dashboard/subscription`,
+  };
+}
+
+export function subscriptionExpiredEmail(o: { name?: string; planName: string }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p(`Your <strong>${esc(o.planName)}</strong> plan has expired, so your card is now <strong>paused</strong> and hidden from visitors.`) +
+    p("Everything you built is safe. Renew any time to bring your card back online instantly.") +
+    button("Renew &amp; go live again", `${SITE}/dashboard/subscription`);
+  return {
+    subject: `Your ${o.planName} plan expired — renew to go live`,
+    html: layout({ preheader: "Your plan expired and your card is paused — renew to reactivate.", badge: "Plan expired", heading: "Your plan has expired", bodyHtml, accent: "#EF4444" }),
+    text: `Hi ${o.name || "there"},\n\nYour ${o.planName} plan expired and your card is paused. Renew to reactivate: ${SITE}/dashboard/subscription`,
+  };
+}
+
+export function paymentFailedEmail(o: { name?: string; planName: string; amount: number }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p(`Your online payment of <strong>${inr(o.amount)}</strong> for the <strong>${esc(o.planName)}</strong> plan didn't go through — no money was deducted, or any hold will be released automatically.`) +
+    p("You can try again with a different method (card, UPI, netbanking or wallet) — it only takes a minute.") +
+    button("Try payment again", `${SITE}/dashboard/subscription`);
+  return {
+    subject: `Payment didn't go through — ${o.planName}`,
+    html: layout({ preheader: "Your payment didn't complete — try again to activate your plan.", badge: "Payment · Failed", heading: "Payment didn't complete", bodyHtml, accent: "#EF4444" }),
+    text: `Hi ${o.name || "there"},\n\nYour ${inr(o.amount)} payment for ${o.planName} didn't go through — no money was deducted. Try again: ${SITE}/dashboard/subscription`,
+  };
+}
+
+/* ── Reseller earnings ───────────────────────────────────────────────── */
+
+export function resellerCommissionEmail(o: { name?: string; customerName?: string; amount: number | string; pendingPayout?: number | string }): Email {
+  const rows: [string, string][] = [["Commission earned", inr(o.amount)]];
+  if (o.pendingPayout != null) rows.push(["Pending payout", inr(o.pendingPayout)]);
+  const bodyHtml =
+    hi(o.name) +
+    p(`Nice work — <strong>${esc(o.customerName || "one of your customers")}</strong> just activated a paid plan, so you've earned a commission! 💰`) +
+    detailTable(rows, { accentLast: true }) +
+    p("Keep onboarding customers — every paid activation adds to your payout.") +
+    button("View my earnings", `${SITE}/reseller`);
+  return {
+    subject: `You earned ${inr(o.amount)} commission 💰`,
+    html: layout({ preheader: `${o.customerName || "A customer"} went paid — you earned ${inr(o.amount)}.`, badge: "Commission earned", heading: "You earned a commission 💰", bodyHtml, accent: "#22C55E" }),
+    text: `Hi ${o.name || "there"},\n\n${o.customerName || "A customer"} activated a paid plan — you earned ${inr(o.amount)} commission. View earnings: ${SITE}/reseller`,
+  };
+}
+
+export function payoutCompletedEmail(o: { name?: string; amount: number | string; method?: string; reference?: string }): Email {
+  const rows: [string, string][] = [["Amount", inr(o.amount)]];
+  if (o.method) rows.push(["Method", esc(o.method.toUpperCase())]);
+  if (o.reference) rows.push(["Reference", esc(o.reference)]);
+  const bodyHtml =
+    hi(o.name) +
+    p("Good news — your payout has been <strong>processed</strong> and is on its way to you. 🎉") +
+    detailTable(rows, { accentLast: true }) +
+    p(`<span style="color:${BRAND.sub};font-size:13px">Bank transfers can take 1–2 business days to reflect.</span>`) +
+    button("View my wallet", `${SITE}/reseller`);
+  return {
+    subject: `Payout sent — ${inr(o.amount)} 🎉`,
+    html: layout({ preheader: `Your ${inr(o.amount)} payout has been processed.`, badge: "Payout · Sent", heading: "Your payout is on its way 🎉", bodyHtml, accent: "#22C55E" }),
+    text: `Hi ${o.name || "there"},\n\nYour payout of ${inr(o.amount)} has been processed${o.reference ? ` (ref ${o.reference})` : ""}. It may take 1–2 business days to reflect.`,
+  };
+}
+
+/* ── Cold outreach / marketing intro ─────────────────────────────────────
+   For prospecting emails to businesses who don't yet have an account. Uses a
+   marketing footer (not the account-holder footer) with an opt-out line. */
+
+export function marketingIntroEmail(o: { name?: string; businessName?: string; ctaUrl?: string }): Email {
+  const who = o.businessName ? esc(o.businessName) : "your business";
+  const feature = (title: string, desc: string) =>
+    `<tr>
+      <td style="padding:10px 0;vertical-align:top;width:26px;font-size:18px">✅</td>
+      <td style="padding:10px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#334155"><strong style="color:${BRAND.ink}">${title}</strong> — ${desc}</td>
+    </tr>`;
+  const bodyHtml =
+    p(`Hi ${esc(o.name || "there")},`) +
+    p(`I'm reaching out from <strong>DigitalCarda</strong> — we help businesses like ${who} replace the paper visiting card with a smart, shareable <strong>digital business card</strong> that wins more customers.`) +
+    p("In minutes you get a professional card you can share by link, QR or WhatsApp — with everything a customer needs in one place:") +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 18px">
+      ${feature("One tap to everything", "call, WhatsApp, directions, website & save-contact")}
+      ${feature("Showcase what you sell", "products, services, gallery, videos & offers")}
+      ${feature("Capture leads automatically", "every enquiry lands in your dashboard")}
+      ${feature("Take payments", "UPI, cards & netbanking built in")}
+      ${feature("Look credible", "Google reviews, custom domain & your own branding")}
+      ${feature("Know what works", "real analytics on views, taps & leads")}
+    </table>` +
+    p("There's a <strong>30-day free trial</strong> — no credit card needed. Build your card today and share it the same day.") +
+    button("Create your free card", o.ctaUrl || `${SITE}/`) +
+    p(`<span style="color:${BRAND.sub};font-size:13px">Prefer to talk? Reply to this email or reach us at <a href="mailto:hello@digitalcarda.in" style="color:${BRAND.goldDark};text-decoration:none">hello@digitalcarda.in</a> · +91 95177 22444.</span>`);
+  return {
+    subject: `${o.businessName ? o.businessName + " — turn" : "Turn"} your visiting card into a smart digital card`,
+    html: layout({
+      preheader: "A smart digital business card that wins more customers — 30-day free trial.",
+      badge: "DigitalCarda",
+      heading: "Your business deserves a smarter card 🚀",
+      bodyHtml,
+      footer: "You received this because we believe DigitalCarda can help your business grow. Not interested? Just reply “unsubscribe”.",
+    }),
+    text: `Hi ${o.name || "there"},\n\nDigitalCarda turns your paper visiting card into a smart digital business card — share by link/QR/WhatsApp, showcase products & services, capture leads, take payments (UPI/cards), add Google reviews, a custom domain and real analytics.\n\n30-day free trial, no credit card. Create your card: ${o.ctaUrl || SITE + "/"}\n\nQuestions? hello@digitalcarda.in · +91 95177 22444\n\nNot interested? Reply "unsubscribe".`,
   };
 }

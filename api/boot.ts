@@ -201,6 +201,31 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// One-time, idempotent add of payment_orders.gateway (Payment Orders module). MySQL
+// has no "ADD COLUMN IF NOT EXISTS", so check information_schema first. Additive with
+// a default — every existing row becomes 'manual', which is correct (all prior orders
+// were manual). Never drops or rewrites data.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    const rows = await db.execute(sql.raw(
+      `SELECT COUNT(*) AS n FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'payment_orders' AND column_name = 'gateway'`,
+    ));
+    const n = Number((rows as unknown as [{ n?: number }[]])[0]?.[0]?.n ?? (rows as unknown as { n?: number }[])[0]?.n ?? 0);
+    if (!n) {
+      await db.execute(sql.raw(
+        `ALTER TABLE payment_orders ADD COLUMN gateway ENUM('manual','razorpay') NOT NULL DEFAULT 'manual' AFTER method`,
+      ));
+      console.log("[schema] payment_orders.gateway column added");
+    }
+  } catch (e) {
+    console.error("[schema] ensure payment_orders.gateway failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be
@@ -404,6 +429,54 @@ app.post("/api/funnel", async (c) => {
     }
   } catch { /* best-effort */ }
   return c.body(null, 204);
+});
+
+// ── Razorpay webhook: server-to-server payment confirmation (backstop to the
+// browser-side verify). If the customer's browser closed after paying but before
+// the client verify ran, this still activates their plan. Verifies the webhook
+// signature (HMAC of the RAW body with the webhook secret), then on
+// payment.captured records + activates the order idempotently (dedup by payment id,
+// shared with the client-verify path). Non-2xx makes Razorpay retry, so a transient
+// DB/API hiccup never loses a payment.
+app.post("/api/razorpay/webhook", async (c) => {
+  const raw = await c.req.text();
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { resolveRazorpay, recordRazorpayPayment } = await import("./payment-router");
+    const { verifyRazorpayWebhook, fetchRazorpayOrder } = await import("./lib/razorpay");
+    const db = getDb();
+    const cr = await resolveRazorpay(db);
+    if (!verifyRazorpayWebhook(raw, c.req.header("x-razorpay-signature"), cr.webhookSecret)) {
+      return c.json({ error: "invalid signature" }, 400);
+    }
+    const event = JSON.parse(raw) as { event?: string; payload?: { payment?: { entity?: { id?: string; order_id?: string; amount?: number } } } };
+    // Ack every non-target event so Razorpay stops retrying it.
+    if (event.event !== "payment.captured") return c.json({ ok: true, ignored: event.event });
+    const pay = event.payload?.payment?.entity;
+    if (!pay?.id || !pay.order_id) return c.json({ ok: true, note: "no payment entity" });
+
+    // Read the notes we stashed on the order at creation to know which plan to activate.
+    const order = await fetchRazorpayOrder(pay.order_id, cr);
+    const notes = order.notes || {};
+    const userId = Number(notes.userId);
+    const packageId = Number(notes.packageId);
+    const cycle = notes.billingCycle;
+    const billingCycle = (cycle === "monthly" || cycle === "yearly" || cycle === "triennial") ? cycle : "yearly";
+    if (!userId || !packageId) return c.json({ ok: true, note: "order missing notes" });
+
+    const res = await recordRazorpayPayment(db, {
+      userId, packageId,
+      planName: String(notes.planName || "Plan"),
+      billingCycle,
+      amountRupees: Number(order.amount || pay.amount || 0) / 100, // the authoritative charged amount
+      paymentId: pay.id,
+    });
+    console.log(`[razorpay webhook] payment.captured ${pay.id} → ${res.already ? "already recorded" : "activated"}`);
+    return c.json({ ok: true });
+  } catch (e) {
+    console.error("[razorpay webhook] error:", (e as Error).message);
+    return c.json({ ok: false }, 500); // 500 → Razorpay retries later
+  }
 });
 
 // Permanent QR / print target: /q/<public_id> resolves to the card's CURRENT

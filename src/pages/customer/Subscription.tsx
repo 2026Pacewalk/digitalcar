@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
 import { useCustomer } from "@/hooks/useCustomer";
 import { planFeatures, planRank, isFreePlan, type PlanPkg } from "@/lib/planFeatures";
+import { openRazorpayCheckout } from "@/lib/razorpay";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
 const inr = (v: number) => "₹" + Math.round(Number(v) || 0).toLocaleString("en-IN");
@@ -234,6 +235,62 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
   const [method, setMethod] = useState<"upi" | "bank">("upi");
   const [reference, setReference] = useState("");
   const [copied, setCopied] = useState("");
+
+  // ─── Razorpay instant checkout (shown only when the gateway is configured) ───
+  const rzpCfg = trpc.payment.razorpayConfig.useQuery();
+  const rzpCreate = trpc.payment.razorpayCreateOrder.useMutation();
+  const rzpVerify = trpc.payment.razorpayVerify.useMutation();
+  const { data: customer } = useCustomer();
+  const [rzpBusy, setRzpBusy] = useState(false);
+
+  const payWithRazorpay = async () => {
+    setRzpBusy(true);
+    try {
+      const order = await rzpCreate.mutateAsync({ packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0 });
+      const rzp = await openRazorpayCheckout({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        name: "DigitalCarda",
+        description: `${plan.name} · ${cycleLabel}`,
+        order_id: order.orderId,
+        prefill: {
+          name: String(customer?.name || ""),
+          email: String(customer?.email || ""),
+          contact: String(customer?.mobile1 || ""),
+        },
+        theme: { color: "#F7B31C" },
+        // Razorpay calls this after a successful payment — verify the signature
+        // server-side before treating the plan as paid.
+        handler: async (resp) => {
+          try {
+            await rzpVerify.mutateAsync({
+              razorpayOrderId: resp.razorpay_order_id,
+              razorpayPaymentId: resp.razorpay_payment_id,
+              razorpaySignature: resp.razorpay_signature,
+              packageId: plan.id,
+              billingCycle: cycle,
+              wantsOffer: offerPct > 0,
+            });
+            toast.success("Payment successful — your plan is now active 🎉");
+            onDone();
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "We couldn't verify the payment. If you were charged, contact support.");
+          } finally {
+            setRzpBusy(false);
+          }
+        },
+        modal: { ondismiss: () => { setRzpBusy(false); toast("Payment cancelled"); } },
+      });
+      rzp.on("payment.failed", (r) => {
+        setRzpBusy(false);
+        toast.error(r?.error?.description || "Payment failed. Please try another method.");
+      });
+    } catch (e) {
+      setRzpBusy(false);
+      toast.error(e instanceof Error ? e.message : "Could not start the payment");
+    }
+  };
   const copy = (t: string, k: string) => { navigator.clipboard.writeText(t).then(() => { setCopied(k); setTimeout(() => setCopied(""), 1400); }); };
   const upiLink = pay?.upiId ? `upi://pay?pa=${encodeURIComponent(pay.upiId)}&pn=${encodeURIComponent(pay.upiName || "DigitalCarda")}&am=${plan.amount}&cu=INR` : "";
   const qrSrc = pay?.upiQr || (upiLink ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiLink)}` : "");
@@ -263,7 +320,25 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#F1F5F9] text-[#64748B]"><X size={18} /></button>
         </div>
 
-        <div className="flex rounded-xl bg-[#F1F5F9] p-1 m-4 mb-0">
+        {/* Instant online checkout (Razorpay) — card / UPI / netbanking in one modal */}
+        {rzpCfg.data?.enabled && (
+          <div className="px-4 pt-4">
+            <button onClick={payWithRazorpay} disabled={rzpBusy}
+              className="w-full h-12 rounded-2xl bg-[#0F172A] text-white font-bold flex items-center justify-center gap-2 hover:bg-[#1E293B] active:scale-[0.99] disabled:opacity-60">
+              {rzpBusy
+                ? <><Loader2 size={18} className="animate-spin" /> Opening secure checkout…</>
+                : <><Zap size={18} className="text-[#F7B31C]" /> Pay {inr(plan.amount)} instantly</>}
+            </button>
+            <p className="text-[11px] text-[#94A3B8] text-center mt-1.5">Card · UPI · Netbanking · Wallets — activated instantly</p>
+            <div className="flex items-center gap-3 my-3">
+              <div className="h-px flex-1 bg-[#E2E8F0]" />
+              <span className="text-[11px] text-[#94A3B8]">or pay manually</span>
+              <div className="h-px flex-1 bg-[#E2E8F0]" />
+            </div>
+          </div>
+        )}
+
+        <div className="flex rounded-xl bg-[#F1F5F9] p-1 m-4 mb-0 mt-0">
           {(["upi", "bank"] as const).map((m) => (
             <button key={m} onClick={() => setMethod(m)} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${method === m ? "bg-white text-[#0F172A] shadow-sm" : "text-[#64748B]"}`}>{m === "upi" ? "UPI / QR" : "Bank Transfer"}</button>
           ))}

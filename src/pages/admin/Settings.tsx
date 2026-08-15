@@ -1,12 +1,17 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { Save, Globe, Mail, Palette, Shield, Bell, CreditCard, CheckCircle2, XCircle, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
+import PaymentSettingsPanel from "@/components/admin/PaymentSettingsPanel";
 
 export default function AdminSettings() {
-  const [activeTab, setActiveTab] = useState("general");
+  // Deep-linkable: /admin/settings?tab=payment opens the Payment tab directly.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "general";
+  const setActiveTab = (id: string) => setSearchParams(id === "general" ? {} : { tab: id });
   const [saving, setSaving] = useState(false);
 
   // Email / SMTP status + test tool.
@@ -68,7 +73,7 @@ export default function AdminSettings() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Support Email</label>
-                    <input defaultValue="support@digitalcarda.in" className="input-premium w-full" />
+                    <input defaultValue="hello@digitalcarda.in" className="input-premium w-full" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Default Language</label>
@@ -206,44 +211,24 @@ export default function AdminSettings() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-base font-semibold text-[#0F172A]">Payment Settings</h3>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">Configure payment gateways</p>
+                  <p className="text-xs text-[#94A3B8] mt-0.5">Razorpay online checkout and manual UPI / bank details. Each card saves on its own.</p>
                 </div>
-                <div className="space-y-4">
-                  <label className="flex items-center gap-3 p-4 rounded-xl bg-[#F8FAFC]">
-                    <input type="checkbox" defaultChecked className="rounded border-[#E2E8F0]" />
-                    <div>
-                      <p className="text-sm font-medium text-[#0F172A]">Stripe</p>
-                      <p className="text-xs text-[#94A3B8]">Accept credit card payments</p>
-                    </div>
-                  </label>
-                  <label className="flex items-center gap-3 p-4 rounded-xl bg-[#F8FAFC]">
-                    <input type="checkbox" className="rounded border-[#E2E8F0]" />
-                    <div>
-                      <p className="text-sm font-medium text-[#0F172A]">PayPal</p>
-                      <p className="text-xs text-[#94A3B8]">Accept PayPal payments</p>
-                    </div>
-                  </label>
-                  <div>
-                    <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Stripe Secret Key</label>
-                    <input type="password" placeholder="sk_live_..." className="input-premium w-full" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[#0F172A] mb-1.5">Stripe Publishable Key</label>
-                    <input placeholder="pk_live_..." className="input-premium w-full" />
-                  </div>
-                </div>
+                <PaymentSettingsPanel />
               </div>
             )}
 
-            <div className="mt-6 pt-6 border-t border-[#F1F5F9] flex justify-end">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 h-11 px-6 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-50"
-              >
-                <Save size={16} /> {saving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
+            {/* The Payment tab's cards save themselves — hide the generic footer there. */}
+            {activeTab !== "payment" && (
+              <div className="mt-6 pt-6 border-t border-[#F1F5F9] flex justify-end">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-2 h-11 px-6 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-50"
+                >
+                  <Save size={16} /> {saving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -6,8 +6,8 @@ import type { Transporter } from "nodemailer";
  *   Gmail App Password → SMTP_HOST=smtp.gmail.com SMTP_PORT=465
  *   Zoho              → SMTP_HOST=smtp.zoho.in   SMTP_PORT=465
  * Required env: SMTP_HOST, SMTP_USER, SMTP_PASS.
- * Optional:     SMTP_PORT (default 465), MAIL_FROM (default SMTP_USER),
- *               LEAD_NOTIFY_TO (default hellopacewalk@gmail.com).
+ * Optional:     SMTP_PORT (default 465), MAIL_FROM (default hello@digitalcarda.in),
+ *               LEAD_NOTIFY_TO (default hello@digitalcarda.in).
  *
  * If SMTP isn't configured, mail is skipped (logged) — it never throws, so it
  * can't break lead capture.
@@ -37,7 +37,11 @@ import type { Email } from "./email-templates";
 import { leadNotificationEmail, hotLeadEmail } from "./email-templates";
 import { classifyLeadSmart } from "./lead-intel";
 
-export const ownerAddress = () => process.env.LEAD_NOTIFY_TO || "hellopacewalk@gmail.com";
+// The platform's own email — used as the default sender and the fallback address
+// for owner/admin alerts. Override per-environment with MAIL_FROM / LEAD_NOTIFY_TO.
+export const PLATFORM_EMAIL = "hello@digitalcarda.in";
+
+export const ownerAddress = () => process.env.LEAD_NOTIFY_TO || PLATFORM_EMAIL;
 
 /** Send a rendered Email template to a recipient. Never throws — returns a
     status so callers (e.g. the admin test tool) can report success/failure.
@@ -47,7 +51,7 @@ export async function sendEmail(to: string | undefined | null, email: Email, rep
     if (!to) return { ok: false, error: "No recipient" };
     const t = transport();
     if (!t) return { ok: false, error: "SMTP not configured" };
-    const from = process.env.MAIL_FROM || process.env.SMTP_USER;
+    const from = process.env.MAIL_FROM || process.env.SMTP_USER || `DigitalCarda <${PLATFORM_EMAIL}>`;
     await t.sendMail({ from, to, replyTo: replyTo || undefined, subject: email.subject, text: email.text, html: email.html });
     console.log(`[mail] "${email.subject}" sent to ${to}`);
     return { ok: true };

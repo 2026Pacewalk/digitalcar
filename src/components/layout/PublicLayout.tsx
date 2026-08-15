@@ -319,7 +319,7 @@ export default function PublicLayout() {
                 </Link>
               </div>
               <div className="flex items-center justify-between px-1 pt-1">
-                <span className="text-[11px] text-[#94A3B8] flex items-center gap-1.5"><Headphones size={13} /> support@digitalcarda.in</span>
+                <span className="text-[11px] text-[#94A3B8] flex items-center gap-1.5"><Headphones size={13} /> hello@digitalcarda.in</span>
                 <div className="flex items-center gap-1.5">
                   {[Twitter, Instagram, Facebook, Linkedin].map((Ic, i) => (
                     <span key={i} className="w-7 h-7 rounded-lg bg-[#F1F5F9] flex items-center justify-center text-[#64748B] hover:text-[#F7B31C] hover:bg-[#FEF3C7] transition-colors cursor-pointer"><Ic size={13} /></span>
@@ -383,7 +383,7 @@ export default function PublicLayout() {
               </div>
               <div className="mt-6 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-[#94A3B8]">
-                  <Mail size={14} className="text-[#64748B]" /> support@digitalcarda.in
+                  <Mail size={14} className="text-[#64748B]" /> hello@digitalcarda.in
                 </div>
                 <div className="flex items-center gap-2 text-sm text-[#94A3B8]">
                   <Phone size={14} className="text-[#64748B]" /> +91 95177 22444

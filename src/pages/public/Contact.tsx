@@ -47,7 +47,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <p className="text-xs text-[#94A3B8]">Email</p>
-                  <a href="mailto:support@digitalcarda.in" className="text-sm font-semibold text-[#0F172A] hover:text-[#14B8A6] transition-colors">support@digitalcarda.in</a>
+                  <a href="mailto:hello@digitalcarda.in" className="text-sm font-semibold text-[#0F172A] hover:text-[#14B8A6] transition-colors">hello@digitalcarda.in</a>
                 </div>
               </div>
             </div>

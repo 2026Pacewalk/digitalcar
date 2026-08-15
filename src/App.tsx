@@ -51,11 +51,12 @@ const AdminLeads = lazy(() => import("./pages/admin/Leads"));
 const AdminBulkOrders = lazy(() => import("./pages/admin/BulkOrders"));
 const AdminAiGenerator = lazy(() => import("./pages/admin/AiGenerator"));
 const AdminReferrals = lazy(() => import("./pages/admin/Referrals"));
-const AdminPayments = lazy(() => import("./pages/admin/Payments"));
+const AdminPaymentOrders = lazy(() => import("./pages/admin/PaymentOrders"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const AdminProfile = lazy(() => import("./pages/admin/Profile"));
 const ResellerDashboard = lazy(() => import("./pages/reseller/Dashboard"));
 const ResellerCustomers = lazy(() => import("./pages/reseller/Customers"));
+const ResellerPaymentOrders = lazy(() => import("./pages/reseller/PaymentOrders"));
 const ResellerProfile = lazy(() => import("./pages/reseller/Profile"));
 const CustomerDashboard = lazy(() => import("./pages/customer/Dashboard"));
 const CardTemplateEditor = lazy(() => import("./pages/customer/CardTemplateEditor"));
@@ -65,6 +66,7 @@ const CustomerBulkCreate = lazy(() => import("./pages/customer/BulkCreate"));
 const CustomerAnalytics = lazy(() => import("./pages/customer/Analytics"));
 const CustomerLeads = lazy(() => import("./pages/customer/Leads"));
 const CustomerSubscription = lazy(() => import("./pages/customer/Subscription"));
+const CustomerBilling = lazy(() => import("./pages/customer/Billing"));
 const CustomerSettings = lazy(() => import("./pages/customer/Settings"));
 const CustomerProfile = lazy(() => import("./pages/customer/Profile"));
 const CustomerQR = lazy(() => import("./pages/customer/QR"));
@@ -221,13 +223,16 @@ export default function App() {
         <Route path="/admin/bulk-orders" element={<RoleRoute allowedRoles={["super_admin"]}><AdminBulkOrders /></RoleRoute>} />
         <Route path="/admin/ai-generator" element={<RoleRoute allowedRoles={["super_admin"]}><AdminAiGenerator /></RoleRoute>} />
         <Route path="/admin/referrals" element={<RoleRoute allowedRoles={["super_admin"]}><AdminReferrals /></RoleRoute>} />
-        <Route path="/admin/payments" element={<RoleRoute allowedRoles={["super_admin"]}><AdminPayments /></RoleRoute>} />
+        {/* Payment settings moved into Settings → Payment. Keep the old path working. */}
+        <Route path="/admin/payments" element={<Navigate to="/admin/settings?tab=payment" replace />} />
+        <Route path="/admin/payment-orders" element={<RoleRoute allowedRoles={["super_admin"]}><AdminPaymentOrders /></RoleRoute>} />
         <Route path="/admin/settings" element={<RoleRoute allowedRoles={["super_admin"]}><AdminSettings /></RoleRoute>} />
         <Route path="/admin/profile" element={<RoleRoute allowedRoles={["super_admin"]}><AdminProfile /></RoleRoute>} />
 
         {/* Reseller */}
         <Route path="/reseller" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerDashboard /></RoleRoute>} />
         <Route path="/reseller/customers" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerCustomers /></RoleRoute>} />
+        <Route path="/reseller/payments" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerPaymentOrders /></RoleRoute>} />
         <Route path="/reseller/profile" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerProfile /></RoleRoute>} />
 
         {/* Customer */}
@@ -242,6 +247,7 @@ export default function App() {
         <Route path="/dashboard/analytics" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerAnalytics /></RoleRoute>} />
         <Route path="/dashboard/leads" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerLeads /></RoleRoute>} />
         <Route path="/dashboard/subscription" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSubscription /></RoleRoute>} />
+        <Route path="/dashboard/billing" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerBilling /></RoleRoute>} />
         <Route path="/dashboard/settings" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSettings /></RoleRoute>} />
         <Route path="/dashboard/profile" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerProfile /></RoleRoute>} />
         <Route path="/dashboard/qr" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerQR /></RoleRoute>} />

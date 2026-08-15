@@ -55,7 +55,7 @@ export default function Privacy() {
           <section>
             <h2 className="text-lg font-semibold text-[#0F172A] mb-3">6. Your Rights</h2>
             <p className="text-sm text-[#64748B] leading-relaxed">
-              You have the right to access, correct, or delete your personal information. You may also opt out of marketing communications at any time. Contact us at support@digitalcarda.in to exercise these rights.
+              You have the right to access, correct, or delete your personal information. You may also opt out of marketing communications at any time. Contact us at hello@digitalcarda.in to exercise these rights.
             </p>
           </section>
 
@@ -69,7 +69,7 @@ export default function Privacy() {
           <section>
             <h2 className="text-lg font-semibold text-[#0F172A] mb-3">8. Contact Us</h2>
             <p className="text-sm text-[#64748B] leading-relaxed">
-              If you have any questions about this Privacy Policy, please contact us at support@digitalcarda.in or +91 95177 22444.
+              If you have any questions about this Privacy Policy, please contact us at hello@digitalcarda.in or +91 95177 22444.
             </p>
           </section>
         </div>

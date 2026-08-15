@@ -10,7 +10,7 @@ const SELLER = {
   name: "DigitalCarda",
   tagline: "Smart Digital Business Cards",
   address: "MG Road, Bengaluru, Karnataka 560001, India",
-  email: "support@digitalcarda.in",
+  email: "hello@digitalcarda.in",
   phone: "+91 98765 43210",
   gstin: "29AAACD1234F1Z5",
   website: "digitalcarda.in",
