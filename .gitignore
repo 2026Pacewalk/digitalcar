@@ -74,3 +74,7 @@ connect-live-db.cmd
 
 # Legacy customer media (uploaded to server directly, never committed)
 media/
+
+# Live DB pull — never commit the snapshot or the DB password (contains PII/secrets)
+.live-dump.sql
+.live-db-pass
