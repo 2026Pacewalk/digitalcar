@@ -48,10 +48,12 @@ try {
       const [up] = await conn.query("UPDATE products SET price=?, sale_price=NULL WHERE price='499.00'", [goldYearly]);
       if (up.affectedRows) console.log(`✓ Aligned ${up.affectedRows} products to Gold price ₹${goldYearly}.`);
     }
-    // Platinum products are a finite cap (100), not unlimited — keep the pricing
-    // page + dashboard limit in step. Only touches the old "unlimited" sentinel.
-    const [cap] = await conn.query("UPDATE subscription_packages SET max_products=100 WHERE id=6 AND max_products>=9999");
-    if (cap.affectedRows) console.log("✓ Capped Platinum products at 100.");
+    // Finite product caps that match the dashboard PACKAGE_LIMITS + pricing page:
+    // Gold/Trial 50, Platinum 100. Guarded to the old default values so admin
+    // edits are never overwritten (and it's a no-op once applied).
+    const [capP] = await conn.query("UPDATE subscription_packages SET max_products=100 WHERE id=6 AND max_products>=9999");
+    const [capG] = await conn.query("UPDATE subscription_packages SET max_products=50 WHERE id IN (5,7) AND max_products=25");
+    if (capP.affectedRows || capG.affectedRows) console.log(`✓ Product caps set — Gold/Trial 50, Platinum 100.`);
   } catch (e) {
     console.log("• Plans seed skipped: " + (e.code || e.message));
   }

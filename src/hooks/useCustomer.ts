@@ -52,8 +52,8 @@ export const DEFAULT_CUSTOMER: CustomerRecord = {
    7 = Trial · 5 = Gold · 6 = Platinum. `cards` = how many digital cards the
    login may hold (the multi-card limit). */
 export const PACKAGE_LIMITS: Record<number, Record<string, number>> = {
-  7: { product: 25, offer: 15, gallery: 20, video: 8, uploads: 5, qrcode: 5, cards: 1 },      // Trial (full Gold features)
-  5: { product: 25, offer: 15, gallery: 20, video: 8, uploads: 5, qrcode: 5, cards: 1 },      // Gold
+  7: { product: 50, offer: 15, gallery: 20, video: 8, uploads: 5, qrcode: 5, cards: 1 },      // Trial (full Gold features)
+  5: { product: 50, offer: 15, gallery: 20, video: 8, uploads: 5, qrcode: 5, cards: 1 },      // Gold
   6: { product: 100, offer: 50, gallery: 60, video: 25, uploads: 20, qrcode: 10, cards: 3 }, // Platinum
 };
 export function packageLimit(packageId: number | undefined, key: string): number {
