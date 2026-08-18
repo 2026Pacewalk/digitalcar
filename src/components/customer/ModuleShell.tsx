@@ -39,18 +39,13 @@ export function Field({ label, children, hint, full }: { label: string; children
 }
 
 export function LimitBar({ used, limit, unit = "items" }: { used: number; limit: number; unit?: string }) {
-  // 999 is the "unlimited" sentinel (e.g. Platinum products) — show it as such
-  // rather than a raw number, and never as "full".
-  const unlimited = limit >= 999;
-  const pct = unlimited ? Math.min(30, used) : limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-  const full = !unlimited && used >= limit;
+  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  const full = used >= limit;
   return (
     <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-4">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-semibold text-[#334155]">{unit} used <span className="text-[#94A3B8] font-normal">(package limit)</span></p>
-        <p className={`text-sm font-bold tabular-nums ${full ? "text-red-500" : "text-[#0F172A]"}`}>
-          {used} / {unlimited ? <span className="text-emerald-600">Unlimited</span> : limit}
-        </p>
+        <p className={`text-sm font-bold tabular-nums ${full ? "text-red-500" : "text-[#0F172A]"}`}>{used} / {limit}</p>
       </div>
       <div className="h-2.5 rounded-full bg-[#F1F5F9] overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: full ? "#EF4444" : "linear-gradient(90deg,#F7B31C,#D97706)" }} />

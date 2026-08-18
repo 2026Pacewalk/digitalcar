@@ -54,7 +54,7 @@ export const DEFAULT_CUSTOMER: CustomerRecord = {
 export const PACKAGE_LIMITS: Record<number, Record<string, number>> = {
   7: { product: 25, offer: 15, gallery: 20, video: 8, uploads: 5, qrcode: 5, cards: 1 },      // Trial (full Gold features)
   5: { product: 25, offer: 15, gallery: 20, video: 8, uploads: 5, qrcode: 5, cards: 1 },      // Gold
-  6: { product: 999, offer: 999, gallery: 60, video: 25, uploads: 20, qrcode: 10, cards: 3 }, // Platinum
+  6: { product: 100, offer: 50, gallery: 60, video: 25, uploads: 20, qrcode: 10, cards: 3 }, // Platinum
 };
 export function packageLimit(packageId: number | undefined, key: string): number {
   const p = PACKAGE_LIMITS[Number(packageId)] || PACKAGE_LIMITS[7];
