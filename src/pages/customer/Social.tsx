@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Share2, Save, MapPin, Star, Plus, Trash2, GripVertical, Palette } from "lucide-react";
+import { Share2, Save, MapPin, Star, Trash2, Palette, Plus } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel, Field, fieldCls, Tip } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
-import { SOCIAL_PLATFORMS, SOCIAL_BY_KEY, readSocialLinks, type SocialLink } from "@/lib/socialPlatforms";
+import { SOCIAL_PLATFORMS, SOCIAL_BY_KEY, readSocialLinks, type SocialLink, type SocialPlatform } from "@/lib/socialPlatforms";
+
+// Render a platform's real brand glyph — an inline SVG (X, TikTok) or a Font
+// Awesome icon (loaded in index.html). `currentColor` picks up the parent colour.
+function PlatformIcon({ p, size = 16 }: { p: SocialPlatform; size?: number }) {
+  if (p.svg) return <span style={{ width: size, height: size, display: "inline-flex" }} dangerouslySetInnerHTML={{ __html: p.svg.replace("<svg", `<svg width="${size}" height="${size}"`) }} />;
+  return <i className={p.fa} style={{ fontSize: Math.round(size * 0.92) }} aria-hidden />;
+}
 
 export default function CustomerSocial() {
   const { data, update } = useCustomer();
@@ -11,26 +18,20 @@ export default function CustomerSocial() {
   const val = (k: string) => (form[k] !== undefined ? form[k] : String(data[k] ?? ""));
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  // Seed the editable link list from the saved record once it has loaded (the
-  // customer record hydrates asynchronously, so we wait for a real one).
+  // Seed the list from the saved record, re-seeding as the record hydrates —
+  // until the user edits (then we stop so their changes aren't overwritten).
   const [links, setLinks] = useState<SocialLink[]>([]);
-  const seeded = useRef(false);
-  useEffect(() => {
-    if (seeded.current) return;
-    if (data && (data.username || data.slug || data.social_links || data.facebook || data.instagram)) {
-      setLinks(readSocialLinks(data as Record<string, unknown>));
-      seeded.current = true;
-    }
-  }, [data]);
+  const dirty = useRef(false);
+  useEffect(() => { if (!dirty.current) setLinks(readSocialLinks(data as Record<string, unknown>)); }, [data]);
+  const mutate = (next: SocialLink[]) => { dirty.current = true; setLinks(next); };
 
   const style = val("social_icon_style") === "brand" ? "brand" : "theme";
-  const setLink = (i: number, patch: Partial<SocialLink>) => setLinks((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-  const removeLink = (i: number) => setLinks((ls) => ls.filter((_, idx) => idx !== i));
-  const addLink = () => {
-    const used = new Set(links.map((l) => l.platform));
-    const next = SOCIAL_PLATFORMS.find((p) => !used.has(p.key)) || SOCIAL_PLATFORMS[0];
-    setLinks((ls) => [...ls, { platform: next.key, url: "" }]);
-  };
+  const used = new Set(links.map((l) => l.platform));
+  const available = SOCIAL_PLATFORMS.filter((p) => !used.has(p.key));
+
+  const addPlatform = (key: string) => mutate([...links, { platform: key, url: "" }]);
+  const setUrl = (i: number, url: string) => mutate(links.map((l, idx) => (idx === i ? { ...l, url } : l)));
+  const removeLink = (i: number) => mutate(links.filter((_, idx) => idx !== i));
 
   const save = () => {
     const clean = links.filter((l) => l.platform && l.url.trim()).map((l) => ({ platform: l.platform, url: l.url.trim() }));
@@ -42,14 +43,14 @@ export default function CustomerSocial() {
   return (
     <ModuleShell title="Social Links" subtitle="Add every profile you want on your card" icon={Share2}
       actions={<button onClick={save} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save</button>}>
-      <Tip>Add as many profiles as you like — pick a platform, paste the link. Choose your icon style below, then Save. Changes go live on your card instantly.</Tip>
+      <Tip>Tap a platform below to add it, then paste your profile link. Add as many as you like, choose your icon style, then Save — changes go live instantly.</Tip>
 
       <Panel title="Social Profiles" subtitle="Heading, icon style and your links">
         <Field label="Section Heading" hint="Shown above your social icons — e.g. “Follow Us” or “Follow Me”."><input value={val("social_title")} onChange={(e) => set("social_title", e.target.value)} className={fieldCls} placeholder="Follow Us" /></Field>
 
         {/* Icon style — theme colour vs real brand colours */}
         <div className="mt-4">
-          <label className="block text-[11px] font-medium text-[#64748B] mb-1.5 flex items-center gap-1.5"><Palette size={12} /> Icon style</label>
+          <label className="text-[11px] font-medium text-[#64748B] mb-1.5 flex items-center gap-1.5"><Palette size={12} /> Icon style</label>
           <div className="grid grid-cols-2 gap-2 max-w-md">
             {([
               { id: "theme", title: "Theme colour", desc: "All icons in your card colour" },
@@ -62,7 +63,7 @@ export default function CustomerSocial() {
                   <div className="flex items-center gap-1.5 mb-2">
                     {["facebook", "instagram", "x", "youtube"].map((k) => {
                       const p = SOCIAL_BY_KEY[k];
-                      return <span key={k} className="w-4 h-4 rounded-full" style={{ background: o.id === "brand" ? p.color : "#F7B31C" }} />;
+                      return <span key={k} className="w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ background: o.id === "brand" ? p.color : "#F7B31C", color: o.id === "brand" ? (p.fg || "#fff") : "#0F172A" }}><PlatformIcon p={p} size={12} /></span>;
                     })}
                   </div>
                   <p className="text-[12.5px] font-semibold text-[#0F172A]">{o.title}</p>
@@ -73,25 +74,46 @@ export default function CustomerSocial() {
           </div>
         </div>
 
-        {/* Flexible list of links */}
-        <div className="mt-5 space-y-2.5">
-          {links.length === 0 && <p className="text-[12.5px] text-[#94A3B8] py-2">No links yet — add your first profile below.</p>}
-          {links.map((l, i) => {
-            const p = SOCIAL_BY_KEY[l.platform] || SOCIAL_PLATFORMS[0];
-            return (
-              <div key={i} className="flex items-center gap-2 rounded-xl border border-[#F1F5F9] bg-white p-2">
-                <GripVertical size={15} className="text-[#CBD5E1] shrink-0" />
-                <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white text-[11px] font-bold" style={{ background: p.color }}>{p.label.slice(0, 1)}</span>
-                <select value={l.platform} onChange={(e) => setLink(i, { platform: e.target.value })} className={`${fieldCls} h-9 w-32 sm:w-40 shrink-0`}>
-                  {SOCIAL_PLATFORMS.map((op) => <option key={op.key} value={op.key}>{op.label}</option>)}
-                </select>
-                <input value={l.url} onChange={(e) => setLink(i, { url: e.target.value })} className={`${fieldCls} h-9 flex-1`} placeholder={p.ph} />
-                <button onClick={() => removeLink(i)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[#94A3B8] hover:text-red-500 hover:bg-red-50 shrink-0 transition-colors" aria-label="Remove"><Trash2 size={15} /></button>
-              </div>
-            );
-          })}
+        {/* Your links */}
+        <div className="mt-5">
+          <label className="block text-[11px] font-medium text-[#64748B] mb-1.5">Your links</label>
+          {links.length === 0 ? (
+            <p className="text-[12.5px] text-[#94A3B8] py-1">Pick a platform below to add your first link.</p>
+          ) : (
+            <div className="space-y-2.5">
+              {links.map((l, i) => {
+                const p = SOCIAL_BY_KEY[l.platform];
+                if (!p) return null;
+                return (
+                  <div key={l.platform} className="flex items-center gap-3 rounded-xl border border-[#F1F5F9] bg-white p-2.5">
+                    <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: p.color, color: p.fg || "#fff" }}><PlatformIcon p={p} size={17} /></span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-semibold text-[#334155] mb-0.5">{p.label}</p>
+                      <input value={l.url} onChange={(e) => setUrl(i, e.target.value)} className={`${fieldCls} h-8`} placeholder={p.ph} />
+                    </div>
+                    <button onClick={() => removeLink(i)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[#94A3B8] hover:text-red-500 hover:bg-red-50 shrink-0 transition-colors self-end" aria-label={`Remove ${p.label}`}><Trash2 size={15} /></button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-        <button onClick={addLink} className="mt-3 flex items-center gap-2 h-9 px-4 rounded-xl border border-dashed border-[#CBD5E1] text-[#334155] text-[13px] font-semibold hover:border-[#F7B31C] hover:text-[#B45309] transition-colors"><Plus size={15} /> Add social link</button>
+
+        {/* Platform picker */}
+        {available.length > 0 && (
+          <div className="mt-5">
+            <label className="block text-[11px] font-medium text-[#64748B] mb-2 flex items-center gap-1.5"><Plus size={12} /> Add a platform</label>
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+              {available.map((p) => (
+                <button key={p.key} type="button" onClick={() => addPlatform(p.key)}
+                  className="flex flex-col items-center gap-1.5 rounded-xl border border-[#F1F5F9] p-2.5 hover:border-[#F7B31C] hover:bg-[#FFFBEB] transition-colors">
+                  <span className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: p.color, color: p.fg || "#fff" }}><PlatformIcon p={p} size={17} /></span>
+                  <span className="text-[10px] font-semibold text-[#475569] text-center leading-tight">{p.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </Panel>
 
       <Panel title="Google" subtitle="Map location and reviews link">
