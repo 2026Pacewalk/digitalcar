@@ -392,20 +392,50 @@ app.get("/api/tls/check", async (c) => {
 // Real engagement analytics: the public card beacons here on view + every
 // action tap (call/whatsapp/email/website/directions/save-contact). Slug-keyed
 // so it works for snapshot AND legacy cards. Numbers are always real (§36).
-const TRACK_TYPES = ["view", "call", "whatsapp", "email", "website", "directions", "save_contact", "qr_scan", "product", "share", "social", "enquiry"];
+// Salt for the anonymous visitor hash. A stable per-deployment secret keeps
+// unique/returning counts consistent over time; falling back to the JWT secret
+// means there is always *a* salt, and it never leaves the server.
+const VISITOR_SALT = process.env.ANALYTICS_SALT || process.env.JWT_SECRET || "dc-analytics";
+
 app.post("/api/track", async (c) => {
-  if (!rateLimit(c, "track", 120, 60_000)) return c.json({ ok: false, error: "rate_limited" }, 429);
+  if (!rateLimit(c, "track", 240, 60_000)) return c.json({ ok: false, error: "rate_limited" }, 429);
   try {
-    let body: { slug?: string; type?: string } | null = null;
+    let body: Record<string, unknown> | null = null;
     try { body = await c.req.json(); } catch { try { body = JSON.parse(await c.req.text()); } catch { body = null; } }
-    const slug = String(body?.slug || "").slice(0, 191).toLowerCase();
-    const type = String(body?.type || "").slice(0, 32);
-    if (slug && TRACK_TYPES.includes(type)) {
-      const { getDb } = await import("./queries/connection");
-      const { cardEvents } = await import("@db/schema");
-      getDb().insert(cardEvents).values({ slug, type }).catch(() => {});
-    }
-  } catch { /* best-effort */ }
+    const s = (v: unknown, n: number) => (v == null ? "" : String(v).slice(0, n));
+
+    const slug = s(body?.slug, 191).toLowerCase();
+    const type = s(body?.type, 32);
+    const { TRACK_TYPE_SET, parseUa, deriveSource, hashVisitor, edgeGeo } = await import("./lib/analytics");
+    if (!slug || !TRACK_TYPE_SET.has(type)) return c.body(null, 204);
+
+    const ua = parseUa(c.req.header("user-agent") || "");
+    const geo = edgeGeo((n) => c.req.header(n));
+    const referrer = s(body?.referrer, 255);
+    const source = deriveSource(referrer, s(body?.src, 32));
+    const visitorId = hashVisitor(s(body?.visitorId, 128), VISITOR_SALT);
+
+    // Duration is only meaningful for dwell events; clamp to a sane window so a
+    // backgrounded tab can't report a 9-hour "visit".
+    const rawMs = Number(body?.durationMs);
+    const durationMs = Number.isFinite(rawMs) && rawMs > 0 ? Math.min(Math.round(rawMs), 2 * 60 * 60_000) : null;
+    const rawCard = Number(body?.cardId);
+    const cardId = Number.isFinite(rawCard) && rawCard > 0 ? Math.min(Math.round(rawCard), 100000) : null;
+
+    const { getDb } = await import("./queries/connection");
+    const { cardEvents } = await import("@db/schema");
+    getDb().insert(cardEvents).values({
+      slug, type,
+      label: s(body?.label, 191) || null,
+      cardId,
+      visitorId,
+      sessionId: s(body?.sessionId, 64) || null,
+      device: ua.device, os: ua.os, browser: ua.browser,
+      source, referrer: referrer || null,
+      country: geo.country, city: geo.city,
+      durationMs,
+    }).catch(() => {});
+  } catch { /* best-effort — analytics must never break a card view */ }
   return c.body(null, 204);
 });
 

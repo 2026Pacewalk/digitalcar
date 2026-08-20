@@ -25,7 +25,7 @@ const MODULES: { on: string; key: string; name: string; def: string; icon: Lucid
   { on: "review_on", key: "review", name: "Google Reviews", def: "Google Reviews", icon: Star, desc: "Star rating & a “Write a Review” button — add the link on the Reviews page" },
   { on: "uploads_on", key: "uploads", name: "Uploads", def: "eBrochure", icon: FileText, desc: "Share a brochure or downloadable files" },
   { on: "enquiry_on", key: "enquiry", name: "Enquiry Form", def: "Enquiry Form", icon: MessageSquare, desc: "Let visitors send you an enquiry from the card" },
-  { on: "cardqr_on", key: "cardqr", name: "Scan My Card (QR)", def: "Scan My Card", icon: ScanLine, desc: "Show a QR of your card so visitors can scan to open & save it", defOn: 0 },
+  { on: "cardqr_on", key: "cardqr", name: "Scan My Card (QR)", def: "Scan My Card", icon: ScanLine, desc: "Show a QR of your card so visitors can scan to open & save it" },
 ];
 
 const SWATCHES = ["#F7B31C", "#14243E", "#3B82F6", "#A21CAF", "#06B6D4", "#EF4444", "#0F172A", "#EAB308"];

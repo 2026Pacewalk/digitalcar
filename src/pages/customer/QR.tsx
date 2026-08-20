@@ -10,7 +10,7 @@ import { STANDEE_STYLES, standeeMarkup, escapeHtml } from "@/lib/standee";
 const ORIGIN = "https://digitalcarda.in";
 
 export default function CustomerQR() {
-  const { data } = useCustomer();
+  const { data, update } = useCustomer();
   const { data: mine } = trpc.publish.mine.useQuery({ cardId: getActiveCardId() }, { retry: false });
   const slug = String(mine?.slug || data.slug || "");
   // The QR targets the PERMANENT /q/<public_id> link when the card has been
@@ -24,6 +24,16 @@ export default function CustomerQR() {
   const [busy, setBusy] = useState("");
   const [showLink, setShowLink] = useState(true);
   const [showPhone, setShowPhone] = useState(true);
+
+  // The on-card "Scan My Card" QR section. Defaults to ON (?? 1) to match the
+  // card renderer and Settings → Card Sections. Saved immediately on tap; the
+  // live card re-publishes automatically.
+  const cardQrOn = Number(data.cardqr_on ?? 1) === 1;
+  const toggleCardQr = () => {
+    const next = cardQrOn ? "0" : "1";
+    update({ cardqr_on: next });
+    toast.success(next === "1" ? "Scan My Card QR is now shown on your card" : "Scan My Card QR hidden from your card");
+  };
 
   const colors = ["#0F172A", "#F7B31C", "#14B8A6", "#3B82F6", "#EF4444", "#8B5CF6"];
   const bgs = ["#FFFFFF", "#F8FAFC", "#FEF3C7", "#E0F2FE"];
@@ -177,6 +187,32 @@ export default function CustomerQR() {
 
             {/* Controls */}
             <div className="space-y-4">
+              {/* Mirrors the "Scan My Card (QR)" switch in Settings → Card
+                  Sections, so the QR section can be turned on/off from the page
+                  the owner is already on. Same `cardqr_on` field, saved on tap. */}
+              <div className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
+                <div className="flex items-start gap-3">
+                  <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${cardQrOn ? "bg-[#FEF3C7] text-[#B45309]" : "bg-[#F1F5F9] text-[#94A3B8]"}`}><QrCode size={17} /></span>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-[#0F172A]">Scan My Card (QR) on your card</h3>
+                    <p className="text-[11.5px] text-[#94A3B8] leading-snug mt-0.5">Shows a “Scan My Card” section on your public card so visitors can scan to open &amp; save it.</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`hidden sm:inline text-[11px] font-semibold ${cardQrOn ? "text-[#B45309]" : "text-[#94A3B8]"}`}>{cardQrOn ? "Shown" : "Hidden"}</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={cardQrOn}
+                      aria-label="Show the Scan My Card QR section on your public card"
+                      onClick={toggleCardQr}
+                      className={`w-11 h-6 rounded-full transition-colors relative ${cardQrOn ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`}
+                    >
+                      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${cardQrOn ? "left-[22px]" : "left-0.5"}`} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
                 <h3 className="text-sm font-semibold text-[#0F172A] mb-1">Print-ready standee</h3>
                 <p className="text-[12px] text-[#94A3B8] mb-3">Download or print this branded card and stand it on your desk, shop counter or reception.</p>

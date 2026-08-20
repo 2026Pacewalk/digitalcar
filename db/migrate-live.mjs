@@ -203,6 +203,51 @@ try {
   log("• legacy enquiries import skipped (" + (e.code || e.message) + ")");
 }
 
+// Deep analytics: enrich card_events so an event records WHAT was tapped, on
+// WHICH device, from WHICH source, by an anonymous visitor — instead of just
+// "a tap happened". Every column is NULLABLE, so existing rows stay valid and
+// every query tolerates NULLs. Nothing personal is stored: visitor_id is a
+// rotating salted hash (never an IP) and geo is coarse country/city from the
+// CDN edge headers. Idempotent — each column/index is checked before adding.
+{
+  const evCols = [
+    ["label", "VARCHAR(191) NULL"],
+    ["card_id", "INT NULL"],
+    ["visitor_id", "VARCHAR(64) NULL"],
+    ["session_id", "VARCHAR(64) NULL"],
+    ["device", "VARCHAR(16) NULL"],
+    ["os", "VARCHAR(24) NULL"],
+    ["browser", "VARCHAR(24) NULL"],
+    ["source", "VARCHAR(32) NULL"],
+    ["referrer", "VARCHAR(255) NULL"],
+    ["country", "VARCHAR(2) NULL"],
+    ["city", "VARCHAR(64) NULL"],
+    ["duration_ms", "INT NULL"],
+    ["meta", "JSON NULL"],
+  ];
+  let added = 0;
+  for (const [col, ddl] of evCols) {
+    const [r] = await conn.query(
+      "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='card_events' AND column_name=?", [col]);
+    if (r[0].n === 0) { await conn.query(`ALTER TABLE card_events ADD COLUMN ${col} ${ddl}`); added++; }
+  }
+  log(added ? `✓ card_events: ${added} analytics column(s) added` : "• card_events analytics columns already present (skipped)");
+
+  // Range + breakdown queries always filter slug (+type) over a date window.
+  const evIdx = [
+    ["cardev_slug_created_idx", "(slug, created_at)"],
+    ["cardev_slug_type_created_idx", "(slug, type, created_at)"],
+    ["cardev_visitor_idx", "(visitor_id)"],
+  ];
+  let idx = 0;
+  for (const [name, cols] of evIdx) {
+    const [r] = await conn.query(
+      "SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE table_schema=DATABASE() AND table_name='card_events' AND index_name=?", [name]);
+    if (r[0].n === 0) { await conn.query(`ALTER TABLE card_events ADD INDEX ${name} ${cols}`); idx++; }
+  }
+  log(idx ? `✓ card_events: ${idx} analytics index(es) added` : "• card_events analytics indexes already present (skipped)");
+}
+
 console.log("\n✅  Migration complete — additive only, no existing data touched.\n");
 console.log("   Next: seed products (node db/seed-products.mjs) once the app has");
 console.log("   generated its template presets, then set real INR prices in admin.\n");

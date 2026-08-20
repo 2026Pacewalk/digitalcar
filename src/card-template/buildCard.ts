@@ -361,8 +361,10 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 
   // Card-share QR — an opt-in section showing a scannable QR of this card's own
   // URL, so a visitor can scan to open & save the card (or show it to someone
-  // else). Off by default so existing live cards are unchanged until enabled.
-  const cardQrSection = Number(c.cardqr_on ?? 0) === 1 && slug ? `
+  // else). ON by default — scanning is the primary way these cards get shared in
+  // person, so a card should offer it unless the owner deliberately turns it off
+  // (Settings → Card Sections, or the toggle on the QR & Share page).
+  const cardQrSection = Number(c.cardqr_on ?? 1) === 1 && slug ? `
     <div id="cardqr-section" class="section-container dc-cardqr">
       <div class="section-header">${esc(s(c.cardqr) || "Scan My Card")}</div>
       <div class="dc-cardqr-box">
@@ -745,22 +747,134 @@ var DC_OFF = false;
 try { var _pp = (window.parent && window.parent !== window && window.parent.location.pathname) || ""; if (/^\\/dashboard|^\\/demo\\//.test(_pp)) DC_OFF = true; } catch (e) {}
 /* text/plain body = CORS-safelisted (no preflight) so it works from the
    sandboxed public-card iframe (opaque origin). Server parses text as JSON. */
-function dcTrack(t){ if(!DC_SLUG||DC_OFF) return;
+/* One id per visit, so a journey (view → section → product → enquiry) can be
+   stitched together. Random and in-memory only — nothing is persisted here (the
+   sandboxed card has no storage access anyway). */
+var DC_SESSION = 's_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+function dcTrack(t, label, extra){ if(!DC_SLUG||DC_OFF) return;
   /* In the PUBLIC card the iframe is sandboxed WITHOUT allow-same-origin, so from
      its opaque origin sendBeacon does NOT deliver and a relative fetch is blocked
      — views and every tap event were being lost (analytics stuck at 0). Detect
      the opaque origin and let the trusted parent record it same-origin, exactly
      as enquiries now do. Non-sandboxed previews (dashboard/demo, already gated by
      DC_OFF) keep the direct beacon. */
+  var p = { slug: DC_SLUG, type: t, sessionId: DC_SESSION };
+  if(label!=null && label!=='') p.label = String(label).slice(0,191);
+  if(extra && typeof extra==='object'){ for(var k in extra){ if(extra[k]!=null) p[k]=extra[k]; } }
   var _sb=false; try{ _sb=(window.origin==='null'); }catch(_){ _sb=true; }
-  if(_sb){ try{ if(window.parent&&window.parent!==window) window.parent.postMessage({__dcTrack:t},'*'); }catch(_){} return; }
-  try{ var b=new Blob([JSON.stringify({slug:DC_SLUG,type:t})],{type:'text/plain'}); if(!navigator.sendBeacon||!navigator.sendBeacon('/api/track',b)) throw 0; }catch(e){ try{ fetch('/api/track',{method:'POST',keepalive:true,body:JSON.stringify({slug:DC_SLUG,type:t})}); }catch(_){} } }
+  if(_sb){ try{ if(window.parent&&window.parent!==window) window.parent.postMessage({__dcTrack:p},'*'); }catch(_){} return; }
+  try{ var b=new Blob([JSON.stringify(p)],{type:'text/plain'}); if(!navigator.sendBeacon||!navigator.sendBeacon('/api/track',b)) throw 0; }catch(e){ try{ fetch('/api/track',{method:'POST',keepalive:true,body:JSON.stringify(p)}); }catch(_){} } }
 dcTrack('view');
+
+/* ── Deep engagement signals ───────────────────────────────────────────────
+   Everything below answers "what actually interested this visitor?" rather than
+   just "someone opened the card". All of it is passive, debounced, and capped so
+   a long visit can never flood the endpoint. */
+
+/* 1. Section views — which parts of the card people actually reach. Fires once
+      per section per visit, only when at least 45% of it has been on screen. */
+try{
+  if('IntersectionObserver' in window){
+    var _seen={};
+    var _secObs=new IntersectionObserver(function(entries){
+      for(var i=0;i<entries.length;i++){
+        var en=entries[i]; if(!en.isIntersecting) continue;
+        var id=en.target.id||''; if(!id||_seen[id]) continue;
+        _seen[id]=1; dcTrack('section_view', id.replace(/-section$/,''));
+        _secObs.unobserve(en.target);
+      }
+    },{threshold:0.45});
+    var _secs=document.querySelectorAll('.section-container[id]');
+    for(var si=0;si<_secs.length;si++) _secObs.observe(_secs[si]);
+  }
+}catch(_){}
+
+/* 2. Scroll depth — 25/50/75/100%, once each. Shows how far down the card the
+      average visitor actually gets. */
+try{
+  var _marks=[25,50,75,100], _hit={};
+  var _onScroll=function(){
+    var d=document.documentElement, b=document.body;
+    var h=Math.max(d.scrollHeight,b.scrollHeight)-window.innerHeight;
+    if(h<=0) return;
+    var pct=Math.min(100,Math.round(((window.pageYOffset||d.scrollTop||0)/h)*100));
+    for(var i=0;i<_marks.length;i++){ var m=_marks[i]; if(pct>=m && !_hit[m]){ _hit[m]=1; dcTrack('scroll', String(m)); } }
+  };
+  var _st=null;
+  window.addEventListener('scroll', function(){ if(_st) return; _st=setTimeout(function(){ _st=null; _onScroll(); },350); }, {passive:true});
+}catch(_){}
+
+/* 3. Time on card — accumulates only while the tab is actually visible, and is
+      flushed once on hide/unload. Gives a real "avg time on card" figure. */
+try{
+  var _acc=0, _since=Date.now(), _vis=(document.visibilityState!=='hidden'), _flushed=false;
+  var _tick=function(){ if(_vis){ _acc+=Date.now()-_since; } _since=Date.now(); };
+  document.addEventListener('visibilitychange', function(){
+    _tick(); _vis=(document.visibilityState!=='hidden');
+    if(!_vis) _flush();
+  });
+  var _flush=function(){
+    _tick();
+    if(_flushed && _acc<2000) return;
+    if(_acc<1000) return;           // ignore instant bounces
+    _flushed=true;
+    dcTrack('time_on_card', null, {durationMs:_acc});
+    _acc=0;
+  };
+  window.addEventListener('pagehide', _flush);
+  window.addEventListener('beforeunload', _flush);
+}catch(_){}
+
+/* 4. Enquiry funnel start — the first focus inside the enquiry form. Paired with
+      the existing 'enquiry' submit event this exposes form drop-off. */
+try{
+  var _ef=document.querySelector('#enquiry-section form');
+  if(_ef){ var _once=false; _ef.addEventListener('focusin', function(){ if(_once) return; _once=true; dcTrack('enquiry_start'); }, true); }
+}catch(_){}
 /* The parent page fetches the REAL view count (same-origin, reliable) and posts
    it in; we just render it. Avoids an unreliable cross-origin fetch from this
    sandboxed opaque-origin iframe. */
 window.addEventListener('message', function(e){ try{ if(e.data&&typeof e.data.__dcViews==='number'){ var el=document.getElementById('dc-view-count'); if(el) el.textContent=Number(e.data.__dcViews).toLocaleString('en-IN'); } }catch(_){} });
-document.addEventListener('click', function(e){ var a=e.target.closest?e.target.closest('a,button'):null; if(!a) return; var href=(a.getAttribute&&a.getAttribute('href'))||''; var oc=(a.getAttribute&&a.getAttribute('onclick'))||''; if(/saveVCard/.test(oc)) return dcTrack('save_contact'); if(/openShare/.test(oc)) return dcTrack('share'); if(href.indexOf('tel:')===0) return dcTrack('call'); if(href.indexOf('mailto:')===0) return dcTrack('email'); if(/wa\\.me|whatsapp/i.test(href)) return dcTrack('whatsapp'); if(/maps\\.google|google\\.[a-z.]+\\/maps|goo\\.gl\\/maps/i.test(href)) return dcTrack('directions'); if(a.closest&&a.closest('.product-card')) return dcTrack('product'); if(/facebook|instagram|youtube|twitter|linkedin|pinterest/i.test(href)) return dcTrack('social'); if(href.indexOf('http')===0) return dcTrack('website'); }, true);
+/* Click tracking. Every branch now also reports a LABEL — which product, which
+   social platform, which share channel — so the owner sees what actually pulls,
+   not just that "a tap happened". */
+function dcPlatform(h){
+  var m=[['facebook','facebook'],['instagram','instagram'],['youtube','youtube'],['linkedin','linkedin'],['twitter','twitter'],['x.com','twitter'],['pinterest','pinterest'],['telegram','telegram'],['t.me','telegram'],['snapchat','snapchat'],['tiktok','tiktok'],['github','github'],['behance','behance'],['dribbble','dribbble'],['spotify','spotify'],['twitch','twitch'],['discord','discord']];
+  for(var i=0;i<m.length;i++){ if(h.indexOf(m[i][0])!==-1) return m[i][1]; }
+  return 'link';
+}
+function dcProductName(el){
+  try{ var card=el.closest('.product-card'); if(!card) return null;
+    var h=card.querySelector('h5'); return h?(h.textContent||'').trim().slice(0,120):null;
+  }catch(_){ return null; }
+}
+document.addEventListener('click', function(e){
+  var a=e.target.closest?e.target.closest('a,button'):null; if(!a) return;
+  var href=(a.getAttribute&&a.getAttribute('href'))||'';
+  var oc=(a.getAttribute&&a.getAttribute('onclick'))||'';
+  var lower=href.toLowerCase();
+  if(/saveVCard/.test(oc)) return dcTrack('save_contact');
+  if(/openShare|dcShareModal/.test(oc)) return dcTrack('share');
+  if(/copyShare/.test(oc)) return dcTrack('copy_link');
+  if(/dcShareWa/.test(oc)) return dcTrack('share_channel','whatsapp');
+  if(/lbOpen/.test(oc)) return dcTrack('gallery_open');
+  if(/playVid/.test(oc)) return dcTrack('video_play', (a.getAttribute&&a.getAttribute('data-title'))||null);
+  /* A tap inside a product card is the highest-intent signal on the card. */
+  var pn=dcProductName(a);
+  if(pn!=null){
+    var isCta=a.className&&String(a.className).indexOf('product-enquiry-btn')!==-1;
+    return dcTrack(isCta?'product_enquiry':'product_click', pn);
+  }
+  if(lower.indexOf('tel:')===0) return dcTrack('call');
+  if(lower.indexOf('mailto:')===0) return dcTrack('email');
+  if(/wa\\.me|whatsapp/i.test(href)) return dcTrack('whatsapp');
+  if(/maps\\.google|google\\.[a-z.]+\\/maps|goo\\.gl\\/maps/i.test(href)) return dcTrack('map_click');
+  if(/upi:|upi%3a/i.test(lower)) return dcTrack('pay_click','upi');
+  if(/facebook|instagram|youtube|twitter|linkedin|pinterest|telegram|snapchat|tiktok|github|behance|dribbble|spotify|twitch|discord|x\\.com/i.test(href)) return dcTrack('social_click', dcPlatform(lower));
+  if(/\\.pdf($|\\?)/i.test(lower)) return dcTrack('brochure', (a.textContent||'').trim().slice(0,80)||null);
+  if(/search\\?q=|\\/review|g\\.page/i.test(lower)) return dcTrack('review_click');
+  if(lower.indexOf('http')===0) return dcTrack('website');
+}, true);
 var galImgs = ${JSON.stringify(gallery.map((g) => s(g.filename)))};
 var lbI = 0;
 function lbShow(){ document.getElementById('lbImg').src = galImgs[lbI]; document.getElementById('lbCount').textContent = (lbI+1)+' / '+galImgs.length; }

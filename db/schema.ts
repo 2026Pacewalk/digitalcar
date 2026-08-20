@@ -282,14 +282,46 @@ export type PublishedCard = typeof publishedCards.$inferSelect;
 // Lightweight event log for the PUBLIC card: views, QR scans, and every action
 // tap (call / whatsapp / email / website / directions / save-contact). Keyed by
 // slug so it works for both snapshot and legacy cards. Never fabricated (§36).
+// Every column beyond (slug, type, created_at) is NULLABLE and was added later —
+// old rows simply have NULLs and every query tolerates that. Nothing here is
+// personal data: `visitorId` is a rotating salted hash (never an IP, never
+// cross-site), and geo is coarse country/city taken from the CDN edge headers.
 export const cardEvents = mysqlTable("card_events", {
   id: serial("id").primaryKey(),
   slug: varchar("slug", { length: 191 }).notNull(),
   type: varchar("type", { length: 32 }).notNull(),
+  // WHICH thing was acted on — product name, social platform, section id,
+  // video title, share channel. This is what turns "a tap happened" into
+  // "3 people tapped your Gold Plan".
+  label: varchar("label", { length: 191 }),
+  // Which of the owner's cards (multi-card accounts).
+  cardId: int("card_id"),
+  // Anonymous, rotating, salted daily hash → unique vs returning visitors
+  // without storing anything that identifies a person.
+  visitorId: varchar("visitor_id", { length: 64 }),
+  // Groups the events of a single visit together (journey + time on card).
+  sessionId: varchar("session_id", { length: 64 }),
+  device: varchar("device", { length: 16 }),   // mobile | tablet | desktop
+  os: varchar("os", { length: 24 }),
+  browser: varchar("browser", { length: 24 }),
+  // Where the visit came from: whatsapp, qr, instagram, facebook, google,
+  // linkedin, direct… Derived from the referrer plus the ?src= tag we put on
+  // QR/share links.
+  source: varchar("source", { length: 32 }),
+  referrer: varchar("referrer", { length: 255 }),
+  country: varchar("country", { length: 2 }),
+  city: varchar("city", { length: 64 }),
+  // For time-on-card / dwell events, in milliseconds.
+  durationMs: int("duration_ms"),
+  meta: json("meta"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("cardev_slug_idx").on(table.slug),
   index("cardev_type_idx").on(table.type),
+  // Range + breakdown queries always filter by slug and a date window.
+  index("cardev_slug_created_idx").on(table.slug, table.createdAt),
+  index("cardev_slug_type_created_idx").on(table.slug, table.type, table.createdAt),
+  index("cardev_visitor_idx").on(table.visitorId),
 ]);
 
 export type CardEvent = typeof cardEvents.$inferSelect;
