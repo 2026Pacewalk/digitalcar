@@ -485,7 +485,7 @@ ${firstPagePadCss(Number(theme))}
 ${ownerHierarchyCss}
 ${desigFontCss(Number(theme))}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
-html{scroll-behavior:smooth;}
+html{scroll-behavior:smooth;scrollbar-gutter:stable;}
 body{background:#f1f1f1;}
 main{padding-bottom:78px;box-shadow:none;}
 .footer{position:fixed;left:0;bottom:0;width:100%;z-index:999;}
