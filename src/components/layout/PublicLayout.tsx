@@ -142,7 +142,7 @@ export default function PublicLayout() {
   }, [mobileOpen]);
 
   const navLinks = [
-    { label: "Templates", href: "/digital-business-cards-templates", icon: LayoutGrid },
+    { label: "Templates", href: "/templates", icon: LayoutGrid },
     { label: "Features", href: "/features", icon: Sparkles },
     { label: "Pricing", href: "/pricing", icon: Tag },
     { label: "Bulk Cards", href: "/bulk-cards", icon: Layers },

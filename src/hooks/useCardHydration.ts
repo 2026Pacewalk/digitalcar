@@ -80,6 +80,17 @@ export function useCardHydration(): boolean {
     if (!u || u.role !== "customer") { setReady(true); return; }
     const marker = scopedKey("dc_hydrated");
     if (localStorage.getItem(marker) === "1") { setReady(true); return; }
+    // Never clobber a card that already exists locally — e.g. one the signup just
+    // seeded with the chosen design, or one the user has been editing this
+    // session. Hydration is only for a genuinely EMPTY browser (a returning user
+    // on a fresh device). Without this, the snapshot/legacy load overwrote the
+    // signup's theme (customer picked Coral → card opened on the default).
+    try {
+      const cur = JSON.parse(localStorage.getItem(scopedKey("dc_customer")) || "null") as { name?: string; slug?: string; theme?: unknown } | null;
+      if (cur && (String(cur.name || "").trim() || String(cur.slug || "").trim() || cur.theme !== undefined)) {
+        localStorage.setItem(marker, "1"); setReady(true); return;
+      }
+    } catch { /* fall through to hydrate */ }
 
     let cancelled = false;
     (async () => {
