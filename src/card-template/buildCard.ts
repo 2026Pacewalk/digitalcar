@@ -3,6 +3,7 @@ import type { CustomerRecord } from "@/hooks/useCustomer";
 import { fixMojibake } from "@/lib/cardContent";
 import { parseVideo } from "@/lib/video";
 import { buildLinkBioHtml, LINKBIO_START, LINKBIO_COUNT } from "./linkbio";
+import { buildPremiumCardHtml, PREMIUM_COUNT } from "./premiumCards";
 import { SOCIAL_BY_KEY, readSocialLinks } from "@/lib/socialPlatforms";
 
 /* All 31 legacy templates (style1.css … style31.css) loaded as raw strings. */
@@ -14,9 +15,14 @@ for (const [path, css] of Object.entries(STYLE_MODULES)) {
 }
 /* 31 legacy business-card styles, then the link-in-bio variants (numbers 32+). */
 const CARD_STYLE_COUNT = 31;
-export const TEMPLATE_COUNT = LINKBIO_START - 1 + LINKBIO_COUNT; // 31 + link-bio variants
+/* Template number ranges: 1..31 scrolling styles, then link-in-bio, then the
+   premium single-screen card designs — each block appended so numbers are stable. */
+const PREMIUM_START = LINKBIO_START + LINKBIO_COUNT;
+export const TEMPLATE_COUNT = LINKBIO_START - 1 + LINKBIO_COUNT + PREMIUM_COUNT;
 /* True when a template number selects the link-in-bio layout instead of a card style. */
-export const isLinkBio = (theme: number | string) => Number(theme) >= LINKBIO_START;
+export const isLinkBio = (theme: number | string) => Number(theme) >= LINKBIO_START && Number(theme) < PREMIUM_START;
+/* True when a template number selects a premium single-screen card design. */
+export const isPremiumCard = (theme: number | string) => Number(theme) >= PREMIUM_START && Number(theme) < PREMIUM_START + PREMIUM_COUNT;
 
 /* Perceived brightness of a #rrggbb colour (0 dark … 1 light). */
 const lumOf = (hex: string) => {
@@ -133,8 +139,9 @@ const renderSocialIcons = (c: CustomerRecord, clickable: boolean) => {
 };
 
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
-  // Link-in-bio templates (32+) use a completely different, minimal layout.
+  // Link-in-bio and premium single-screen cards use completely different layouts.
   const tNum = Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1));
+  if (isPremiumCard(tNum)) return buildPremiumCardHtml(c as Record<string, unknown>, products as unknown as Parameters<typeof buildPremiumCardHtml>[1], tNum - PREMIUM_START);
   if (isLinkBio(tNum)) return buildLinkBioHtml(c as Record<string, unknown>, products, tNum - LINKBIO_START);
 
   const accent = s(c.color) || "#F7B31C";
@@ -813,7 +820,11 @@ function saveVCard(){
    used for the template picker thumbnails. No scripts, no other sections. */
 export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
   const theme = Math.min(TEMPLATE_COUNT, Math.max(1, Number(themeNum) || 1));
-  // Link-in-bio templates render their own compact preview.
+  // Premium single-screen cards + link-in-bio render their own compact preview.
+  if (isPremiumCard(theme)) {
+    const demo = [{ name: "Fraud Sentinel 360", tagline: "Fraud & risk management" }, { name: "Whistle Sentinel", tagline: "Secure whistle-blower app" }, { name: "MeCard.me", tagline: "Digital card solutions" }];
+    return buildPremiumCardHtml(c as Record<string, unknown>, demo, theme - PREMIUM_START, { thumb: true });
+  }
   if (isLinkBio(theme)) {
     const sampleProducts = [{ name: "Our Services", button: "", button_title: "View Services" }];
     return buildLinkBioHtml(c as Record<string, unknown>, sampleProducts, theme - LINKBIO_START, { thumb: true });
