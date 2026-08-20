@@ -45,7 +45,7 @@ export function standeeMarkup(o: StandeeData): string {
         <div class="dc-tent-pill">SCAN ME</div>
         <div class="dc-tent-qr"><img src="${o.qrSrc}" alt="QR code" crossorigin="anonymous" referrerpolicy="no-referrer" /></div>
         <div class="dc-tent-prompt">${escapeHtml(prompt)}<small>Save my contact · See products · Get directions</small></div>
-        <div class="dc-tent-link">${escapeHtml(o.linkText)}</div>
+        ${o.linkText ? `<div class="dc-tent-link">${escapeHtml(o.linkText)}</div>` : ""}
         ${o.phone ? `<div class="dc-tent-phone">📞 ${escapeHtml(o.phone)}</div>` : ""}
       </div>
       <div class="dc-tent-foot">Powered by <b>DigitalCarda</b> · Your smart digital business card</div>

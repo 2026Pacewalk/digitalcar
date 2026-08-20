@@ -22,6 +22,8 @@ export default function CustomerQR() {
   const [bg, setBg] = useState("#FFFFFF");
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState("");
+  const [showLink, setShowLink] = useState(true);
+  const [showPhone, setShowPhone] = useState(true);
 
   const colors = ["#0F172A", "#F7B31C", "#14B8A6", "#3B82F6", "#EF4444", "#8B5CF6"];
   const bgs = ["#FFFFFF", "#F8FAFC", "#FEF3C7", "#E0F2FE"];
@@ -62,7 +64,7 @@ export default function CustomerQR() {
   /* ── Branded standee: shared markup for the on-screen preview AND the print
      window (and the public homepage), so all stay identical. See lib/standee. ── */
   const standeeStyles = STANDEE_STYLES;
-  const standeeInner = () => standeeMarkup({ brandName, subtitle, phone, linkText, qrSrc: qrSrc(440) });
+  const standeeInner = () => standeeMarkup({ brandName, subtitle, phone: showPhone ? phone : "", linkText: showLink ? linkText : "", qrSrc: qrSrc(440) });
 
   const printStandee = () => {
     const w = window.open("", "_blank", "width=520,height=760");
@@ -126,11 +128,13 @@ export default function CustomerQR() {
       ctx.fillText("Save my contact · See products · Get directions", W / 2, fy + frame + 56 * S);
       // link pill
       const ly = fy + frame + 82 * S;
-      ctx.font = `700 ${13 * S}px Inter, sans-serif`;
-      const lw = ctx.measureText(linkText).width + 32 * S;
-      ctx.fillStyle = "#F1F5F9"; rr(W / 2 - lw / 2, ly - 15 * S, lw, 30 * S, 10 * S); ctx.fill();
-      ctx.fillStyle = "#0F172A"; ctx.fillText(linkText, W / 2, ly + 4 * S);
-      if (phone) { ctx.fillStyle = "#334155"; ctx.font = `600 ${13 * S}px Inter, sans-serif`; ctx.fillText("📞 " + phone, W / 2, ly + 34 * S); }
+      if (showLink) {
+        ctx.font = `700 ${13 * S}px Inter, sans-serif`;
+        const lw = ctx.measureText(linkText).width + 32 * S;
+        ctx.fillStyle = "#F1F5F9"; rr(W / 2 - lw / 2, ly - 15 * S, lw, 30 * S, 10 * S); ctx.fill();
+        ctx.fillStyle = "#0F172A"; ctx.fillText(linkText, W / 2, ly + 4 * S);
+      }
+      if (showPhone && phone) { ctx.fillStyle = "#334155"; ctx.font = `600 ${13 * S}px Inter, sans-serif`; ctx.fillText("📞 " + phone, W / 2, ly + (showLink ? 34 : 4) * S); }
       // footer
       ctx.fillStyle = "#0F172A"; ctx.fillRect(0, H - 40 * S, W, 40 * S);
       ctx.save(); rr(0, 0, W, H, 26 * S); ctx.clip();
@@ -179,6 +183,20 @@ export default function CustomerQR() {
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={downloadStandee} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all disabled:opacity-60"><ImageIcon size={16} /> {busy === "poster" ? "Preparing…" : "Download PNG"}</button>
                   <button onClick={printStandee} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 border border-[#E2E8F0] text-[#334155] rounded-xl text-sm font-semibold hover:bg-[#F8FAFC] transition-all disabled:opacity-60"><Printer size={16} /> Print / PDF</button>
+                </div>
+                <div className="mt-3 pt-3 border-t border-[#F1F5F9] space-y-1">
+                  <p className="text-[11px] font-medium text-[#94A3B8] mb-1.5">Show on the standee</p>
+                  {[
+                    { on: showLink, set: setShowLink, label: <>Card link <span className="text-[#94A3B8] font-normal">({linkText})</span></> },
+                    { on: showPhone, set: setShowPhone, label: <>Phone number <span className="text-[#94A3B8] font-normal">{phone ? `(${phone})` : "(none)"}</span></> },
+                  ].map((t, i) => (
+                    <button key={i} type="button" onClick={() => t.set((v) => !v)} disabled={i === 1 && !phone} className="flex items-center gap-2.5 py-1.5 w-full text-left disabled:opacity-50">
+                      <span className={`w-10 h-6 rounded-full transition-colors relative shrink-0 ${t.on ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`}>
+                        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${t.on ? "left-[18px]" : "left-0.5"}`} />
+                      </span>
+                      <span className="text-[13px] font-medium text-[#334155] truncate">{t.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
