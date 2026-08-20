@@ -17,14 +17,24 @@ interface SidebarProps {
   onMobileToggle: () => void;
 }
 
-type NavLink = { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; path: string };
+type NavLink = { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; path: string; children?: NavLink[] };
 type NavGroup = { title: string; items: NavLink[] };
 
-// Core journey first (§39), then the detailed card-section editors, then account.
+// Core journey first (§39): the card-section editors are nested UNDER Edit Card,
+// then Grow, then account.
 const customerGroups: NavGroup[] = [
   { title: "My Card", items: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-    { label: "Edit Card", icon: Wand2, path: "/dashboard/build" },
+    { label: "Edit Card", icon: Wand2, path: "/dashboard/build", children: [
+      { label: "Templates", icon: Palette, path: "/dashboard/templates" },
+      { label: "Products / Services", icon: ShoppingBag, path: "/dashboard/products?tab=products" },
+      { label: "Gallery & Videos", icon: ImageIcon, path: "/dashboard/media" },
+      { label: "Social Links", icon: Share2, path: "/dashboard/social" },
+      { label: "Google Reviews", icon: Star, path: "/dashboard/reviews" },
+      { label: "About Us", icon: Info, path: "/dashboard/about" },
+      { label: "Payments", icon: Wallet, path: "/dashboard/payments" },
+      { label: "Uploads", icon: Upload, path: "/dashboard/uploads" },
+    ] },
     { label: "View Card", icon: Eye, path: "/dashboard/view" },
   ] },
   { title: "Grow", items: [
@@ -32,16 +42,6 @@ const customerGroups: NavGroup[] = [
     { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
     { label: "QR & Share", icon: QrCode, path: "/dashboard/qr" },
     { label: "Refer & Earn", icon: Gift, path: "/dashboard/refer" },
-  ] },
-  { title: "Card Sections", items: [
-    { label: "Templates", icon: Palette, path: "/dashboard/templates" },
-    { label: "Products / Services", icon: ShoppingBag, path: "/dashboard/products?tab=products" },
-    { label: "Gallery & Videos", icon: ImageIcon, path: "/dashboard/media" },
-    { label: "Social Links", icon: Share2, path: "/dashboard/social" },
-    { label: "Google Reviews", icon: Star, path: "/dashboard/reviews" },
-    { label: "About Us", icon: Info, path: "/dashboard/about" },
-    { label: "Payments", icon: Wallet, path: "/dashboard/payments" },
-    { label: "Uploads", icon: Upload, path: "/dashboard/uploads" },
   ] },
   { title: "Account", items: [
     { label: "Subscription", icon: CreditCard, path: "/dashboard/subscription" },
@@ -113,6 +113,28 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
     return curTab === wantTab;
   };
 
+  const navItem = (item: NavLink, child: boolean) => {
+    const active = isActive(item.path);
+    return (
+      <Link
+        key={item.path}
+        to={item.path}
+        onClick={() => { if (window.innerWidth < 1024) onMobileToggle(); }}
+        title={collapsed ? item.label : undefined}
+        className={`relative flex items-center gap-3 rounded-xl font-medium transition-all duration-200 group
+          ${child ? "px-3 py-1.5 text-[12.5px]" : "px-3 py-2 text-[13px]"}
+          ${active ? theme.activeNav : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1E293B]"}
+          ${collapsed ? "lg:justify-center lg:px-2" : ""}`}
+      >
+        <item.icon size={child ? 15 : 17} className={`shrink-0 ${active ? theme.activeIcon : "text-[#64748B] group-hover:text-[#F8FAFC]"}`} />
+        {!collapsed && <span className="truncate flex-1">{item.label}</span>}
+        {badgeFor(item.path) > 0 && (
+          <span className={`shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-[#F7B31C] text-[#0F172A] text-[10px] font-bold flex items-center justify-center ${collapsed ? "lg:absolute lg:top-1 lg:right-1" : ""}`}>{badgeFor(item.path)}</span>
+        )}
+      </Link>
+    );
+  };
+
   return (
     <>
       {mobileOpen && (
@@ -156,26 +178,15 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
                 <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#64748B]">{group.title}</p>
               )}
               <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const active = isActive(item.path);
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => { if (window.innerWidth < 1024) onMobileToggle(); }}
-                      title={collapsed ? item.label : undefined}
-                      className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 group
-                        ${active ? theme.activeNav : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1E293B]"}
-                        ${collapsed ? "lg:justify-center lg:px-2" : ""}`}
-                    >
-                      <item.icon size={17} className={`shrink-0 ${active ? theme.activeIcon : "text-[#64748B] group-hover:text-[#F8FAFC]"}`} />
-                      {!collapsed && <span className="truncate flex-1">{item.label}</span>}
-                      {badgeFor(item.path) > 0 && (
-                        <span className={`shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-[#F7B31C] text-[#0F172A] text-[10px] font-bold flex items-center justify-center ${collapsed ? "lg:absolute lg:top-1 lg:right-1" : ""}`}>{badgeFor(item.path)}</span>
-                      )}
-                    </Link>
-                  );
-                })}
+                {group.items.map((item) => (
+                  <div key={item.path}>
+                    {navItem(item, false)}
+                    {item.children && (collapsed
+                      ? <div className="space-y-0.5">{item.children.map((ch) => navItem(ch, false))}</div>
+                      : <div className="mt-0.5 mb-1 ml-[26px] pl-2 border-l border-[#1E293B] space-y-0.5">{item.children.map((ch) => navItem(ch, true))}</div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           ))}
