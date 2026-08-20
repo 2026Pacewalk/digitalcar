@@ -22,7 +22,17 @@ const REMOTE =
   `MYSQL_PWD="$p" mysqldump --single-transaction --no-tablespaces --routines --triggers ` +
   `-h 127.0.0.1 -P 3306 -u digitalcarda digitalcarda`;
 
-const die = (m) => { console.error("✗ " + m); process.exit(1); };
+// `--soft` (used by predev): never block dev on a failed pull — warn and let the
+// app start on the existing local copy. Without it (manual `db:pull`), fail hard.
+const SOFT = process.argv.includes("--soft");
+// Escape hatch for the auto-pull: `set SKIP_LIVE_SYNC=1 && npm run dev` restarts
+// dev without re-pulling (handy when you're only iterating on code).
+if (SOFT && process.env.SKIP_LIVE_SYNC) { console.log("○ Live sync skipped (SKIP_LIVE_SYNC set).\n"); process.exit(0); }
+const die = (m) => {
+  if (SOFT) { console.warn(`⚠ Live sync skipped (${m}). Using the existing local copy.\n`); process.exit(0); }
+  console.error("✗ " + m);
+  process.exit(1);
+};
 
 if (!fs.existsSync(KEY)) die(`SSH key not found: ${KEY}`);
 
