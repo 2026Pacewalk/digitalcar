@@ -233,7 +233,21 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const bankCopyText = `Bank Account Details —\n\n${bankLines.join("\n")}`;
   const bankRow = (icon: string, k: string, v: string) =>
     v ? `<div class="dc-bank-row"><span class="dc-bank-ic"><i class="fa ${icon}"></i></span><div class="dc-bank-kv"><span class="k">${k}</span><span class="v">${esc(v)}</span></div></div>` : "";
-  const paymentSection = on(c.payment_on) && (hasPay || hasBank) ? `
+  // Payment QR is part of the Payment Details section — render its inner content
+  // here and fold it in below the bank card (no separate top-level section).
+  const hasQr = on(c.qrcode_on) && (qrcodes.length || slug);
+  const qrContent = hasQr
+    ? (qrcodes.length ? qrcodes.map((q) => `<div class="qrcode-card" style="text-align:center;margin-bottom:16px">
+        <img src="${esc(q.filename)}" style="max-width:240px;width:100%;border-radius:6px" ${IMG} onerror="this.style.display='none'">
+        <div><a href="${cardUrl}" class="qrcode-enquiry-btn" target="_blank">${esc(q.name) || "Pay Online"}</a></div>
+      </div>`).join("") : `<div class="qrcode-card" style="text-align:center">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(cardUrl)}" style="width:170px;height:170px" ${IMG}>
+        <div><a href="${cardUrl}" class="qrcode-enquiry-btn" target="_blank">Pay Online</a></div>
+      </div>`)
+    : "";
+
+  const hasPaymentBody = on(c.payment_on) && (hasPay || hasBank);
+  const paymentSection = hasPaymentBody || qrContent ? `
     <div id="payment-section" class="section-container">
       <div class="section-header">Payment Details</div>
       ${hasPay ? `<div class="dc-pay-list">
@@ -245,14 +259,15 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       ${hasBank ? `<div class="dc-bank">
         <div class="dc-bank-head"><span class="dc-bank-title"><i class="fa fa-university"></i>Bank Account Details</span><button type="button" class="dc-bank-copy" data-copy="${esc(bankCopyText).replace(/\n/g, "&#10;")}" onclick="dcCopy(this)" title="Copy bank details"><i class="fa fa-copy"></i><span>Copy</span></button></div>
         <div class="dc-bank-body">
-          ${bankRow("fa-university", "Bank Name", s(c.bank_name))}
           ${bankRow("fa-user", "A/c Holder", s(c.account_holder))}
           ${bankRow("fa-credit-card", "Account No.", s(c.account_number))}
+          ${bankRow("fa-university", "Bank Name", s(c.bank_name))}
           ${bankRow("fa-hashtag", "IFSC Code", s(c.ifsc))}
-          ${bankRow("fa-wallet", "Account Type", s(c.account_type))}
+          ${bankRow("fa-wallet", "Account Type", cap(s(c.account_type)))}
           ${bankRow("fa-file-invoice", "GST No.", s(c.gst))}
         </div>
       </div>` : ""}
+      ${qrContent ? `<div class="dc-qr-sub"><div class="dc-qr-sub-title">Payment QR Code</div>${qrContent}</div>` : ""}
     </div>` : "";
 
   const ratingNum = Number(s(c.google_rating)) || 0;
@@ -296,17 +311,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       ${s(c.google_review) ? `<div class="grev-btn-wrap"><a href="${esc(c.google_review)}" target="_blank" class="grev-btn"><i class="fab fa-google"></i> Write a Review</a></div>` : ""}
     </div>` : "";
 
-  const qrSection = on(c.qrcode_on) && (qrcodes.length || slug) ? `
-    <div id="qrcode-section" class="section-container" style="text-align:center">
-      <div class="section-header" style="text-align:left">Payment QR Code</div>
-      ${qrcodes.length ? qrcodes.map((q) => `<div class="qrcode-card" style="text-align:center;margin-bottom:16px">
-        <img src="${esc(q.filename)}" style="max-width:240px;width:100%;border-radius:6px" ${IMG} onerror="this.style.display='none'">
-        <div><a href="${cardUrl}" class="qrcode-enquiry-btn" target="_blank">${esc(q.name) || "Pay Online"}</a></div>
-      </div>`).join("") : `<div class="qrcode-card" style="text-align:center">
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(cardUrl)}" style="width:170px;height:170px" ${IMG}>
-        <div><a href="${cardUrl}" class="qrcode-enquiry-btn" target="_blank">Pay Online</a></div>
-      </div>`}
-    </div>` : "";
+  // (Payment QR is now rendered inside the Payment Details section above.)
 
   const offersSection = on(c.offer_on) && offers.length ? `
     <div id="offers-section" class="section-container">
@@ -409,7 +414,6 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     { id: "products-section", icon: "fas fa-box-open", label: navLabel(c.product, "Services"), show: !!servicesSection },
     { id: "offers-section", icon: "fas fa-tags", label: navLabel(c.offer, "Offers"), show: !!offersSection },
     { id: "payment-section", icon: "fas fa-money-bill-alt", label: navLabel(c.payment, "Payment"), show: !!paymentSection },
-    { id: "qrcode-section", icon: "fas fa-qrcode", label: "Pay QR", show: !!qrSection },
     { id: "review-section", icon: "fab fa-google", label: "Reviews", show: !!googleReviewSection },
     { id: "gallery-section", icon: "fa fa-photo-video", label: navLabel(c.gallery, "Gallery"), show: !!gallerySection },
     { id: "video-section", icon: "fa fa-video", label: navLabel(c.video, "Video"), show: !!videoSection },
@@ -556,6 +560,8 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-pay-copy:hover{background:${accent}26;}
 .dc-pay-copy:active{transform:scale(.95);}
 /* Bank account details — premium compact card */
+.dc-qr-sub{margin-top:18px;text-align:center;}
+.dc-qr-sub-title{text-align:left;font-size:13.5px;font-weight:700;color:#334155;margin-bottom:10px;padding-top:14px;border-top:1px solid #eef0f3;}
 .dc-bank{margin-top:16px;border-radius:14px;overflow:hidden;border:1px solid #edeff2;box-shadow:0 6px 18px rgba(16,24,40,.09);}
 .dc-bank-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;background:linear-gradient(135deg,${accent},${accentDark});color:#fff;font-weight:800;font-size:13.5px;letter-spacing:.3px;}
 .dc-bank-title{display:flex;align-items:center;gap:9px;}
@@ -598,7 +604,6 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
     ${servicesSection}
     ${offersSection}
     ${paymentSection}
-    ${qrSection}
     ${gallerySection}
     ${videoSection}
     ${enquirySection}
