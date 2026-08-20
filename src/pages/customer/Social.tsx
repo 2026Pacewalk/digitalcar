@@ -37,7 +37,7 @@ export default function CustomerSocial() {
   const removeLink = (i: number) => mutate(links.filter((_, idx) => idx !== i));
 
   // Preview icon colours — mirror how the card renders theme vs brand.
-  const chipStyle = (p: SocialPlatform) => (style === "brand" ? { background: p.color, color: p.fg || "#fff", boxShadow: "none" } : { background: "#F7B31C", color: "#fff", boxShadow: "none" });
+  const chipStyle = (p: SocialPlatform) => (style === "brand" ? { background: p.color, color: p.fg || "#fff" } : { background: "#F7B31C", color: "#fff" });
 
   const save = () => {
     const clean = links.filter((l) => l.platform && l.url.trim()).map((l) => ({ platform: l.platform, url: l.url.trim() }));
@@ -87,7 +87,7 @@ export default function CustomerSocial() {
                   <div className="flex items-center gap-1.5 mb-2.5">
                     {["facebook", "instagram", "x", "youtube"].map((k) => {
                       const p = SOCIAL_BY_KEY[k];
-                      return <span key={k} className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: o.id === "brand" ? p.color : "#F7B31C", color: o.id === "brand" ? (p.fg || "#fff") : "#fff", boxShadow: "none" }}><PlatformIcon p={p} size={12} /></span>;
+                      return <span key={k} className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: o.id === "brand" ? p.color : "#F7B31C", color: o.id === "brand" ? (p.fg || "#fff") : "#fff" }}><PlatformIcon p={p} size={12} /></span>;
                     })}
                   </div>
                   <p className="text-[12.5px] font-semibold text-[#0F172A]">{o.title}</p>
@@ -113,7 +113,7 @@ export default function CustomerSocial() {
                 if (!p) return null;
                 return (
                   <div key={i} className="group flex items-center gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-2.5 hover:border-[#CBD5E1] transition-colors">
-                    <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: p.color, color: p.fg || "#fff", boxShadow: "none" }}><PlatformIcon p={p} size={19} /></span>
+                    <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: p.color, color: p.fg || "#fff" }}><PlatformIcon p={p} size={19} /></span>
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-semibold text-[#64748B] mb-0.5">{p.key === "website" ? "Custom link" : p.label}</p>
                       <input value={l.url} onChange={(e) => setUrl(i, e.target.value)} className={`${fieldCls} h-8`} placeholder={p.ph} />
@@ -134,7 +134,7 @@ export default function CustomerSocial() {
               {available.map((p) => (
                 <button key={p.key} type="button" onClick={() => addPlatform(p.key)}
                   className="flex flex-col items-center gap-2 rounded-2xl border border-[#E2E8F0] bg-white p-3 hover:border-[#F7B31C] hover:-translate-y-0.5 hover:shadow-sm transition-all">
-                  <span className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: p.color, color: p.fg || "#fff", boxShadow: "none" }}><PlatformIcon p={p} size={18} /></span>
+                  <span className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: p.color, color: p.fg || "#fff" }}><PlatformIcon p={p} size={18} /></span>
                   <span className="text-[10px] font-semibold text-[#475569] text-center leading-tight">{p.label === "Website" ? "Custom link" : p.label}</span>
                 </button>
               ))}

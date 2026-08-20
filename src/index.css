@@ -444,8 +444,10 @@ body {
   border-radius: 2px;
 }
 
-/* FAB styles */
-.fab {
+/* FAB styles — scoped to button.fab so it never collides with Font Awesome's
+   brand-icon class (`<i class="fab …">`), which would otherwise inherit this
+   gold box-shadow as a glow under every brand icon. */
+button.fab {
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -455,7 +457,7 @@ body {
   box-shadow: 0 4px 16px rgba(247, 179, 28, 0.4);
   transition: all 0.2s ease;
 }
-.fab:active {
+button.fab:active {
   transform: scale(0.92);
   box-shadow: 0 2px 8px rgba(247, 179, 28, 0.3);
 }
