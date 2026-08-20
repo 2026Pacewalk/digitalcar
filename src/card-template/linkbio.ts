@@ -149,6 +149,36 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-btn-shadow:0 4px 16px rgba(124,58,237,.15); --lb-btn-hover:#fff; --lb-radius:14px;
         --lb-ring:#ffffff; --lb-social:#7c3aed; --lb-accent:#7c3aed;`,
     },
+    {
+      // Corporate navy + gold — like a premium business card.
+      name: "Corporate Navy", swatch: "#12263d",
+      css: `
+        --lb-bg:radial-gradient(120% 90% at 50% -10%,#1c3d61 0%,#12263d 55%,#0a1826 100%);
+        --lb-text:#eaf2fb; --lb-sub:#9db4cc; --lb-name-font:'Poppins',sans-serif; --lb-name-weight:700;
+        --lb-btn-bg:rgba(255,255,255,.05); --lb-btn-text:#eaf2fb; --lb-btn-border:1px solid ${a}88;
+        --lb-btn-shadow:0 6px 20px rgba(0,0,0,.42); --lb-btn-hover:${a}1f; --lb-radius:12px;
+        --lb-ring:${a}; --lb-social:#cfe0f0; --lb-accent:${a};`,
+    },
+    {
+      // Deep emerald + gold — a prestige / membership look.
+      name: "Emerald Prestige", swatch: "#0f5132",
+      css: `
+        --lb-bg:radial-gradient(120% 90% at 50% -10%,#125c39 0%,#0b3d26 55%,#062417 100%);
+        --lb-text:#f4f1e4; --lb-sub:#bcd6c6; --lb-name-font:'Playfair Display',serif; --lb-name-weight:600;
+        --lb-btn-bg:rgba(212,175,55,.08); --lb-btn-text:#f6f0da; --lb-btn-border:1px solid ${a}99;
+        --lb-btn-shadow:0 6px 20px rgba(0,0,0,.38); --lb-btn-hover:${a}26; --lb-radius:10px;
+        --lb-ring:${a}; --lb-social:#e6d9a8; --lb-accent:${a};`,
+    },
+    {
+      // Clean white + deep navy — a crisp corporate / ID-card feel.
+      name: "Executive", swatch: "#12263d",
+      css: `
+        --lb-bg:radial-gradient(120% 80% at 50% 0%,#ffffff 0%,#f2f6fb 60%,#e6edf6 100%);
+        --lb-text:#12263d; --lb-sub:#5a708a; --lb-name-font:'Poppins',sans-serif; --lb-name-weight:700;
+        --lb-btn-bg:#12263d; --lb-btn-text:#ffffff; --lb-btn-border:none;
+        --lb-btn-shadow:0 8px 20px rgba(18,38,61,.22); --lb-btn-hover:#1c3d61; --lb-radius:12px;
+        --lb-ring:#12263d; --lb-social:#12263d; --lb-accent:#12263d;`,
+    },
   ];
   return defs.map((d, i) => ({ ...d, id: LINKBIO_START + i }));
 }

@@ -58,6 +58,10 @@ const SEED_PRESETS: Preset[] = [
   { id: 42, name: "Editorial (Bio)", style: 42, primary: "#111111", secondary: "#E5E7EB", active: true },
   { id: 43, name: "Mint Fresh (Bio)", style: 43, primary: "#34D399", secondary: "#065F46", active: true },
   { id: 44, name: "Lavender Dream (Bio)", style: 44, primary: "#A78BFA", secondary: "#7C3AED", active: true },
+  // Premium business/ID/membership-inspired looks.
+  { id: 45, name: "Corporate Navy (Bio)", style: 45, primary: "#F7B31C", secondary: "#12263D", active: true },
+  { id: 46, name: "Emerald Prestige (Bio)", style: 46, primary: "#D4AF37", secondary: "#0F5132", active: true },
+  { id: 47, name: "Executive (Bio)", style: 47, primary: "#1E3A5F", secondary: "#12263D", active: true },
 ];
 /* The lowest preset id/style that is a link-in-bio layout (rest are card styles). */
 const LINKBIO_MIN_ID = 32;
