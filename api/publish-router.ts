@@ -187,11 +187,27 @@ export const publishRouter = createRouter({
     const now = Date.now();
     const total: Record<string, number> = {};
     const last30: Record<string, number> = {};
+    // Daily series for the last 30 days (IST day buckets) → real charts.
+    const IST = 5.5 * 3600_000;
+    const dayKey = (t: number) => new Date(t + IST).toISOString().slice(0, 10);
+    const dayMap: Record<string, { views: number; taps: number }> = {};
+    const dowCounts = [0, 0, 0, 0, 0, 0, 0]; // views by day-of-week (0=Sun)
     for (const r of rows) {
+      const t = new Date(r.createdAt).getTime();
       total[r.type] = (total[r.type] || 0) + 1;
-      if (now - new Date(r.createdAt).getTime() <= 30 * DAY) last30[r.type] = (last30[r.type] || 0) + 1;
+      if (now - t <= 30 * DAY) {
+        last30[r.type] = (last30[r.type] || 0) + 1;
+        const k = dayKey(t);
+        (dayMap[k] = dayMap[k] || { views: 0, taps: 0 })[r.type === "view" ? "views" : "taps"]++;
+      }
+      if (r.type === "view") dowCounts[new Date(t + IST).getUTCDay()]++;
     }
-    return { slug, total, last30 };
+    const daily: { date: string; views: number; taps: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const k = dayKey(now - i * DAY);
+      daily.push({ date: k, views: dayMap[k]?.views || 0, taps: dayMap[k]?.taps || 0 });
+    }
+    return { slug, total, last30, daily, dow: dowCounts };
   }),
 
   // Authed: the signed-in user's public identity (for the QR / share tools).
