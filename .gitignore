@@ -78,3 +78,4 @@ media/
 # Live DB pull — never commit the snapshot or the DB password (contains PII/secrets)
 .live-dump.sql
 .live-db-pass
+.last-live-sync

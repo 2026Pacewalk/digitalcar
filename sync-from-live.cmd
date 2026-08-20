@@ -69,6 +69,7 @@ if errorlevel 1 (
 )
 
 del "%DUMP%"
+powershell -NoProfile -Command "(Get-Date).ToString('o') | Set-Content -NoNewline '%~dp0.last-live-sync'" >nul 2>&1
 echo.
 echo  Done. Your local database now matches digitalcarda.in.
 echo  Any local changes you had were replaced by the live snapshot.
