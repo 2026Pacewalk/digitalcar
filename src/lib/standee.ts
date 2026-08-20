@@ -7,11 +7,11 @@ export const STANDEE_STYLES = `
   .dc-tent{width:100%;max-width:420px;margin:0 auto;background:#fff;border-radius:26px;overflow:hidden;
     box-shadow:0 20px 60px rgba(15,23,42,.14);font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;border:1px solid #EEF2F7;}
   .dc-tent-head{background:linear-gradient(135deg,#F7B31C 0%,#F59E0B 55%,#EA9A08 100%);padding:26px 26px 38px;text-align:center;position:relative;}
-  .dc-tent-brand{display:inline-flex;align-items:center;gap:7px;font-weight:800;font-size:15px;letter-spacing:.2px;color:#0F172A;opacity:.85;margin-bottom:14px;}
-  .dc-tent-brand span{color:#fff;}
-  .dc-tent-logo{width:22px;height:22px;border-radius:7px;background:#0F172A;display:inline-flex;align-items:center;justify-content:center;color:#F7B31C;font-size:12px;font-weight:900;}
+  .dc-tent-brand{display:inline-flex;align-items:center;justify-content:center;background:#0F172A;border-radius:11px;padding:8px 15px;margin-bottom:16px;box-shadow:0 6px 16px rgba(15,23,42,.28);}
+  .dc-tent-brand img{height:22px;width:auto;display:block;}
   .dc-tent-name{font-size:26px;line-height:1.15;font-weight:800;color:#0F172A;margin:0;word-break:break-word;}
   .dc-tent-sub{font-size:13px;font-weight:600;color:#0F172A;opacity:.72;margin-top:6px;}
+  .dc-tent-user{font-size:12.5px;font-weight:700;color:#0F172A;opacity:.62;margin-top:5px;}
   .dc-tent-body{padding:0 26px 22px;text-align:center;margin-top:-14px;}
   .dc-tent-pill{position:relative;z-index:2;display:inline-block;background:#0F172A;color:#F7B31C;font-size:12px;font-weight:800;letter-spacing:2px;padding:8px 20px;border-radius:999px;box-shadow:0 10px 22px rgba(15,23,42,.28);}
   .dc-tent-qr{background:#fff;border:1px solid #EEF2F7;border-radius:20px;padding:16px;margin:16px auto 0;width:fit-content;box-shadow:0 10px 30px rgba(15,23,42,.08);}
@@ -31,6 +31,7 @@ export type StandeeData = {
   linkText: string;
   qrSrc: string;   // fully-built QR image URL
   prompt?: string;
+  username?: string;   // optional @handle shown under the name
 };
 
 export function standeeMarkup(o: StandeeData): string {
@@ -38,9 +39,10 @@ export function standeeMarkup(o: StandeeData): string {
   return `
     <div class="dc-tent">
       <div class="dc-tent-head">
-        <div class="dc-tent-brand"><span class="dc-tent-logo">D</span> Digital<span>Carda</span></div>
+        <div class="dc-tent-brand"><img src="https://digitalcarda.in/logo.png" alt="DigitalCarda" /></div>
         <h2 class="dc-tent-name">${escapeHtml(o.brandName)}</h2>
         ${o.subtitle ? `<div class="dc-tent-sub">${escapeHtml(o.subtitle)}</div>` : ""}
+        ${o.username ? `<div class="dc-tent-user">@${escapeHtml(o.username)}</div>` : ""}
       </div>
       <div class="dc-tent-body">
         <div class="dc-tent-pill">SCAN ME</div>

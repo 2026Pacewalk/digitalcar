@@ -22,6 +22,7 @@ export default function CustomerQR() {
   const [bg, setBg] = useState("#FFFFFF");
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState("");
+  const [showUsername, setShowUsername] = useState(false);
 
   const colors = ["#0F172A", "#F7B31C", "#14B8A6", "#3B82F6", "#EF4444", "#8B5CF6"];
   const bgs = ["#FFFFFF", "#F8FAFC", "#FEF3C7", "#E0F2FE"];
@@ -57,7 +58,7 @@ export default function CustomerQR() {
   /* ── Branded standee: shared markup for the on-screen preview AND the print
      window (and the public homepage), so all stay identical. See lib/standee. ── */
   const standeeStyles = STANDEE_STYLES;
-  const standeeInner = () => standeeMarkup({ brandName, subtitle, phone, linkText, qrSrc: qrSrc(440) });
+  const standeeInner = () => standeeMarkup({ brandName, subtitle, phone, linkText, qrSrc: qrSrc(440), username: showUsername ? slug : undefined });
 
   const printStandee = () => {
     const w = window.open("", "_blank", "width=520,height=760");
@@ -94,11 +95,17 @@ export default function CustomerQR() {
       g.addColorStop(0, "#F7B31C"); g.addColorStop(1, "#EA9A08");
       ctx.save(); rr(0, 0, W, hh, 26 * S); ctx.clip(); ctx.fillStyle = g; ctx.fillRect(0, 0, W, hh); ctx.restore();
       ctx.textAlign = "center";
-      ctx.fillStyle = "rgba(15,23,42,.85)"; ctx.font = `800 ${15 * S}px Inter, sans-serif`;
-      ctx.fillText("DigitalCarda", W / 2, 34 * S);
+      // Real DigitalCarda logo on a dark chip (same-origin /logo.png → no canvas taint).
+      const logoImg = await loadImg("/logo.png").catch(() => null);
+      if (logoImg) {
+        const lh = 20 * S, lw = lh * (logoImg.width / logoImg.height), chipW = lw + 26 * S, chipH = 32 * S, chipY = 16 * S;
+        ctx.fillStyle = "#0F172A"; rr(W / 2 - chipW / 2, chipY, chipW, chipH, 11 * S); ctx.fill();
+        ctx.drawImage(logoImg, W / 2 - lw / 2, chipY + (chipH - lh) / 2, lw, lh);
+      }
       ctx.fillStyle = "#0F172A"; ctx.font = `800 ${26 * S}px Inter, sans-serif`;
-      wrapText(ctx, brandName, W / 2, 74 * S, W - 60 * S, 30 * S);
+      wrapText(ctx, brandName, W / 2, 82 * S, W - 60 * S, 30 * S);
       if (subtitle) { ctx.fillStyle = "rgba(15,23,42,.72)"; ctx.font = `600 ${13 * S}px Inter, sans-serif`; ctx.fillText(clip(subtitle, 42), W / 2, 118 * S); }
+      if (showUsername && slug) { ctx.fillStyle = "rgba(15,23,42,.62)"; ctx.font = `700 ${12.5 * S}px Inter, sans-serif`; ctx.fillText("@" + slug, W / 2, 137 * S); }
       // SCAN ME pill
       const pillY = 168 * S;
       ctx.fillStyle = "#0F172A"; rr(W / 2 - 55 * S, pillY - 15 * S, 110 * S, 28 * S, 14 * S); ctx.fill();
@@ -170,6 +177,12 @@ export default function CustomerQR() {
                   <button onClick={downloadStandee} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all disabled:opacity-60"><ImageIcon size={16} /> {busy === "poster" ? "Preparing…" : "Download PNG"}</button>
                   <button onClick={printStandee} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 border border-[#E2E8F0] text-[#334155] rounded-xl text-sm font-semibold hover:bg-[#F8FAFC] transition-all disabled:opacity-60"><Printer size={16} /> Print / PDF</button>
                 </div>
+                <button type="button" onClick={() => setShowUsername((v) => !v)} className="flex items-center gap-2.5 mt-3 pt-3 border-t border-[#F1F5F9] w-full text-left">
+                  <span className={`w-10 h-6 rounded-full transition-colors relative shrink-0 ${showUsername ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`}>
+                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${showUsername ? "left-[18px]" : "left-0.5"}`} />
+                  </span>
+                  <span className="text-[13px] font-medium text-[#334155]">Show my <b className="text-[#0F172A]">@{slug || "username"}</b> on the standee</span>
+                </button>
               </div>
 
               <div className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9]">
