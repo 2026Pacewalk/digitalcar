@@ -42,7 +42,7 @@ export function useMobileChrome(title: string | null, action: ReactNode) {
   }, [chrome, title, action]);
 }
 
-type NavItem = { icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>; label: string; path: string };
+type NavItem = { icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>; label: string; path: string; children?: NavItem[] };
 type NavGroup = { title: string; items: NavItem[] };
 interface NavConfig { tabs: NavItem[]; drawer: NavGroup[]; roots: string[]; profile: string; settings?: string; bell: string; fab: boolean }
 
@@ -119,24 +119,25 @@ const NAV: Record<string, NavConfig> = {
     drawer: [
       { title: "My Card", items: [
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-        { icon: Wand2, label: "Edit Card", path: "/dashboard/build" },
-        { icon: Eye, label: "View Card", path: "/dashboard/view" },
+        // Card-section editors nested under Edit Card, ordered to match the public
+        // card's section flow (same as the desktop sidebar).
+        { icon: Wand2, label: "Edit Card", path: "/dashboard/build", children: [
+          { icon: Palette, label: "Templates", path: "/dashboard/templates" },
+          { icon: Share2, label: "Social Links", path: "/dashboard/social" },
+          { icon: Info, label: "About Us", path: "/dashboard/about" },
+          { icon: ShoppingBag, label: "Products / Services", path: "/dashboard/products?tab=products" },
+          { icon: Wallet, label: "Payments", path: "/dashboard/payments" },
+          { icon: ImageIcon, label: "Gallery & Videos", path: "/dashboard/media" },
+          { icon: Star, label: "Google Reviews", path: "/dashboard/reviews" },
+          { icon: Upload, label: "Uploads", path: "/dashboard/uploads" },
+          { icon: Eye, label: "View Card", path: "/dashboard/view" },
+        ] },
       ] },
       { title: "Grow", items: [
         { icon: Mail, label: "Leads", path: "/dashboard/leads" },
         { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
         { icon: QrCode, label: "QR & Share", path: "/dashboard/qr" },
         { icon: Gift, label: "Refer & Earn", path: "/dashboard/refer" },
-      ] },
-      { title: "Card Sections", items: [
-        { icon: Palette, label: "Templates", path: "/dashboard/templates" },
-        { icon: ShoppingBag, label: "Products / Services", path: "/dashboard/products?tab=products" },
-        { icon: ImageIcon, label: "Gallery & Videos", path: "/dashboard/media" },
-        { icon: Share2, label: "Social Links", path: "/dashboard/social" },
-        { icon: Star, label: "Google Reviews", path: "/dashboard/reviews" },
-        { icon: Info, label: "About Us", path: "/dashboard/about" },
-        { icon: Wallet, label: "Payments", path: "/dashboard/payments" },
-        { icon: Upload, label: "Uploads", path: "/dashboard/uploads" },
       ] },
       { title: "Account", items: [
         { icon: CreditCard, label: "Subscription", path: "/dashboard/subscription" },
@@ -218,6 +219,24 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
   const role = user?.role || "customer";
   const cfg = NAV[role] || NAV.customer;
   const theme = roleTheme(role);
+
+  // One drawer row — used for top-level items and their nested (indented) children.
+  const renderDrawerItem = (item: NavItem, child: boolean, key: number = 0) => {
+    const [p, q] = item.path.split("?");
+    const defaultTab = p === "/dashboard/products" ? "products" : "module";
+    const curTab = new URLSearchParams(location.search).get("tab") || defaultTab;
+    const wantTab = q ? new URLSearchParams(q).get("tab") : null;
+    const isActive = location.pathname === p && (!wantTab || wantTab === curTab);
+    return (
+      <button
+        key={key}
+        onClick={() => { navigate(item.path); setDrawerOpen(false); }}
+        className={`w-full flex items-center gap-3 rounded-xl font-medium transition-all ${child ? "px-3 py-2 text-[12.5px]" : "px-3 py-2.5 text-[13px]"} ${isActive ? "bg-[#0F172A] text-white" : "text-[#64748B] active:bg-[#F1F5F9]"}`}
+      >
+        <item.icon size={child ? 15 : 17} /> {item.label}
+      </button>
+    );
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 6);
@@ -371,24 +390,16 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
                     <div key={group.title} className={gi > 0 ? "mt-4" : ""}>
                       <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8]">{group.title}</p>
                       <div className="space-y-0.5">
-                        {group.items.map((item, i) => {
-                          const [p, q] = item.path.split("?");
-                          const defaultTab = p === "/dashboard/products" ? "products" : "module";
-                          const curTab = new URLSearchParams(location.search).get("tab") || defaultTab;
-                          const wantTab = q ? new URLSearchParams(q).get("tab") : null;
-                          const isActive = location.pathname === p && (!wantTab || wantTab === curTab);
-                          return (
-                            <button
-                              key={i}
-                              onClick={() => { navigate(item.path); setDrawerOpen(false); }}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
-                                isActive ? "bg-[#0F172A] text-white" : "text-[#64748B] active:bg-[#F1F5F9]"
-                              }`}
-                            >
-                              <item.icon size={17} /> {item.label}
-                            </button>
-                          );
-                        })}
+                        {group.items.map((item, i) => (
+                          <div key={i}>
+                            {renderDrawerItem(item, false)}
+                            {item.children && (
+                              <div className="mt-0.5 mb-1 ml-[26px] pl-2 border-l border-[#F1F5F9] space-y-0.5">
+                                {item.children.map((ch, ci) => renderDrawerItem(ch, true, ci))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
