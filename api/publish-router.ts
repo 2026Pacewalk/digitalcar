@@ -9,6 +9,23 @@ import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEven
 import { eq, desc, and } from "drizzle-orm";
 
 const DAY = 86_400_000;
+
+// A published snapshot is served to the PUBLIC by slug, so it must never carry
+// account secrets. The card JSON (dc_customer) has historically picked up a few
+// non-card fields (a stray `password` from the old change-password flow, the
+// e-mail-verification flag); strip them on the way in AND on the way out so a
+// leak can never be published and any already-stored leak is never served.
+const CUSTOMER_SECRET_KEYS = ["password", "email_verify_on", "email_verify", "otp", "reset_token"];
+function sanitizeSnapshot<T>(data: T): T {
+  try {
+    const d = data as { customer?: Record<string, unknown> } | null;
+    if (d && d.customer && typeof d.customer === "object") {
+      for (const k of CUSTOMER_SECRET_KEYS) delete d.customer[k];
+    }
+  } catch { /* never let sanitising break a publish/read */ }
+  return data;
+}
+
 async function setting(db: ReturnType<typeof getDb>, key: string): Promise<string | null> {
   const r = await db.select().from(appSettings).where(eq(appSettings.key, key));
   return r[0]?.value ?? null;
@@ -105,14 +122,15 @@ export const publishRouter = createRouter({
       if (await slugTakenByOther(db, slug, ctx.user.id, cardId, ctx.user.email))
         throw new TRPCError({ code: "CONFLICT", message: "That card URL is already taken." });
 
+      const data = sanitizeSnapshot(input.data);
       const owner = and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId));
       const existing = await db.select().from(publishedCards).where(owner);
       if (existing[0]) {
-        await db.update(publishedCards).set({ slug, data: input.data }).where(owner);
+        await db.update(publishedCards).set({ slug, data }).where(owner);
         return { ok: true, publicId: existing[0].publicId };
       }
       const publicId = nanoid(10);
-      await db.insert(publishedCards).values({ userId: ctx.user.id, cardId, slug, publicId, data: input.data });
+      await db.insert(publishedCards).values({ userId: ctx.user.id, cardId, slug, publicId, data });
       return { ok: true, publicId };
     }),
 
@@ -150,7 +168,7 @@ export const publishRouter = createRouter({
     .query(async ({ input }) => {
       const db = getDb();
       const rows = await db.select().from(publishedCards).where(eq(publishedCards.slug, input.slug)).orderBy(publishedCards.id).limit(1);
-      return rows[0]?.data ?? null;
+      return rows[0]?.data ? sanitizeSnapshot(rows[0].data) : null;
     }),
 
   // Public: is this card paused (trial expired past grace, no active plan)?

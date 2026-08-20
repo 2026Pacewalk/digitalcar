@@ -255,6 +255,9 @@ function dropDemoSentinels(c: CustomerRecord): CustomerRecord {
   const demo = DEFAULT_CUSTOMER as Record<string, unknown>;
   for (const k of DEMO_FIELDS) if (demo[k] && out[k] === demo[k]) out[k] = "";
   if (Number(out.views) === Number(DEFAULT_CUSTOMER.views)) out.views = 0;
+  // A login password must NEVER live in card data — an old change-password bug
+  // wrote it here and it got published. Drop it defensively on every read.
+  delete out.password;
   return out as CustomerRecord;
 }
 

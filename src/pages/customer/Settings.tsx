@@ -60,6 +60,7 @@ export default function CustomerSettings() {
     if (urlTab && TAB_IDS.includes(urlTab)) setTab(urlTab);
   }, [urlTab]);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [pwd0, setPwd0] = useState("");
   const [pwd, setPwd] = useState("");
   const [pwd2, setPwd2] = useState("");
   const val = (k: string, dflt = "") => (form[k] !== undefined ? form[k] : String(data[k] ?? dflt));
@@ -98,11 +99,24 @@ export default function CustomerSettings() {
   }, [data.id, data.seo_title, update]);
 
   const save = (msg = "Settings saved") => { update(form); toast.success(msg); setForm({}); };
-  const savePassword = () => {
+  // Change the LOGIN password on the server (users table). The old code did
+  // `update({ password: pwd })`, which only wrote the plaintext password into the
+  // local card JSON (dc_customer) — so login never changed AND the password was
+  // auto-published into the public card snapshot. Call the authed mutation and
+  // never let a password touch the card data.
+  const changePw = trpc.auth.changePassword.useMutation();
+  const savePassword = async () => {
+    if (!pwd0) { toast.error("Enter your current password"); return; }
     const probs = passwordProblems(pwd);
     if (probs.length) { toast.error(`Password needs ${probs.join(", ")}.`); return; }
     if (pwd !== pwd2) { toast.error("Passwords do not match"); return; }
-    update({ password: pwd }); toast.success("Password updated"); setPwd(""); setPwd2("");
+    try {
+      await changePw.mutateAsync({ currentPassword: pwd0, newPassword: pwd });
+      toast.success("Password updated");
+      setPwd0(""); setPwd(""); setPwd2("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update password");
+    }
   };
 
   // The card link (slug) the user is editing belongs to the ACTIVE card, so
@@ -309,9 +323,12 @@ export default function CustomerSettings() {
       {/* ── PASSWORD ── */}
       {tab === "password" && (
         <Panel title="Reset Password" subtitle="Change your login password">
+          <div className="max-w-lg mb-4">
+            <Field label="Current Password"><input value={pwd0} onChange={(e) => setPwd0(e.target.value)} type="password" className={fieldCls} placeholder="Your current password" autoComplete="current-password" /></Field>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
-            <Field label="New Password"><input value={pwd} onChange={(e) => setPwd(e.target.value)} type="password" className={fieldCls} placeholder="Min 8 characters" /></Field>
-            <Field label="Confirm Password"><input value={pwd2} onChange={(e) => setPwd2(e.target.value)} type="password" className={fieldCls} placeholder="Re-enter password" /></Field>
+            <Field label="New Password"><input value={pwd} onChange={(e) => setPwd(e.target.value)} type="password" className={fieldCls} placeholder="Min 8 characters" autoComplete="new-password" /></Field>
+            <Field label="Confirm Password"><input value={pwd2} onChange={(e) => setPwd2(e.target.value)} type="password" className={fieldCls} placeholder="Re-enter password" autoComplete="new-password" /></Field>
           </div>
           <p className="text-[11px] text-[#94A3B8] mt-1.5">Use {PASSWORD_HINT}.</p>
           <div className="flex justify-start mt-4"><button onClick={savePassword} className="h-11 px-5 rounded-xl bg-[#0F172A] text-white text-sm font-semibold hover:bg-[#1E293B] flex items-center gap-2"><KeyRound size={15} /> Update Password</button></div>
