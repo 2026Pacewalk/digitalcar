@@ -107,7 +107,7 @@ const NAV: Record<string, NavConfig> = {
     profile: "/dashboard/profile",
     settings: "/dashboard/settings",
     bell: "/dashboard/enquiry",
-    fab: true,
+    fab: false,
     roots: ["/dashboard", "/dashboard/home"],
     tabs: [
       { icon: Home, label: "Home", path: "/dashboard" },

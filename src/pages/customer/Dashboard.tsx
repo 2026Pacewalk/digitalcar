@@ -1,5 +1,5 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   CalendarClock, MessageSquare, Eye, Pencil, MessageCircle,
@@ -84,6 +84,18 @@ export default function CustomerDashboard() {
   const [enquiries, setEnquiries] = useState<number | null>(null);
   const [recentEnqs, setRecentEnqs] = useState<Enq[]>([]);
   const [copied, setCopied] = useState(false);
+  // Real, live view count — same source as the public card's eye-counter, so the
+  // dashboard and the card always agree (base + tracked views).
+  const [realViews, setRealViews] = useState<number | null>(null);
+  useEffect(() => {
+    if (!customer.slug) return;
+    let cancelled = false;
+    fetch(`/api/views/${encodeURIComponent(customer.slug)}`).then((r) => r.json())
+      .then((d) => { if (!cancelled && d && typeof d.views === "number") setRealViews(d.views); })
+      .catch(() => { /* fall back to the stored number */ });
+    return () => { cancelled = true; };
+  }, [customer.slug]);
+  const totalViews = realViews ?? customer.views;
 
   // Refer & Earn wallet — live from the backend for the signed-in user
   const { data: program } = trpc.referral.myProgram.useQuery(undefined, { retry: false });
@@ -192,7 +204,7 @@ export default function CustomerDashboard() {
   const stats = [
     { icon: CalendarClock, value: daysPending.toLocaleString("en-IN"), label: !active ? "Plan expired" : onTrial ? "Trial days left" : "Days left", bg: active ? "#DCFCE7" : "#FEE2E2", fg: active ? "#16A34A" : "#DC2626", onClick: () => navigate("/dashboard/settings?tab=package") },
     { icon: MessageSquare, value: enquiries === null ? "…" : String(enquiries), label: "Enquiries", bg: "#FEF3C7", fg: "#D97706", onClick: () => navigate("/dashboard/enquiry") },
-    { icon: Eye, value: customer.views.toLocaleString("en-IN"), label: "Total Views", bg: "#CFFAFE", fg: "#0891B2", onClick: () => navigate("/dashboard/analytics") },
+    { icon: Eye, value: totalViews.toLocaleString("en-IN"), label: "Total Views", bg: "#CFFAFE", fg: "#0891B2", onClick: () => navigate("/dashboard/analytics") },
     { icon: Wallet, value: inr(program?.wallet?.balance ?? 0), label: "Wallet", bg: "#EDE9FE", fg: "#7C3AED", onClick: () => navigate("/dashboard/refer") },
   ];
 
@@ -250,7 +262,7 @@ export default function CustomerDashboard() {
         </div>
 
         {/* ─── Trial / expiry FOMO ─── */}
-        <TrialBanner isTrial={customer.package_id === 7 && getAuthUser()?.role === "customer"} expiredOn={customer.expired_on} days={daysPending} views={customer.views} leads={enquiries ?? 0} />
+        <TrialBanner isTrial={customer.package_id === 7 && getAuthUser()?.role === "customer"} expiredOn={customer.expired_on} days={daysPending} views={totalViews} leads={enquiries ?? 0} />
 
         {/* ─── Guided onboarding: what to add next & why it wins leads ─── */}
         <OnboardingGuide
