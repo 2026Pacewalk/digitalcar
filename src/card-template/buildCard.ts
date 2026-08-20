@@ -221,15 +221,16 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const hasPay = s(c.upi) || s(c.paytm_number) || s(c.phone_pe) || s(c.google_pay);
   const hasBank = s(c.account_number) || s(c.bank_name) || s(c.gst);
   // Clean, shareable "copy all" message for the bank details.
-  const bankCopyText = [
-    `Bank Account Details${s(c.company_name) ? " — " + s(c.company_name) : ""}`,
-    s(c.bank_name) ? `Bank: ${s(c.bank_name)}` : "",
+  const cap = (v: string) => (v ? v.charAt(0).toUpperCase() + v.slice(1) : v);
+  const bankLines = [
     s(c.account_holder) ? `A/c Holder: ${s(c.account_holder)}` : "",
     s(c.account_number) ? `A/c No.: ${s(c.account_number)}` : "",
+    s(c.bank_name) ? `Bank: ${s(c.bank_name)}` : "",
     s(c.ifsc) ? `IFSC: ${s(c.ifsc)}` : "",
-    s(c.account_type) ? `Account Type: ${s(c.account_type)}` : "",
+    s(c.account_type) ? `Account Type: ${cap(s(c.account_type))}` : "",
     s(c.gst) ? `GST: ${s(c.gst)}` : "",
-  ].filter(Boolean).join("\n");
+  ].filter(Boolean);
+  const bankCopyText = `Bank Account Details —\n\n${bankLines.join("\n")}`;
   const bankRow = (icon: string, k: string, v: string) =>
     v ? `<div class="dc-bank-row"><span class="dc-bank-ic"><i class="fa ${icon}"></i></span><div class="dc-bank-kv"><span class="k">${k}</span><span class="v">${esc(v)}</span></div></div>` : "";
   const paymentSection = on(c.payment_on) && (hasPay || hasBank) ? `
