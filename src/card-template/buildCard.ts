@@ -3,6 +3,7 @@ import type { CustomerRecord } from "@/hooks/useCustomer";
 import { fixMojibake } from "@/lib/cardContent";
 import { parseVideo } from "@/lib/video";
 import { buildLinkBioHtml, LINKBIO_START, LINKBIO_COUNT } from "./linkbio";
+import { SOCIAL_BY_KEY, readSocialLinks } from "@/lib/socialPlatforms";
 
 /* All 31 legacy templates (style1.css … style31.css) loaded as raw strings. */
 const STYLE_MODULES = import.meta.glob("./styles/style*.css", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
@@ -108,14 +109,28 @@ const darken = (hex: string, f: number) => {
   return `#${p.map((x) => x.toString(16).padStart(2, "0")).join("")}`;
 };
 
-const SOCIAL_FA: Record<string, string> = {
-  facebook: "fab fa-facebook-f", instagram: "fab fa-instagram", youtube: "fab fa-youtube",
-  twitter: "fab fa-twitter", pinterest: "fab fa-pinterest-p", linkedin: "fab fa-linkedin",
-};
 // The card loads Font Awesome 5, which predates the X (formerly Twitter) logo, so
-// render it as an inline SVG. currentColor makes it inherit the icon's white fill.
+// render it as an inline SVG for the share sheet. currentColor inherits the fill.
 const X_SVG = `<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" style="display:inline-block;vertical-align:-2px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.65l-5.21-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231L18.244 2.25Zm-1.16 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"/></svg>`;
-const socialIcon = (k: string) => (k === "twitter" ? X_SVG : `<i class="${SOCIAL_FA[k]}"></i>`);
+// Owner's "Follow Us" icons from the flexible social list. In "brand" mode each
+// icon takes its network's real colour; otherwise the card theme colour (via CSS).
+const safeSocialHref = (u: string) => {
+  const t = String(u ?? "").trim();
+  if (/^(https?:|mailto:|tel:)/i.test(t)) return t;      // already a full URL
+  if (/^[\w-]+(\.[\w-]+)+(\/|$)/.test(t)) return "https://" + t; // bare domain → https
+  return "#";                                            // block javascript:/data: etc.
+};
+const renderSocialIcons = (c: CustomerRecord, clickable: boolean) => {
+  const brand = String(c.social_icon_style ?? "") === "brand";
+  return readSocialLinks(c as Record<string, unknown>).map(({ platform, url }) => {
+    const p = SOCIAL_BY_KEY[platform];
+    if (!p) return "";
+    const ic = p.svg || `<i class="${p.fa}"></i>`;
+    const st = brand ? ` style="background:${p.color};color:${p.fg || "#fff"}"` : "";
+    const href = clickable ? `href="${esc(safeSocialHref(url))}" target="_blank" rel="noopener"` : `href="javascript:void(0)"`;
+    return `<li><a ${href}${st}>${ic}</a></li>`;
+  }).join("");
+};
 
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
   // Link-in-bio templates (32+) use a completely different, minimal layout.
@@ -155,8 +170,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     ? `<span class="dc-plan-badge dc-plan-gold" title="Gold member" aria-label="Gold member"><i class="fa fa-crown"></i></span>`
     : "";
 
-  const social = Object.keys(SOCIAL_FA).filter((k) => s(c[k]))
-    .map((k) => `<li><a href="${esc(c[k])}" target="_blank">${socialIcon(k)}</a></li>`).join("");
+  const social = renderSocialIcons(c, true);
 
   const detail = (icon: string, href: string, text: string) =>
     text ? `<div class="home-single-details"><a href="${esc(href)}" target="_blank"><i class="${icon}"></i><span>${esc(text)}</span></a></div>` : "";
@@ -809,8 +823,7 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
   const initial = (s(c.name)[0] || "D").toUpperCase();
   const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='12' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
-  const social = Object.keys(SOCIAL_FA).filter((k) => s(c[k]))
-    .map((k) => `<li><a href="javascript:void(0)">${socialIcon(k)}</a></li>`).join("")
+  const social = renderSocialIcons(c, false)
     || `<li><a href="javascript:void(0)"><i class="fab fa-facebook-f"></i></a></li><li><a href="javascript:void(0)"><i class="fab fa-instagram"></i></a></li>`;
   const detail = (icon: string, text: string) =>
     text ? `<div class="home-single-details"><a href="javascript:void(0)"><i class="${icon}"></i><span>${esc(text)}</span></a></div>` : "";

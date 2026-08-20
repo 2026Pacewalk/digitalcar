@@ -473,6 +473,8 @@ padding: 0px;
 	padding:6px 12px;border-radius:99px;
 }
 .about-chip i{color:var(--theme-color);font-size:11px;}
+/* Inline brand SVGs (X, TikTok…) inside the round Follow-Us icons */
+.social-icons li a svg{width:14px;height:14px;vertical-align:middle;fill:currentColor;}
 
 /* ── Google Reviews ──────────────────────────────── */
 .grev-stars{position:relative;display:inline-block;color:#e2e5ea;font-size:19px;letter-spacing:2px;line-height:1;white-space:nowrap;}
