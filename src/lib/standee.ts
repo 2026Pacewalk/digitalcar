@@ -11,7 +11,6 @@ export const STANDEE_STYLES = `
   .dc-tent-brand img{height:22px;width:auto;display:block;}
   .dc-tent-name{font-size:26px;line-height:1.15;font-weight:800;color:#0F172A;margin:0;word-break:break-word;}
   .dc-tent-sub{font-size:13px;font-weight:600;color:#0F172A;opacity:.72;margin-top:6px;}
-  .dc-tent-user{font-size:12.5px;font-weight:700;color:#0F172A;opacity:.62;margin-top:5px;}
   .dc-tent-body{padding:0 26px 22px;text-align:center;margin-top:-14px;}
   .dc-tent-pill{position:relative;z-index:2;display:inline-block;background:#0F172A;color:#F7B31C;font-size:12px;font-weight:800;letter-spacing:2px;padding:8px 20px;border-radius:999px;box-shadow:0 10px 22px rgba(15,23,42,.28);}
   .dc-tent-qr{background:#fff;border:1px solid #EEF2F7;border-radius:20px;padding:16px;margin:16px auto 0;width:fit-content;box-shadow:0 10px 30px rgba(15,23,42,.08);}
@@ -30,8 +29,7 @@ export type StandeeData = {
   phone?: string;
   linkText: string;
   qrSrc: string;   // fully-built QR image URL
-  prompt?: string;
-  username?: string;   // optional @handle shown under the name
+  prompt?: string;   // editable call-to-action under the QR
 };
 
 export function standeeMarkup(o: StandeeData): string {
@@ -42,7 +40,6 @@ export function standeeMarkup(o: StandeeData): string {
         <div class="dc-tent-brand"><img src="https://digitalcarda.in/logo.png" alt="DigitalCarda" /></div>
         <h2 class="dc-tent-name">${escapeHtml(o.brandName)}</h2>
         ${o.subtitle ? `<div class="dc-tent-sub">${escapeHtml(o.subtitle)}</div>` : ""}
-        ${o.username ? `<div class="dc-tent-user">@${escapeHtml(o.username)}</div>` : ""}
       </div>
       <div class="dc-tent-body">
         <div class="dc-tent-pill">SCAN ME</div>
