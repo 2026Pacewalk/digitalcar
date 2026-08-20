@@ -2,7 +2,7 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2, BadgePercent, Copy, X, Clock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
@@ -11,6 +11,7 @@ import { planFeatures, planRank, isFreePlan, type PlanPkg } from "@/lib/planFeat
 import { openRazorpayCheckout } from "@/lib/razorpay";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
+const TERM_LABEL: Record<"monthly" | "yearly" | "triennial", string> = { monthly: "Monthly", yearly: "Yearly", triennial: "3-Year" };
 const inr = (v: number) => "₹" + Math.round(Number(v) || 0).toLocaleString("en-IN");
 
 export default function CustomerSubscription() {
@@ -42,6 +43,24 @@ export default function CustomerSubscription() {
   const expiryRaw = subscription?.currentPeriodEnd || (customer?.expired_on as string | undefined);
   const planExpired = !!currentPkgId && !!expiryRaw &&
     new Date(String(expiryRaw).replace(" ", "T")).getTime() < Date.now();
+  // Which billing TERM the member is actually on — derived from their validity
+  // span (subscriptions don't expose it, legacy cards have none). So "Current
+  // Plan" only shows under the matching term (e.g. 3 Years, not also Yearly).
+  const userCycle = ((): "monthly" | "yearly" | "triennial" | null => {
+    if (!currentPkgId || planExpired) return null;
+    const sub = subscription as { currentPeriodStart?: string; currentPeriodEnd?: string } | undefined;
+    const parse = (v?: string | null) => { const t = v ? new Date(String(v).replace(" ", "T")).getTime() : NaN; return Number.isFinite(t) ? t : NaN; };
+    const start = parse(sub?.currentPeriodStart ?? (customer?.activated_on as string | undefined));
+    const end = parse(sub?.currentPeriodEnd ?? (customer?.expired_on as string | undefined));
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+    const days = (end - start) / 86_400_000;
+    if (days < 62) return "monthly";
+    if (days < 550) return "yearly"; // up to ~18 months counts as yearly
+    return "triennial";
+  })();
+  // Open the page on the member's actual term (once known, unless they toggled).
+  const cyclePinned = useRef(false);
+  useEffect(() => { if (!cyclePinned.current && userCycle) { setCycle(userCycle); cyclePinned.current = true; } }, [userCycle]);
   // Don't offer a downgrade to an ACTIVE member (current + higher tiers only) —
   // but once expired, show every plan so they can renew or switch down.
   const currentRank = currentPlan && !planExpired ? planRank(currentPlan as unknown as PlanPkg) : -1;
@@ -149,7 +168,7 @@ export default function CustomerSubscription() {
               { id: "yearly", label: "Yearly", badge: "Save more" },
               { id: "triennial", label: "3 Years", badge: "Best value" },
             ] as const).map((c) => (
-              <button key={c.id} onClick={() => setCycle(c.id)}
+              <button key={c.id} onClick={() => { cyclePinned.current = true; setCycle(c.id); }}
                 className={`relative px-4 sm:px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all ${cycle === c.id ? "gradient-gold text-[#0F172A] shadow-gold" : "text-[#64748B] hover:text-[#0F172A]"}`}>
                 {c.label}
                 {c.badge && <span className={`ml-1.5 hidden sm:inline text-[10px] font-bold px-1.5 py-0.5 rounded-full ${cycle === c.id ? "bg-[#0F172A]/10 text-[#0F172A]" : "bg-[#DCFCE7] text-[#166534]"}`}>{c.badge}</span>}
@@ -161,7 +180,13 @@ export default function CustomerSubscription() {
         {/* Plans Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {visiblePackages.map((plan, idx) => {
-            const isCurrent = currentPkgId === plan.id && !planExpired;
+            // Only the member's ACTUAL plan+term is "current" — so Platinum 3-Year
+            // isn't also flagged current under the Yearly tab. Their own plan shown
+            // on a different term is disabled with a note (never a "Choose" that
+            // would sell them a shorter term).
+            const isOwnPlan = currentPkgId === plan.id && !planExpired;
+            const isCurrent = isOwnPlan && (!userCycle || cycle === userCycle);
+            const isOwnOtherTerm = isOwnPlan && !isCurrent;
             const Icon = PLAN_ICONS[idx % PLAN_ICONS.length];
             const base = Number(cycle === "triennial" ? plan.threeYearPrice : cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice);
             const isPaid = base > 0;
@@ -202,10 +227,10 @@ export default function CustomerSubscription() {
                 </div>
                 <button
                   onClick={() => choose(plan.id, plan.name, finalPrice)}
-                  disabled={isCurrent || !!pendingOrder}
-                  className={`w-full h-11 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isCurrent ? "bg-[#F1F5F9] text-[#94A3B8] cursor-default" : "gradient-gold text-[#0F172A] hover:shadow-gold active:scale-[0.98] disabled:opacity-50"}`}
+                  disabled={isCurrent || isOwnOtherTerm || !!pendingOrder}
+                  className={`w-full h-11 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isCurrent || isOwnOtherTerm ? "bg-[#F1F5F9] text-[#94A3B8] cursor-default" : "gradient-gold text-[#0F172A] hover:shadow-gold active:scale-[0.98] disabled:opacity-50"}`}
                 >
-                  {isCurrent ? "Current Plan" : isPaid ? "Upgrade" : "Choose"}
+                  {isCurrent ? "Current Plan" : isOwnOtherTerm ? `On your ${TERM_LABEL[userCycle!]} plan` : isPaid ? "Upgrade" : "Choose"}
                 </button>
               </div>
             );
