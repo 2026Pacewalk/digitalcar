@@ -166,7 +166,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     `\n\nEverything in one tap — call, WhatsApp, directions, products & save the contact:\n${cardUrl}`;
   const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean);
   const initial = (s(c.name)[0] || "D").toUpperCase();
-  const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='12' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
+  const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='${s(c.logo_shape) === "round" ? 70 : 12}' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
 
   // Paid-plan trust badge on the logo — Gold (pkg 5) = crown, Platinum (pkg 6) =
   // gem; both gold. Trial/Free show none, and the owner can hide it (badge_on=0).
@@ -675,7 +675,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
       <a href="javascript:void(0)" id="home-card-share" onclick="openShare()"><i class="fa fa-share-alt"></i></a>
       <div class="home-section-content">
         <div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p id="dc-view-count">${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>
-        <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" alt="${esc(c.name)}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'">${planBadge}</div></div>
+        <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" alt="${esc(c.name)}" style="border-radius:${s(c.logo_shape) === "round" ? "50%" : "10px"}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'">${planBadge}</div></div>
         <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
         <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation)}</p></div>
         <div class="home-details">${homeDetails}</div>
@@ -836,7 +836,7 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
   const secondary = s(c.color2);
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
   const initial = (s(c.name)[0] || "D").toUpperCase();
-  const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='12' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
+  const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='${s(c.logo_shape) === "round" ? 70 : 12}' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
   const social = renderSocialIcons(c, false)
     || `<li><a href="javascript:void(0)"><i class="fab fa-facebook-f"></i></a></li><li><a href="javascript:void(0)"><i class="fab fa-instagram"></i></a></li>`;
   const detail = (icon: string, text: string) =>
@@ -864,7 +864,7 @@ main{box-shadow:none;padding:0;}
 <body data-theme="${theme}">
 <main><div class="page-wrapper"><section id="home-section">
   <div class="home-section-content">
-    <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'"></div></div>
+    <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" style="border-radius:${s(c.logo_shape) === "round" ? "50%" : "10px"}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'"></div></div>
     <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
     <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation) || "Designation"}</p></div>
     <div class="home-details">${homeDetails}</div>

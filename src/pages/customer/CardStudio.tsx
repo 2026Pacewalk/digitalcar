@@ -179,7 +179,18 @@ export default function CardStudio() {
         <div className="space-y-5 order-2 lg:order-1">
           <Panel title="The basics" subtitle="Who you are">
             <div className="flex flex-col sm:flex-row gap-5">
-              <ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-24 h-24 mx-auto sm:mx-0" label="Logo / Photo" fit="contain" />
+              <div className="flex flex-col items-center sm:items-start gap-2 mx-auto sm:mx-0">
+                <ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-24 h-24" label="Logo / Photo" fit="contain" />
+                <div>
+                  <span className="block text-[10px] font-medium text-[#94A3B8] mb-1">Logo shape</span>
+                  <div className="inline-flex rounded-lg border border-[#E2E8F0] overflow-hidden text-[11px] font-semibold">
+                    {([["square", "Square"], ["round", "Round"]] as const).map(([v, label]) => {
+                      const active = (val("logo_shape") || "square") === v;
+                      return <button key={v} type="button" onClick={() => set("logo_shape", v)} className={`px-3 h-7 transition-colors ${active ? "bg-[#0F172A] text-white" : "bg-white text-[#64748B] hover:bg-[#F8FAFC]"}`}>{label}</button>;
+                    })}
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
                 <Field label="Name"><div className="relative"><User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("name")} onChange={(e) => set("name", e.target.value)} className={`${fieldCls} pl-9`} placeholder="Full name" /></div></Field>
                 <Field label="Designation"><input value={val("designation")} onChange={(e) => set("designation", e.target.value)} className={fieldCls} placeholder="e.g. Founder" /></Field>
