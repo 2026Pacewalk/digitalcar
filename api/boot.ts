@@ -76,7 +76,11 @@ function rateLimit(
 app.post("/api/enquiry", async (c) => {
   if (!rateLimit(c, "enquiry", 10, 60_000)) return c.json({ ok: false, error: "rate_limited" }, 429);
   try {
-    const body = await c.req.json<{ slug?: string; name?: string; contact?: string; email?: string; description?: string }>();
+    // Robust body parse: the public card submits via sendBeacon with a
+    // text/plain Blob (CORS-safelisted so it fires from the sandboxed card's
+    // opaque origin), so accept a text/plain JSON body too — same as /api/track.
+    let body: { slug?: string; name?: string; contact?: string; email?: string; description?: string };
+    try { body = await c.req.json(); } catch { try { body = JSON.parse(await c.req.text()); } catch { body = {}; } }
     const name = String(body.name || "").trim();
     const slug = String(body.slug || "").trim().toLowerCase();
     if (!name) return c.json({ ok: false, error: "Name required" }, 400);

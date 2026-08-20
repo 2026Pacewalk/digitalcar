@@ -781,8 +781,21 @@ function dcSendEnquiry(form){
       email:(form.email.value||'').trim(), description:(form.description.value||'').trim(),
       uname:'${slug}', created_on:ts, status:'new' };
     /* Send to the server FIRST (owner stored + emailed) — the important path.
-       Runs before any localStorage, which throws in the sandboxed public card. */
-    try{ fetch('/api/enquiry',{method:'POST',body:JSON.stringify({slug:e.uname,name:e.name,contact:e.contact,email:e.email,description:e.description})}).catch(function(){}); }catch(_){}
+       Runs before any localStorage, which throws in the sandboxed public card.
+       The public card iframe is sandboxed WITHOUT allow-same-origin, so from its
+       opaque origin BOTH a plain CORS fetch ("Failed to fetch") AND sendBeacon
+       silently fail to deliver — every enquiry was being lost. So when we detect
+       the opaque origin, hand the payload to the trusted parent page (real
+       origin) via postMessage and let IT do the same-origin fetch (the exact
+       pattern used for the view count and video player). Non-sandboxed preview
+       contexts (dashboard/demo) keep posting directly. */
+    var _data={slug:e.uname,name:e.name,contact:e.contact,email:e.email,description:e.description};
+    var _sandboxed=false; try{ _sandboxed=(window.origin==='null'); }catch(_){ _sandboxed=true; }
+    if(_sandboxed){
+      try{ if(window.parent && window.parent!==window) window.parent.postMessage({__dcEnquiry:_data},'*'); }catch(_){}
+    } else {
+      try{ fetch('/api/enquiry',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(_data),keepalive:true}).catch(function(){}); }catch(_){}
+    }
     /* Best-effort local mirror for the owner's dashboard — silently no-ops under sandbox. */
     try{ var key='dc_new_enquiries', list=[]; try{ list=JSON.parse(localStorage.getItem(key)||'[]'); if(!Array.isArray(list))list=[]; }catch(_){ list=[]; } list.push(e); localStorage.setItem(key, JSON.stringify(list)); localStorage.setItem('dc_enquiry_ping', String(d.getTime())); }catch(_){}
     try{ window.dispatchEvent(new CustomEvent('dc:new-enquiry',{detail:e})); }catch(_){}

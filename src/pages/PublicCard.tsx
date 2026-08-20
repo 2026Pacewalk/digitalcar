@@ -110,6 +110,28 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
     return () => window.removeEventListener("message", onMsg);
   }, []);
 
+  // Relay enquiries from the sandboxed card to the server. The card iframe is
+  // opaque-origin, so neither fetch nor sendBeacon reaches the API from inside
+  // it — the enquiry POST is done here, from the parent's real origin. We use
+  // THIS page's URL slug (never the slug the frame sends) so a card can only
+  // ever file a lead against itself.
+  useEffect(() => {
+    const onEnquiry = (e: MessageEvent) => {
+      const d = (e.data && (e.data as { __dcEnquiry?: { name?: string; contact?: string; email?: string; description?: string } }).__dcEnquiry);
+      if (!d || !String(d.name || "").trim()) return;
+      try {
+        fetch("/api/enquiry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify({ slug, name: d.name, contact: d.contact, email: d.email, description: d.description }),
+        }).catch(() => {});
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("message", onEnquiry);
+    return () => window.removeEventListener("message", onEnquiry);
+  }, [slug]);
+
   // Real customers live in customers.json (the DB has no card for them yet), so
   // when the DB has nothing, render their actual card via the legacy renderer.
   // Canonical URL — /c/:slug and /:slug serve the same card; point both at /:slug.

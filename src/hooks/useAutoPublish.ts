@@ -57,9 +57,16 @@ export function useAutoPublish(): void {
     };
 
     const run = async () => {
+      // Don't publish until first-load hydration has SETTLED. useCardHydration
+      // sets this marker when it finishes (or when it deliberately skips because
+      // a local card already exists). Publishing before then can snapshot a
+      // half-hydrated readCustomer() — name + phone present but company, title,
+      // website, address and the products/gallery/videos lists still blank — and
+      // silently overwrite a good public snapshot with that stub. Gate on it.
       const data = readCustomer();
       const slug = String(data.slug || data.username || "").trim().toLowerCase();
       if (slug.length < 3) return;
+      if (localStorage.getItem(scopedKey("dc_hydrated")) !== "1") return;
       if (!(await isLive(data, slug))) return; // never auto-activate a fresh card
       saveRef.current.mutate({
         slug,
