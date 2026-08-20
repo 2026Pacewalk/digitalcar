@@ -22,9 +22,6 @@ export default function CustomerQR() {
   const [bg, setBg] = useState("#FFFFFF");
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState("");
-  const DEFAULT_CTA = "Scan to view my digital card";
-  const [cta, setCta] = useState("");
-  const prompt = (cta.trim() || DEFAULT_CTA);
 
   const colors = ["#0F172A", "#F7B31C", "#14B8A6", "#3B82F6", "#EF4444", "#8B5CF6"];
   const bgs = ["#FFFFFF", "#F8FAFC", "#FEF3C7", "#E0F2FE"];
@@ -65,7 +62,7 @@ export default function CustomerQR() {
   /* ── Branded standee: shared markup for the on-screen preview AND the print
      window (and the public homepage), so all stay identical. See lib/standee. ── */
   const standeeStyles = STANDEE_STYLES;
-  const standeeInner = () => standeeMarkup({ brandName, subtitle, phone, linkText, qrSrc: qrSrc(440), prompt });
+  const standeeInner = () => standeeMarkup({ brandName, subtitle, phone, linkText, qrSrc: qrSrc(440) });
 
   const printStandee = () => {
     const w = window.open("", "_blank", "width=520,height=760");
@@ -124,7 +121,7 @@ export default function CustomerQR() {
       const q = frame - 32 * S; ctx.drawImage(qrImg, fx + 16 * S, fy + 16 * S, q, q);
       // prompt
       ctx.fillStyle = "#0F172A"; ctx.font = `700 ${15 * S}px Inter, sans-serif`;
-      ctx.fillText(clip(prompt, 42), W / 2, fy + frame + 34 * S);
+      ctx.fillText("Scan to view my digital card", W / 2, fy + frame + 34 * S);
       ctx.fillStyle = "#64748B"; ctx.font = `500 ${12 * S}px Inter, sans-serif`;
       ctx.fillText("Save my contact · See products · Get directions", W / 2, fy + frame + 56 * S);
       // link pill
@@ -182,13 +179,6 @@ export default function CustomerQR() {
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={downloadStandee} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all disabled:opacity-60"><ImageIcon size={16} /> {busy === "poster" ? "Preparing…" : "Download PNG"}</button>
                   <button onClick={printStandee} disabled={!!busy} className="flex items-center justify-center gap-2 h-11 border border-[#E2E8F0] text-[#334155] rounded-xl text-sm font-semibold hover:bg-[#F8FAFC] transition-all disabled:opacity-60"><Printer size={16} /> Print / PDF</button>
-                </div>
-                <div className="mt-3 pt-3 border-t border-[#F1F5F9]">
-                  <label className="block text-xs text-[#64748B] mb-1.5">Standee message</label>
-                  <input value={cta} onChange={(e) => setCta(e.target.value.slice(0, 42))} maxLength={42}
-                    className="h-10 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-[13px] text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#94A3B8]"
-                    placeholder={DEFAULT_CTA} />
-                  <p className="text-[11px] text-[#94A3B8] mt-1">The line under the QR — tailor it, e.g. “Scan for our Menu”, “Scan &amp; leave a Google review”, “Scan to book”.</p>
                 </div>
               </div>
 
