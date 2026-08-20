@@ -5,7 +5,202 @@ import { analyticsEvents, cards, users, subscriptions, invoices, leads, funnelEv
 import { eq, and, sql, gte, desc, inArray, isNotNull } from "drizzle-orm";
 import { mergedCustomerCount } from "./admin-router";
 
+/* ── Deep card insights ────────────────────────────────────────────────────
+   Everything the customer Analytics page needs, in ONE round trip, computed
+   with SQL aggregation.
+
+   Why not reuse publish.myStats: that loads EVERY event row for a slug into
+   node and reduces in JavaScript. Fine at a few hundred rows, ruinous at a few
+   hundred thousand — and it can only ever answer "how many", never "of what".
+   These queries group in MySQL and lean on the (slug, type, created_at) index. */
+
+// Types that represent a deliberate visitor ACTION (everything except the
+// passive page-level signals) — used for the "actions" and engagement figures.
+const PASSIVE_TYPES = ["view", "section_view", "scroll", "time_on_card", "card_exit"];
+
 export const analyticsRouter = createRouter({
+  /* The signed-in owner's deep report for ONE of their cards.
+     Server-scoped to ctx.user, so a card id/slug can never leak another
+     account's analytics. */
+  insights: authedQuery
+    .input(z.object({
+      cardId: z.number().int().positive().default(1),
+      days: z.number().int().min(1).max(365).default(30),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const db = getDb();
+      const days = input?.days ?? 30;
+      const cardId = input?.cardId ?? 1;
+      const { publishedCards, cardEvents } = await import("@db/schema");
+
+      // Resolve the slug from the OWNER's published cards only.
+      const owned = await db.select({ slug: publishedCards.slug, cardId: publishedCards.cardId })
+        .from(publishedCards).where(eq(publishedCards.userId, ctx.user.id)).orderBy(publishedCards.cardId);
+      const slug = (owned.find((r) => r.cardId === cardId) || owned[0])?.slug;
+
+      const empty = {
+        slug: null as string | null, days,
+        totals: { views: 0, visitors: 0, returning: 0, actions: 0, leads: 0, avgTimeMs: 0 },
+        prev: { views: 0, visitors: 0, actions: 0, leads: 0 },
+        daily: [] as { date: string; views: number; actions: number }[],
+        byType: [] as { key: string; n: number }[],
+        topProducts: [] as { key: string; n: number }[],
+        topSections: [] as { key: string; n: number }[],
+        bySource: [] as { key: string; n: number }[],
+        byDevice: [] as { key: string; n: number }[],
+        byCity: [] as { key: string; n: number }[],
+        heatmap: [] as { dow: number; hour: number; n: number }[],
+        scroll: { d25: 0, d50: 0, d75: 0, d100: 0 },
+        funnel: { views: 0, engaged: 0, enquiryStart: 0, enquiry: 0 },
+      };
+      if (!slug) return empty;
+
+      const DAYMS = 86_400_000;
+      const now = Date.now();
+      const from = new Date(now - days * DAYMS);
+      const prevFrom = new Date(now - 2 * days * DAYMS);
+
+      const inRange = and(eq(cardEvents.slug, slug), gte(cardEvents.createdAt, from));
+      const inPrev = and(eq(cardEvents.slug, slug), gte(cardEvents.createdAt, prevFrom), sql`${cardEvents.createdAt} < ${from}`);
+      const passive = PASSIVE_TYPES.map((t) => `'${t}'`).join(",");
+
+      // A single grouped pass per dimension. `label`/`source`/… are NULL on old
+      // rows, so every breakdown filters NULLs out rather than showing a blank.
+      const grouped = (col: typeof cardEvents.label, where = inRange, limit = 12) =>
+        db.select({ key: sql<string>`${col}`, n: sql<number>`count(*)` })
+          .from(cardEvents).where(and(where, isNotNull(col), sql`${col} <> ''`))
+          .groupBy(sql`${col}`).orderBy(desc(sql`count(*)`)).limit(limit);
+
+      const [
+        totalsRow, prevRow, dailyRows, typeRows, productRows, sectionRows,
+        sourceRows, deviceRows, cityRows, heatRows, scrollRows, funnelRows,
+      ] = await Promise.all([
+        // Headline totals for the window.
+        db.select({
+          views: sql<number>`sum(case when ${cardEvents.type} = 'view' then 1 else 0 end)`,
+          actions: sql<number>`sum(case when ${cardEvents.type} not in (${sql.raw(passive)}) then 1 else 0 end)`,
+          visitors: sql<number>`count(distinct ${cardEvents.visitorId})`,
+          avgTimeMs: sql<number>`avg(case when ${cardEvents.type} = 'time_on_card' then ${cardEvents.durationMs} end)`,
+        }).from(cardEvents).where(inRange),
+        // Same figures for the PREVIOUS window → up/down comparison.
+        db.select({
+          views: sql<number>`sum(case when ${cardEvents.type} = 'view' then 1 else 0 end)`,
+          actions: sql<number>`sum(case when ${cardEvents.type} not in (${sql.raw(passive)}) then 1 else 0 end)`,
+          visitors: sql<number>`count(distinct ${cardEvents.visitorId})`,
+        }).from(cardEvents).where(inPrev),
+        // Daily series (IST buckets so "today" matches the owner's day).
+        db.select({
+          date: sql<string>`date(convert_tz(${cardEvents.createdAt}, '+00:00', '+05:30'))`,
+          views: sql<number>`sum(case when ${cardEvents.type} = 'view' then 1 else 0 end)`,
+          actions: sql<number>`sum(case when ${cardEvents.type} not in (${sql.raw(passive)}) then 1 else 0 end)`,
+        }).from(cardEvents).where(inRange)
+          .groupBy(sql`date(convert_tz(${cardEvents.createdAt}, '+00:00', '+05:30'))`)
+          .orderBy(sql`date(convert_tz(${cardEvents.createdAt}, '+00:00', '+05:30'))`),
+        db.select({ key: sql<string>`${cardEvents.type}`, n: sql<number>`count(*)` })
+          .from(cardEvents).where(inRange).groupBy(sql`${cardEvents.type}`).orderBy(desc(sql`count(*)`)),
+        // Which products pull — the single most actionable table on the page.
+        db.select({ key: sql<string>`${cardEvents.label}`, n: sql<number>`count(*)` })
+          .from(cardEvents)
+          .where(and(inRange, isNotNull(cardEvents.label), inArray(cardEvents.type, ["product_click", "product_enquiry", "offer_click"])))
+          .groupBy(sql`${cardEvents.label}`).orderBy(desc(sql`count(*)`)).limit(10),
+        db.select({ key: sql<string>`${cardEvents.label}`, n: sql<number>`count(*)` })
+          .from(cardEvents).where(and(inRange, eq(cardEvents.type, "section_view"), isNotNull(cardEvents.label)))
+          .groupBy(sql`${cardEvents.label}`).orderBy(desc(sql`count(*)`)).limit(12),
+        grouped(cardEvents.source as unknown as typeof cardEvents.label),
+        grouped(cardEvents.device as unknown as typeof cardEvents.label, inRange, 5),
+        grouped(cardEvents.city as unknown as typeof cardEvents.label, inRange, 10),
+        // When are people actually looking? (IST day-of-week × hour)
+        db.select({
+          dow: sql<number>`dayofweek(convert_tz(${cardEvents.createdAt}, '+00:00', '+05:30'))`,
+          hour: sql<number>`hour(convert_tz(${cardEvents.createdAt}, '+00:00', '+05:30'))`,
+          n: sql<number>`count(*)`,
+        }).from(cardEvents).where(and(inRange, eq(cardEvents.type, "view")))
+          .groupBy(sql`dayofweek(convert_tz(${cardEvents.createdAt}, '+00:00', '+05:30'))`, sql`hour(convert_tz(${cardEvents.createdAt}, '+00:00', '+05:30'))`),
+        db.select({ key: sql<string>`${cardEvents.label}`, n: sql<number>`count(*)` })
+          .from(cardEvents).where(and(inRange, eq(cardEvents.type, "scroll"), isNotNull(cardEvents.label)))
+          .groupBy(sql`${cardEvents.label}`),
+        // Enquiry funnel: reached the card → engaged → opened the form → sent.
+        db.select({
+          views: sql<number>`count(distinct case when ${cardEvents.type} = 'view' then ${cardEvents.visitorId} end)`,
+          engaged: sql<number>`count(distinct case when ${cardEvents.type} not in (${sql.raw(passive)}) then ${cardEvents.visitorId} end)`,
+          enquiryStart: sql<number>`count(distinct case when ${cardEvents.type} = 'enquiry_start' then ${cardEvents.visitorId} end)`,
+          enquiry: sql<number>`count(distinct case when ${cardEvents.type} = 'enquiry' then ${cardEvents.visitorId} end)`,
+        }).from(cardEvents).where(inRange),
+      ]);
+
+      // Visitors seen on more than one distinct day in the window = returning.
+      // Raw execute: a derived table is clearer here than a query-builder
+      // subquery, and drizzle's .from(sql`…`.as()) drops the inner SELECT.
+      let returningCount = 0;
+      try {
+        const res = await db.execute(sql`
+          select count(*) as n from (
+            select visitor_id from card_events
+            where slug = ${slug} and created_at >= ${from} and visitor_id is not null
+            group by visitor_id
+            having count(distinct date(created_at)) > 1
+          ) t`);
+        // mysql2 returns [rows, fields]; drizzle may hand back either shape.
+        const rows = (Array.isArray(res) ? res[0] : res) as unknown as { n?: number }[];
+        returningCount = Number(rows?.[0]?.n || 0);
+      } catch { returningCount = 0; }
+
+      const leadRows = await db.select({ n: sql<number>`count(*)` }).from(leads)
+        .where(and(eq(leads.userId, ctx.user.id), gte(leads.createdAt, from)));
+      const prevLeadRows = await db.select({ n: sql<number>`count(*)` }).from(leads)
+        .where(and(eq(leads.userId, ctx.user.id), gte(leads.createdAt, prevFrom), sql`${leads.createdAt} < ${from}`));
+
+      const num = (v: unknown) => Number(v || 0);
+      const list = (rows: { key: string | null; n: unknown }[]) =>
+        rows.filter((r) => r.key != null && String(r.key).trim() !== "").map((r) => ({ key: String(r.key), n: num(r.n) }));
+      const scrollAt = (d: string) => num(scrollRows.find((r) => String(r.key) === d)?.n);
+
+      // Fill every day in the window so the chart has no gaps.
+      const IST = 5.5 * 3600_000;
+      const dayKey = (t: number) => new Date(t + IST).toISOString().slice(0, 10);
+      const dmap = new Map(dailyRows.map((r) => [String(r.date).slice(0, 10), r]));
+      const daily: { date: string; views: number; actions: number }[] = [];
+      for (let i = days - 1; i >= 0; i--) {
+        const k = dayKey(now - i * DAYMS);
+        const hit = dmap.get(k);
+        daily.push({ date: k, views: num(hit?.views), actions: num(hit?.actions) });
+      }
+
+      return {
+        slug, days,
+        totals: {
+          views: num(totalsRow[0]?.views),
+          visitors: num(totalsRow[0]?.visitors),
+          returning: returningCount,
+          actions: num(totalsRow[0]?.actions),
+          leads: num(leadRows[0]?.n),
+          avgTimeMs: Math.round(num(totalsRow[0]?.avgTimeMs)),
+        },
+        prev: {
+          views: num(prevRow[0]?.views),
+          visitors: num(prevRow[0]?.visitors),
+          actions: num(prevRow[0]?.actions),
+          leads: num(prevLeadRows[0]?.n),
+        },
+        daily,
+        byType: list(typeRows),
+        topProducts: list(productRows),
+        topSections: list(sectionRows),
+        bySource: list(sourceRows),
+        byDevice: list(deviceRows),
+        byCity: list(cityRows),
+        // MySQL DAYOFWEEK() is 1=Sunday; normalise to 0=Sunday.
+        heatmap: heatRows.map((r) => ({ dow: (num(r.dow) + 6) % 7, hour: num(r.hour), n: num(r.n) })),
+        scroll: { d25: scrollAt("25"), d50: scrollAt("50"), d75: scrollAt("75"), d100: scrollAt("100") },
+        funnel: {
+          views: num(funnelRows[0]?.views),
+          engaged: num(funnelRows[0]?.engaged),
+          enquiryStart: num(funnelRows[0]?.enquiryStart),
+          enquiry: num(funnelRows[0]?.enquiry),
+        },
+      };
+    }),
+
   // Admin: per-product funnel — which designs drive views → try → publish (§61).
   productFunnel: adminQuery.query(async () => {
     const db = getDb();
