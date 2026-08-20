@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router";
 import { trpc } from "@/providers/trpc";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Phone, Mail, MapPin, Globe, Share2, Download, MessageCircle,
   X, Send, Check, FileText, Briefcase, ChevronRight, UserPlus,
@@ -30,6 +30,16 @@ function safeUrl(u: unknown): string {
 // on window.parent to SUPPRESS tracking, which sandbox would break.
 const CARD_SANDBOX = "allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads allow-forms allow-modals allow-top-navigation-by-user-activation";
 
+// The sandboxed (opaque-origin) card iframe can't reliably read a cross-origin
+// fetch, so the parent fetches the real view count and postMessages it in. The
+// card renders it into its eye-counter. Posts on load and whenever it changes.
+function CardFrame({ html, views }: { html: string; views: number | null }) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const post = () => { if (views != null) { try { ref.current?.contentWindow?.postMessage({ __dcViews: views }, "*"); } catch { /* ignore */ } } };
+  useEffect(post, [views]);
+  return <iframe ref={ref} srcDoc={html} title="card" onLoad={post} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" />;
+}
+
 export default function PublicCard({ slugOverride }: { slugOverride?: string } = {}) {
   const { slug: slugParam = "" } = useParams();
   // On a custom domain the slug is resolved from the host, not the URL path.
@@ -44,6 +54,18 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
   const { data: pubState, isLoading: stateLoading } = trpc.publish.publicState.useQuery({ slug }, { retry: false });
   // Template presets — used to colour a relational/bulk card by its templateId.
   const { data: presetData } = trpc.template.presets.useQuery();
+
+  // Real, live view count (base + tracked views) fetched same-origin from the
+  // parent, then postMessaged into the sandboxed card iframe (see CardFrame).
+  const [realViews, setRealViews] = useState<number | null>(null);
+  useEffect(() => {
+    if (!slug) return;
+    let cancelled = false;
+    fetch(`/api/views/${encodeURIComponent(slug)}`).then((r) => r.json())
+      .then((d) => { if (!cancelled && d && typeof d.views === "number") setRealViews(d.views); })
+      .catch(() => { /* leave the card's own initial number */ });
+    return () => { cancelled = true; };
+  }, [slug]);
   // Only treat the DB card as usable if it actually has content blocks. Imported
   // (recovery) cards are slug-only with no blocks — those must fall back to the
   // legacy customers.json renderer, not render as an empty card.
@@ -187,12 +209,12 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
         (s.qrcodes ?? []) as Parameters<typeof buildCardHtml>[5],
       );
     }
-    return <>{videoLightbox}<iframe srcDoc={html} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" /></>;
+    return <>{videoLightbox}<CardFrame html={html} views={realViews} /></>;
   }
 
   // Real customer card rendered from customers.json (the common case today).
   if (!dbHasContent && legacyHtml) {
-    return <>{videoLightbox}<iframe srcDoc={legacyHtml} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" /></>;
+    return <>{videoLightbox}<CardFrame html={legacyHtml} views={realViews} /></>;
   }
 
   // No usable DB card and not in the legacy data → genuinely not found.
@@ -266,7 +288,7 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
       color2: preset?.secondary || "",
     } as unknown as Parameters<typeof buildCardHtml>[0];
     const html = buildCardHtml(cust, [], [], [], [], []);
-    return <>{videoLightbox}<iframe srcDoc={html} title={slug} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" /></>;
+    return <>{videoLightbox}<CardFrame html={html} views={realViews} /></>;
   }
 
   const about = aboutBlock?.content as Record<string, string> || {};

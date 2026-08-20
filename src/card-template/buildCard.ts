@@ -112,6 +112,10 @@ const SOCIAL_FA: Record<string, string> = {
   facebook: "fab fa-facebook-f", instagram: "fab fa-instagram", youtube: "fab fa-youtube",
   twitter: "fab fa-twitter", pinterest: "fab fa-pinterest-p", linkedin: "fab fa-linkedin",
 };
+// The card loads Font Awesome 5, which predates the X (formerly Twitter) logo, so
+// render it as an inline SVG. currentColor makes it inherit the icon's white fill.
+const X_SVG = `<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" style="display:inline-block;vertical-align:-2px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.65l-5.21-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231L18.244 2.25Zm-1.16 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"/></svg>`;
+const socialIcon = (k: string) => (k === "twitter" ? X_SVG : `<i class="${SOCIAL_FA[k]}"></i>`);
 
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
   // Link-in-bio templates (32+) use a completely different, minimal layout.
@@ -152,7 +156,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     : "";
 
   const social = Object.keys(SOCIAL_FA).filter((k) => s(c[k]))
-    .map((k) => `<li><a href="${esc(c[k])}" target="_blank"><i class="${SOCIAL_FA[k]}"></i></a></li>`).join("");
+    .map((k) => `<li><a href="${esc(c[k])}" target="_blank">${socialIcon(k)}</a></li>`).join("");
 
   const detail = (icon: string, href: string, text: string) =>
     text ? `<div class="home-single-details"><a href="${esc(href)}" target="_blank"><i class="${icon}"></i><span>${esc(text)}</span></a></div>` : "";
@@ -444,9 +448,9 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     { id: "products-section", icon: "fas fa-box-open", label: navLabel(c.product, "Services"), show: !!servicesSection },
     { id: "offers-section", icon: "fas fa-tags", label: navLabel(c.offer, "Offers"), show: !!offersSection },
     { id: "payment-section", icon: "fas fa-money-bill-alt", label: navLabel(c.payment, "Payment"), show: !!paymentSection },
-    { id: "review-section", icon: "fab fa-google", label: "Reviews", show: !!googleReviewSection },
     { id: "gallery-section", icon: "fa fa-photo-video", label: navLabel(c.gallery, "Gallery"), show: !!gallerySection },
     { id: "video-section", icon: "fa fa-video", label: navLabel(c.video, "Video"), show: !!videoSection },
+    { id: "review-section", icon: "fab fa-google", label: "Reviews", show: !!googleReviewSection },
     { id: "enquiry-section", icon: "fas fa-comment-alt", label: navLabel(c.enquiry, "Enquiry"), show: !!enquirySection },
     { id: "cardqr-section", icon: "fas fa-qrcode", label: navLabel(c.cardqr, "QR"), show: !!cardQrSection },
   ].filter((f) => f.show);
@@ -514,8 +518,27 @@ main{padding-bottom:78px;box-shadow:none;}
 .dc-ig-badge{position:absolute;top:10px;left:10px;z-index:3;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#fff;background:rgba(0,0,0,.32);padding:4px 9px;border-radius:999px;}
 .dc-ig-badge i{font-size:13px;}
 .speciality-list li i{color:var(--theme-color);}
-#shareModal .popup-share-icons ul{list-style:none;display:flex;justify-content:center;flex-wrap:wrap;padding:0;margin:0 0 8px;}
-#shareModal .popup-share-icons ul li a i{height:46px;width:46px;line-height:46px;min-width:46px;border-radius:8px;font-size:17px;margin:4px;}
+/* Beautiful share sheet */
+#shareModal .dc-share-sheet{background:#fff;border-radius:22px;max-width:384px;width:100%;box-shadow:0 24px 64px rgba(2,6,23,.4);overflow:hidden;animation:dcSheetIn .22s cubic-bezier(.2,.8,.2,1);}
+@keyframes dcSheetIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}
+#shareModal .dc-sh-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 10px;}
+#shareModal .dc-sh-title{margin:0;font-size:18px;font-weight:800;color:#0f172a;letter-spacing:-.2px;}
+#shareModal .dc-sh-x{width:32px;height:32px;border:none;background:#f1f5f9;border-radius:50%;color:#475569;font-size:19px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+#shareModal .dc-sh-x:hover{background:#e2e8f0;}
+#shareModal .dc-sh-sub{margin:0 20px 14px;font-size:12.5px;color:#94a3b8;line-height:1.5;}
+#shareModal .dc-sh-copy{display:flex;align-items:center;gap:9px;margin:0 20px 16px;background:#f8fafc;border:1px solid #e6e8eb;border-radius:12px;padding:7px 7px 7px 13px;}
+#shareModal .dc-sh-copy > i{color:#94a3b8;font-size:13px;}
+#shareModal .dc-sh-copy span{flex:1;min-width:0;font-size:12.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+#shareModal .dc-sh-copy button{border:none;background:var(--theme-color);color:#111;font-weight:700;font-size:12.5px;padding:8px 15px;border-radius:9px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:filter .15s,transform .1s;}
+#shareModal .dc-sh-copy button:hover{filter:brightness(1.05);}
+#shareModal .dc-sh-copy button.dc-copied{background:#16a34a;color:#fff;}
+#shareModal .dc-sh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:0 12px 20px;}
+#shareModal .dc-sh-item{display:flex;flex-direction:column;align-items:center;gap:7px;padding:11px 4px;border-radius:14px;text-decoration:none;transition:background .15s;}
+#shareModal .dc-sh-item:hover{background:#f6f7f9;}
+#shareModal .dc-sh-item:active{transform:scale(.95);}
+#shareModal .dc-sh-ic{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:19px;box-shadow:0 5px 12px rgba(16,24,40,.16);}
+#shareModal .dc-sh-ic svg{width:19px;height:19px;}
+#shareModal .dc-sh-item > span:last-child{font-size:11px;font-weight:600;color:#475569;}
 /* beautified enquiry + share */
 .dc-field{position:relative;margin-bottom:12px;}
 .dc-field > i{position:absolute;left:14px;top:24px;transform:translateY(-50%);color:#9aa0a6;font-size:14px;z-index:1;}
@@ -627,7 +650,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
     <section id="home-section">
       <a href="javascript:void(0)" id="home-card-share" onclick="openShare()"><i class="fa fa-share-alt"></i></a>
       <div class="home-section-content">
-        <div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p>${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>
+        <div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p id="dc-view-count">${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>
         <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" alt="${esc(c.name)}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'">${planBadge}</div></div>
         <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
         <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation)}</p></div>
@@ -640,12 +663,12 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
       <div class="home-extra-one"></div><div class="home-extra-two"></div><div class="home-extra-three"></div><div class="home-extra-four"></div>
     </section>
     ${aboutSection}
-    ${googleReviewSection}
     ${servicesSection}
     ${offersSection}
     ${paymentSection}
     ${gallerySection}
     ${videoSection}
+    ${googleReviewSection}
     ${enquirySection}
     ${cardQrSection}
     ${shareSection}
@@ -667,26 +690,23 @@ ${footer}
   <span onclick="lbNext(event)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);color:#fff;font-size:40px;cursor:pointer;padding:12px;user-select:none">&#8250;</span>
   <div id="lbCount" style="color:#fff;margin-top:14px;font-size:13px;letter-spacing:1px"></div>
 </div>
-<div id="shareModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99998;align-items:center;justify-content:center;padding:16px">
-  <div style="background:#fff;border-radius:8px;max-width:420px;width:100%;box-shadow:0 12px 45px rgba(0,0,0,.35);overflow:hidden">
-    <div style="display:flex;align-items:center;justify-content:center;position:relative;padding:15px;border-bottom:1px solid #eee">
-      <h3 style="margin:0;font-size:22px;font-weight:700;color:#111">Share Profile</h3>
-      <span onclick="closeShare()" style="position:absolute;right:16px;top:12px;font-size:24px;cursor:pointer;color:#333;line-height:1">&times;</span>
+<div id="shareModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:99998;align-items:center;justify-content:center;padding:16px">
+  <div class="dc-share-sheet">
+    <div class="dc-sh-head">
+      <h3 class="dc-sh-title">Share this card</h3>
+      <button class="dc-sh-x" onclick="closeShare()" aria-label="Close">&times;</button>
     </div>
-    <div class="popup-share-icons" style="padding:22px 16px">
-      <p style="text-align:center;margin:0 0 16px;color:#555"><em>Share my Digital Card in your network</em></p>
-      <ul>
-        <li><a href="https://wa.me/?text=${encodeURIComponent(waShareText)}" target="_blank"><i class="fab fa-whatsapp"></i></a></li>
-        <li><a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(cardUrl)}" target="_blank"><i class="fab fa-facebook-f"></i></a></li>
-        <li><a href="https://twitter.com/share?url=${encodeURIComponent(cardUrl)}" target="_blank"><i class="fab fa-twitter"></i></a></li>
-        <li><a href="https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(cardUrl)}" target="_blank"><i class="fab fa-linkedin-in"></i></a></li>
-      </ul>
-      <ul>
-        <li><a href="sms:?body=${encodeURIComponent(cardUrl)}"><i class="fas fa-comment-dots"></i></a></li>
-        <li><a href="https://pinterest.com/pin/create/link/?url=${encodeURIComponent(cardUrl)}" target="_blank"><i class="fab fa-pinterest-p"></i></a></li>
-        <li><a href="mailto:?subject=Digital%20Card&body=${encodeURIComponent(cardUrl)}"><i class="fa fa-envelope"></i></a></li>
-        <li><a href="javascript:void(0)" onclick="copyShare()"><i class="fas fa-copy"></i></a></li>
-      </ul>
+    <p class="dc-sh-sub">Send ${esc(shareName)}'s digital card to anyone — they can save the contact, call or message in a single tap.</p>
+    <div class="dc-sh-copy"><i class="fa fa-link"></i><span>${esc(cardUrl.replace(/^https?:\/\//, ""))}</span><button id="dc-copy-btn" onclick="copyShare()"><i class="fa fa-copy"></i> Copy</button></div>
+    <div class="dc-sh-grid">
+      <a class="dc-sh-item" href="https://wa.me/?text=${encodeURIComponent(waShareText)}" target="_blank"><span class="dc-sh-ic" style="background:#25D366"><i class="fab fa-whatsapp"></i></span><span>WhatsApp</span></a>
+      <a class="dc-sh-item" href="https://t.me/share/url?url=${encodeURIComponent(cardUrl)}&text=${encodeURIComponent("Take a look at " + shareName + "'s digital card")}" target="_blank"><span class="dc-sh-ic" style="background:#229ED9"><i class="fab fa-telegram-plane"></i></span><span>Telegram</span></a>
+      <a class="dc-sh-item" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(cardUrl)}" target="_blank"><span class="dc-sh-ic" style="background:#1877F2"><i class="fab fa-facebook-f"></i></span><span>Facebook</span></a>
+      <a class="dc-sh-item" href="https://twitter.com/intent/tweet?url=${encodeURIComponent(cardUrl)}" target="_blank"><span class="dc-sh-ic" style="background:#000">${X_SVG}</span><span>X</span></a>
+      <a class="dc-sh-item" href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(cardUrl)}" target="_blank"><span class="dc-sh-ic" style="background:#0A66C2"><i class="fab fa-linkedin-in"></i></span><span>LinkedIn</span></a>
+      <a class="dc-sh-item" href="https://pinterest.com/pin/create/link/?url=${encodeURIComponent(cardUrl)}" target="_blank"><span class="dc-sh-ic" style="background:#E60023"><i class="fab fa-pinterest-p"></i></span><span>Pinterest</span></a>
+      <a class="dc-sh-item" href="sms:?body=${encodeURIComponent(cardUrl)}"><span class="dc-sh-ic" style="background:#6366F1"><i class="fas fa-comment-dots"></i></span><span>Message</span></a>
+      <a class="dc-sh-item" href="mailto:?subject=${encodeURIComponent(shareName + " — Digital Card")}&body=${encodeURIComponent(waShareText)}"><span class="dc-sh-ic" style="background:#EA4335"><i class="fa fa-envelope"></i></span><span>Email</span></a>
     </div>
   </div>
 </div>
@@ -703,6 +723,10 @@ try { var _pp = (window.parent && window.parent !== window && window.parent.loca
    sandboxed public-card iframe (opaque origin). Server parses text as JSON. */
 function dcTrack(t){ if(!DC_SLUG||DC_OFF) return; try{ var b=new Blob([JSON.stringify({slug:DC_SLUG,type:t})],{type:'text/plain'}); if(!navigator.sendBeacon||!navigator.sendBeacon('/api/track',b)) throw 0; }catch(e){ try{ fetch('/api/track',{method:'POST',keepalive:true,body:JSON.stringify({slug:DC_SLUG,type:t})}); }catch(_){} } }
 dcTrack('view');
+/* The parent page fetches the REAL view count (same-origin, reliable) and posts
+   it in; we just render it. Avoids an unreliable cross-origin fetch from this
+   sandboxed opaque-origin iframe. */
+window.addEventListener('message', function(e){ try{ if(e.data&&typeof e.data.__dcViews==='number'){ var el=document.getElementById('dc-view-count'); if(el) el.textContent=Number(e.data.__dcViews).toLocaleString('en-IN'); } }catch(_){} });
 document.addEventListener('click', function(e){ var a=e.target.closest?e.target.closest('a,button'):null; if(!a) return; var href=(a.getAttribute&&a.getAttribute('href'))||''; var oc=(a.getAttribute&&a.getAttribute('onclick'))||''; if(/saveVCard/.test(oc)) return dcTrack('save_contact'); if(/openShare/.test(oc)) return dcTrack('share'); if(href.indexOf('tel:')===0) return dcTrack('call'); if(href.indexOf('mailto:')===0) return dcTrack('email'); if(/wa\\.me|whatsapp/i.test(href)) return dcTrack('whatsapp'); if(/maps\\.google|google\\.[a-z.]+\\/maps|goo\\.gl\\/maps/i.test(href)) return dcTrack('directions'); if(a.closest&&a.closest('.product-card')) return dcTrack('product'); if(/facebook|instagram|youtube|twitter|linkedin|pinterest/i.test(href)) return dcTrack('social'); if(href.indexOf('http')===0) return dcTrack('website'); }, true);
 var galImgs = ${JSON.stringify(gallery.map((g) => s(g.filename)))};
 var lbI = 0;
@@ -743,9 +767,17 @@ function dcSendEnquiry(form){
   form.innerHTML='<p class="dc-sent">✓ Thank you! We will get back to you shortly.</p>';
   return false;
 }
-function openShare(){ try{ if(navigator.share){ navigator.share({title:(document.title||'Digital Card'), url:'${cardUrl}'}).catch(function(){}); return; } }catch(_){} document.getElementById('shareModal').style.display='flex'; }
+function dcShareModal(){ var el=document.getElementById('shareModal'); if(el) el.style.display='flex'; }
+// Native share where allowed; otherwise (incl. the sandboxed card iframe, where
+// navigator.share exists but rejects) fall back to our own share modal.
+function openShare(){ try{ if(navigator.share){ navigator.share({title:(document.title||'Digital Card'), url:'${cardUrl}'}).catch(dcShareModal); return; } }catch(_){} dcShareModal(); }
 function closeShare(){ document.getElementById('shareModal').style.display='none'; }
-function copyShare(){ var u='${cardUrl}'; if(navigator.clipboard){navigator.clipboard.writeText(u).then(function(){alert('Link copied');});}else{alert(u);} }
+function copyShare(){ var u='${cardUrl}'; var btn=document.getElementById('dc-copy-btn');
+  function ok(){ if(!btn) return; var h=btn.getAttribute('data-h')||btn.innerHTML; btn.setAttribute('data-h',h); btn.classList.add('dc-copied'); btn.innerHTML='<i class="fa fa-check"></i> Copied'; setTimeout(function(){ btn.classList.remove('dc-copied'); btn.innerHTML=h; },1600); }
+  function ex(){ try{ var ta=document.createElement('textarea'); ta.value=u; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); var r=document.execCommand('copy'); document.body.removeChild(ta); return r; }catch(_){ return false; } }
+  // clipboard API rejects inside the sandboxed card iframe → fall back to execCommand.
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(ok, function(){ if(ex()) ok(); }); }
+  else { if(ex()) ok(); } }
 function dcCopy(b){ var t=(b.getAttribute('data-copy')||''); var i=b.querySelector('i');
   function flash(){ if(i){ var o=i.className; i.className='fa fa-check'; b.classList.add('dc-copied'); setTimeout(function(){ i.className=o; b.classList.remove('dc-copied'); },1300); } }
   function exec(){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.top='0'; ta.style.left='0'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); try{ta.setSelectionRange(0,t.length);}catch(_){} var ok=document.execCommand('copy'); document.body.removeChild(ta); return ok; }catch(_){ return false; } }
@@ -778,7 +810,7 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
   const initial = (s(c.name)[0] || "D").toUpperCase();
   const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='12' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
   const social = Object.keys(SOCIAL_FA).filter((k) => s(c[k]))
-    .map((k) => `<li><a href="javascript:void(0)"><i class="${SOCIAL_FA[k]}"></i></a></li>`).join("")
+    .map((k) => `<li><a href="javascript:void(0)">${socialIcon(k)}</a></li>`).join("")
     || `<li><a href="javascript:void(0)"><i class="fab fa-facebook-f"></i></a></li><li><a href="javascript:void(0)"><i class="fab fa-instagram"></i></a></li>`;
   const detail = (icon: string, text: string) =>
     text ? `<div class="home-single-details"><a href="javascript:void(0)"><i class="${icon}"></i><span>${esc(text)}</span></a></div>` : "";

@@ -405,6 +405,27 @@ app.post("/api/track", async (c) => {
   return c.body(null, 204);
 });
 
+// Public: the REAL view count for a card slug — the same "view" events the card
+// beacons to /api/track above, so the eye-counter shows live reality instead of
+// a frozen snapshot number. A few cards carry a starting base (their historic
+// count from the old platform) that new real views add on top of. ACAO:* so the
+// parent page (or the card) can read it; short cache to spare the DB.
+const VIEW_BASE: Record<string, number> = { pacewalk: 11542 };
+app.get("/api/views/:slug", async (c) => {
+  const slug = String(c.req.param("slug") || "").slice(0, 191).toLowerCase();
+  c.header("Access-Control-Allow-Origin", "*");
+  c.header("Cache-Control", "public, max-age=30");
+  if (!slug) return c.json({ views: 0 });
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { cardEvents } = await import("@db/schema");
+    const { and, eq, sql } = await import("drizzle-orm");
+    const rows = await getDb().select({ n: sql<number>`count(*)` }).from(cardEvents)
+      .where(and(eq(cardEvents.slug, slug), eq(cardEvents.type, "view")));
+    return c.json({ views: (VIEW_BASE[slug] || 0) + Number(rows[0]?.n || 0) });
+  } catch { return c.json({ views: VIEW_BASE[slug] || 0 }); }
+});
+
 // Conversion funnel: one row per step a visitor reaches (product_view → demo →
 // try_free → registration → published → payment) so drop-off is visible (§62).
 const FUNNEL_STAGES = ["product_view", "demo_view", "try_free", "registration", "customization", "published", "first_share", "payment", "upgrade"];

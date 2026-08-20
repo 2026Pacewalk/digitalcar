@@ -7,7 +7,7 @@ import { useCustomer } from "@/hooks/useCustomer";
 const SOCIALS = [
   { k: "facebook", label: "Facebook", icon: Facebook, color: "#1877F2", ph: "https://facebook.com/yourpage" },
   { k: "instagram", label: "Instagram", icon: Instagram, color: "#E4405F", ph: "https://instagram.com/yourhandle" },
-  { k: "twitter", label: "Twitter / X", icon: Twitter, color: "#0F172A", ph: "https://twitter.com/yourhandle" },
+  { k: "twitter", label: "X (Twitter)", icon: Twitter, color: "#0F172A", ph: "https://x.com/yourhandle" },
   { k: "youtube", label: "YouTube", icon: Youtube, color: "#FF0000", ph: "https://youtube.com/@yourchannel" },
   { k: "linkedin", label: "LinkedIn", icon: Linkedin, color: "#0A66C2", ph: "https://linkedin.com/in/you" },
   { k: "pinterest", label: "Pinterest", icon: Star, color: "#BD081C", ph: "https://pinterest.com/you" },
