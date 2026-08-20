@@ -745,7 +745,16 @@ var DC_OFF = false;
 try { var _pp = (window.parent && window.parent !== window && window.parent.location.pathname) || ""; if (/^\\/dashboard|^\\/demo\\//.test(_pp)) DC_OFF = true; } catch (e) {}
 /* text/plain body = CORS-safelisted (no preflight) so it works from the
    sandboxed public-card iframe (opaque origin). Server parses text as JSON. */
-function dcTrack(t){ if(!DC_SLUG||DC_OFF) return; try{ var b=new Blob([JSON.stringify({slug:DC_SLUG,type:t})],{type:'text/plain'}); if(!navigator.sendBeacon||!navigator.sendBeacon('/api/track',b)) throw 0; }catch(e){ try{ fetch('/api/track',{method:'POST',keepalive:true,body:JSON.stringify({slug:DC_SLUG,type:t})}); }catch(_){} } }
+function dcTrack(t){ if(!DC_SLUG||DC_OFF) return;
+  /* In the PUBLIC card the iframe is sandboxed WITHOUT allow-same-origin, so from
+     its opaque origin sendBeacon does NOT deliver and a relative fetch is blocked
+     — views and every tap event were being lost (analytics stuck at 0). Detect
+     the opaque origin and let the trusted parent record it same-origin, exactly
+     as enquiries now do. Non-sandboxed previews (dashboard/demo, already gated by
+     DC_OFF) keep the direct beacon. */
+  var _sb=false; try{ _sb=(window.origin==='null'); }catch(_){ _sb=true; }
+  if(_sb){ try{ if(window.parent&&window.parent!==window) window.parent.postMessage({__dcTrack:t},'*'); }catch(_){} return; }
+  try{ var b=new Blob([JSON.stringify({slug:DC_SLUG,type:t})],{type:'text/plain'}); if(!navigator.sendBeacon||!navigator.sendBeacon('/api/track',b)) throw 0; }catch(e){ try{ fetch('/api/track',{method:'POST',keepalive:true,body:JSON.stringify({slug:DC_SLUG,type:t})}); }catch(_){} } }
 dcTrack('view');
 /* The parent page fetches the REAL view count (same-origin, reliable) and posts
    it in; we just render it. Avoids an unreliable cross-origin fetch from this

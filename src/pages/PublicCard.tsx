@@ -117,7 +117,19 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
   // ever file a lead against itself.
   useEffect(() => {
     const onEnquiry = (e: MessageEvent) => {
-      const d = (e.data && (e.data as { __dcEnquiry?: { name?: string; contact?: string; email?: string; description?: string } }).__dcEnquiry);
+      const data = e.data as { __dcEnquiry?: { name?: string; contact?: string; email?: string; description?: string }; __dcTrack?: string } | null;
+      // Analytics event relayed from the sandboxed card (views, taps). The server
+      // validates `type` against its own whitelist, so an untrusted string is safe.
+      if (data && typeof data.__dcTrack === "string") {
+        try {
+          fetch("/api/track", {
+            method: "POST", headers: { "Content-Type": "text/plain" }, keepalive: true,
+            body: JSON.stringify({ slug, type: data.__dcTrack }),
+          }).catch(() => {});
+        } catch { /* ignore */ }
+        return;
+      }
+      const d = data && data.__dcEnquiry;
       if (!d || !String(d.name || "").trim()) return;
       try {
         fetch("/api/enquiry", {
