@@ -49,10 +49,15 @@ export default function Signup() {
   // The card the visitor chose in the marketplace — carried through signup so
   // their new card starts on that design and they land in customisation (§32).
   const { data: selectedProduct } = trpc.product.bySlug.useQuery({ slug: productSlug }, { enabled: !!productSlug });
-  const productThumb = useMemo(
-    () => (selectedProduct ? buildCardThumb({ ...DEFAULT_CUSTOMER, color: selectedProduct.primaryColor || "#F7B31C", color2: selectedProduct.secondaryColor || "" }, selectedProduct.styleNumber) : ""),
-    [selectedProduct],
-  );
+  // A design can also arrive from the Templates gallery as ?theme=&color=&color2=.
+  const themeParam = Number(searchParams.get("theme")) || 0;
+  const colorParam = searchParams.get("color") || "";
+  const color2Param = searchParams.get("color2") || "";
+  const productThumb = useMemo(() => {
+    if (selectedProduct) return buildCardThumb({ ...DEFAULT_CUSTOMER, color: selectedProduct.primaryColor || "#F7B31C", color2: selectedProduct.secondaryColor || "" }, selectedProduct.styleNumber);
+    if (themeParam > 0) return buildCardThumb({ ...DEFAULT_CUSTOMER, color: colorParam || "#F7B31C", color2: color2Param }, themeParam);
+    return "";
+  }, [selectedProduct, themeParam, colorParam, color2Param]);
   useEffect(() => { if (productSlug) logFunnel("try_free", productSlug); }, [productSlug]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -127,6 +132,14 @@ export default function Signup() {
             next.color2 = selectedProduct.secondaryColor || existing.color2 || "";
             next.product_id = selectedProduct.id;
             next.product_slug = selectedProduct.slug;
+          } else if (searchParams.get("theme")) {
+            // Chosen from the public Templates gallery (a design preset, not a
+            // product) → /signup?theme=<style>&color=<hex>&color2=<hex>. Persist
+            // it so the card opens on the design the customer actually picked.
+            const st = Number(searchParams.get("theme"));
+            if (Number.isFinite(st) && st > 0) next.theme = st;
+            const cp = searchParams.get("color"); if (cp) next.color = cp;
+            const c2 = searchParams.get("color2"); if (c2 !== null) next.color2 = c2;
           }
           // Hydrate the new card from the AI Card Generator draft, if the user
           // came from there — so their AI-made card is saved to their account.
