@@ -278,7 +278,10 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     v ? `<div class="dc-bank-row"><span class="dc-bank-ic"><i class="fa ${icon}"></i></span><div class="dc-bank-kv"><span class="k">${k}</span><span class="v">${esc(v)}</span></div></div>` : "";
   // Payment QR is part of the Payment Details section — render its inner content
   // here and fold it in below the bank card (no separate top-level section).
-  const hasQr = on(c.qrcode_on) && (qrcodes.length || slug);
+  // Show the payment QR only when it's meaningful: an explicitly-uploaded QR,
+  // OR the auto card-URL QR only once the user actually has payment details.
+  // (Previously every new user got a "Payment QR" just for having a slug.)
+  const hasQr = on(c.qrcode_on) && (qrcodes.length || (slug && (hasPay || hasBank)));
   const qrContent = hasQr
     ? (qrcodes.length ? qrcodes.map((q) => `<div class="qrcode-card" style="text-align:center;margin-bottom:16px">
         <img src="${esc(q.filename)}" style="max-width:240px;width:100%;border-radius:6px" ${IMG} onerror="this.style.display='none'">
