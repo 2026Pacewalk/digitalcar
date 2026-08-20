@@ -34,8 +34,8 @@ const customerGroups: NavGroup[] = [
       { label: "About Us", icon: Info, path: "/dashboard/about" },
       { label: "Payments", icon: Wallet, path: "/dashboard/payments" },
       { label: "Uploads", icon: Upload, path: "/dashboard/uploads" },
+      { label: "View Card", icon: Eye, path: "/dashboard/view" },
     ] },
-    { label: "View Card", icon: Eye, path: "/dashboard/view" },
   ] },
   { title: "Grow", items: [
     { label: "Leads", icon: Mail, path: "/dashboard/leads" },
