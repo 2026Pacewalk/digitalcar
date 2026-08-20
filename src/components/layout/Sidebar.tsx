@@ -25,14 +25,17 @@ type NavGroup = { title: string; items: NavLink[] };
 const customerGroups: NavGroup[] = [
   { title: "My Card", items: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+    // Ordered top-to-bottom to match the sections on the public card: Templates
+    // (design) first, then Follow-Us → About → Products → Payment → Gallery/Videos
+    // → Reviews, then Uploads and a final View Card preview.
     { label: "Edit Card", icon: Wand2, path: "/dashboard/build", children: [
       { label: "Templates", icon: Palette, path: "/dashboard/templates" },
-      { label: "Products / Services", icon: ShoppingBag, path: "/dashboard/products?tab=products" },
-      { label: "Gallery & Videos", icon: ImageIcon, path: "/dashboard/media" },
       { label: "Social Links", icon: Share2, path: "/dashboard/social" },
-      { label: "Google Reviews", icon: Star, path: "/dashboard/reviews" },
       { label: "About Us", icon: Info, path: "/dashboard/about" },
+      { label: "Products / Services", icon: ShoppingBag, path: "/dashboard/products?tab=products" },
       { label: "Payments", icon: Wallet, path: "/dashboard/payments" },
+      { label: "Gallery & Videos", icon: ImageIcon, path: "/dashboard/media" },
+      { label: "Google Reviews", icon: Star, path: "/dashboard/reviews" },
       { label: "Uploads", icon: Upload, path: "/dashboard/uploads" },
       { label: "View Card", icon: Eye, path: "/dashboard/view" },
     ] },
