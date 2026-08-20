@@ -25,7 +25,7 @@ export default function CustomerSocial() {
       actions={<button onClick={save} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save</button>}>
       <Tip>Link only your active profiles — a focused set looks more credible than a long list. WhatsApp and Instagram usually earn the most taps.</Tip>
       <Panel title="Social Profiles" subtitle="Section title and links">
-        <Field label="Section Title"><input value={val("social_title")} onChange={(e) => set("social_title", e.target.value)} className={fieldCls} placeholder="Follow Us" /></Field>
+        <Field label="Section Heading" hint="Shown above your social icons — e.g. “Follow Us” or “Follow Me”."><input value={val("social_title")} onChange={(e) => set("social_title", e.target.value)} className={fieldCls} placeholder="Follow Us" /></Field>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           {SOCIALS.map((s) => (
             <Field key={s.k} label={s.label}>

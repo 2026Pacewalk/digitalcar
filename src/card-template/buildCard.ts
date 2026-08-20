@@ -70,6 +70,14 @@ const SMALL_DESIG = new Set([3, 6, 7, 12, 13, 16, 28]);
 const desigFontCss = (theme: number) =>
   SMALL_DESIG.has(Number(theme)) ? `#home-section .owner-designation{font-size:12px !important;letter-spacing:.2px;}` : "";
 
+/* Clear visual hierarchy for the hero: the person's NAME should read larger than
+   their DESIGNATION. Several templates set both to the same size (1.5rem), which
+   looks flat. We only shrink the designation (never touch the name's size or
+   position — that would break the ribbon layout it sits inside). Injected BEFORE
+   desigFontCss so the tight small-designation templates keep their 12px handling. */
+const ownerHierarchyCss =
+  `#home-section .owner-designation{font-size:1.05rem !important;font-weight:500 !important;letter-spacing:.5px;}`;
+
 type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
 type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
@@ -120,6 +128,16 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const slug = s(c.slug).replace(/[^a-zA-Z0-9_-]/g, "");
   const cardUrl = `https://digitalcarda.in/${slug}`;
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
+  // Friendly, ready-to-send WhatsApp message when a visitor shares this card —
+  // beats forwarding a bare link. Works whether it's the owner or a visitor
+  // passing it along (refers to the business by name, not "my").
+  const shareName = s(c.company_name) || s(c.name) || "this business";
+  const shareSub = [s(c.company_name) ? s(c.name) : "", s(c.designation)].filter(Boolean).join(" · ");
+  const waShareText =
+    `Hi 👋\n\n` +
+    `Take a look at *${shareName}*'s digital visiting card 📇` +
+    (shareSub ? `\n${shareSub}` : "") +
+    `\n\nEverything in one tap — call, WhatsApp, directions, products & save the contact:\n${cardUrl}`;
   const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean);
   const initial = (s(c.name)[0] || "D").toUpperCase();
   const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='12' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
@@ -303,15 +321,27 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
           ${s(rv.date) ? `<span class="grev-date">${esc(rv.date)}</span>` : ""}
         </div>`).join("")}</div>`
     : "";
-  const googleReviewSection = (s(c.google_review) || ratingNum > 0 || reviews.length) ? `
+  const googleReviewSection = on(c.review_on) && (s(c.google_review) || ratingNum > 0 || reviews.length) ? `
     <div id="review-section" class="section-container">
-      <div class="section-header">Google Reviews</div>
+      <div class="section-header">${esc(s(c.review) || "Google Reviews")}</div>
       ${summaryBlock}
       ${reviewCards}
       ${s(c.google_review) ? `<div class="grev-btn-wrap"><a href="${esc(c.google_review)}" target="_blank" class="grev-btn"><i class="fab fa-google"></i> Write a Review</a></div>` : ""}
     </div>` : "";
 
   // (Payment QR is now rendered inside the Payment Details section above.)
+
+  // Card-share QR — an opt-in section showing a scannable QR of this card's own
+  // URL, so a visitor can scan to open & save the card (or show it to someone
+  // else). Off by default so existing live cards are unchanged until enabled.
+  const cardQrSection = Number(c.cardqr_on ?? 0) === 1 && slug ? `
+    <div id="cardqr-section" class="section-container dc-cardqr">
+      <div class="section-header">${esc(s(c.cardqr) || "Scan My Card")}</div>
+      <div class="dc-cardqr-box">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(cardUrl)}" alt="Scan to view my digital card" style="width:190px;height:190px" ${IMG}>
+        <p class="dc-cardqr-cap">Scan to view &amp; save my digital card</p>
+      </div>
+    </div>` : "";
 
   const offersSection = on(c.offer_on) && offers.length ? `
     <div id="offers-section" class="section-container">
@@ -387,7 +417,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const shareSection = `
     <div class="section-container dc-share">
       <div class="section-header">Share with others on WhatsApp</div>
-      <form class="dc-wa-form" onsubmit="var n=this.num.value.replace(/[^0-9]/g,'');if(n)window.open('https://wa.me/'+ (n.length===10?'91'+n:n) +'/?text=' + encodeURIComponent('${cardUrl}'),'_blank');return false;">
+      <form class="dc-wa-form" onsubmit="return dcShareWa(this)">
         <span class="dc-wa-cc"><i class="fas fa-mobile-alt"></i>+91</span>
         <input name="num" class="dc-wa-input" placeholder="WhatsApp number" inputmode="numeric" required>
         <button type="submit" class="dc-wa-btn"><i class="fab fa-whatsapp"></i><span>Share</span></button>
@@ -418,6 +448,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     { id: "gallery-section", icon: "fa fa-photo-video", label: navLabel(c.gallery, "Gallery"), show: !!gallerySection },
     { id: "video-section", icon: "fa fa-video", label: navLabel(c.video, "Video"), show: !!videoSection },
     { id: "enquiry-section", icon: "fas fa-comment-alt", label: navLabel(c.enquiry, "Enquiry"), show: !!enquirySection },
+    { id: "cardqr-section", icon: "fas fa-qrcode", label: navLabel(c.cardqr, "QR"), show: !!cardQrSection },
   ].filter((f) => f.show);
   const footer = `<div class="footer"><ul class="footer-menu">${footerItems.map((f) =>
     `<li><a href="javascript:void(0)" onclick="goSection('${f.id}')" class="footer-menu-link"><i class="${f.icon}"></i><p>${f.label}</p></a></li>`).join("")}</ul></div>`;
@@ -433,6 +464,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 ${mainCss}
 ${styleFor(Number(theme))}
 ${firstPagePadCss(Number(theme))}
+${ownerHierarchyCss}
 ${desigFontCss(Number(theme))}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 html{scroll-behavior:smooth;}
@@ -502,6 +534,10 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-phone:focus-within{border-color:${accent};background:#fff;box-shadow:0 0 0 3px ${accent}30;}
 .dc-phone .cc{display:flex;align-items:center;gap:5px;padding:0 14px;background:#f1f3f5;font-weight:700;font-size:14px;color:#333;border-right:1px solid #e6e8eb;}
 .dc-phone input{flex:1;min-width:0;border:none;outline:none;padding:0 14px;height:48px;font-size:14px;background:transparent;color:#111;}
+/* Card-share QR — scannable QR of this card's own URL */
+.dc-cardqr .dc-cardqr-box{display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px 16px 6px;}
+.dc-cardqr-box img{border-radius:12px;background:#fff;padding:12px;box-shadow:0 4px 14px rgba(16,24,40,.08);border:1px solid #eef0f3;}
+.dc-cardqr-cap{margin:0;font-size:13.5px;font-weight:600;color:#475569;text-align:center;}
 /* Compact Share section — inline number + Share, slim Save-Contact */
 .dc-share{padding-top:14px;padding-bottom:14px;}
 .dc-share .section-header{margin-bottom:12px;}
@@ -522,11 +558,15 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 /* Bottom nav: keep each tab a fixed width and let the bar scroll sideways (it
    already has edge-fade shadows for this) instead of squeezing 9–10 tabs into
    the width and truncating every label. Smaller, single-line labels. */
-#body-content .footer-menu,.footer-menu{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.footer-menu li{flex:0 0 auto;min-width:62px;}
+#body-content .footer-menu,.footer-menu{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-snap-type:x proximity;}
+.footer-menu::-webkit-scrollbar{display:none;}
+/* Exactly 5 buttons per view; any more scroll horizontally. flex-grow lets a card
+   with 5 or fewer sections still fill the bar evenly, while no-shrink keeps each
+   button a fifth wide (no cramming) once there are more than five. */
+.footer-menu li{flex:1 0 20%;min-width:0;scroll-snap-align:start;}
 .footer-menu-link{padding:8px 6px;}
 .footer-menu-link i{font-size:20px;}
-.footer-menu-link p{font-size:10px;white-space:nowrap;margin-top:3px;line-height:1.2;}
+.footer-menu-link p{font-size:10px;white-space:nowrap;margin-top:3px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;}
 /* Paid-plan trust badge — small golden seal on the logo (Gold=crown, Platinum=gem) */
 #home-section .home-brand-img{position:relative;display:inline-block;}
 .dc-plan-badge{position:absolute;top:0;right:0;transform:translate(38%,-30%);z-index:6;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;font-size:8px;line-height:1;background:linear-gradient(135deg,#FCE4A0,#E8A317);color:#5b3d00;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);}
@@ -589,7 +629,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
       <div class="home-section-content">
         <div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p>${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>
         <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" alt="${esc(c.name)}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'">${planBadge}</div></div>
-        <div class="home-social"><p>Follow Us</p><ul class="social-icons">${social}</ul></div>
+        <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
         <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation)}</p></div>
         <div class="home-details">${homeDetails}</div>
         <div class="home-call-whatsapp">
@@ -607,6 +647,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
     ${gallerySection}
     ${videoSection}
     ${enquirySection}
+    ${cardQrSection}
     ${shareSection}
     <div class="dc-foot">
       <div class="dc-foot-actions">
@@ -635,7 +676,7 @@ ${footer}
     <div class="popup-share-icons" style="padding:22px 16px">
       <p style="text-align:center;margin:0 0 16px;color:#555"><em>Share my Digital Card in your network</em></p>
       <ul>
-        <li><a href="https://wa.me/?text=${encodeURIComponent(cardUrl)}" target="_blank"><i class="fab fa-whatsapp"></i></a></li>
+        <li><a href="https://wa.me/?text=${encodeURIComponent(waShareText)}" target="_blank"><i class="fab fa-whatsapp"></i></a></li>
         <li><a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(cardUrl)}" target="_blank"><i class="fab fa-facebook-f"></i></a></li>
         <li><a href="https://twitter.com/share?url=${encodeURIComponent(cardUrl)}" target="_blank"><i class="fab fa-twitter"></i></a></li>
         <li><a href="https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(cardUrl)}" target="_blank"><i class="fab fa-linkedin-in"></i></a></li>
@@ -654,6 +695,8 @@ ${footer}
    Suppressed inside the dashboard builder preview and /demo pages so the owner's
    own editing/previews never inflate their numbers (§36 — real data only). */
 var DC_SLUG = ${JSON.stringify(slug)};
+var DC_WA_TEXT = ${jsq(waShareText)};
+function dcShareWa(form){ var n=(form.num.value||'').replace(/[^0-9]/g,''); if(!n) return false; if(n.length===10) n='91'+n; window.open('https://wa.me/'+n+'/?text='+encodeURIComponent(DC_WA_TEXT),'_blank'); return false; }
 var DC_OFF = false;
 try { var _pp = (window.parent && window.parent !== window && window.parent.location.pathname) || ""; if (/^\\/dashboard|^\\/demo\\//.test(_pp)) DC_OFF = true; } catch (e) {}
 /* text/plain body = CORS-safelisted (no preflight) so it works from the
@@ -752,6 +795,7 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
 ${mainCss}
 ${styleFor(theme)}
 ${firstPagePadCss(theme)}
+${ownerHierarchyCss}
 ${desigFontCss(theme)}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 html,body{margin:0;background:#fff;overflow:hidden;}
@@ -762,7 +806,7 @@ main{box-shadow:none;padding:0;}
 <main><div class="page-wrapper"><section id="home-section">
   <div class="home-section-content">
     <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'"></div></div>
-    <div class="home-social"><p>Follow Us</p><ul class="social-icons">${social}</ul></div>
+    <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
     <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation) || "Designation"}</p></div>
     <div class="home-details">${homeDetails}</div>
     <div class="home-call-whatsapp">

@@ -115,6 +115,18 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
     return () => { cancelled = true; };
   }, [cardLoading, dbHasContent, slug]);
 
+  // Reflect the owner's SEO Meta Title in the browser tab for snapshot cards
+  // (crawlers get it via SSR; this covers the visible tab + client navigation).
+  useEffect(() => {
+    const cust = (snapshot as { customer?: Record<string, unknown> } | null)?.customer;
+    if (!cust) return;
+    const t = String(cust.seo_title ?? "").trim();
+    const nm = String(cust.name ?? "").trim();
+    const co = String(cust.company_name ?? "").trim();
+    const fallback = nm ? `${nm}${co ? " · " + co : ""} — DigitalCarda` : "";
+    if (t || fallback) document.title = t || fallback;
+  }, [snapshot]);
+
   const handleLeadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!card) return;

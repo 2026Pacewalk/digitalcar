@@ -65,8 +65,8 @@ export default function CustomerProfile() {
 
   const quickActions = [
     { icon: Pencil, label: "Edit business details", onClick: () => navigate("/dashboard/home") },
-    { icon: KeyRound, label: "Change password", onClick: () => navigate("/dashboard/settings") },
-    { icon: ShieldCheck, label: "SEO & theme settings", onClick: () => navigate("/dashboard/settings") },
+    { icon: KeyRound, label: "Change password", onClick: () => navigate("/dashboard/settings?tab=password") },
+    { icon: ShieldCheck, label: "SEO & theme settings", onClick: () => navigate("/dashboard/settings?tab=seo") },
     { icon: Eye, label: "View live card", onClick: () => navigate("/dashboard/view") },
   ];
 

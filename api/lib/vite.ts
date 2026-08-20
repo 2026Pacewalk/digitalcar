@@ -59,6 +59,57 @@ async function productMeta(pathname: string, distPath: string): Promise<CardMeta
   return result;
 }
 
+// Per-card SEO/OG from the owner's PUBLISHED snapshot — so the Meta Title, Meta
+// Description and keywords a customer sets in Settings → SEO actually drive their
+// public card's <head> and Google listing. Falls back to auto values (name/role)
+// for any field left blank. Returns null when there's no snapshot for the slug,
+// so marketing pages and legacy-only cards fall through to metaFor(). Cached like
+// productMeta so crawler hits don't re-query the DB.
+async function cardSnapshotMeta(pathname: string): Promise<CardMeta | null> {
+  const m = pathname.match(/^\/(?:c\/)?([^/]+)\/?$/);
+  if (!m) return null;
+  const slug = decodeURIComponent(m[1]).toLowerCase();
+  if (!slug || slug.includes(".")) return null; // skip files like favicon.ico
+  const key = `card:${slug}`;
+  const hit = metaCache.get(key);
+  if (hit && Date.now() - hit.at < META_TTL) return hit.meta;
+
+  let result: CardMeta | null = null;
+  try {
+    const { getDb } = await import("../queries/connection");
+    const { publishedCards } = await import("@db/schema");
+    const { eq } = await import("drizzle-orm");
+    const rows = await getDb().select({ data: publishedCards.data }).from(publishedCards).where(eq(publishedCards.slug, slug)).limit(1);
+    const cust = (rows[0]?.data as { customer?: Record<string, unknown> } | null)?.customer;
+    if (cust) {
+      const s = (v: unknown) => String(v ?? "").trim();
+      const name = s(cust.name) || slug;
+      const company = s(cust.company_name);
+      const desig = s(cust.designation);
+      const autoTitle = `${name}${company ? " · " + company : ""} — DigitalCarda`;
+      const autoDesc =
+        (desig ? `${desig}${company ? " at " + company : ""}` : s(cust.about_us).replace(/<[^>]*>/g, "").slice(0, 150)) ||
+        "View my digital business card.";
+      const title = s(cust.seo_title) || autoTitle;
+      const description = s(cust.seo_description) || autoDesc;
+      const keywords = s(cust.seo_keywords) || [1, 2, 3, 4, 5].map((n) => s(cust[`keyword${n}`])).filter(Boolean).join(", ");
+      const logo = s(cust.logo);
+      const hasImg = /^https?:/i.test(logo);
+      const image = hasImg ? logo : `${SITE}/why-businessman.png`;
+      const url = `${SITE}/${slug}`;
+      const jsonLd = JSON.stringify({
+        "@context": "https://schema.org", "@type": "Person", name, url,
+        ...(desig ? { jobTitle: desig } : {}),
+        ...(company ? { worksFor: { "@type": "Organization", name: company } } : {}),
+        ...(hasImg ? { image } : {}),
+      });
+      result = { title, description, image, url, jsonLd, ogType: "profile", h1: name, locale: "en_IN", ...(keywords ? { keywords } : {}) };
+    }
+  } catch { result = null; }
+  metaCache.set(key, { meta: result, at: Date.now() });
+  return result;
+}
+
 export function serveStaticFiles(app: App) {
   const distPath = path.resolve(import.meta.dirname, "../dist/public");
   const indexPath = path.resolve(distPath, "index.html");
@@ -81,7 +132,7 @@ export function serveStaticFiles(app: App) {
     let content = readShell();
     let cacheable = false;
     try {
-      const meta = (await productMeta(pathname, distPath)) || metaFor(pathname, distPath);
+      const meta = (await productMeta(pathname, distPath)) || (await cardSnapshotMeta(pathname)) || metaFor(pathname, distPath);
       if (meta) { content = injectCardMeta(content, meta); cacheable = true; }
     } catch { /* fall back to plain index.html */ }
     // Only cache real pages (meta matched); never cache arbitrary 404 paths.

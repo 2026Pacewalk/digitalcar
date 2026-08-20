@@ -57,9 +57,11 @@ function mapProfile(row: Record<string, unknown>, u: { id: number; fullName: str
     video_on: Number(row.video_on ?? 1), qrcode_on: Number(row.qrcode_on ?? 1),
     offer_on: Number(row.offer_on ?? 0), uploads_on: Number(row.uploads_on ?? 0),
     enquiry_on: Number(row.enquiry_on ?? 1), feedback_on: Number(row.feedback_on ?? 0),
+    review_on: Number(row.review_on ?? 1), cardqr_on: Number(row.cardqr_on ?? 0),
     about: s(row.about), product: s(row.product), payment: s(row.payment),
     gallery: s(row.gallery), video: s(row.video), qrcode: s(row.qrcode),
     offer: s(row.offer), uploads: s(row.uploads), enquiry: s(row.enquiry),
+    review: s(row.review), cardqr: s(row.cardqr),
   };
 }
 
