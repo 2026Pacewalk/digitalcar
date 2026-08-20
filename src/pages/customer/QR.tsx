@@ -27,9 +27,14 @@ export default function CustomerQR() {
   const colors = ["#0F172A", "#F7B31C", "#14B8A6", "#3B82F6", "#EF4444", "#8B5CF6"];
   const bgs = ["#FFFFFF", "#F8FAFC", "#FEF3C7", "#E0F2FE"];
 
-  // Branding shown on the printable standee.
-  const brandName = String(data.company_name || data.name || "My Business");
-  const subtitle = String(data.designation || data.nature || "");
+  // Branding shown on the printable standee — the PERSON leads (like the card's
+  // name banner), with their role and company beneath. Falls back to the company
+  // name as the headline only when there's no person name.
+  const personName = String(data.name || "").trim();
+  const company = String(data.company_name || "").trim();
+  const desig = String(data.designation || data.nature || "").trim();
+  const brandName = personName || company || "My Business";
+  const subtitle = [desig, personName && company ? company : ""].filter(Boolean).join(" · ");
   const phone = String(data.mobile1 || "");
   const linkText = `${ORIGIN}/${slug}`.replace(/^https?:\/\//, "");
 
