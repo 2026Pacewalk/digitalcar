@@ -67,7 +67,13 @@ export async function slugTakenByOther(
   if (legacyOwner !== undefined) {
     const email = String(ownerEmail || "").toLowerCase().trim();
     if (!email || legacyOwner !== email) return true;
-    // owner match → fall through to the relational/snapshot checks below.
+    // The caller IS the legitimate legacy owner of this slug — they're
+    // authoritative for their own URL and must always be able to (re)publish it.
+    // Do NOT fall through to relational/snapshot checks: a legacy→new migration
+    // can leave a `cards`/`published_cards` row for the same slug under a
+    // different internal user id, which would otherwise wrongly flag their own
+    // slug as "taken" and silently block every edit from reaching the live card.
+    return false;
   }
   // 2) Relational cards — cards.slug is globally unique; taken if another user holds it.
   const rel = await db.select({ userId: cards.userId }).from(cards).where(eq(cards.slug, slug));

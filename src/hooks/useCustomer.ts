@@ -46,6 +46,23 @@ export const DEFAULT_CUSTOMER: CustomerRecord = {
   package_id: 6, views: 1284,
 };
 
+/* Neutral base for merging a REAL user's stored (often partial) card. Unlike
+   DEFAULT_CUSTOMER — the Aarav Sharma / acme-digital SHOWCASE — this carries NO
+   demo values, so a new user's missing fields never inherit "1,284 views" or
+   "https://acmedigital.example". DEFAULT_CUSTOMER stays the showcase shown to
+   the demo account and logged-out visitors only. */
+export const BLANK_CUSTOMER: CustomerRecord = {
+  id: 0, name: "", username: "", slug: "", designation: "", company_name: "", gst: "", logo: "",
+  mobile1: "", mobile2: "", email: "", url: "", address: "",
+  establishment: "", nature: "", about_us: "",
+  specialties_title: "Our Specialties", specialities: "",
+  bank_name: "", ifsc: "", account_holder: "", account_number: "", account_type: "current",
+  paytm_number: "", phone_pe: "", google_pay: "", upi: "",
+  facebook: "", twitter: "", instagram: "", youtube: "", pinterest: "", linkedin: "",
+  google_map: "", google_review: "", social_title: "Follow Us",
+  password: "", activated_on: "", expired_on: null, package_id: 7, views: 0,
+};
+
 /* Per-plan content limits — the single source of truth for what each plan
    unlocks, matching the public pricing page (Trial gets full Gold features;
    Platinum lifts the caps and allows 3 cards). Keyed by the stored package_id:
@@ -223,14 +240,36 @@ function seedFromAuth(u: AuthUserLite): CustomerRecord {
   };
 }
 
+/* Strip any DEMO showcase values that leaked into (and were persisted onto) a
+   REAL user's card via the old `{...DEFAULT_CUSTOMER, ...partial}` merge — e.g.
+   "https://acmedigital.example", the fake demo phone, or "1,284 views". These
+   are fixed fictional sentinels no real user has, so clearing the exact matches
+   is safe and self-heals already-affected accounts. Never applied to the demo
+   showcase itself. */
+const DEMO_FIELDS = [
+  "name", "company_name", "designation", "email", "mobile1", "mobile2", "url",
+  "address", "establishment", "nature", "google_map", "gst", "specialities",
+] as const;
+function dropDemoSentinels(c: CustomerRecord): CustomerRecord {
+  const out = { ...c } as Record<string, unknown>;
+  const demo = DEFAULT_CUSTOMER as Record<string, unknown>;
+  for (const k of DEMO_FIELDS) if (demo[k] && out[k] === demo[k]) out[k] = "";
+  if (Number(out.views) === Number(DEFAULT_CUSTOMER.views)) out.views = 0;
+  return out as CustomerRecord;
+}
+
 /** Read the current user's card record synchronously (scoped + seeded). */
 export function readCustomer(): CustomerRecord {
   const u = getAuthUser();
+  const showcase = isShowcase(u);
   try {
     const raw = localStorage.getItem(scopedKey("dc_customer"));
-    if (raw) return healCustomerImgs({ ...DEFAULT_CUSTOMER, ...JSON.parse(raw) });
+    if (raw) {
+      const merged = { ...BLANK_CUSTOMER, ...JSON.parse(raw) } as CustomerRecord;
+      return healCustomerImgs(showcase ? merged : dropDemoSentinels(merged));
+    }
   } catch { /* fall through to seed */ }
-  return u && !isShowcase(u) ? seedFromAuth(u) : DEFAULT_CUSTOMER;
+  return u && !showcase ? seedFromAuth(u) : DEFAULT_CUSTOMER;
 }
 
 export function useCustomer() {
@@ -238,13 +277,21 @@ export function useCustomer() {
 
   useEffect(() => {
     const u = getAuthUser();
+    const showcase = isShowcase(u);
     const key = scopedKey("dc_customer");
     try {
       const raw = localStorage.getItem(key);
-      if (raw) { setData(healCustomerImgs({ ...DEFAULT_CUSTOMER, ...JSON.parse(raw) })); return; }
+      if (raw) {
+        const merged = { ...BLANK_CUSTOMER, ...JSON.parse(raw) } as CustomerRecord;
+        const clean = healCustomerImgs(showcase ? merged : dropDemoSentinels(merged));
+        setData(clean);
+        // Persist the cleaned record so the leaked demo values are gone for good.
+        if (!showcase) { try { localStorage.setItem(key, JSON.stringify(clean)); } catch { /* ignore */ } }
+        return;
+      }
     } catch { /* seed below */ }
     // First visit for this user → seed from their own account (or the showcase sample).
-    const seed = u && !isShowcase(u) ? seedFromAuth(u) : DEFAULT_CUSTOMER;
+    const seed = u && !showcase ? seedFromAuth(u) : DEFAULT_CUSTOMER;
     setData(seed);
     try { localStorage.setItem(key, JSON.stringify(seed)); } catch { /* ignore */ }
   }, []);
