@@ -66,6 +66,7 @@ const SEED_PRESETS: Preset[] = [
   { id: 48, name: "Corporate Business Card", style: 48, primary: "#F7B31C", secondary: "#0E2647", active: true },
   { id: 49, name: "Employee ID Card", style: 49, primary: "#E0B23C", secondary: "#16365D", active: true },
   { id: 50, name: "Membership Card", style: 50, primary: "#D4AF37", secondary: "#0F5132", active: true },
+  { id: 51, name: "Professional Profile", style: 51, primary: "#2563EB", secondary: "#0F2747", active: true },
 ];
 /* The lowest preset id/style that is a link-in-bio layout (rest are card styles). */
 const LINKBIO_MIN_ID = 32;

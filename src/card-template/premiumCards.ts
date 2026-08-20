@@ -10,6 +10,8 @@ type PCRecord = Record<string, unknown>;
 
 const s = (v: unknown) => String(v ?? "").trim();
 const esc = (v: unknown) => s(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Perceived brightness of a #rrggbb colour (0 dark … 1 light) — pick readable text.
+const lum = (hex: string) => { const h = s(hex).replace("#", ""); if (h.length < 6) return 1; const r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255; return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 const IMG = 'referrerpolicy="no-referrer"';
 const SOCIAL_FA: Record<string, string> = {
   facebook: "fab fa-facebook-f", instagram: "fab fa-instagram", youtube: "fab fa-youtube",
@@ -18,7 +20,7 @@ const SOCIAL_FA: Record<string, string> = {
 
 /* Design names — the count drives the template gallery. Add more here + a branch
    in buildPremiumCardHtml to introduce the ID / Membership cards later. */
-export const PREMIUM_NAMES = ["Corporate Business Card", "Employee ID Card", "Membership Card"];
+export const PREMIUM_NAMES = ["Corporate Business Card", "Employee ID Card", "Membership Card", "Professional Profile"];
 export const PREMIUM_COUNT = PREMIUM_NAMES.length;
 
 const HEAD = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,6 +36,7 @@ export function buildPremiumCardHtml(c: PCRecord, products: PCProduct[] = [], in
   switch (index) {
     case 1: return idCard(c);
     case 2: return membershipCard(c);
+    case 3: return professionalProfile(c, opts);
     default: return businessCard(c, products, opts);
   }
 }
@@ -344,6 +347,167 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     </main>
   </div>
   ${dock}
+  ${script}
+  </body></html>`;
+}
+
+// ── Professional Profile (image #4): cover banner, overlapping circular photo,
+// 3 contact buttons, social row, 4 action tiles, QR modal, website + address cards ──
+function professionalProfile(c: PCRecord, opts: { thumb?: boolean }): string {
+  const brand = s(c.color) || "#2563eb";
+  const dark = s(c.color2) || "#0f2747";
+  const nameCol = lum(brand) < 0.62 ? brand : dark; // keep the name readable on white
+  const name = esc(c.name) || "Your Name";
+  const desig = esc(c.designation);
+  const company = esc(c.company_name);
+  const tag = esc(s(c.nature) || s(c.about_us).replace(/<[^>]*>/g, "").trim().slice(0, 64));
+  const slug = s(c.slug).replace(/[^a-zA-Z0-9_-]/g, "");
+  const cardUrl = `https://digitalcarda.in/${slug || "card"}`;
+  const photo = s(c.photo);
+  const logo = s(c.logo);
+  const phone = s(c.mobile1).replace(/[^\d+]/g, "");
+  const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
+  const email = s(c.email);
+  const url = s(c.url);
+  const about = s(c.about_us).replace(/<[^>]*>/g, "").trim();
+  const mapHref = s(c.google_map) || (s(c.address) ? `https://maps.google.com/?q=${encodeURIComponent(s(c.address))}` : "");
+  const youtube = s(c.youtube);
+  const qrSrc = (n: number) => `https://api.qrserver.com/v1/create-qr-code/?size=${n}x${n}&margin=8&data=${encodeURIComponent(cardUrl)}`;
+
+  const primary = [
+    wa ? { ic: "fab fa-whatsapp", lb: "WhatsApp", href: `https://wa.me/${wa}`, ext: true } : (phone ? { ic: "fa fa-comment-dots", lb: "Text", href: `sms:${phone}`, ext: false } : null),
+    phone ? { ic: "fa fa-phone-alt", lb: "Call", href: `tel:${phone}`, ext: false } : null,
+    email ? { ic: "fa fa-envelope", lb: "Email", href: `mailto:${email}`, ext: false } : null,
+  ].filter(Boolean).map((a) => `<a class="pp-act" href="${esc((a as { href: string }).href)}"${(a as { ext: boolean }).ext ? ' target="_blank" rel="noopener"' : ""} aria-label="${(a as { lb: string }).lb}"><span class="pp-act-ic"><i class="${(a as { ic: string }).ic}"></i></span><span>${(a as { lb: string }).lb}</span></a>`).join("");
+
+  const socials = Object.keys(SOCIAL_FA).filter((k) => s(c[k])).map((k) => `<a class="pp-soc" href="${esc(c[k])}" target="_blank" rel="noopener" aria-label="${k}"><i class="${SOCIAL_FA[k]}"></i></a>`).join("");
+
+  const tiles = [
+    { ic: "fa fa-user-plus", lb: "Save", attr: `href="data:text/vcard;charset=utf-8,${encodeURIComponent(["BEGIN:VCARD", "VERSION:3.0", `FN:${s(c.name)}`, `ORG:${s(c.company_name)}`, `TITLE:${s(c.designation)}`, `TEL;TYPE=CELL:${s(c.mobile1)}`, `EMAIL:${s(c.email)}`, `URL:${s(c.url)}`, `ADR:;;${s(c.address)};;;;`, "END:VCARD"].join("\n"))}" download="${slug || "contact"}.vcf"`, tag: "a" },
+    youtube ? { ic: "fa fa-play", lb: "Watch", attr: `href="${esc(youtube)}" target="_blank" rel="noopener"`, tag: "a" } : null,
+    about ? { ic: "fa fa-user", lb: "About", attr: `href="javascript:void(0)" onclick="document.getElementById('pp-about').scrollIntoView({behavior:'smooth'})"`, tag: "a" } : null,
+    { ic: "fa fa-qrcode", lb: "Scan", attr: `type="button" onclick="ppQR(true)"`, tag: "button" },
+  ].filter(Boolean).map((t) => { const x = t as { ic: string; lb: string; attr: string; tag: string }; return `<${x.tag} class="pp-tile" ${x.attr} aria-label="${x.lb}"><span class="pp-tile-ic"><i class="${x.ic}"></i></span><span>${x.lb}</span></${x.tag}>`; }).join("");
+
+  const ref = s(c.referral_code) || slug;
+  const brandTxt = logo ? `<img src="${esc(logo)}" alt="${company || name}" ${IMG}>` : (company ? `<span class="pp-cover-txt">${company}</span>` : "");
+
+  const css = `
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  :root{--brand:${brand};--dark:${dark};--name:${nameCol};--ink:#101828;--muted:#667085;--line:#eef1f5;--soft:#f6f8fb;}
+  html{-webkit-text-size-adjust:100%;}
+  body{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;background:#eef1f6;color:var(--ink);line-height:1.5;}
+  .pp{max-width:430px;margin:0 auto;min-height:100vh;background:#f4f6fa;box-shadow:0 24px 70px rgba(16,24,40,.14);overflow:hidden;}
+  .pp-in{padding:0 14px 26px;}
+  @keyframes ppUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+  .pp-rise{animation:ppUp .45s cubic-bezier(.2,.7,.2,1) both;}
+  @media(prefers-reduced-motion:reduce){.pp-rise{animation:none;}}
+  .pp-cover{position:relative;height:132px;background:linear-gradient(135deg,var(--brand),var(--dark) 130%);overflow:hidden;}
+  .pp-cover::after{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 80% 10%,rgba(255,255,255,.18),transparent 55%);}
+  .pp-cover-logo{position:absolute;top:14px;left:16px;z-index:2;}
+  .pp-cover-logo img{max-height:30px;max-width:140px;object-fit:contain;filter:brightness(0) invert(1);opacity:.96;}
+  .pp-cover-txt{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:15px;letter-spacing:.3px;}
+  .pp-share{position:absolute;top:14px;right:16px;z-index:2;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;backdrop-filter:blur(4px);}
+  .pp-card{position:relative;background:#fff;border-radius:22px;margin-top:-26px;padding:64px 20px 22px;text-align:center;box-shadow:0 10px 30px rgba(16,24,40,.06);}
+  .pp-photo{position:absolute;top:-52px;left:50%;transform:translateX(-50%);width:104px;height:104px;border-radius:50%;padding:4px;background:#fff;box-shadow:0 10px 26px rgba(16,24,40,.18);}
+  .pp-photo::before{content:"";position:absolute;inset:0;border-radius:50%;border:2.5px solid var(--brand);}
+  .pp-photo img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
+  .pp-name{font-family:'Sora',sans-serif;font-weight:800;font-size:23px;line-height:1.15;color:var(--name);letter-spacing:-.01em;}
+  .pp-role{font-size:13.5px;font-weight:600;color:var(--ink);margin-top:5px;}
+  .pp-org{font-size:12.5px;color:var(--muted);margin-top:2px;}
+  .pp-tag{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5;max-width:300px;margin-left:auto;margin-right:auto;}
+  .pp-acts{display:flex;justify-content:center;gap:26px;margin-top:20px;}
+  .pp-act{display:flex;flex-direction:column;align-items:center;gap:7px;text-decoration:none;color:var(--muted);font-size:11.5px;font-weight:600;}
+  .pp-act-ic{width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--dark) 160%);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 8px 20px ${brand}44;transition:transform .16s;}
+  .pp-act:active .pp-act-ic{transform:scale(.92);}
+  .pp-socials{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:22px;}
+  .pp-soc{width:40px;height:40px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;color:var(--dark);background:var(--soft);border:1px solid var(--line);text-decoration:none;transition:transform .15s,color .2s,box-shadow .2s;}
+  .pp-soc:hover{transform:translateY(-2px);color:var(--brand);box-shadow:0 8px 18px rgba(16,24,40,.1);}
+  .pp-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:22px;}
+  .pp-tile{display:flex;flex-direction:column;align-items:center;gap:7px;padding:13px 4px;border:1px solid var(--line);border-radius:15px;background:#fff;color:var(--ink);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.04);transition:transform .15s,box-shadow .2s,border-color .2s;font-family:inherit;}
+  .pp-tile:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(16,24,40,.09);border-color:${brand}55;}
+  .pp-tile-ic{width:34px;height:34px;border-radius:10px;background:${brand}14;color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:15px;}
+  .pp-cta{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px;margin-top:14px;text-decoration:none;box-shadow:0 2px 10px rgba(16,24,40,.04);transition:transform .15s,box-shadow .2s;}
+  .pp-cta:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(16,24,40,.1);}
+  .pp-cta-ic{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--brand),var(--dark) 160%);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .pp-cta-tx{flex:1;min-width:0;} .pp-cta-tx b{display:block;font-family:'Sora',sans-serif;font-size:14px;color:var(--ink);} .pp-cta-tx small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pp-cta-ar{color:#c3cbd6;font-size:14px;}
+  .pp-addr{display:flex;gap:13px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(16,24,40,.04);align-items:center;}
+  .pp-addr-map{width:66px;height:66px;border-radius:12px;background:linear-gradient(135deg,${brand}22,${dark}22);display:flex;align-items:center;justify-content:center;color:var(--brand);font-size:22px;flex-shrink:0;}
+  .pp-addr-tx{flex:1;min-width:0;} .pp-addr-tx b{font-family:'Sora',sans-serif;font-size:12.5px;color:var(--ink);} .pp-addr-tx p{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45;}
+  .pp-go{display:inline-flex;align-items:center;gap:6px;background:var(--brand);color:#fff;font-size:11.5px;font-weight:700;padding:9px 14px;border-radius:10px;text-decoration:none;flex-shrink:0;align-self:center;}
+  .pp-about{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px;margin-top:12px;box-shadow:0 2px 10px rgba(16,24,40,.04);}
+  .pp-about h3{font-family:'Sora',sans-serif;font-size:13px;color:var(--ink);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+  .pp-about h3::before{content:"";width:18px;height:3px;border-radius:3px;background:var(--brand);}
+  .pp-about p{font-size:12.5px;color:var(--muted);line-height:1.6;}
+  .pp-powered{text-align:center;font-size:11px;color:var(--muted);margin-top:18px;}
+  .pp-powered a{color:var(--brand);text-decoration:none;font-weight:700;}
+  .pp-foot{display:flex;margin-top:14px;border:1px solid var(--line);border-radius:13px;overflow:hidden;background:#fff;}
+  .pp-foot a{flex:1;text-align:center;font-weight:700;font-size:12.5px;color:var(--dark);text-decoration:none;padding:12px 8px;}
+  .pp-foot a:first-child{border-right:1px solid var(--line);}
+  .pp-modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);z-index:80;align-items:center;justify-content:center;padding:20px;}
+  .pp-modal-in{background:#fff;border-radius:22px;max-width:320px;width:100%;padding:26px 22px 22px;text-align:center;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.35);}
+  .pp-modal-x{position:absolute;top:12px;right:12px;width:30px;height:30px;border:none;background:var(--soft);border-radius:50%;color:var(--muted);font-size:17px;cursor:pointer;}
+  .pp-qr-big{background:#fff;padding:8px;border:1px solid var(--line);border-radius:16px;display:inline-block;line-height:0;}
+  .pp-qr-big img{width:190px;height:190px;display:block;}
+  .pp-qr-name{font-family:'Sora',sans-serif;font-weight:700;font-size:16px;margin-top:14px;color:var(--ink);}
+  .pp-qr-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .pp-qr-btns{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px;}
+  .pp-qr-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:44px;border-radius:12px;font-weight:700;font-size:12.5px;text-decoration:none;cursor:pointer;border:none;font-family:inherit;background:var(--brand);color:#fff;}
+  .pp-qr-btn.ghost{background:var(--soft);color:var(--dark);border:1px solid var(--line);}
+  `;
+
+  const chrome = opts.thumb ? "" : `
+    <div class="pp-foot">
+      <a href="/login" target="_top">Customer Login</a>
+      <a href="/signup${ref ? `?ref=${encodeURIComponent(ref)}` : ""}" target="_top">Create Free Card</a>
+    </div>`;
+
+  const modal = opts.thumb ? "" : `
+  <div id="ppqr" class="pp-modal" onclick="if(event.target===this)ppQR(false)">
+    <div class="pp-modal-in">
+      <button class="pp-modal-x" type="button" onclick="ppQR(false)" aria-label="Close">&times;</button>
+      <div class="pp-qr-big"><img src="${qrSrc(240)}" alt="QR code for ${name}" ${IMG}></div>
+      <div class="pp-qr-name">${name}</div>
+      <div class="pp-qr-sub">Scan to View My Digital Card</div>
+      <div class="pp-qr-btns">
+        <a class="pp-qr-btn" href="${qrSrc(600)}" target="_blank" rel="noopener" download="${slug || "card"}-qr.png"><i class="fa fa-download"></i> Download</a>
+        <button class="pp-qr-btn ghost" type="button" onclick="pwShare()"><i class="fa fa-share-alt"></i> Share</button>
+      </div>
+    </div>
+  </div>`;
+
+  const script = opts.thumb ? "" : `<script>
+  function ppQR(o){var m=document.getElementById('ppqr');if(m)m.style.display=o?'flex':'none';}
+  function pwCopy(u){try{var t=document.createElement('textarea');t.value=u;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.focus();t.select();document.execCommand('copy');document.body.removeChild(t);alert('Link copied');}catch(e){alert(u);}}
+  function pwShare(){var u=${JSON.stringify(cardUrl)},t=${JSON.stringify(s(c.name) + (company ? " — " + s(c.company_name) : ""))};try{if(navigator.share){navigator.share({title:t,url:u}).catch(function(){pwCopy(u);});return;}}catch(e){}pwCopy(u);}
+  </script>`;
+
+  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}</style></head><body>
+  <div class="pp">
+    <div class="pp-cover">
+      <div class="pp-cover-logo">${brandTxt}</div>
+      <button class="pp-share" type="button" onclick="pwShare()" aria-label="Share profile"><i class="fa fa-share-alt"></i></button>
+    </div>
+    <div class="pp-in">
+      <div class="pp-card pp-rise">
+        <div class="pp-photo"><img src="${esc(photo) || initialPh(c, brand)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, brand)}'"></div>
+        <h1 class="pp-name">${name}</h1>
+        ${desig ? `<p class="pp-role">${desig}</p>` : ""}
+        ${company ? `<p class="pp-org">${company}</p>` : ""}
+        ${tag ? `<p class="pp-tag">${tag}</p>` : ""}
+        ${primary ? `<div class="pp-acts">${primary}</div>` : ""}
+        ${socials ? `<div class="pp-socials">${socials}</div>` : ""}
+        <div class="pp-tiles">${tiles}</div>
+      </div>
+      ${url ? `<a class="pp-cta pp-rise" href="${esc(/^https?:/i.test(url) ? url : "https://" + url)}" target="_blank" rel="noopener"><span class="pp-cta-ic"><i class="fa fa-globe"></i></span><span class="pp-cta-tx"><b>Check Out My Website!</b><small>${esc(url.replace(/^https?:\/\//i, "").replace(/\/$/, ""))}</small></span><i class="fa fa-arrow-right pp-cta-ar"></i></a>` : ""}
+      ${s(c.address) ? `<div class="pp-addr pp-rise"><span class="pp-addr-map"><i class="fa fa-map-marked-alt"></i></span><span class="pp-addr-tx"><b>Visit Us</b><p>${esc(c.address)}</p></span>${mapHref ? `<a class="pp-go" href="${esc(mapHref)}" target="_blank" rel="noopener"><i class="fa fa-location-arrow"></i> Go</a>` : ""}</div>` : ""}
+      ${about ? `<div id="pp-about" class="pp-about pp-rise"><h3>About</h3><p>${esc(about.slice(0, 420))}</p></div>` : ""}
+      <div class="pp-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
+      ${chrome}
+    </div>
+  </div>
+  ${modal}
   ${script}
   </body></html>`;
 }
