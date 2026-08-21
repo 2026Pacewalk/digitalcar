@@ -229,7 +229,14 @@
     transform: none !important;
     transition: none !important;
   }
-  .animate-marquee, .animate-aurora-drift, .animate-float, .animate-spin-slow { animation: none !important; }
+  .animate-marquee, .animate-aurora-drift, .animate-float, .animate-spin-slow,
+  .dc-rise { animation: none !important; }
+  .dc-rise { opacity: 1 !important; transform: none !important; }
+  .dc-live-dot::after { display: none !important; }
+  .dc-collapse { transition: none !important; }
+  /* .animate-spin is deliberately NOT listed: a loading spinner is the one
+     motion reduced-motion users still expect, and this selector list is global
+     to every route. */
 }
 
 /* Marquee row (duplicate children for seamless loop) */
@@ -472,4 +479,38 @@ button.fab:active {
   .mobile-table-card {
     display: table;
   }
+}
+
+/* ── Login page (src/pages/Login.tsx + src/components/auth/*) ───────────── */
+
+@keyframes dcRise {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+.dc-rise {
+  animation: dcRise 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Composited halo: scale + opacity on a pseudo-element, never box-shadow
+   (box-shadow repaints every frame; transform/opacity composite). */
+@keyframes dcLivePing {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  70%  { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.dc-live-dot { position: relative; }
+.dc-live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #14B8A6;
+  animation: dcLivePing 2600ms cubic-bezier(0, 0, 0.2, 1) infinite;
+  animation-delay: var(--dc-delay, 0s);
+  pointer-events: none;
+}
+
+/* Height-auto disclosure with no JS measurement. */
+.dc-collapse {
+  transition: grid-template-rows 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
