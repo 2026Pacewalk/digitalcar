@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import { readCustomer, scopedKey, getActiveCardId } from "@/hooks/useCustomer";
 import { healUploadUrl } from "@/lib/img";
@@ -31,6 +32,10 @@ export function useAutoPublish(): void {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Cache of "is this slug a live legacy card?" (undefined = not yet checked).
   const legacyLive = useRef<boolean | undefined>(undefined);
+  // Last publish error we surfaced, keyed by `slug|message`. An edit inherently
+  // fires several debounced saves, so without this the same failure would toast
+  // on every burst. Reset on the first success so a later break re-alerts.
+  const lastErr = useRef<string | null>(null);
 
   useEffect(() => {
     const readList = (base: string) => {
@@ -68,18 +73,36 @@ export function useAutoPublish(): void {
       if (slug.length < 3) return;
       if (localStorage.getItem(scopedKey("dc_hydrated")) !== "1") return;
       if (!(await isLive(data, slug))) return; // never auto-activate a fresh card
-      saveRef.current.mutate({
-        slug,
-        cardId: getActiveCardId(),
-        data: {
-          customer: data,
-          products: readList("dc_products"),
-          gallery: readList("dc_gallery"),
-          videos: readList("dc_videos"),
-          offers: readList("dc_offers"),
-          qrcodes: readList("dc_qrcode"),
-        },
-      });
+      try {
+        await saveRef.current.mutateAsync({
+          slug,
+          cardId: getActiveCardId(),
+          data: {
+            customer: data,
+            products: readList("dc_products"),
+            gallery: readList("dc_gallery"),
+            videos: readList("dc_videos"),
+            offers: readList("dc_offers"),
+            qrcodes: readList("dc_qrcode"),
+          },
+        });
+        // A save that now succeeds clears any prior alert so a future break re-warns.
+        lastErr.current = null;
+      } catch (e) {
+        // Auto-publish used to swallow every error, so a rejected snapshot left
+        // the dashboard showing "Saved" while the PUBLIC page kept the old
+        // content — the exact confusion behind the pacewalk About-Us report.
+        // Surface the real reason, once per distinct failure (see lastErr).
+        const raw = (e as { message?: string })?.message || "";
+        const msg = /taken/i.test(raw)
+          ? `Your edits aren't showing on /${slug} — that card link belongs to another account. Contact support to claim it.`
+          : `Couldn't update your public card /${slug}. Your changes are saved here but aren't live yet — retrying on your next edit.`;
+        const sig = `${slug}|${msg}`;
+        if (lastErr.current !== sig) {
+          lastErr.current = sig;
+          toast.error(msg, { duration: 8000 });
+        }
+      }
     };
 
     const onChange = () => {
