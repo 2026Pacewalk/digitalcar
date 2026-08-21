@@ -29,7 +29,12 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get("next");
-  const next = nextPath && nextPath.startsWith("/") ? nextPath : "";
+  // Only same-site paths. "//evil.com" and "/\evil.com" are browser-protocol
+  // relative URLs — they start with "/" but navigate OFF-SITE, so a crafted
+  // ?next= could bounce a freshly-authenticated user to an attacker's page.
+  const next =
+    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") && !nextPath.startsWith("/\\")
+      ? nextPath : "";
   const loginMut = trpc.auth.login.useMutation();
   const slot = adminMode ? "admin" : "main"; // this login page's portal
 
@@ -86,13 +91,19 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     try {
       const res = await loginMut.mutateAsync({ email: mail.trim(), password: pass });
       setSession(res.token, res.user, slot);
-      if (!gateOk(res.user.role)) return;
+      // gateOk rejecting does NOT navigate, so the spinner has to be released
+      // here — otherwise a super-admin who signs in at /login is left staring at
+      // a disabled "Signing in…" button forever.
+      if (!gateOk(res.user.role)) { setLoading(false); return; }
       toast.success("Welcome back!");
       navigate(next || routeFor(res.user.role));
     } catch (err) {
-      if (demoLogin(mail, pass)) return;
+      if (demoLogin(mail, pass)) { setLoading(false); return; }
       const msg = err instanceof Error ? err.message : "";
-      const backendDown = /Failed query|fetch|ECONNREFUSED|NetworkError|Failed to fetch|users/i.test(msg);
+      // NOTE: "users" was previously in this list, which meant any error whose
+      // text merely contained that word (e.g. a validation message) was reported
+      // to the customer as a server outage. Match transport failures only.
+      const backendDown = /Failed query|fetch|ECONNREFUSED|NetworkError|Failed to fetch/i.test(msg);
       toast.error(backendDown ? "Server is temporarily unavailable. Please try again shortly." : (msg || "Invalid email or password"));
       setLoading(false);
     }
@@ -100,6 +111,9 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    // The server rate-limits login at 8/min per IP and 10/5min per identifier
+    // (auth-router.ts:326,328). A double Enter must not burn two attempts.
+    if (loading) return;
     if (!email || !password) { toast.error("Please fill in all fields"); return; }
     doLogin(email, password);
   };
