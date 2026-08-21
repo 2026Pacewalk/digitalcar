@@ -248,6 +248,29 @@ try {
   log(idx ? `✓ card_events: ${idx} analytics index(es) added` : "• card_events analytics indexes already present (skipped)");
 }
 
+// SECURITY SCRUB: an old change-password bug wrote the user's PLAINTEXT password
+// into the card JSON (dc_customer), which auto-publish then copied into the
+// public snapshot — where publish.bySlug served it to anyone. The code paths are
+// fixed (the mutation is server-side + bcrypt now, and saveSnapshot/bySlug strip
+// these keys on both write and read), but historic rows can still carry the
+// value. This removes ONLY those secret keys from the JSON and touches nothing
+// else. Idempotent: once clean, it reports and skips.
+{
+  const SECRET_PATHS = ["$.customer.password", "$.customer.email_verify_on", "$.customer.otp", "$.customer.reset_token"];
+  const whereAny = SECRET_PATHS.map((p) => `JSON_EXTRACT(data, '${p}') IS NOT NULL`).join(" OR ");
+  const [before] = await conn.query(`SELECT COUNT(*) AS n FROM published_cards WHERE ${whereAny}`);
+  if (before[0].n > 0) {
+    await conn.query(
+      `UPDATE published_cards
+         SET data = JSON_REMOVE(data, ${SECRET_PATHS.map((p) => `'${p}'`).join(", ")})
+       WHERE ${whereAny}`);
+    const [after] = await conn.query(`SELECT COUNT(*) AS n FROM published_cards WHERE ${whereAny}`);
+    log(`✓ published_cards: secrets stripped from ${before[0].n} snapshot(s) — ${after[0].n} remaining`);
+  } else {
+    log("• published_cards snapshots carry no secrets (skipped)");
+  }
+}
+
 console.log("\n✅  Migration complete — additive only, no existing data touched.\n");
 console.log("   Next: seed products (node db/seed-products.mjs) once the app has");
 console.log("   generated its template presets, then set real INR prices in admin.\n");

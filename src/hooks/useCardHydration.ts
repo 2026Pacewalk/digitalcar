@@ -57,7 +57,7 @@ function mapProfile(row: Record<string, unknown>, u: { id: number; fullName: str
     video_on: Number(row.video_on ?? 1), qrcode_on: Number(row.qrcode_on ?? 1),
     offer_on: Number(row.offer_on ?? 0), uploads_on: Number(row.uploads_on ?? 0),
     enquiry_on: Number(row.enquiry_on ?? 1), feedback_on: Number(row.feedback_on ?? 0),
-    review_on: Number(row.review_on ?? 1), cardqr_on: Number(row.cardqr_on ?? 0),
+    review_on: Number(row.review_on ?? 1), cardqr_on: Number(row.cardqr_on ?? 1),
     about: s(row.about), product: s(row.product), payment: s(row.payment),
     gallery: s(row.gallery), video: s(row.video), qrcode: s(row.qrcode),
     offer: s(row.offer), uploads: s(row.uploads), enquiry: s(row.enquiry),
@@ -93,6 +93,7 @@ export function useCardHydration(): boolean {
     } catch { /* fall through to hydrate */ }
 
     let cancelled = false;
+    let hydrated = false;
     (async () => {
       const put = (base: string, arr: unknown[]) => {
         localStorage.setItem(scopedKey(base), JSON.stringify(arr || []));
@@ -135,9 +136,20 @@ export function useCardHydration(): boolean {
             put("dc_qrcode", (d.qrcodes as unknown[]) || []);
           }
         }
+        hydrated = true; // reached the end without throwing
       } catch { /* leave whatever's there — never block the dashboard on this */ }
       finally {
-        if (!cancelled) { try { localStorage.setItem(marker, "1"); } catch { /* ignore */ } setReady(true); }
+        if (!cancelled) {
+          // Only claim "hydrated" when it actually SUCCEEDED. This marker is what
+          // releases auto-publish (see useAutoPublish), so setting it after a
+          // failed load was a data-loss path: open the dashboard on a new device,
+          // have the snapshot fetch fail, and auto-publish would then overwrite
+          // the live card with the empty local one. On failure we leave the marker
+          // unset, which keeps auto-publish disabled for this session — the
+          // dashboard still works, it just won't republish from a bad state.
+          try { if (hydrated) localStorage.setItem(marker, "1"); } catch { /* ignore */ }
+          setReady(true);
+        }
       }
     })();
 

@@ -68,17 +68,25 @@ export function useAutoPublish(): void {
       if (slug.length < 3) return;
       if (localStorage.getItem(scopedKey("dc_hydrated")) !== "1") return;
       if (!(await isLive(data, slug))) return; // never auto-activate a fresh card
+
+      const products = readList("dc_products"), gallery = readList("dc_gallery"),
+        videos = readList("dc_videos"), offers = readList("dc_offers"), qrcodes = readList("dc_qrcode");
+
+      // SAFETY NET: never let auto-publish REPLACE a live card with a stub.
+      // The signup seed leaves name + account email + phone and nothing else; a
+      // card that is already live was published with more than that. If all the
+      // "substance" fields are empty AND there is no content at all, treat this
+      // as a half-loaded state rather than a real edit and skip the publish.
+      // (A manual Publish still works — this only guards the automatic path.)
+      const filled = (k: string) => String((data as Record<string, unknown>)[k] ?? "").trim().length > 0;
+      const hasSubstance =
+        ["company_name", "designation", "about_us", "address", "url", "nature"].some(filled) ||
+        products.length || gallery.length || videos.length || offers.length || qrcodes.length;
+      if (!hasSubstance) return;
       saveRef.current.mutate({
         slug,
         cardId: getActiveCardId(),
-        data: {
-          customer: data,
-          products: readList("dc_products"),
-          gallery: readList("dc_gallery"),
-          videos: readList("dc_videos"),
-          offers: readList("dc_offers"),
-          qrcodes: readList("dc_qrcode"),
-        },
+        data: { customer: data, products, gallery, videos, offers, qrcodes },
       });
     };
 
