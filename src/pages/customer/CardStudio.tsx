@@ -177,7 +177,7 @@ export default function CardStudio() {
         <button onClick={() => navigate("/dashboard/settings?tab=password")} className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-[12px] font-semibold text-[#334155] hover:bg-[#F8FAFC] shrink-0 hidden sm:block">Edit link</button>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_360px] gap-5 items-start">
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_408px] gap-5 items-start">
         {/* ── Form ── */}
         <div className="space-y-5 order-2 lg:order-1">
           <Panel title="The basics" subtitle="Who you are" icon={User}>
@@ -338,21 +338,20 @@ export default function CardStudio() {
           </Panel>
         </div>
 
-        {/* ── Live preview (desktop sticky phone mockup) ── */}
+        {/* ── Live preview (desktop sticky phone mockup) — renders at a real
+             ~390px phone viewport so what you see matches modern phones. ── */}
         <div className="hidden lg:block order-1 lg:order-2 sticky top-[100px]">
-          <div className="mx-auto w-full max-w-[300px]">
-            <div className="relative rounded-[38px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-2.5 shadow-premium-lg ring-1 ring-black/5">
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 h-5 px-3 rounded-full bg-[#0F172A]">
+          <div className="mx-auto w-full max-w-[408px]">
+            <div className="relative rounded-[44px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-[9px] shadow-premium-lg ring-1 ring-black/5">
+              <div className="absolute top-[9px] left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 h-6 px-4 rounded-b-2xl bg-[#0F172A]">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#334155]" />
-                <span className="w-10 h-1 rounded-full bg-[#334155]" />
+                <span className="w-12 h-1 rounded-full bg-[#334155]" />
               </div>
-              <div className="pt-6">
-                <iframe srcDoc={previewHtml} title="Live preview" className="w-full h-[600px] rounded-[30px] bg-white border-0 block" />
-              </div>
+              <iframe srcDoc={previewHtml} title="Live preview" className="w-full h-[640px] rounded-[36px] bg-white border-0 block" />
             </div>
           </div>
           <div className="flex items-center justify-center gap-2 mt-3">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live preview</span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live preview · actual phone size</span>
             <span className="text-[#CBD5E1]">·</span>
             <a href={cardUrl} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#64748B] hover:text-[#F7B31C] inline-flex items-center gap-1">Open card <ChevronRight size={12} /></a>
           </div>
