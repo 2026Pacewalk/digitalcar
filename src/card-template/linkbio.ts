@@ -10,6 +10,8 @@
  * These are the templates numbered LINKBIO_START … (LINKBIO_START + variants − 1).
  */
 
+import { resolveCardBg, cardBgOverrideCss } from "./cardBackground";
+
 type LBProduct = { name: string; button?: string; button_title?: string };
 type LBRecord = Record<string, unknown>;
 
@@ -226,6 +228,7 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
   const variants = linkBioVariants(accent);
   const v = variants[Math.max(0, Math.min(variants.length - 1, variantIndex))];
   const glass = /--lb-glass:1/.test(v.css);
+  const customBg = resolveCardBg(c);
 
   const name = esc(c.name) || "Your Name";
   const handle = s(c.username) || s(c.slug);
@@ -278,8 +281,10 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap">
 <style>${BASE_CSS}
 body{${v.css}}
+${customBg ? cardBgOverrideCss(customBg) : ""}
 </style></head>
 <body class="lb" data-variant="${v.id}"${glass ? ' data-glass="1"' : ""}>
+  ${customBg ? customBg.layerHtml : ""}
   <div class="lb-wrap">
     <div class="lb-avatar${s(c.logo_shape) === "plain" && s(c.logo) ? " is-plain" : ""}"><img src="${esc(c.logo) || avatarPh}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${avatarPh}'"></div>
     <h1 class="lb-name">${name}</h1>

@@ -11,6 +11,7 @@ import { useCustomer, useLocalList, getActiveCardId } from "@/hooks/useCustomer"
 import { useValidityDays } from "@/hooks/useValidityDays";
 import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
+import { BG_PRESETS } from "@/card-template/cardBackground";
 import { trpc } from "@/providers/trpc";
 import { logFunnel } from "@/lib/funnel";
 
@@ -235,6 +236,80 @@ export default function CardStudio() {
                 </div>
               </div>
             )}
+          </Panel>
+
+          <Panel title="Background" subtitle="Make it yours — a preset, colour, gradient or your own photo">
+            {(() => {
+              const bgType = val("bg_type") || "theme";
+              const TYPES = [["theme", "Template"], ["preset", "Presets"], ["solid", "Solid"], ["gradient", "Gradient"], ["image", "Photo"]] as const;
+              const setType = (t: string) => set("bg_type", t === "theme" ? "" : t);
+              const slider = (k: string, label: string, min: number, max: number, def: number, suffix: string) => (
+                <div>
+                  <div className="flex items-center justify-between mb-1"><span className="text-[11px] font-medium text-[#64748B]">{label}</span><span className="text-[11px] tabular-nums text-[#94A3B8]">{val(k) || def}{suffix}</span></div>
+                  <input type="range" min={min} max={max} value={Number(val(k) || def)} onChange={(e) => set(k, e.target.value)} className="w-full accent-[#F7B31C]" />
+                </div>
+              );
+              return (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {TYPES.map(([t, label]) => (
+                      <button key={t} type="button" onClick={() => setType(t)} className={`px-3 h-8 rounded-lg text-[12px] font-semibold transition-colors ${bgType === t ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>{label}</button>
+                    ))}
+                  </div>
+
+                  {bgType === "theme" && <p className="text-[12px] text-[#94A3B8]">Using the template's built-in background. Pick another option above to customise it.</p>}
+
+                  {bgType === "preset" && (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
+                      {BG_PRESETS.map((p) => {
+                        const active = val("bg_preset") === p.key;
+                        return (
+                          <button key={p.key} type="button" onClick={() => set("bg_preset", p.key)} title={p.label} className={`group relative rounded-xl overflow-hidden aspect-square ring-2 transition-all ${active ? "ring-[#0F172A] scale-[1.03]" : "ring-transparent hover:ring-[#CBD5E1]"}`}>
+                            <span className="absolute inset-0" style={{ background: p.bg, backgroundSize: "cover" }} />
+                            {active && <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center"><Check size={11} className="text-[#0F172A]" /></span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {bgType === "solid" && (
+                    <div className="flex items-center gap-3">
+                      <input type="color" value={val("bg_color1") || "#0F172A"} onChange={(e) => set("bg_color1", e.target.value)} className="w-12 h-10 rounded-lg border border-[#E2E8F0] bg-white cursor-pointer p-1" />
+                      <div className="flex flex-wrap gap-1.5">
+                        {COLORS.map((c) => (
+                          <button key={c} type="button" onClick={() => set("bg_color1", c)} className={`w-8 h-8 rounded-lg ring-2 transition-all ${(val("bg_color1") || "").toLowerCase() === c.toLowerCase() ? "ring-[#0F172A] scale-110" : "ring-transparent"}`} style={{ background: c }} aria-label={c} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {bgType === "gradient" && (
+                    <div className="space-y-3">
+                      <div className="h-16 rounded-xl border border-[#E2E8F0]" style={{ background: `linear-gradient(${Number(val("bg_angle") || 160)}deg, ${val("bg_color1") || "#6d28d9"} 0%, ${val("bg_color2") || "#db2777"} 100%)` }} />
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-[11px] font-medium text-[#64748B]">Start <input type="color" value={val("bg_color1") || "#6d28d9"} onChange={(e) => set("bg_color1", e.target.value)} className="w-10 h-9 rounded-lg border border-[#E2E8F0] bg-white cursor-pointer p-1" /></label>
+                        <label className="flex items-center gap-2 text-[11px] font-medium text-[#64748B]">End <input type="color" value={val("bg_color2") || "#db2777"} onChange={(e) => set("bg_color2", e.target.value)} className="w-10 h-9 rounded-lg border border-[#E2E8F0] bg-white cursor-pointer p-1" /></label>
+                      </div>
+                      {slider("bg_angle", "Direction", 0, 360, 160, "°")}
+                    </div>
+                  )}
+
+                  {bgType === "image" && (
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <ImagePick value={val("bg_image")} onChange={(u) => set("bg_image", u)} className="w-24 h-32" label="Upload photo" fit="cover" />
+                      <div className="flex-1 space-y-3 min-w-0">
+                        {slider("bg_dim", "Darken", 0, 80, 35, "%")}
+                        {slider("bg_blur", "Blur", 0, 24, 0, "px")}
+                        <p className="text-[11px] text-[#94A3B8]">A little darken keeps your name and buttons readable over the photo.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {bgType !== "theme" && <p className="text-[11px] text-[#94A3B8]">Custom backgrounds apply to the minimal “link-in-bio” templates. Buttons and text auto-adjust to stay readable.</p>}
+                </div>
+              );
+            })()}
           </Panel>
         </div>
 
