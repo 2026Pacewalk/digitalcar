@@ -194,8 +194,13 @@ const BASE_CSS = `
 html,body{margin:0;padding:0;}
 body.lb{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--lb-bg);color:var(--lb-text);min-height:100vh;}
 .lb-wrap{max-width:480px;margin:0 auto;padding:38px 22px 30px;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100vh;}
-.lb-avatar{width:104px;height:104px;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.2);box-shadow:0 0 0 4px var(--lb-ring),0 10px 30px rgba(0,0,0,.18);margin-bottom:16px;}
+.lb-avatar{width:104px;height:104px;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.2);box-shadow:0 0 0 4px var(--lb-ring),0 10px 30px rgba(0,0,0,.18);margin-bottom:16px;display:flex;align-items:center;justify-content:center;}
 .lb-avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+/* Square shape — a rounded tile instead of a circle. */
+.lb-avatar.shape-square{border-radius:22px;}
+/* Fit the whole logo inside the shape (used when scaled or square): contain on white. */
+.lb-avatar.fit-contain{background:#fff;}
+.lb-avatar.fit-contain img{object-fit:contain;}
 /* "Plain" logo: drop the circular disc + ring so a transparent PNG shows on its own. */
 .lb-avatar.is-plain{width:auto;max-width:180px;height:96px;border-radius:0;overflow:visible;background:none;box-shadow:none;}
 .lb-avatar.is-plain img{width:auto;max-width:100%;height:100%;object-fit:contain;}
@@ -253,12 +258,20 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
       ? `<span class="lb-badge lb-badge-gold" title="Gold member" aria-label="Gold member"><i class="fa fa-crown"></i></span>`
       : "";
 
-  // Owner-adjustable logo size (70–160%). Base avatar is 104px (96px tall for plain).
-  const logoScale = Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100;
-  const isPlainLogo = s(c.logo_shape) === "plain" && !!s(c.logo);
-  const avatarStyle = isPlainLogo
-    ? `height:${Math.round(96 * logoScale)}px`
-    : `width:${Math.round(104 * logoScale)}px;height:${Math.round(104 * logoScale)}px`;
+  // Logo shape + size. The shape box stays a fixed 104px; "Logo size" (70–160%)
+  // scales the logo INSIDE the shape so a wide logo can be shrunk to fit the
+  // circle/square without being cropped. Plain shows the PNG on its own (size
+  // scales the PNG height directly).
+  const logoSizePct = Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100));
+  const hasLogo = !!s(c.logo);
+  const isPlainLogo = s(c.logo_shape) === "plain" && hasLogo;
+  const isSquare = s(c.logo_shape) === "square" && !isPlainLogo;
+  // Fit the whole logo inside the shape (contain, on white) when the user has
+  // shrunk/grown it or picked the square shape; otherwise fill (cover).
+  const fitContain = hasLogo && !isPlainLogo && (logoSizePct !== 100 || isSquare);
+  const avatarClass = [isPlainLogo ? "is-plain" : "", isSquare ? "shape-square" : "", fitContain ? "fit-contain" : ""].filter(Boolean).join(" ");
+  const avatarStyle = isPlainLogo ? `height:${Math.round(96 * logoSizePct / 100)}px` : "";
+  const avatarImgStyle = !isPlainLogo && fitContain ? `width:${logoSizePct}%;height:${logoSizePct}%` : "";
 
   const cardUrl = `https://digitalcarda.in/${s(c.slug) || "card"}`;
   const showQr = Number(c.cardqr_on ?? 1) === 1 && !!s(c.slug);
@@ -325,7 +338,7 @@ ${showShare ? shareSheetCss("#111827") : ""}
   ${customBg ? customBg.layerHtml : ""}
   ${showShare ? `<button class="lb-share" onclick="openShare()" aria-label="Share this card"><i class="fa fa-share-alt"></i></button>` : ""}
   <div class="lb-wrap">
-    <div class="lb-avatar-wrap"><div class="lb-avatar${isPlainLogo ? " is-plain" : ""}" style="${avatarStyle}"><img src="${esc(c.logo) || avatarPh}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${avatarPh}'"></div>${planBadge}</div>
+    <div class="lb-avatar-wrap"><div class="lb-avatar${avatarClass ? " " + avatarClass : ""}" style="${avatarStyle}"><img src="${esc(c.logo) || avatarPh}" alt="${name}" style="${avatarImgStyle}" ${IMG} onerror="this.onerror=null;this.src='${avatarPh}'"></div>${planBadge}</div>
     <h1 class="lb-name">${name}</h1>
     ${handle ? `<p class="lb-handle">@${esc(handle)}</p>` : ""}
     ${bio ? `<p class="lb-bio">${bio}</p>` : ""}

@@ -194,6 +194,7 @@ export default function CardStudio() {
                   <div className="mt-3 max-w-[190px]">
                     <div className="flex items-center justify-between mb-1"><span className="text-[10px] font-medium text-[#94A3B8]">Logo size</span><span className="text-[10px] tabular-nums text-[#94A3B8]">{val("logo_size") || 100}%</span></div>
                     <input type="range" min={70} max={160} value={Number(val("logo_size") || 100)} onChange={(e) => set("logo_size", e.target.value)} className="w-full accent-[#F7B31C]" aria-label="Logo size" />
+                    <span className="block text-[10px] text-[#94A3B8] mt-1 leading-snug">Shrink your logo so the full logo fits neatly inside the shape.</span>
                   </div>
                 </div>
               </div>
