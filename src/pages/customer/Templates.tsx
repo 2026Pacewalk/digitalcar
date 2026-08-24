@@ -181,9 +181,11 @@ export default function CustomerTemplates() {
         </Panel>
       )}
 
-      {/* Sticky Preview + Apply bar — appears the moment a template is selected */}
+      {/* Sticky Preview + Apply bar — appears the moment a template is selected.
+          On mobile it sits ABOVE the bottom tab-bar (h-16 + safe area); on desktop
+          (sidebar layout, no bottom nav) it drops to the bottom edge. */}
       {dirty && selected && (
-        <div className="fixed bottom-4 inset-x-0 z-40 flex justify-center px-4 pointer-events-none">
+        <div className="fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] lg:bottom-4">
           <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 bg-white/95 backdrop-blur rounded-2xl shadow-premium-lg border border-[#E2E8F0] pl-3.5 pr-2 py-2">
             <span className="hidden sm:flex items-center gap-2 pr-1">
               <span className="w-3.5 h-3.5 rounded-full border border-black/10" style={{ background: effPrimary }} />
