@@ -74,3 +74,25 @@ export async function verifyResetToken(token: string): Promise<{ userId: number;
     return null;
   }
 }
+
+// ── Email-verification tokens (3-day, distinct key so they can't be reused as
+//    auth or reset tokens). Binds the userId + email at issue time. ──
+const VERIFY_KEY = new TextEncoder().encode(RAW_SECRET + "::emailverify");
+
+export async function createVerifyToken(userId: number, email: string): Promise<string> {
+  return new SignJWT({ userId, email, purpose: "emailverify" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("3d")
+    .sign(VERIFY_KEY);
+}
+
+export async function verifyVerifyToken(token: string): Promise<{ userId: number; email: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, VERIFY_KEY, { clockTolerance: 60 });
+    if (payload.purpose !== "emailverify") return null;
+    return { userId: Number(payload.userId), email: String(payload.email) };
+  } catch {
+    return null;
+  }
+}

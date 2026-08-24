@@ -7,9 +7,9 @@ import { getDb } from "./queries/connection";
 import { users, resellerProfiles, referrals, notifications, cards, publishedCards, cardTrials, appSettings } from "@db/schema";
 import { eq, like } from "drizzle-orm";
 import { slugTakenByOther } from "./publish-router";
-import { createToken, createResetToken, verifyResetToken } from "./lib/jwt";
+import { createToken, createResetToken, verifyResetToken, createVerifyToken, verifyVerifyToken } from "./lib/jwt";
 import { sendEmail, ownerAddress } from "./lib/mail";
-import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail } from "./lib/email-templates";
+import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail, verifyEmailAddressEmail } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
@@ -214,6 +214,8 @@ export const authRouter = createRouter({
           phone: input.phone || null,
           role: input.role,
           status: "active",
+          // New accounts start unverified — they get a verification email below.
+          emailVerified: false,
         });
 
       const insertedUser = await db.query.users.findFirst({
@@ -227,8 +229,14 @@ export const authRouter = createRouter({
         });
       }
 
-      // Welcome email to the new user + new-signup alert to the owner (non-blocking).
+      // Welcome email + email-verification link to the new user, and a new-signup
+      // alert to the owner (all non-blocking).
       void sendEmail(insertedUser.email, welcomeEmail({ name: insertedUser.fullName, role: insertedUser.role }));
+      {
+        const vtoken = await createVerifyToken(insertedUser.id, insertedUser.email);
+        const vlink = `${PUBLIC_BASE_URL}/verify-email?token=${encodeURIComponent(vtoken)}`;
+        void sendEmail(insertedUser.email, verifyEmailAddressEmail({ name: insertedUser.fullName, link: vlink }));
+      }
       void sendEmail(ownerAddress(), newSignupAdminEmail({ name: insertedUser.fullName, email: insertedUser.email, role: insertedUser.role, phone: insertedUser.phone }));
 
       // Create reseller profile if registering as reseller
@@ -549,5 +557,46 @@ export const authRouter = createRouter({
       await db.update(users).set({ password: hashedPassword }).where(eq(users.id, user.id));
       void sendEmail(user.email, passwordChangedEmail({ name: user.fullName }));
       return { ok: true };
+    }),
+
+  // ── Email verification: current status (drives the dashboard banner) ──
+  verificationStatus: authedQuery.query(async ({ ctx }) => ({
+    verified: !!ctx.user.emailVerified,
+    email: ctx.user.email,
+  })),
+
+  // ── Email verification: (re)send the branded verification link ──
+  resendVerification: authedQuery.mutation(async ({ ctx }) => {
+    if (ctx.user.emailVerified) return { ok: true, already: true, email: ctx.user.email };
+    enforceRateLimit(`emailverify:${ctx.user.id}`, 4, 300_000);
+    const token = await createVerifyToken(ctx.user.id, ctx.user.email);
+    const link = `${PUBLIC_BASE_URL}/verify-email?token=${encodeURIComponent(token)}`;
+    const res = await sendEmail(ctx.user.email, verifyEmailAddressEmail({ name: ctx.user.fullName, link }));
+    if (!res.ok) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: res.error === "SMTP not configured"
+          ? "Email delivery isn't configured yet. Please contact support."
+          : "We couldn't send the email just now — please try again in a moment.",
+      });
+    }
+    return { ok: true, email: ctx.user.email };
+  }),
+
+  // ── Email verification: confirm the emailed token (public — no session yet) ──
+  verifyEmail: publicQuery
+    .input(z.object({ token: z.string().min(10) }))
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`emailverify-confirm:${clientIp(ctx.req)}`, 20, 300_000);
+      const data = await verifyVerifyToken(input.token);
+      if (!data) throw new TRPCError({ code: "BAD_REQUEST", message: "This verification link is invalid or has expired. Please request a new one from your dashboard." });
+      const db = getDb();
+      const user = await db.query.users.findFirst({ where: eq(users.id, data.userId) });
+      if (!user) throw new TRPCError({ code: "BAD_REQUEST", message: "We couldn't find that account." });
+      const already = !!user.emailVerified;
+      if (!already) {
+        await db.update(users).set({ emailVerified: true, emailVerifiedAt: new Date() }).where(eq(users.id, user.id));
+      }
+      return { ok: true, already, email: user.email };
     }),
 });

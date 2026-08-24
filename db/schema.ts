@@ -24,6 +24,10 @@ export const users = mysqlTable("users", {
   avatar: varchar("avatar", { length: 500 }),
   role: mysqlEnum("role", ["super_admin", "reseller", "customer"]).notNull().default("customer"),
   status: mysqlEnum("status", ["active", "inactive", "suspended"]).notNull().default("active"),
+  // Email verification. Defaults true so migrated/existing accounts aren't
+  // disrupted; new signups are inserted with false and get a verification email.
+  emailVerified: boolean("email_verified").notNull().default(true),
+  emailVerifiedAt: timestamp("email_verified_at"),
   // Super-admin per-user card-limit override (null = use the plan default).
   cardLimit: int("card_limit"),
   resellerId: bigint("reseller_id", { mode: "number", unsigned: true }),

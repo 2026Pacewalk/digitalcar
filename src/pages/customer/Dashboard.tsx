@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   CalendarClock, MessageSquare, Eye, Pencil, MessageCircle,
-  Copy, Check, ShieldAlert, ChevronRight, CreditCard, Wallet, Gift,
+  Copy, Check, ChevronRight, CreditCard, Wallet, Gift,
   ShoppingBag, ImageIcon, Share2, Star, Upload, QrCode, Info, Home as HomeIcon,
   Sparkles, ArrowRight, TrendingUp, Layers, PhoneCall,
 } from "lucide-react";
@@ -15,6 +15,7 @@ import { useValidityDays } from "@/hooks/useValidityDays";
 import { fetchMyLeads } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import TrialBanner from "@/components/customer/TrialBanner";
+import EmailVerifyBanner from "@/components/customer/EmailVerifyBanner";
 import TrialLifecycleBanner from "@/components/customer/TrialLifecycleBanner";
 import LeadReminder from "@/components/customer/LeadReminder";
 import OnboardingGuide, { type GuideStep } from "@/components/customer/OnboardingGuide";
@@ -417,16 +418,8 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        {/* ─── Email verify alert ─── */}
-        {customer.email_verify === 0 && (
-          <div className="rounded-2xl bg-gradient-to-r from-[#FEF2F2] to-[#FFF7F7] border border-red-100 p-3.5 flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-red-100 text-red-500 flex items-center justify-center shrink-0"><ShieldAlert size={17} /></span>
-            <p className="text-xs text-[#991B1B] flex-1 leading-snug">Email not verified. Check your inbox for the verification link.</p>
-            <button onClick={() => toast.success("Verification link resent to " + customer.email)} className="h-9 px-3.5 rounded-lg bg-[#0F172A] text-white text-xs font-semibold hover:bg-[#1E293B] transition-colors shrink-0">
-              Resend
-            </button>
-          </div>
-        )}
+        {/* ─── Email verify alert (real — server-driven, sends a branded email) ─── */}
+        <EmailVerifyBanner />
       </div>
     </ResponsiveDashboardLayout>
   );

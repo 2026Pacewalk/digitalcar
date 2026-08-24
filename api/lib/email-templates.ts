@@ -217,6 +217,23 @@ export function paymentRejectedEmail(o: { name?: string; planName: string; note?
   };
 }
 
+export function verifyEmailAddressEmail(o: { name?: string; link: string }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p("Thanks for joining <strong>DigitalCarda</strong>! Please confirm this is your email address — it secures your account and lets us send you important updates about your card, leads and plan.") +
+    button("Verify my email", o.link) +
+    `<div style="margin:8px 0 6px;padding:12px 14px;background:${BRAND.soft};border:1px solid ${BRAND.line};border-radius:12px">
+      <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:${BRAND.sub}">Button not working? Paste this link into your browser:</p>
+      <a href="${esc(o.link)}" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${BRAND.goldDark};text-decoration:none;word-break:break-all">${esc(o.link)}</a>
+    </div>` +
+    p(`<span style="color:${BRAND.sub};font-size:13px">This link expires in 3 days. If you didn't create a DigitalCarda account, you can safely ignore this email.</span>`);
+  return {
+    subject: "Verify your email — DigitalCarda",
+    html: layout({ preheader: "Confirm your email to secure your DigitalCarda account.", badge: "Verify email", heading: "Confirm your email address ✅", bodyHtml, accent: "#3B82F6" }),
+    text: `Hi ${o.name || "there"},\n\nWelcome to DigitalCarda! Confirm your email to secure your account:\n${o.link}\n\nThis link expires in 3 days. If you didn't sign up, ignore this email.`,
+  };
+}
+
 export function passwordChangedEmail(o: { name?: string }): Email {
   const bodyHtml =
     hi(o.name) +

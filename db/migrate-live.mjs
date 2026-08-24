@@ -119,6 +119,19 @@ try {
   } else { log("• users.card_limit present (skipped)"); }
 }
 
+// Email verification (new-flow accounts). EXISTING users default to verified (1)
+// so no one is disrupted; the register endpoint inserts new signups with 0 and
+// sends them a verification email. Additive + guarded + idempotent.
+{
+  const [cc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='users' AND column_name='email_verified'");
+  if (cc[0].n === 0) {
+    await conn.query("ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 1 AFTER status");
+    await conn.query("ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP NULL AFTER email_verified");
+    log("✓ users.email_verified added (existing users default verified)");
+  } else { log("• users.email_verified present (skipped)"); }
+}
+
 // Phase 34: multi-card publishing — published_cards goes one-row-per-card so a
 // multi-card plan can publish several. Add card_id (default 1 = primary), drop
 // the single-column user_id UNIQUE, add composite UNIQUE (user_id, card_id).
