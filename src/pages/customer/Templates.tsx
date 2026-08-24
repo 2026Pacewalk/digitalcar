@@ -99,6 +99,15 @@ export default function CustomerTemplates() {
   // Effective colours = custom override (if set) else the preset's own colours
   const effPrimary = primary || selected?.primary || "#F7B31C";
 
+  // The template currently LIVE on the card (matched by style + colour) — stays
+  // marked "Applied" even while the user is previewing a different one.
+  const currentId = useMemo(() => {
+    const t = Number(data.theme);
+    if (!t) return null;
+    const col = String(data.color || "").toLowerCase();
+    return (presets.find((p) => p.style === t && p.primary.toLowerCase() === col) || presets.find((p) => p.style === t))?.id ?? null;
+  }, [presets, data.theme, data.color]);
+
   const thumbs = useMemo(() =>
     presets.map((p) => buildCardThumb({ ...data, color: p.primary, color2: p.secondary }, p.style)),
     [presets, data]);
@@ -128,11 +137,13 @@ export default function CustomerTemplates() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {presets.map((p, i) => {
               const isSel = selId === p.id;
+              const isCurrent = currentId === p.id;
               return (
                 <button key={p.id} onClick={() => pick(p.id)}
-                  className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all group ${isSel ? "border-[#F7B31C] shadow-gold ring-2 ring-[#F7B31C]/20" : "border-[#F1F5F9] hover:border-[#F7B31C]/50 hover:-translate-y-0.5 hover:shadow-premium"}`}>
+                  className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all group ${isSel ? "border-[#F7B31C] shadow-gold ring-2 ring-[#F7B31C]/20" : isCurrent ? "border-emerald-400 ring-2 ring-emerald-400/15" : "border-[#F1F5F9] hover:border-[#F7B31C]/50 hover:-translate-y-0.5 hover:shadow-premium"}`}>
                   {isSel && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F7B31C] flex items-center justify-center z-10 shadow"><Check size={13} className="text-[#0F172A]" /></span>}
-                  {defaultId === p.id && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
+                  {isCurrent && <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500 text-white shadow"><Check size={9} strokeWidth={3} /> APPLIED</span>}
+                  {!isCurrent && defaultId === p.id && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
                   <ThumbFrame html={thumbs[i]} title={p.name} />
                   <div className="px-2 py-2 flex items-center gap-1.5 justify-center">
                     <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: p.primary }} />
