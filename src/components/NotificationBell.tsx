@@ -1,12 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Bell, Mail, Inbox, Banknote, CheckCircle2, XCircle, Package,
-  Sparkles, CalendarClock, Users, CheckCheck, Trash2,
+  Sparkles, CalendarClock, Users, CheckCheck, Trash2, TrendingUp, Wand2, Clock,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { useEnquiryNotifications } from "@/hooks/useEnquiryNotifications";
-import { readCustomer } from "@/hooks/useCustomer";
+import { readCustomer, scopedKey } from "@/hooks/useCustomer";
 import { trpc } from "@/providers/trpc";
 
 const timeAgo = (s: string | Date) => {
@@ -18,17 +18,42 @@ const timeAgo = (s: string | Date) => {
   return `${Math.floor(h / 24)}d ago`;
 };
 
-/* Type → icon + colors. Every notification kind gets its own look. */
-const STYLE: Record<string, { icon: ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>; bg: string; fg: string }> = {
-  enquiry:          { icon: Mail,         bg: "#FEF3C7", fg: "#D97706" },
-  referral_joined:  { icon: Users,        bg: "#DBEAFE", fg: "#2563EB" },
-  referral_reward:  { icon: Banknote,     bg: "#DCFCE7", fg: "#16A34A" },
-  payout_paid:      { icon: CheckCircle2, bg: "#DCFCE7", fg: "#16A34A" },
-  payout_rejected:  { icon: XCircle,      bg: "#FEE2E2", fg: "#DC2626" },
-  plan:             { icon: Package,      bg: "#EDE9FE", fg: "#7C3AED" },
-  welcome:          { icon: Sparkles,     bg: "#FEF3C7", fg: "#F7B31C" },
-  expiry:           { icon: CalendarClock, bg: "#FEE2E2", fg: "#DC2626" },
-  default:          { icon: Bell,         bg: "#F1F5F9", fg: "#64748B" },
+type Style = { icon: ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>; bg: string; fg: string };
+
+/* Type → icon + colours. Every notification kind gets its own look. */
+const STYLE: Record<string, Style> = {
+  enquiry:            { icon: Mail,          bg: "#FEF3C7", fg: "#D97706" },
+  referral_joined:    { icon: Users,         bg: "#DBEAFE", fg: "#2563EB" },
+  referral_reward:    { icon: Banknote,      bg: "#DCFCE7", fg: "#16A34A" },
+  reseller_commission:{ icon: Banknote,      bg: "#DCFCE7", fg: "#16A34A" },
+  reward:             { icon: Banknote,      bg: "#DCFCE7", fg: "#16A34A" },
+  payout_paid:        { icon: CheckCircle2,  bg: "#DCFCE7", fg: "#16A34A" },
+  payout_rejected:    { icon: XCircle,       bg: "#FEE2E2", fg: "#DC2626" },
+  payment_verified:   { icon: CheckCircle2,  bg: "#DCFCE7", fg: "#16A34A" },
+  payment_pending:    { icon: Clock,         bg: "#FEF3C7", fg: "#D97706" },
+  payment_rejected:   { icon: XCircle,       bg: "#FEE2E2", fg: "#DC2626" },
+  plan:               { icon: Package,       bg: "#EDE9FE", fg: "#7C3AED" },
+  welcome:            { icon: Sparkles,      bg: "#FEF3C7", fg: "#F7B31C" },
+  expiry:             { icon: CalendarClock, bg: "#FEE2E2", fg: "#DC2626" },
+  trial_email_ending: { icon: CalendarClock, bg: "#FEF3C7", fg: "#D97706" },
+  trial_email_ended:  { icon: CalendarClock, bg: "#FEE2E2", fg: "#DC2626" },
+  ls_abandoned:       { icon: Wand2,         bg: "#FEF3C7", fg: "#F7B31C" },
+  milestone:          { icon: TrendingUp,    bg: "#DBEAFE", fg: "#2563EB" },
+  default:            { icon: Bell,          bg: "#F1F5F9", fg: "#64748B" },
+};
+
+/* Robust fallback so a NEW server type still gets a sensible icon/colour, never
+   a blank grey bell — matched by keyword when there's no exact entry. */
+const styleFor = (type: string): Style => {
+  if (STYLE[type]) return STYLE[type];
+  if (/trial|expir/.test(type)) return { icon: CalendarClock, bg: "#FEF3C7", fg: "#D97706" };
+  if (/pay|commission|reward|payout|wallet|credit/.test(type)) return { icon: Banknote, bg: "#DCFCE7", fg: "#16A34A" };
+  if (/referral|invite/.test(type)) return { icon: Users, bg: "#DBEAFE", fg: "#2563EB" };
+  if (/enquiry|lead/.test(type)) return { icon: Mail, bg: "#FEF3C7", fg: "#D97706" };
+  if (/view|milestone|reach/.test(type)) return { icon: TrendingUp, bg: "#DBEAFE", fg: "#2563EB" };
+  if (/plan|upgrade|subscription|renew/.test(type)) return { icon: Package, bg: "#EDE9FE", fg: "#7C3AED" };
+  if (/welcome|ls_|publish|complete/.test(type)) return { icon: Sparkles, bg: "#FEF3C7", fg: "#F7B31C" };
+  return STYLE.default;
 };
 
 type FeedItem = {
@@ -50,10 +75,12 @@ const FILTERS = [
 ] as const;
 type FilterId = (typeof FILTERS)[number]["id"];
 
-const GROUP: Record<string, FilterId> = {
-  enquiry: "leads",
-  referral_joined: "rewards", referral_reward: "rewards", payout_paid: "rewards", payout_rejected: "rewards",
-  plan: "system", welcome: "system", expiry: "system", default: "system",
+/* Which tab a notification type belongs to — keyword-matched so every kind,
+   including new ones, lands in the right filter. */
+const groupFor = (type: string): FilterId => {
+  if (/enquiry|lead/.test(type)) return "leads";
+  if (/referral|reward|payout|commission|wallet|credit/.test(type)) return "rewards";
+  return "system";
 };
 
 export default function NotificationBell() {
@@ -92,7 +119,35 @@ export default function NotificationBell() {
     } catch { return null; }
   }, []);
 
-  /* Merge every source into one feed, newest first (expiry alert pinned) */
+  // New: celebrate card-view milestones (100, 500, 1k, 5k, 10k…). Uses the real
+  // live view count; fires once per milestone (remembered per-user) so it never nags.
+  const [views, setViews] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    try {
+      const slug = String(readCustomer()?.slug || "").toLowerCase();
+      if (!slug) return;
+      fetch(`/api/views/${encodeURIComponent(slug)}`).then((r) => r.json())
+        .then((d) => { if (!cancelled && typeof d?.views === "number") setViews(d.views); })
+        .catch(() => { /* ignore */ });
+    } catch { /* ignore */ }
+    return () => { cancelled = true; };
+  }, []);
+  const VIEW_MS = [100, 500, 1000, 5000, 10000, 25000, 50000, 100000];
+  const reachedMs = views == null ? 0 : (VIEW_MS.filter((m) => views >= m).pop() || 0);
+  const markMilestoneSeen = () => { try { if (reachedMs) localStorage.setItem(scopedKey("views_ms_seen"), String(reachedMs)); } catch { /* ignore */ } };
+  const milestoneAlert = useMemo((): FeedItem | null => {
+    if (!reachedMs) return null;
+    try { if (reachedMs <= Number(localStorage.getItem(scopedKey("views_ms_seen")) || 0)) return null; } catch { return null; }
+    return {
+      key: "local-milestone", type: "milestone",
+      title: `🎉 ${reachedMs.toLocaleString("en-IN")} card views!`,
+      message: "Your digital card is getting noticed — keep sharing it to grow.",
+      time: null, unread: true, link: "/dashboard/analytics",
+    };
+  }, [reachedMs]);
+
+  /* Merge every source into one feed, newest first (local alerts pinned) */
   const feed = useMemo((): FeedItem[] => {
     const items: FeedItem[] = [];
     for (const n of backendList || []) {
@@ -110,23 +165,25 @@ export default function NotificationBell() {
       });
     }
     items.sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
-    return expiryAlert ? [expiryAlert, ...items] : items;
-  }, [backendList, enqRecent, expiryAlert]);
+    const pinned = [expiryAlert, milestoneAlert].filter(Boolean) as FeedItem[];
+    return [...pinned, ...items];
+  }, [backendList, enqRecent, expiryAlert, milestoneAlert]);
 
-  const visible = filter === "all" ? feed : feed.filter((i) => (GROUP[i.type] || "system") === filter);
-  const badge = enqUnread + (backendUnread?.count ?? 0);
+  const visible = filter === "all" ? feed : feed.filter((i) => groupFor(i.type) === filter);
+  const badge = enqUnread + (backendUnread?.count ?? 0) + (expiryAlert ? 1 : 0) + (milestoneAlert ? 1 : 0);
 
   const markAll = () => {
-    markEnqRead();
+    markEnqRead(); markMilestoneSeen();
     markAllReadMut.mutate(undefined, { onSuccess: () => { utils.notification.list.invalidate(); utils.notification.unreadCount.invalidate(); } });
   };
   const clearAll = () => {
-    markEnqRead();
+    markEnqRead(); markMilestoneSeen();
     clearAllMut.mutate(undefined, { onSuccess: () => { utils.notification.list.invalidate(); utils.notification.unreadCount.invalidate(); } });
   };
   const openItem = (i: FeedItem) => {
     if (i.backendId) markReadMut.mutate({ id: i.backendId }, { onSuccess: () => { utils.notification.list.invalidate(); utils.notification.unreadCount.invalidate(); } });
     if (i.type === "enquiry") markEnqRead();
+    if (i.type === "milestone") markMilestoneSeen();
     setOpen(false);
     navigate(i.link);
   };
@@ -174,7 +231,7 @@ export default function NotificationBell() {
                   <p className="text-[10px] text-[#CBD5E1] mt-1">Enquiries, rewards & updates appear here.</p>
                 </div>
               ) : visible.slice(0, 15).map((i) => {
-                const st = STYLE[i.type] || STYLE.default;
+                const st = styleFor(i.type);
                 return (
                   <button key={i.key} onClick={() => openItem(i)}
                     className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-[#F8FAFC] transition-colors text-left border-b border-[#F8FAFC] last:border-0 ${i.unread ? "bg-[#FFFDF5]" : ""}`}>
