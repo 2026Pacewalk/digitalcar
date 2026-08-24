@@ -122,6 +122,25 @@ export const subscriptions = mysqlTable("subscriptions", {
 
 export type Subscription = typeof subscriptions.$inferSelect;
 
+// ─── Card Add-ons (ID Card / Membership Card) ───────────────────
+// Paid extras a user adds ON TOP of their subscription — ₹299/year each
+// (÷12 on a monthly plan). One active row per (user, type).
+export const cardAddons = mysqlTable("card_addons", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  type: mysqlEnum("type", ["id_card", "membership"]).notNull(),
+  billingCycle: mysqlEnum("billing_cycle", ["monthly", "yearly"]).notNull().default("yearly"),
+  status: mysqlEnum("status", ["active", "expired", "cancelled"]).notNull().default("active"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("addon_user_idx").on(table.userId),
+  uniqueIndex("uq_addon_user_type").on(table.userId, table.type),
+]);
+
+export type CardAddon = typeof cardAddons.$inferSelect;
+
 // ─── Invoices ───────────────────────────────────────────────────
 export const invoices = mysqlTable("invoices", {
   id: serial("id").primaryKey(),

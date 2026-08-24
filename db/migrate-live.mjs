@@ -77,6 +77,15 @@ const TABLES = {
     status ENUM('new','contacted','won','lost') NOT NULL DEFAULT 'new',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX bulkreq_user_idx (user_id), INDEX bulkreq_status_idx (status))`,
+  card_addons: `CREATE TABLE IF NOT EXISTS card_addons (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id BIGINT UNSIGNED NOT NULL,
+    type ENUM('id_card','membership') NOT NULL,
+    billing_cycle ENUM('monthly','yearly') NOT NULL DEFAULT 'yearly',
+    status ENUM('active','expired','cancelled') NOT NULL DEFAULT 'active',
+    current_period_end TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX addon_user_idx (user_id), UNIQUE INDEX uq_addon_user_type (user_id, type))`,
   ai_generations: `CREATE TABLE IF NOT EXISTS ai_generations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, business_name VARCHAR(120) NULL, profession VARCHAR(80) NULL,
     city VARCHAR(80) NULL, phone VARCHAR(30) NULL, source VARCHAR(16) NULL, ip VARCHAR(64) NULL,

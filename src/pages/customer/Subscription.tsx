@@ -238,6 +238,8 @@ export default function CustomerSubscription() {
         </div>
       </div>
 
+      <AddonsSection cycle={userCycle === "monthly" ? "monthly" : "yearly"} />
+
       {payFor && (
         <PayModal
           plan={payFor} offerPct={offerPct} cycle={cycle}
@@ -246,6 +248,83 @@ export default function CustomerSubscription() {
         />
       )}
     </ResponsiveDashboardLayout>
+  );
+}
+
+/* ─── Add-on cards (ID Card + Membership Card) — bought on top of the plan ─── */
+function AddonsSection({ cycle }: { cycle: "monthly" | "yearly" }) {
+  const { data: pricing } = trpc.addon.pricing.useQuery();
+  const { data: mine } = trpc.addon.mine.useQuery();
+  const rzpCfg = trpc.payment.razorpayConfig.useQuery();
+  const create = trpc.addon.razorpayCreateOrder.useMutation();
+  const verify = trpc.addon.razorpayVerify.useMutation();
+  const utils = trpc.useUtils();
+  const { data: customer } = useCustomer();
+  const [busy, setBusy] = useState<string>("");
+
+  if (!pricing) return null;
+  const owned = new Set((mine ?? []).map((a) => a.type));
+  const price = cycle === "monthly" ? pricing.monthly : pricing.yearly;
+  const suffix = cycle === "monthly" ? "/mo" : "/yr";
+  const money = (n: number) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+
+  const buy = async (type: "id_card" | "membership", name: string) => {
+    setBusy(type);
+    try {
+      const order = await create.mutateAsync({ type, billingCycle: cycle });
+      await openRazorpayCheckout({
+        key: order.keyId, amount: order.amount, currency: order.currency,
+        name: "DigitalCarda", description: `${order.name} · ${cycle === "monthly" ? "Monthly" : "Yearly"}`,
+        order_id: order.orderId,
+        prefill: { name: String(customer?.name || ""), email: String(customer?.email || ""), contact: String(customer?.mobile1 || "") },
+        theme: { color: "#F7B31C" },
+        handler: async (resp) => {
+          try {
+            await verify.mutateAsync({ razorpayOrderId: resp.razorpay_order_id, razorpayPaymentId: resp.razorpay_payment_id, razorpaySignature: resp.razorpay_signature, type, billingCycle: cycle });
+            toast.success(`${name} added to your plan 🎉`);
+            utils.addon.mine.invalidate();
+          } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't verify the payment."); }
+          finally { setBusy(""); }
+        },
+      });
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start the payment."); setBusy(""); }
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 mt-8">
+      <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-premium border border-[#F1F5F9]">
+        <div className="mb-4">
+          <h3 className="text-base font-bold text-[#0F172A]">Add-on cards</h3>
+          <p className="text-[12px] text-[#64748B] mt-0.5">Add these to your plan — <span className="font-semibold text-[#0F172A]">{money(price)}{suffix}</span> each. Unlock ID & membership card designs for your team.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {pricing.addons.map((a) => {
+            const has = owned.has(a.type);
+            return (
+              <div key={a.type} className={`rounded-2xl border p-4 flex flex-col ${has ? "border-emerald-300 bg-emerald-50/40" : "border-[#E2E8F0]"}`}>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-[#0F172A]">{a.name}</p>
+                  <span className="text-[15px] font-extrabold text-[#0F172A]">{money(price)}<span className="text-[11px] font-medium text-[#94A3B8]">{suffix}</span></span>
+                </div>
+                <p className="text-[12px] text-[#64748B] mt-1 mb-3 flex-1">{a.desc}</p>
+                {has ? (
+                  <span className="inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-semibold"><Check size={15} /> Added to your plan</span>
+                ) : (
+                  <>
+                    <button onClick={() => buy(a.type, a.name)} disabled={busy === a.type || !rzpCfg.data?.enabled}
+                      className="h-10 rounded-xl gradient-gold text-[#0F172A] text-sm font-semibold hover:shadow-gold transition-all disabled:opacity-50">
+                      {busy === a.type ? "Opening…" : "Add to my plan"}
+                    </button>
+                    {!rzpCfg.data?.enabled && <p className="text-[10px] text-[#94A3B8] mt-1.5 text-center">Online payments are being set up.</p>}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-[#94A3B8] mt-3">Billed on the same cycle as your plan. On a monthly plan the yearly ₹{pricing.yearly} is split across 12 months.</p>
+      </div>
+    </div>
   );
 }
 

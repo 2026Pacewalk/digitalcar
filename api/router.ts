@@ -20,6 +20,7 @@ import { aiRouter } from "./ai-router";
 import { bulkOrderRouter } from "./bulk-order-router";
 import { adminRouter } from "./admin-router";
 import { domainRouter } from "./domain-router";
+import { addonRouter } from "./addon-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -46,6 +47,7 @@ export const appRouter = createRouter({
   bulkOrder: bulkOrderRouter,
   admin: adminRouter,
   domain: domainRouter,
+  addon: addonRouter,
 });
 
 export type AppRouter = typeof appRouter;
