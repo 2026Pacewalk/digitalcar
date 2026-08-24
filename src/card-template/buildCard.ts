@@ -468,17 +468,25 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     const first = t.split(/\s+/)[0].replace(/[.,;:!|/–—-]+$/, "");
     return first.length > 11 ? first.slice(0, 10) + "…" : first;
   };
+  // Section HTML + footer nav keyed so the owner can reorder them (section_order).
+  const sectionByKey: Record<string, { html: string; foot: { id: string; icon: string; label: string } }> = {
+    about: { html: aboutSection, foot: { id: "about-section", icon: "fas fa-briefcase", label: navLabel(c.about, "About") } },
+    products: { html: servicesSection, foot: { id: "products-section", icon: "fas fa-box-open", label: navLabel(c.product, "Services") } },
+    offers: { html: offersSection, foot: { id: "offers-section", icon: "fas fa-tags", label: navLabel(c.offer, "Offers") } },
+    payment: { html: paymentSection, foot: { id: "payment-section", icon: "fas fa-money-bill-alt", label: navLabel(c.payment, "Payment") } },
+    gallery: { html: gallerySection, foot: { id: "gallery-section", icon: "fa fa-photo-video", label: navLabel(c.gallery, "Gallery") } },
+    video: { html: videoSection, foot: { id: "video-section", icon: "fa fa-video", label: navLabel(c.video, "Video") } },
+    reviews: { html: googleReviewSection, foot: { id: "review-section", icon: "fab fa-google", label: "Reviews" } },
+    enquiry: { html: enquirySection, foot: { id: "enquiry-section", icon: "fas fa-comment-alt", label: navLabel(c.enquiry, "Enquiry") } },
+    cardqr: { html: cardQrSection, foot: { id: "cardqr-section", icon: "fas fa-qrcode", label: navLabel(c.cardqr, "QR") } },
+  };
+  const DEFAULT_SECTION_ORDER = ["about", "products", "offers", "payment", "gallery", "video", "reviews", "enquiry", "cardqr"];
+  const chosen = s(c.section_order).split(",").map((x) => x.trim()).filter((k) => k in sectionByKey);
+  const sectionOrder = [...chosen, ...DEFAULT_SECTION_ORDER.filter((k) => !chosen.includes(k))];
+  const orderedSectionsHtml = sectionOrder.map((k) => sectionByKey[k].html).join("\n    ");
   const footerItems = [
     { id: "home-section", icon: "fa fa-home", label: "Home", show: true },
-    { id: "about-section", icon: "fas fa-briefcase", label: navLabel(c.about, "About"), show: !!aboutSection },
-    { id: "products-section", icon: "fas fa-box-open", label: navLabel(c.product, "Services"), show: !!servicesSection },
-    { id: "offers-section", icon: "fas fa-tags", label: navLabel(c.offer, "Offers"), show: !!offersSection },
-    { id: "payment-section", icon: "fas fa-money-bill-alt", label: navLabel(c.payment, "Payment"), show: !!paymentSection },
-    { id: "gallery-section", icon: "fa fa-photo-video", label: navLabel(c.gallery, "Gallery"), show: !!gallerySection },
-    { id: "video-section", icon: "fa fa-video", label: navLabel(c.video, "Video"), show: !!videoSection },
-    { id: "review-section", icon: "fab fa-google", label: "Reviews", show: !!googleReviewSection },
-    { id: "enquiry-section", icon: "fas fa-comment-alt", label: navLabel(c.enquiry, "Enquiry"), show: !!enquirySection },
-    { id: "cardqr-section", icon: "fas fa-qrcode", label: navLabel(c.cardqr, "QR"), show: !!cardQrSection },
+    ...sectionOrder.map((k) => ({ ...sectionByKey[k].foot, show: !!sectionByKey[k].html })),
   ].filter((f) => f.show);
   const footer = `<div class="footer"><ul class="footer-menu">${footerItems.map((f) =>
     `<li><a href="javascript:void(0)" onclick="goSection('${f.id}')" class="footer-menu-link"><i class="${f.icon}"></i><p>${f.label}</p></a></li>`).join("")}</ul></div>`;
@@ -688,15 +696,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
       </div>
       <div class="home-extra-one"></div><div class="home-extra-two"></div><div class="home-extra-three"></div><div class="home-extra-four"></div>
     </section>
-    ${aboutSection}
-    ${servicesSection}
-    ${offersSection}
-    ${paymentSection}
-    ${gallerySection}
-    ${videoSection}
-    ${googleReviewSection}
-    ${enquirySection}
-    ${cardQrSection}
+    ${orderedSectionsHtml}
     ${shareSection}
     <div class="dc-foot">
       <div class="dc-foot-actions">

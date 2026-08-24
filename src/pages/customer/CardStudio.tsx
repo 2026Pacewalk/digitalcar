@@ -12,6 +12,7 @@ import { useValidityDays } from "@/hooks/useValidityDays";
 import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { BG_PRESETS } from "@/card-template/cardBackground";
+import SectionArranger from "@/components/customer/SectionArranger";
 import { trpc } from "@/providers/trpc";
 import { logFunnel } from "@/lib/funnel";
 
@@ -328,6 +329,11 @@ export default function CardStudio() {
                 </div>
               );
             })()}
+          </Panel>
+
+          <Panel title="Arrange sections" subtitle="Drag to reorder how sections appear on your card">
+            <SectionArranger value={val("section_order")} onChange={(v) => set("section_order", v)} />
+            <p className="text-[11px] text-[#94A3B8] mt-3">Order applies to full-page templates. Empty sections are skipped automatically; toggle sections on/off in Settings → Card Sections.</p>
           </Panel>
         </div>
 
