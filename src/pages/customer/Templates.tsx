@@ -108,16 +108,22 @@ export default function CustomerTemplates() {
     return (presets.find((p) => p.style === t && p.primary.toLowerCase() === col) || presets.find((p) => p.style === t))?.id ?? null;
   }, [presets, data.theme, data.color]);
 
+  // Show each template in its OWN native design in the chooser: clear the card's
+  // custom background so the link-bio variants aren't all painted the same (their
+  // background IS what distinguishes them). Empty bg_type disables the override.
+  // Custom backgrounds still apply to the real card — they're set in the Builder.
+  const baseData = useMemo(() => ({ ...data, bg_type: "" }), [data]);
+
   const thumbs = useMemo(() =>
-    presets.map((p) => buildCardThumb({ ...data, color: p.primary, color2: p.secondary }, p.style)),
-    [presets, data]);
+    presets.map((p) => buildCardThumb({ ...baseData, color: p.primary, color2: p.secondary }, p.style)),
+    [presets, baseData]);
 
   // Full preview of the SELECTED template (not the applied one) — shown in a modal
   // so the user can see the design before committing.
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewHtml = useMemo(
-    () => (selected ? buildCardThumb({ ...data, color: effPrimary, color2: customOpen ? secondary : selected.secondary }, selected.style) : ""),
-    [selected, data, effPrimary, customOpen, secondary],
+    () => (selected ? buildCardThumb({ ...baseData, color: effPrimary, color2: customOpen ? secondary : selected.secondary }, selected.style) : ""),
+    [selected, baseData, effPrimary, customOpen, secondary],
   );
 
   const pick = (id: number) => {
