@@ -303,6 +303,15 @@ try {
   }
 }
 
+// Phase 37c: every template preset must also exist as a product (a design is
+// one thing). Creates products for presets that have none; never deletes.
+try {
+  const { syncProductsFromTemplates } = await import("./sync-products-from-templates.mjs");
+  if (typeof syncProductsFromTemplates === "function") await syncProductsFromTemplates(conn, log);
+} catch (e) {
+  log("• product/template sync skipped (" + (e.code || e.message) + ")");
+}
+
 // Phase 37b: link product mockup images + fill description/SEO where empty.
 // Only writes columns that are NULL/empty, so admin-written copy is preserved.
 try {
