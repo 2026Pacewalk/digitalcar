@@ -11,11 +11,9 @@
  */
 import mysql from "mysql2/promise";
 import { readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import "dotenv/config";
-
-const url = process.env.LIVE_DATABASE_URL || process.env.DATABASE_URL;
-if (!url) { console.error("✗ No DATABASE_URL"); process.exit(1); }
 
 const IMG_RE = /\.(png|jpe?g|webp)$/i;
 /** Mockups for a product, ordered: main → preview → the rest. og.jpg excluded. */
@@ -35,9 +33,11 @@ async function mockupsFor(base, publicDir) {
   } catch { return []; }
 }
 
-const conn = await mysql.createConnection(url);
+/** Backfill mockups + description/SEO. Reusable from migrate-live.mjs. */
+export async function backfillProductMedia(conn, log = (s) => console.log(s)) {
 const [rows] = await conn.query("SELECT id, slug, name, tagline, category, description, seo_title, seo_description, images FROM products");
-const publicDir = "public";
+// After a build the assets live in dist/public; in dev they're in public.
+const publicDir = existsSync(path.join("dist", "public", "products")) ? path.join("dist", "public") : "public";
 
 let imgN = 0, descN = 0, seoN = 0;
 for (const p of rows) {
@@ -79,5 +79,15 @@ for (const p of rows) {
   );
 }
 
-console.log(`✓ product media backfill — images: ${imgN}, descriptions: ${descN}, seo: ${seoN} (of ${rows.length} products)`);
-await conn.end();
+  log(`✓ product media — images: ${imgN}, descriptions: ${descN}, seo: ${seoN} (of ${rows.length} products)`);
+  return { imgN, descN, seoN };
+}
+
+// Standalone run: node db/backfill-product-media.mjs
+if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+  const url = process.env.LIVE_DATABASE_URL || process.env.DATABASE_URL;
+  if (!url) { console.error("✗ No DATABASE_URL"); process.exit(1); }
+  const conn = await mysql.createConnection(url);
+  await backfillProductMedia(conn);
+  await conn.end();
+}

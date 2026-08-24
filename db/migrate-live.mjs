@@ -303,6 +303,15 @@ try {
   }
 }
 
+// Phase 37b: link product mockup images + fill description/SEO where empty.
+// Only writes columns that are NULL/empty, so admin-written copy is preserved.
+try {
+  const { backfillProductMedia } = await import("./backfill-product-media.mjs");
+  if (typeof backfillProductMedia === "function") await backfillProductMedia(conn, log);
+} catch (e) {
+  log("• product media backfill skipped (" + (e.code || e.message) + ")");
+}
+
 console.log("\n✅  Migration complete — additive only, no existing data touched.\n");
 console.log("   Next: seed products (node db/seed-products.mjs) once the app has");
 console.log("   generated its template presets, then set real INR prices in admin.\n");
