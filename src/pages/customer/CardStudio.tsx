@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   Wand2, User, Building2, Phone, MessageCircle, Mail, Globe, MapPin, Info, Palette,
   Eye, Check, Loader2, CloudOff, Rocket, X, ChevronRight, Gift, CalendarClock, Copy, Link2,
+  Image as ImageIcon, LayoutGrid,
 } from "lucide-react";
 import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
@@ -179,7 +180,7 @@ export default function CardStudio() {
       <div className="grid lg:grid-cols-[1fr_360px] gap-5 items-start">
         {/* ── Form ── */}
         <div className="space-y-5 order-2 lg:order-1">
-          <Panel title="The basics" subtitle="Who you are">
+          <Panel title="The basics" subtitle="Who you are" icon={User}>
             <div className="flex flex-col sm:flex-row gap-5">
               <div className="flex flex-col items-center sm:items-start gap-2 mx-auto sm:mx-0">
                 <ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-24 h-24" label="Logo / Photo" fit="contain" />
@@ -207,7 +208,7 @@ export default function CardStudio() {
             </div>
           </Panel>
 
-          <Panel title="How people reach you" subtitle="Only fill what you want shown">
+          <Panel title="How people reach you" subtitle="Only fill what you want shown" icon={Phone}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Call number"><div className="relative"><Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("mobile1")} onChange={(e) => set("mobile1", e.target.value)} className={`${fieldCls} pl-9`} placeholder="+91 XXXXX XXXXX" /></div></Field>
               <Field label="WhatsApp number"><div className="relative"><MessageCircle size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("mobile2")} onChange={(e) => set("mobile2", e.target.value)} className={`${fieldCls} pl-9`} placeholder="+91 XXXXX XXXXX" /></div></Field>
@@ -217,14 +218,14 @@ export default function CardStudio() {
             </div>
           </Panel>
 
-          <Panel title="About your business" subtitle="Optional — helps visitors trust you">
+          <Panel title="About your business" subtitle="Optional — helps visitors trust you" icon={Info}>
             <div className="grid grid-cols-1 gap-4">
               <Field label="Business nature"><div className="relative"><Info size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("nature")} onChange={(e) => set("nature", e.target.value)} className={`${fieldCls} pl-9`} placeholder="e.g. Real Estate Advisory" /></div></Field>
               <Field label="About us"><textarea value={val("about_us")} onChange={(e) => set("about_us", e.target.value)} className={areaCls} placeholder="A short line about what you do and why customers love you." /></Field>
             </div>
           </Panel>
 
-          <Panel title="Design" subtitle="Colours update instantly — full templates in Templates">
+          <Panel title="Design" subtitle="Colours update instantly — full templates in Templates" icon={Palette}>
             <div className="flex items-center gap-2 flex-wrap">
               {COLORS.map((c) => (
                 <button key={c} onClick={() => set("color", c)} className={`w-9 h-9 rounded-xl ring-2 transition-all ${val("color").toLowerCase() === c.toLowerCase() ? "ring-[#0F172A] scale-110" : "ring-transparent"}`} style={{ background: c }} aria-label={`Colour ${c}`} />
@@ -257,7 +258,7 @@ export default function CardStudio() {
             </div>
           </Panel>
 
-          <Panel title="Background" subtitle="Make it yours — a preset, colour, gradient or your own photo">
+          <Panel title="Background" subtitle="Make it yours — a preset, colour, gradient or your own photo" icon={ImageIcon}>
             {(() => {
               const bgType = val("bg_type") || "theme";
               const TYPES = [["theme", "Template"], ["preset", "Presets"], ["solid", "Solid"], ["gradient", "Gradient"], ["image", "Photo"]] as const;
@@ -331,18 +332,30 @@ export default function CardStudio() {
             })()}
           </Panel>
 
-          <Panel title="Arrange sections" subtitle="Drag to reorder how sections appear on your card">
+          <Panel title="Arrange sections" subtitle="Drag to reorder how sections appear on your card" icon={LayoutGrid}>
             <SectionArranger value={val("section_order")} onChange={(v) => set("section_order", v)} />
             <p className="text-[11px] text-[#94A3B8] mt-3">Order applies to full-page templates. Empty sections are skipped automatically; toggle sections on/off in Settings → Card Sections.</p>
           </Panel>
         </div>
 
-        {/* ── Live preview (desktop sticky) ── */}
-        <div className="hidden lg:block order-1 lg:order-2 sticky top-4">
-          <div className="rounded-[28px] bg-[#0F172A] p-2 shadow-premium-lg">
-            <iframe srcDoc={previewHtml} title="Live preview" className="w-full h-[600px] rounded-[22px] bg-white border-0" />
+        {/* ── Live preview (desktop sticky phone mockup) ── */}
+        <div className="hidden lg:block order-1 lg:order-2 sticky top-[100px]">
+          <div className="mx-auto w-full max-w-[300px]">
+            <div className="relative rounded-[38px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-2.5 shadow-premium-lg ring-1 ring-black/5">
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 h-5 px-3 rounded-full bg-[#0F172A]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#334155]" />
+                <span className="w-10 h-1 rounded-full bg-[#334155]" />
+              </div>
+              <div className="pt-6">
+                <iframe srcDoc={previewHtml} title="Live preview" className="w-full h-[600px] rounded-[30px] bg-white border-0 block" />
+              </div>
+            </div>
           </div>
-          <p className="text-center text-[11px] text-[#94A3B8] mt-2">Live preview · updates as you type</p>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live preview</span>
+            <span className="text-[#CBD5E1]">·</span>
+            <a href={cardUrl} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#64748B] hover:text-[#F7B31C] inline-flex items-center gap-1">Open card <ChevronRight size={12} /></a>
+          </div>
         </div>
       </div>
 
