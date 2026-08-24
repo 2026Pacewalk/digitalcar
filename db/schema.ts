@@ -248,6 +248,9 @@ export const products = mysqlTable("products", {
   seoTitle: varchar("seo_title", { length: 255 }),
   seoDescription: varchar("seo_description", { length: 500 }),
   status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
+  // Template category — the same taxonomy the Templates page filters by, so a
+  // design is managed in ONE place (product = template).
+  templateCategory: mysqlEnum("template_category", ["basic", "modern", "bio", "professional", "premium"]).notNull().default("modern"),
   isFeatured: boolean("is_featured").notNull().default(false),
   displayOrder: int("display_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),

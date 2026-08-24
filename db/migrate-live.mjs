@@ -118,6 +118,16 @@ try {
   log("• published_cards.slug unique skipped (" + (e.code || e.message) + ")");
 }
 
+// Phase 37: products carry the template category (product == template).
+{
+  const [cc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='products' AND column_name='template_category'");
+  if (cc[0].n === 0) {
+    await conn.query("ALTER TABLE products ADD COLUMN template_category ENUM('basic','modern','bio','professional','premium') NOT NULL DEFAULT 'modern' AFTER status");
+    log("✓ products.template_category added");
+  } else { log("• products.template_category present (skipped)"); }
+}
+
 // Phase 35: super-admin per-user card-limit override (null = plan default).
 {
   const [cc] = await conn.query(

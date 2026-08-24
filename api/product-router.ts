@@ -42,6 +42,7 @@ const productInput = z.object({
   seoTitle: z.string().optional().nullable(),
   seoDescription: z.string().optional().nullable(),
   status: z.enum(["draft", "published", "archived"]).default("draft"),
+  templateCategory: z.enum(["basic", "modern", "bio", "professional", "premium"]).default("modern"),
   isFeatured: z.boolean().default(false),
   displayOrder: z.number().int().default(0),
 });

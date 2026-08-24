@@ -17,10 +17,13 @@ type Product = {
   styleNumber: number; category?: string | null; price: string; salePrice?: string | null;
   currency: string; trialDays: number; primaryColor?: string | null; secondaryColor?: string | null;
   images?: string[] | null; seoTitle?: string | null; seoDescription?: string | null;
+  templateCategory?: "basic" | "modern" | "bio" | "professional" | "premium";
   status: "draft" | "published" | "archived"; isFeatured: boolean; displayOrder: number;
 };
 type Draft = Partial<Product> & { name: string; styleNumber: number };
 
+// Template taxonomy — the same categories the customer Templates page filters by.
+const TEMPLATE_CATEGORIES = ["basic", "modern", "bio", "professional", "premium"] as const;
 const CATEGORIES = ["Real Estate", "Doctors & Clinics", "Consultants", "Insurance", "Loan Advisors",
   "Chartered Accountants", "Lawyers", "Digital Marketers", "Photographers", "Beauty & Salon",
   "Education", "Restaurants", "Business Owners", "Corporate", "Freelancers"];
@@ -124,9 +127,9 @@ export default function AdminProducts() {
                 <p className="text-[10px] font-semibold text-[#F7B31C] uppercase tracking-wide truncate">{p.category || "Uncategorised"}</p>
                 <p className="text-[12.5px] font-bold text-[#0F172A] leading-tight line-clamp-2 min-h-[32px]">{p.name}</p>
                 <div className="flex items-baseline gap-1.5 mt-1">
-                  <span className="text-[13px] font-extrabold text-[#0F172A] tabular-nums">{inr(p.salePrice || p.price)}</span>
-                  {p.salePrice && <span className="text-[10px] text-[#94A3B8] line-through tabular-nums">{inr(p.price)}</span>}
-                  <span className="text-[10px] text-[#94A3B8]">/yr</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-[#64748B] bg-[#F1F5F9] px-1.5 py-0.5 rounded">{p.templateCategory || "modern"}</span>
+                  {p.isFeatured && <span className="text-[10px] font-bold text-[#92400E] bg-[#FEF3C7] px-1.5 py-0.5 rounded">★</span>}
+                  <span className="text-[10px] text-[#94A3B8]">Style #{p.styleNumber}</span>
                 </div>
                 <div className="flex items-center gap-1 mt-2.5">
                   <button onClick={() => setDraft({ ...p, images: p.images ?? [] })} className="flex-1 h-7 rounded-lg bg-[#F1F5F9] text-[#334155] text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-[#E2E8F0]"><Pencil size={11} /> Edit</button>
@@ -196,11 +199,13 @@ function ProductEditor({ draft, setDraft, onSave, saving, onClose }: {
               <F label="Category"><select value={draft.category || ""} onChange={(e) => set({ category: e.target.value })} className={inputCls}><option value="">Uncategorised</option>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></F>
               <F label="Status"><select value={draft.status || "draft"} onChange={(e) => set({ status: e.target.value as Draft["status"] })} className={inputCls}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select></F>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <F label="Price / year"><div className="relative"><IndianRupee size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={draft.price ?? ""} onChange={(e) => set({ price: e.target.value })} inputMode="decimal" className={`${inputCls} pl-8`} /></div></F>
-              <F label="Sale price"><div className="relative"><IndianRupee size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={draft.salePrice ?? ""} onChange={(e) => set({ salePrice: e.target.value })} inputMode="decimal" placeholder="optional" className={`${inputCls} pl-8`} /></div></F>
+            {/* Designs carry no individual price — the subscription covers them
+                all, and ID/Membership are add-ons. Only the trial length here. */}
+            <div className="grid grid-cols-2 gap-3">
+              <F label="Template category"><select value={draft.templateCategory || "modern"} onChange={(e) => set({ templateCategory: e.target.value as Draft["templateCategory"] })} className={inputCls}>{TEMPLATE_CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c}</option>)}</select></F>
               <F label="Trial days"><input value={draft.trialDays ?? 30} onChange={(e) => set({ trialDays: Number(e.target.value) || 0 })} inputMode="numeric" className={inputCls} /></F>
             </div>
+            <p className="text-[11px] text-[#94A3B8] -mt-1">No per-design price: every template is included in the customer&apos;s plan. ID &amp; Membership cards are paid add-ons.</p>
             <div className="grid grid-cols-2 gap-3">
               <F label="Primary colour"><div className="flex items-center gap-2"><input type="color" value={draft.primaryColor || "#F7B31C"} onChange={(e) => set({ primaryColor: e.target.value })} className="w-9 h-9 rounded-lg border border-[#E2E8F0] cursor-pointer bg-transparent" /><input value={draft.primaryColor || ""} onChange={(e) => set({ primaryColor: e.target.value })} placeholder="#F7B31C" className={`${inputCls} font-mono`} /></div></F>
               <F label="Secondary colour"><div className="flex items-center gap-2"><input type="color" value={draft.secondaryColor || "#0F172A"} onChange={(e) => set({ secondaryColor: e.target.value })} className="w-9 h-9 rounded-lg border border-[#E2E8F0] cursor-pointer bg-transparent" /><input value={draft.secondaryColor || ""} onChange={(e) => set({ secondaryColor: e.target.value })} placeholder="optional" className={`${inputCls} font-mono`} /></div></F>
