@@ -359,9 +359,9 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
                     aria-label={item.label}
                   >
                     <span className={`flex items-center justify-center h-8 w-14 rounded-full transition-colors ${active ? "bg-[#FEF3C7]" : ""}`}>
-                      <item.icon size={21} strokeWidth={active ? 2.4 : 1.8} className={active ? "text-[#D97706]" : "text-[#94A3B8]"} />
+                      <item.icon size={21} strokeWidth={active ? 2.4 : 2} className={active ? "text-[#D97706]" : "text-[#475569]"} />
                     </span>
-                    <span className={`text-[10px] font-semibold leading-none ${active ? "text-[#B45309]" : "text-[#94A3B8]"}`}>{item.label}</span>
+                    <span className={`text-[10px] font-semibold leading-none ${active ? "text-[#B45309]" : "text-[#475569]"}`}>{item.label}</span>
                   </button>
                 );
               })}
