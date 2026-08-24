@@ -184,11 +184,12 @@ export default function CardStudio() {
                 <div>
                   <span className="block text-[10px] font-medium text-[#94A3B8] mb-1">Logo shape</span>
                   <div className="inline-flex rounded-lg border border-[#E2E8F0] overflow-hidden text-[11px] font-semibold">
-                    {([["square", "Square"], ["round", "Round"]] as const).map(([v, label]) => {
+                    {([["square", "Square"], ["round", "Round"], ["plain", "Plain PNG"]] as const).map(([v, label]) => {
                       const active = (val("logo_shape") || "square") === v;
                       return <button key={v} type="button" onClick={() => set("logo_shape", v)} className={`px-3 h-7 transition-colors ${active ? "bg-[#0F172A] text-white" : "bg-white text-[#64748B] hover:bg-[#F8FAFC]"}`}>{label}</button>;
                     })}
                   </div>
+                  <span className="block text-[10px] text-[#94A3B8] mt-1 max-w-[190px] leading-snug">Plain removes the circle/background so a transparent PNG shows on its own.</span>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">

@@ -193,6 +193,9 @@ body.lb{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-ser
 .lb-wrap{max-width:480px;margin:0 auto;padding:38px 22px 30px;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100vh;}
 .lb-avatar{width:104px;height:104px;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.2);box-shadow:0 0 0 4px var(--lb-ring),0 10px 30px rgba(0,0,0,.18);margin-bottom:16px;}
 .lb-avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+/* "Plain" logo: drop the circular disc + ring so a transparent PNG shows on its own. */
+.lb-avatar.is-plain{width:auto;max-width:180px;height:96px;border-radius:0;overflow:visible;background:none;box-shadow:none;}
+.lb-avatar.is-plain img{width:auto;max-width:100%;height:100%;object-fit:contain;}
 .lb-name{font-family:var(--lb-name-font);font-weight:var(--lb-name-weight);font-size:26px;line-height:1.15;margin:2px 0 4px;letter-spacing:-.01em;color:var(--lb-text);}
 .lb-handle{font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--lb-sub);margin:0 0 10px;}
 .lb-bio{font-size:13.5px;line-height:1.5;color:var(--lb-sub);margin:0 0 22px;max-width:340px;}
@@ -278,7 +281,7 @@ body{${v.css}}
 </style></head>
 <body class="lb" data-variant="${v.id}"${glass ? ' data-glass="1"' : ""}>
   <div class="lb-wrap">
-    <div class="lb-avatar"><img src="${esc(c.logo) || avatarPh}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${avatarPh}'"></div>
+    <div class="lb-avatar${s(c.logo_shape) === "plain" && s(c.logo) ? " is-plain" : ""}"><img src="${esc(c.logo) || avatarPh}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${avatarPh}'"></div>
     <h1 class="lb-name">${name}</h1>
     ${handle ? `<p class="lb-handle">@${esc(handle)}</p>` : ""}
     ${bio ? `<p class="lb-bio">${bio}</p>` : ""}
