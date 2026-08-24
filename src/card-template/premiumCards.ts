@@ -5,6 +5,8 @@
  * (name, role, company, contacts, products, socials, QR, vCard) plus a few
  * optional fields (photo, employee id, blood group, membership id…).
  */
+import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
+
 type PCProduct = { name: string; tagline?: string; description?: string; button?: string; button_title?: string; filename?: string };
 type PCRecord = Record<string, unknown>;
 
@@ -310,12 +312,12 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     <button type="button" onclick="pwShare()" aria-label="Share profile"><i class="fa fa-share-alt"></i> Share</button>
   </nav>`;
 
-  const script = opts.thumb ? "" : `<script>
-  function pwCopy(u){try{var t=document.createElement('textarea');t.value=u;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.focus();t.select();document.execCommand('copy');document.body.removeChild(t);alert('Link copied');}catch(e){alert(u);}}
-  function pwShare(){var u=${JSON.stringify(cardUrl)},t=${JSON.stringify(s(c.name) + (company ? " — " + s(c.company_name) : ""))};try{if(navigator.share){navigator.share({title:t,url:u}).catch(function(){pwCopy(u);});return;}}catch(e){}pwCopy(u);}
-  </script>`;
+  const shareName = s(c.company_name) || s(c.name) || "this business";
+  const waShareText = `Hi 👋\n\nTake a look at *${shareName}*'s digital visiting card 📇\n\nEverything in one tap — call, WhatsApp, save the contact:\n${cardUrl}`;
+  const shareUi = opts.thumb ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: navy });
+  const script = opts.thumb ? "" : `<script>${shareSheetJs(cardUrl)}</script>`;
 
-  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}</style></head><body>
+  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${shareSheetCss(navy)}</style></head><body>
   <div class="pw">
     <header class="pw-hero">
       <div class="pw-hero-in">
@@ -347,6 +349,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     </main>
   </div>
   ${dock}
+  ${shareUi}
   ${script}
   </body></html>`;
 }
@@ -477,13 +480,15 @@ function professionalProfile(c: PCRecord, opts: { thumb?: boolean }): string {
     </div>
   </div>`;
 
+  const shareName = s(c.company_name) || s(c.name) || "this business";
+  const waShareText = `Hi 👋\n\nTake a look at *${shareName}*'s digital visiting card 📇\n\nEverything in one tap — call, WhatsApp, save the contact:\n${cardUrl}`;
+  const shareUi = opts.thumb ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: dark });
   const script = opts.thumb ? "" : `<script>
   function ppQR(o){var m=document.getElementById('ppqr');if(m)m.style.display=o?'flex':'none';}
-  function pwCopy(u){try{var t=document.createElement('textarea');t.value=u;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.focus();t.select();document.execCommand('copy');document.body.removeChild(t);alert('Link copied');}catch(e){alert(u);}}
-  function pwShare(){var u=${JSON.stringify(cardUrl)},t=${JSON.stringify(s(c.name) + (company ? " — " + s(c.company_name) : ""))};try{if(navigator.share){navigator.share({title:t,url:u}).catch(function(){pwCopy(u);});return;}}catch(e){}pwCopy(u);}
+  ${shareSheetJs(cardUrl)}
   </script>`;
 
-  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}</style></head><body>
+  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${shareSheetCss(dark)}</style></head><body>
   <div class="pp">
     <div class="pp-cover">
       <div class="pp-cover-logo">${brandTxt}</div>
@@ -508,6 +513,7 @@ function professionalProfile(c: PCRecord, opts: { thumb?: boolean }): string {
     </div>
   </div>
   ${modal}
+  ${shareUi}
   ${script}
   </body></html>`;
 }
