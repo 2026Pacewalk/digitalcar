@@ -8,7 +8,10 @@ import { trpc } from "@/providers/trpc";
 import { buildCardThumb, buildCardHtml } from "@/card-template/buildCard";
 import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
 
-type Preset = { id: number; name: string; style: number; primary: string; secondary: string; active: boolean };
+type Preset = { id: number; name: string; style: number; primary: string; secondary: string; active: boolean; category?: string; featured?: boolean };
+// Same taxonomy the dashboard Templates page filters by.
+const CATS = ["all", "featured", "basic", "modern", "bio", "professional", "premium"] as const;
+type Cat = (typeof CATS)[number];
 
 /* Everything every card comes with — shown next to the preview */
 const CARD_FEATURES = [
@@ -49,6 +52,13 @@ export default function Templates() {
   const { data } = trpc.template.presets.useQuery();
   const presets = useMemo(() => ((data?.list ?? []) as Preset[]).filter((p) => p.active), [data]);
   const [preview, setPreview] = useState<Preset | null>(null);
+  const [cat, setCat] = useState<Cat>("all");
+  const catCount = (c: Cat) => c === "all" ? presets.length
+    : c === "featured" ? presets.filter((p) => p.featured).length
+    : presets.filter((p) => (p.category || "modern") === c).length;
+  const visible = useMemo(() => presets.filter((p) =>
+    cat === "all" ? true : cat === "featured" ? !!p.featured : (p.category || "modern") === cat
+  ), [presets, cat]);
 
   const previewHtml = useMemo(
     () => (preview ? buildCardHtml({ ...DEMO, color: preview.primary, color2: preview.secondary }, [], [], [], [], [], []) : ""),
@@ -71,17 +81,36 @@ export default function Templates() {
           </div>
         </div>
 
+        {/* Category filter */}
+        {presets.length > 0 && (
+          <div className="flex items-center justify-center gap-2 flex-wrap mb-8">
+            {CATS.filter((c) => catCount(c) > 0 || c === "all").map((c) => (
+              <button key={c} onClick={() => setCat(c)}
+                className={`h-9 px-4 rounded-xl text-sm font-semibold capitalize transition-colors inline-flex items-center gap-1.5 ${cat === c ? "bg-[#0F172A] text-white" : "bg-white border border-[#E2E8F0] text-[#64748B] hover:border-[#F7B31C] hover:text-[#0F172A]"}`}>
+                {c === "featured" ? "⭐ Featured" : c}
+                <span className={`text-[11px] font-bold ${cat === c ? "text-white/70" : "text-[#94A3B8]"}`}>{catCount(c)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Grid */}
         {presets.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 shadow-premium border border-[#F1F5F9] text-center">
             <Palette size={32} className="text-[#CBD5E1] mx-auto mb-3" />
             <p className="text-sm text-[#94A3B8]">Loading templates…</p>
           </div>
+        ) : visible.length === 0 ? (
+          <div className="bg-white rounded-2xl p-12 shadow-premium border border-[#F1F5F9] text-center">
+            <Palette size={32} className="text-[#CBD5E1] mx-auto mb-3" />
+            <p className="text-sm text-[#94A3B8]">No templates in this category yet.</p>
+          </div>
         ) : (
           <div className="flex flex-wrap justify-center gap-4">
-            {presets.map((p) => (
+            {visible.map((p) => (
               <div key={p.id} className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden group card-hover" style={{ width: CARD_W }}>
                 <div className="relative">
+                  {p.featured && <span className="absolute top-2 left-2 z-20 text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#F7B31C] text-[#0F172A] shadow">★ FEATURED</span>}
                   <Thumb style={p.style} primary={p.primary} secondary={p.secondary} />
                   <div className="absolute inset-0 bg-[#0F172A]/0 group-hover:bg-[#0F172A]/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 z-10">
                     <button onClick={() => setPreview(p)} className="h-9 px-4 bg-white text-[#0F172A] rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg hover:scale-105 transition-transform"><Eye size={14} /> Preview</button>
