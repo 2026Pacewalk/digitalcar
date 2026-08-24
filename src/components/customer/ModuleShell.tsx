@@ -6,6 +6,7 @@ import NotificationBell from "@/components/NotificationBell";
 import ProfileMenu from "@/components/ProfileMenu";
 import CardSwitcher from "@/components/customer/CardSwitcher";
 import { useMobileChrome } from "@/components/layout/MobileDashboardLayout";
+import { JourneyStrip, JourneyContinue } from "@/components/customer/EditCardJourney";
 
 /* Reusable smart-tip banner shown at the top of a module. */
 export function Tip({ children }: { children: ReactNode }) {
@@ -116,7 +117,9 @@ export default function ModuleShell({
             <ProfileMenu />
           </div>
         </header>
+        <JourneyStrip />
         {children}
+        <JourneyContinue />
       </div>
     </ResponsiveDashboardLayout>
   );

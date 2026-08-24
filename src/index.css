@@ -115,6 +115,13 @@
   .shadow-gold {
     box-shadow: 0 4px 20px -4px rgba(247, 179, 28, 0.3);
   }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
   .card-hover {
     @apply transition-all duration-300 hover:-translate-y-0.5 hover:shadow-premium-lg;
   }
