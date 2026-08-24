@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Wand2, User, Building2, Phone, MessageCircle, Mail, Globe, MapPin, Info, Palette,
   Eye, Check, Loader2, CloudOff, Rocket, X, ChevronRight, Gift, CalendarClock, Copy, Link2,
-  Image as ImageIcon, LayoutGrid,
+  Image as ImageIcon, LayoutGrid, Sparkles,
 } from "lucide-react";
 import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
@@ -14,6 +14,7 @@ import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { BG_PRESETS } from "@/card-template/cardBackground";
 import SectionArranger from "@/components/customer/SectionArranger";
+import { extractBrandColors, darken } from "@/lib/brandColors";
 import { trpc } from "@/providers/trpc";
 import { logFunnel } from "@/lib/funnel";
 
@@ -76,6 +77,22 @@ export default function CardStudio() {
     }, 300);
     return () => clearTimeout(t);
   }, [merged, products.items, gallery.items, videos.items, offers.items, qrcodes.items]);
+
+  // Learn the customer's brand colours from their uploaded logo (client-side),
+  // stored so the Design panel + Templates gallery can preview/apply them.
+  const logoVal = val("logo");
+  useEffect(() => {
+    if (!logoVal) return;
+    let cancelled = false;
+    extractBrandColors(logoVal).then((cols) => {
+      if (cancelled || !cols.length) return;
+      const joined = cols.join(",");
+      if (formRef.current.brand_colors === joined || String(data.brand_colors || "") === joined) return;
+      set("brand_colors", joined);
+    });
+    return () => { cancelled = true; };
+  }, [logoVal]); // eslint-disable-line react-hooks/exhaustive-deps
+  const brandColors = String(val("brand_colors") || "").split(",").map((x) => x.trim()).filter(Boolean);
 
   const progress = useMemo(() => {
     const filled = PROGRESS_FIELDS.filter((k) => String((form[k] ?? data[k]) || "").trim()).length;
@@ -177,7 +194,7 @@ export default function CardStudio() {
         <button onClick={() => navigate("/dashboard/settings?tab=password")} className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-[12px] font-semibold text-[#334155] hover:bg-[#F8FAFC] shrink-0 hidden sm:block">Edit link</button>
       </div>
 
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_408px] gap-5 items-start">
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-5 items-start">
         {/* ── Form ── */}
         <div className="space-y-5 order-2 lg:order-1">
           <Panel title="The basics" subtitle="Who you are" icon={User}>
@@ -226,6 +243,29 @@ export default function CardStudio() {
           </Panel>
 
           <Panel title="Design" subtitle="Colours update instantly — full templates in Templates" icon={Palette}>
+            {brandColors.length > 0 && (
+              <div className="mb-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles size={14} className="text-[#B45309]" />
+                  <span className="text-[12px] font-semibold text-[#92400E]">Brand colours from your logo</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    {brandColors.map((c) => (
+                      <button key={c} type="button" onClick={() => set("color", c)} title={c} className={`w-8 h-8 rounded-lg ring-2 transition-all ${val("color").toLowerCase() === c.toLowerCase() ? "ring-[#0F172A] scale-110" : "ring-white"}`} style={{ background: c }} aria-label={`Brand colour ${c}`} />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { set("color", brandColors[0]); set("color2", brandColors[1] || darken(brandColors[0])); toast.success("Applied your brand colours"); }}
+                    className="h-9 px-3.5 rounded-lg bg-[#0F172A] text-white text-[12px] font-semibold hover:bg-[#1E293B] transition-colors"
+                  >
+                    Use my brand colours
+                  </button>
+                </div>
+                <p className="text-[11px] text-[#B45309] mt-2">Tap a swatch to apply, or preview every template in your brand colours from <button type="button" onClick={() => navigate("/dashboard/templates?brand=1")} className="underline font-semibold">Templates</button>.</p>
+              </div>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               {COLORS.map((c) => (
                 <button key={c} onClick={() => set("color", c)} className={`w-9 h-9 rounded-xl ring-2 transition-all ${val("color").toLowerCase() === c.toLowerCase() ? "ring-[#0F172A] scale-110" : "ring-transparent"}`} style={{ background: c }} aria-label={`Colour ${c}`} />
@@ -341,8 +381,8 @@ export default function CardStudio() {
         {/* ── Live preview (desktop sticky phone mockup) — renders at a real
              ~390px phone viewport so what you see matches modern phones. ── */}
         <div className="hidden lg:block order-1 lg:order-2 sticky top-[100px]">
-          <div className="mx-auto w-full max-w-[408px]">
-            <div className="relative rounded-[44px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-[9px] shadow-premium-lg ring-1 ring-black/5">
+          <div className="mx-auto w-full max-w-[420px]">
+            <div className="relative rounded-[46px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-[9px] shadow-premium-lg ring-1 ring-black/5">
               <div className="absolute top-[9px] left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 h-6 px-4 rounded-b-2xl bg-[#0F172A]">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#334155]" />
                 <span className="w-12 h-1 rounded-full bg-[#334155]" />

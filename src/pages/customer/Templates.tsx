@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
-import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import { Link, useSearchParams } from "react-router";
+import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
+import { darken } from "@/lib/brandColors";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
 
@@ -95,9 +96,21 @@ export default function CustomerTemplates() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presets.length]);
 
+  // Brand colours learned from the logo (set in the Card Builder). When "brand
+  // mode" is on, every template is previewed/applied in these colours so the user
+  // can see how each design looks in their own branding.
+  const brandColors = useMemo(() => String(data.brand_colors || "").split(",").map((x) => x.trim()).filter(Boolean), [data.brand_colors]);
+  const hasBrand = brandColors.length > 0;
+  const brandPrimary = brandColors[0] || "";
+  const brandSecondary = brandColors[1] || (brandPrimary ? darken(brandPrimary) : "");
+  const [params] = useSearchParams();
+  const [brandOn, setBrandOn] = useState(false);
+  useEffect(() => { if (hasBrand && params.get("brand") === "1") setBrandOn(true); }, [hasBrand, params]);
+
   const selected = presets.find((p) => p.id === selId) || null;
-  // Effective colours = custom override (if set) else the preset's own colours
-  const effPrimary = primary || selected?.primary || "#F7B31C";
+  // Effective colours = custom override → brand (if on) → the preset's own colours.
+  const effPrimary = primary || (brandOn && brandPrimary ? brandPrimary : selected?.primary) || "#F7B31C";
+  const effSecondary = customOpen ? secondary : (brandOn && brandSecondary ? brandSecondary : (selected?.secondary || ""));
 
   // The template currently LIVE on the card (matched by style + colour) — stays
   // marked "Applied" even while the user is previewing a different one.
@@ -115,15 +128,19 @@ export default function CustomerTemplates() {
   const baseData = useMemo(() => ({ ...data, bg_type: "" }), [data]);
 
   const thumbs = useMemo(() =>
-    presets.map((p) => buildCardThumb({ ...baseData, color: p.primary, color2: p.secondary }, p.style)),
-    [presets, baseData]);
+    presets.map((p) => buildCardThumb({
+      ...baseData,
+      color: brandOn && brandPrimary ? brandPrimary : p.primary,
+      color2: brandOn && brandSecondary ? brandSecondary : p.secondary,
+    }, p.style)),
+    [presets, baseData, brandOn, brandPrimary, brandSecondary]);
 
   // Full preview of the SELECTED template (not the applied one) — shown in a modal
   // so the user can see the design before committing.
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewHtml = useMemo(
-    () => (selected ? buildCardThumb({ ...baseData, color: effPrimary, color2: customOpen ? secondary : selected.secondary }, selected.style) : ""),
-    [selected, baseData, effPrimary, customOpen, secondary],
+    () => (selected ? buildCardThumb({ ...baseData, color: effPrimary, color2: effSecondary }, selected.style) : ""),
+    [selected, baseData, effPrimary, effSecondary],
   );
 
   const pick = (id: number) => {
@@ -133,9 +150,9 @@ export default function CustomerTemplates() {
   };
   const apply = () => {
     if (!selected) return;
-    update({ theme: String(selected.style), color: effPrimary, color2: customOpen ? secondary : selected.secondary });
+    update({ theme: String(selected.style), color: effPrimary, color2: effSecondary });
     setDirty(false);
-    toast.success(`"${selected.name}" applied to your card`);
+    toast.success(`"${selected.name}" applied${brandOn ? " in your brand colours" : ""}`);
   };
 
   return (
@@ -145,6 +162,23 @@ export default function CustomerTemplates() {
       {/* Gallery of prebuilt templates — each shown in its OWN colours */}
       <Panel title="Choose a template" subtitle={`${presets.length} ready-made designs, previewed with your details`}
         right={<Link to="/dashboard/view" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#14243E] hover:bg-[#F8FAFC]"><Eye size={13} /> Preview</Link>}>
+        {hasBrand && (
+          <div className="mb-4 flex items-center justify-between gap-3 flex-wrap rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-3 py-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles size={14} className="text-[#B45309] shrink-0" />
+              <span className="text-[12px] font-semibold text-[#92400E]">Preview in your brand colours</span>
+              <span className="flex items-center gap-1 ml-1">
+                {brandColors.map((c) => <span key={c} className="w-4 h-4 rounded-full border border-black/10" style={{ background: c }} title={c} />)}
+              </span>
+            </div>
+            <div className="inline-flex rounded-lg border border-[#E2E8F0] overflow-hidden text-[11px] font-semibold bg-white">
+              {([["default", "Template colours"], ["brand", "My brand colours"]] as const).map(([k, label]) => {
+                const active = (k === "brand") === brandOn;
+                return <button key={k} type="button" onClick={() => { setBrandOn(k === "brand"); setDirty(true); }} className={`px-3 h-7 transition-colors ${active ? "bg-[#0F172A] text-white" : "text-[#64748B] hover:bg-[#F8FAFC]"}`}>{label}</button>;
+              })}
+            </div>
+          </div>
+        )}
         {presets.length === 0 ? (
           <div className="text-center py-10"><Palette size={26} className="mx-auto text-[#CBD5E1] mb-2" /><p className="text-xs text-[#94A3B8]">No templates available yet.</p></div>
         ) : (
@@ -160,8 +194,8 @@ export default function CustomerTemplates() {
                   {!isCurrent && defaultId === p.id && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
                   <ThumbFrame html={thumbs[i]} title={p.name} />
                   <div className="px-2 py-2 flex items-center gap-1.5 justify-center">
-                    <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: p.primary }} />
-                    <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: p.secondary }} />
+                    <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: brandOn && brandPrimary ? brandPrimary : p.primary }} />
+                    <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: brandOn && brandSecondary ? brandSecondary : p.secondary }} />
                     <p className={`text-[11px] font-semibold truncate ${isSel ? "text-[#B45309]" : "text-[#334155]"}`}>{p.name}</p>
                   </div>
                 </button>
