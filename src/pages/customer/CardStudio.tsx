@@ -14,7 +14,7 @@ import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { BG_PRESETS } from "@/card-template/cardBackground";
 import SectionArranger from "@/components/customer/SectionArranger";
-import { extractBrandColors, darken } from "@/lib/brandColors";
+import { extractBrandColors, brandSecondaryFor } from "@/lib/brandColors";
 import { trpc } from "@/providers/trpc";
 import { logFunnel } from "@/lib/funnel";
 
@@ -257,7 +257,7 @@ export default function CardStudio() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => { set("color", brandColors[0]); set("color2", brandColors[1] || darken(brandColors[0])); toast.success("Applied your brand colours"); }}
+                    onClick={() => { set("color", brandColors[0]); set("color2", brandSecondaryFor(brandColors[0], brandColors[1])); toast.success("Applied your brand colours"); }}
                     className="h-9 px-3.5 rounded-lg bg-[#0F172A] text-white text-[12px] font-semibold hover:bg-[#1E293B] transition-colors"
                   >
                     Use my brand colours
@@ -272,6 +272,26 @@ export default function CardStudio() {
               ))}
               <button onClick={() => navigate("/dashboard/templates")} className="h-9 px-3 rounded-xl border border-[#E2E8F0] text-[13px] font-semibold text-[#334155] hover:bg-[#F8FAFC] inline-flex items-center gap-1.5">More designs <ChevronRight size={14} /></button>
             </div>
+
+            <div className="mt-4 pt-4 border-t border-[#F1F5F9]">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-[12px] font-semibold text-[#0F172A]">Text &amp; icon colours</span>
+                {(val("text_color") || val("icon_color")) && (
+                  <button type="button" onClick={() => { set("text_color", ""); set("icon_color", ""); }} className="text-[11px] font-semibold text-[#94A3B8] hover:text-[#475569]">Reset to auto</button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-5">
+                {([["text_color", "Text"], ["icon_color", "Icons"]] as const).map(([field, label]) => (
+                  <label key={field} className="flex items-center gap-2 text-[12px] font-medium text-[#64748B]">
+                    {label}
+                    <input type="color" value={val(field) || "#0F172A"} onChange={(e) => set(field, e.target.value)} className="w-9 h-8 rounded-lg border border-[#E2E8F0] bg-white cursor-pointer p-1" aria-label={`${label} colour`} />
+                    {!val(field) && <span className="text-[10px] text-[#94A3B8]">Auto</span>}
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-[#94A3B8] mt-2 leading-snug">Use these if any text or icon is hard to read after applying brand colours. “Auto” keeps each template's own colours.</p>
+            </div>
+
             <div className="mt-4 pt-4 border-t border-[#F1F5F9] space-y-3.5">
               {(() => {
                 const paid = Number(data.package_id) === 5 || Number(data.package_id) === 6;

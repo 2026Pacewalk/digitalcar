@@ -138,6 +138,19 @@ const renderSocialIcons = (c: CustomerRecord, clickable: boolean) => {
   }).join("");
 };
 
+/* Optional owner overrides for text + icon colour, so a card stays readable when
+   brand colours are applied. Empty when unset (templates keep their own colours).
+   Scoped to name/designation/section headings (text) and contact/section/footer
+   icons (icon) — social icons keep their platform colours. */
+function textIconOverrideCss(c: Record<string, unknown>): string {
+  const tc = String(c.text_color ?? "").trim();
+  const ic = String(c.icon_color ?? "").trim();
+  let css = "";
+  if (tc) css += `#home-section .owner-name,#home-section .owner-designation,.owner-name,.owner-designation{color:${tc} !important;}.section-header{color:${tc} !important;}`;
+  if (ic) css += `.section-header i,.footer-menu-link i,.home-single-details i,.home-single-details a i,.contact-details i,.contact-list i,.contact-info i,.info-list i,.single-info i,.speciality-list li i{color:${ic} !important;}`;
+  return css;
+}
+
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
   // Link-in-bio and premium single-screen cards use completely different layouts.
   const tNum = Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1));
@@ -505,6 +518,7 @@ ${firstPagePadCss(Number(theme))}
 ${ownerHierarchyCss}
 ${desigFontCss(Number(theme))}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
+${textIconOverrideCss(c)}
 html{scroll-behavior:smooth;scrollbar-gutter:stable;}
 body{background:#f1f1f1;}
 main{padding-bottom:78px;box-shadow:none;}
@@ -993,6 +1007,7 @@ ${firstPagePadCss(theme)}
 ${ownerHierarchyCss}
 ${desigFontCss(theme)}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
+${textIconOverrideCss(c)}
 html,body{margin:0;background:#fff;overflow:hidden;}
 main{box-shadow:none;padding:0;}
 #home-card-share,.view,.footer{display:none !important;}

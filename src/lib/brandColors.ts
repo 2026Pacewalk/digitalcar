@@ -28,6 +28,16 @@ export function darken(hex: string, amt = 0.28): string {
   return toHex({ r: Math.round(r * (1 - amt)), g: Math.round(g * (1 - amt)), b: Math.round(b * (1 - amt)) });
 }
 
+/**
+ * A secondary/"dark" brand colour suitable for panels & buttons that carry WHITE
+ * text (which most templates do). Prefer a genuinely dark extracted colour;
+ * otherwise derive a dark shade of the primary so contrast stays readable.
+ */
+export function brandSecondaryFor(primary: string, second?: string): string {
+  if (second && relLuminance(second) < 0.42) return second;
+  return darken(primary, relLuminance(primary) > 0.5 ? 0.62 : 0.42);
+}
+
 export async function extractBrandColors(src: string): Promise<string[]> {
   if (!src) return [];
   return new Promise((resolve) => {

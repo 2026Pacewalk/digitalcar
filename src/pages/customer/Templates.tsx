@@ -4,7 +4,7 @@ import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHoriz
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
-import { darken } from "@/lib/brandColors";
+import { brandSecondaryFor } from "@/lib/brandColors";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
 
@@ -102,7 +102,7 @@ export default function CustomerTemplates() {
   const brandColors = useMemo(() => String(data.brand_colors || "").split(",").map((x) => x.trim()).filter(Boolean), [data.brand_colors]);
   const hasBrand = brandColors.length > 0;
   const brandPrimary = brandColors[0] || "";
-  const brandSecondary = brandColors[1] || (brandPrimary ? darken(brandPrimary) : "");
+  const brandSecondary = brandPrimary ? brandSecondaryFor(brandPrimary, brandColors[1]) : "";
   const [params] = useSearchParams();
   const [brandOn, setBrandOn] = useState(false);
   useEffect(() => { if (hasBrand && params.get("brand") === "1") setBrandOn(true); }, [hasBrand, params]);
