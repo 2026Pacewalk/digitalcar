@@ -50,7 +50,7 @@ function ColorRow({ label, hint, value, placeholder, swatches, allowClear, onCha
 }
 
 // Card front (375×560) scaled responsively to fill its frame — no empty gap.
-const THUMB_W = 375, THUMB_H = 560;
+const THUMB_W = 375, THUMB_H = 640;
 function ThumbFrame({ html, title }: { html: string; title: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);

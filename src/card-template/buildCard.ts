@@ -1011,6 +1011,10 @@ ${textIconOverrideCss(c)}
 html,body{margin:0;background:#fff;overflow:hidden;}
 main{box-shadow:none;padding:0;}
 #home-card-share,.view,.footer{display:none !important;}
+/* Show the FULL first page top-to-bottom: fill the frame and pin the
+   Call/WhatsApp bar to the bottom, exactly like the live card's first screen. */
+#home-section{position:relative;min-height:100vh;padding-bottom:54px;box-sizing:border-box;}
+#home-section .home-call-whatsapp{position:absolute;left:0;right:0;bottom:0;}
 </style></head>
 <body data-theme="${theme}">
 <main><div class="page-wrapper"><section id="home-section">
