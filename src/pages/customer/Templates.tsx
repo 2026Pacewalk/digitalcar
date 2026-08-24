@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router";
-import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles } from "lucide-react";
+import { Link, useSearchParams, useNavigate } from "react-router";
+import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
@@ -71,6 +71,7 @@ function ThumbFrame({ html, title }: { html: string; title: string }) {
 }
 
 export default function CustomerTemplates() {
+  const navigate = useNavigate();
   const { data, update } = useCustomer();
   const { data: presetData } = trpc.template.presets.useQuery();
   const presets = useMemo(() => (presetData?.list ?? []).filter((p) => p.active), [presetData]);
@@ -189,7 +190,19 @@ export default function CustomerTemplates() {
               return (
                 <button key={p.id} onClick={() => pick(p.id)}
                   className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all group ${isSel ? "border-[#F7B31C] shadow-gold ring-2 ring-[#F7B31C]/20" : isCurrent ? "border-emerald-400 ring-2 ring-emerald-400/15" : "border-[#F1F5F9] hover:border-[#F7B31C]/50 hover:-translate-y-0.5 hover:shadow-premium"}`}>
-                  {isSel && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F7B31C] flex items-center justify-center z-10 shadow"><Check size={13} className="text-[#0F172A]" /></span>}
+                  {isSel && !isCurrent && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F7B31C] flex items-center justify-center z-10 shadow"><Check size={13} className="text-[#0F172A]" /></span>}
+                  {isCurrent && (
+                    <span className="absolute top-2 right-2 z-20 flex gap-1.5">
+                      <span role="button" tabIndex={0} title="View card"
+                        onClick={(e) => { e.stopPropagation(); navigate("/dashboard/view"); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); navigate("/dashboard/view"); } }}
+                        className="w-7 h-7 rounded-full bg-white shadow flex items-center justify-center text-[#0F172A] hover:bg-[#FEF3C7] transition-colors"><Eye size={13} /></span>
+                      <span role="button" tabIndex={0} title="Edit card"
+                        onClick={(e) => { e.stopPropagation(); navigate("/dashboard/build"); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); navigate("/dashboard/build"); } }}
+                        className="w-7 h-7 rounded-full bg-white shadow flex items-center justify-center text-[#0F172A] hover:bg-[#FEF3C7] transition-colors"><Pencil size={12} /></span>
+                    </span>
+                  )}
                   {isCurrent && <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500 text-white shadow"><Check size={9} strokeWidth={3} /> APPLIED</span>}
                   {!isCurrent && defaultId === p.id && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
                   <ThumbFrame html={thumbs[i]} title={p.name} />
