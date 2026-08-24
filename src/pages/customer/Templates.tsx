@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router";
-import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil } from "lucide-react";
+import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil, Lock } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
 import { useCustomer, getActiveCardId } from "@/hooks/useCustomer";
@@ -158,9 +158,26 @@ export default function CustomerTemplates() {
     [selected, baseData, effPrimary, effSecondary],
   );
 
+  // ── Add-on gated designs ──────────────────────────────────────────
+  // The ID Card (style 49) and Membership Card (style 50) designs are paid
+  // add-ons on top of the plan. Show them, but lock until the user owns one.
+  const { data: myAddons } = trpc.addon.mine.useQuery(undefined, { retry: false });
+  const owned = useMemo(() => new Set((myAddons ?? []).map((a) => a.type)), [myAddons]);
+  const addonFor = (style: number): "id_card" | "membership" | null =>
+    style === 49 ? "id_card" : style === 50 ? "membership" : null;
+  const isLocked = (style: number) => {
+    const need = addonFor(style);
+    return !!need && !owned.has(need);
+  };
+
   const pick = (id: number) => {
-    setSelId(id); setDirty(true);
     const p = presets.find((x) => x.id === id);
+    if (p && isLocked(p.style)) {
+      toast.error(`${p.name} is an add-on — add it to your plan to use this design.`);
+      navigate("/dashboard/subscription");
+      return;
+    }
+    setSelId(id); setDirty(true);
     if (p) { setPrimary(""); setSecondary(p.secondary); } // reset custom to preset
   };
   const updateDesign = trpc.publish.updateDesign.useMutation();
@@ -244,6 +261,13 @@ export default function CustomerTemplates() {
                   {isCurrent && <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500 text-white shadow"><Check size={9} strokeWidth={3} /> APPLIED</span>}
                   {!isCurrent && defaultId === p.id && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
                   {(p as { featured?: boolean }).featured && <span className="absolute bottom-9 right-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#F7B31C] text-[#0F172A] shadow">★</span>}
+                  {isLocked(p.style) && (
+                    <span className="absolute inset-0 z-10 bg-[#0F172A]/55 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1 text-white">
+                      <Lock size={18} />
+                      <span className="text-[9px] font-bold uppercase tracking-wide">Add-on</span>
+                      <span className="text-[8px] opacity-80">Tap to unlock</span>
+                    </span>
+                  )}
                   <ThumbFrame html={thumbById[p.id]} title={p.name} />
                   <div className="px-2 py-2 flex items-center gap-1.5 justify-center">
                     <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: brandOn && brandPrimary ? brandPrimary : p.primary }} />

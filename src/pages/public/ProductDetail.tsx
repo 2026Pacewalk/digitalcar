@@ -150,7 +150,7 @@ export default function ProductDetail() {
           <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[13px] font-bold text-[#0F172A] truncate">{product.name}</p>
-              <p className="text-[12px] text-[#64748B]"><span className="font-extrabold text-[#0F172A]">{inr(price)}</span>/yr · {product.trialDays}-day free trial</p>
+              <p className="text-[12px] text-[#64748B]"><span className="font-semibold text-emerald-600">Included in your plan</span> · {product.trialDays}-day free trial</p>
             </div>
             <Link to={signupHref} className="shrink-0 h-11 px-5 rounded-xl gradient-gold text-[#0F172A] font-bold flex items-center gap-2 hover:shadow-gold transition-all text-sm whitespace-nowrap">Try Free <ArrowRight size={16} /></Link>
           </div>
@@ -191,12 +191,11 @@ export default function ProductDetail() {
               <span className="text-[13px] text-[#64748B]"><b className="text-[#0F172A]">{RATING}</b>/5 · Loved by <b className="text-[#0F172A]">{HAPPY_USERS}</b> businesses</span>
             </div>
 
-            {/* Price */}
+            {/* No per-design price — every template is included in the plan. */}
             <div className="flex items-baseline gap-2.5 mt-5">
-              <span className="text-4xl font-extrabold text-[#0F172A] tabular-nums">{inr(price)}</span>
-              {onSale && <span className="text-base text-[#94A3B8] line-through tabular-nums">{inr(product.price)}</span>}
-              <span className="text-sm text-[#64748B]">/ year</span>
+              <span className="text-2xl font-extrabold text-emerald-600">Included in your plan</span>
             </div>
+            <p className="text-[13px] text-[#64748B] mt-1">Pick any design — your subscription covers them all.</p>
             <span className="inline-flex items-center gap-1.5 mt-3 text-[12px] font-bold text-[#92400E] bg-[#FEF3C7] px-3 py-1.5 rounded-full">◷ {product.trialDays}-Day Free Trial · No credit card needed</span>
 
             <ul className="mt-6 grid sm:grid-cols-2 gap-y-2.5 gap-x-4">
@@ -334,7 +333,7 @@ export default function ProductDetail() {
                       : <ThumbFrame style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />}
                     <div className="p-3">
                       <p className="text-[13px] font-bold text-[#0F172A] line-clamp-1">{p.name}</p>
-                      <p className="text-[13px] font-extrabold text-[#0F172A] mt-0.5 tabular-nums">{inr(p.salePrice || p.price)}<span className="text-[11px] font-normal text-[#94A3B8]"> /yr</span></p>
+                      <p className="text-[11px] font-semibold text-emerald-600 mt-0.5">Included in your plan</p>
                     </div>
                   </Link>
                 );

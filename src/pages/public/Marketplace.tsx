@@ -17,11 +17,10 @@ const inr = (v?: string | number | null) => "₹" + Number(v || 0).toLocaleStrin
    filter reflects every industry shown — not just the few with a DB category. */
 const industryOf = (p: Product): string => String(demoForProduct(p).customer.nature || "Other");
 
+// No price sorting — designs carry no individual price (plan covers them all).
 const SORTS = [
   { id: "popular", label: "Popular" },
   { id: "newest", label: "Newest" },
-  { id: "price_low", label: "Price: Low to High" },
-  { id: "price_high", label: "Price: High to Low" },
 ] as const;
 type SortId = (typeof SORTS)[number]["id"];
 
@@ -147,10 +146,9 @@ export default function Marketplace() {
                     <div className="p-3.5 flex flex-col flex-1">
                       <p className="text-[10px] font-bold text-[#F7B31C] uppercase tracking-wide truncate">{industryOf(p)}</p>
                       <Link to={`/digital-business-cards-templates/${p.slug}`} className="hover:text-[#F7B31C] transition-colors"><h3 className="text-[14px] font-bold text-[#0F172A] leading-snug line-clamp-2 min-h-[36px] mt-0.5">{p.name}</h3></Link>
+                      {/* No per-card price: every design is included in the plan. */}
                       <div className="flex items-baseline gap-1.5 mt-1.5">
-                        <span className="text-[16px] font-extrabold text-[#0F172A] tabular-nums">{inr(p.salePrice || p.price)}</span>
-                        {onSale && <span className="text-[12px] text-[#94A3B8] line-through tabular-nums">{inr(p.price)}</span>}
-                        <span className="text-[11px] text-[#94A3B8]">/year</span>
+                        <span className="text-[12px] font-semibold text-emerald-600">Included in your plan</span>
                       </div>
                       <div className="flex items-center gap-2 mt-3 pt-0.5">
                         <Link to={`/signup?product=${encodeURIComponent(p.slug)}`} className="flex-1 h-9 rounded-xl gradient-gold text-[#0F172A] text-[13px] font-bold flex items-center justify-center whitespace-nowrap hover:shadow-gold active:scale-[0.97] transition-all">Try Free</Link>
