@@ -13,8 +13,10 @@ import { demoForProduct } from "@/lib/demoData";
 const PRIMARY_SW = ["#F7B31C", "#3B82F6", "#16A34A", "#A21CAF", "#EF4444", "#06B6D4", "#F97316", "#EC4899", "#6366F1", "#EAB308"];
 const SECONDARY_SW = ["#0F172A", "#0f2b2e", "#052e16", "#3b0764", "#450a0a", "#083344", "#431407", "#500724", "#1e1b4b", "#082f49"];
 
-type Draft = { id?: number; name: string; style: number; primary: string; secondary: string; active: boolean };
-const NEW: Draft = { name: "", style: 1, primary: "#F7B31C", secondary: "#0F172A", active: true };
+const CATEGORIES = ["basic", "modern", "bio", "professional", "premium"] as const;
+type Category = (typeof CATEGORIES)[number];
+type Draft = { id?: number; name: string; style: number; primary: string; secondary: string; active: boolean; category: Category; featured: boolean };
+const NEW: Draft = { name: "", style: 1, primary: "#F7B31C", secondary: "#0F172A", active: true, category: "modern", featured: false };
 
 // Match the public marketplace: each template previews with its industry demo
 // persona (seeded by style) and the same first-page height, so admin and store
@@ -101,6 +103,7 @@ export default function AdminTemplates() {
               <div key={p.id} className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all ${isDefault ? "border-[#F7B31C] shadow-gold" : "border-[#F1F5F9]"} ${!p.active ? "opacity-60" : ""}`}>
                 {isDefault && <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#F7B31C] text-[#0F172A]"><Crown size={10} /> Default</span>}
                 {!p.active && <span className="absolute top-2 right-2 z-10 text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#0F172A] text-white">Hidden</span>}
+                {(p as { featured?: boolean }).featured && p.active && <span className="absolute top-2 right-2 z-10 text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#F7B31C] text-[#0F172A]">★ Featured</span>}
                 <Thumb style={p.style} primary={p.primary} secondary={p.secondary} />
                 <div className="p-2.5">
                   <div className="flex items-center gap-1.5 mb-1">
@@ -108,9 +111,9 @@ export default function AdminTemplates() {
                     <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: p.secondary }} />
                     <p className="text-[12px] font-bold text-[#0F172A] truncate">{p.name}</p>
                   </div>
-                  <p className="text-[10px] text-[#94A3B8] mb-2">Layout #{p.style}</p>
+                  <p className="text-[10px] text-[#94A3B8] mb-2">Layout #{p.style} · <span className="capitalize font-semibold text-[#64748B]">{(p as { category?: string }).category || "modern"}</span></p>
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => setDraft({ ...p })} className="flex-1 h-7 rounded-lg bg-[#F1F5F9] text-[#334155] text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-[#E2E8F0] transition-colors"><Pencil size={11} /> Edit</button>
+                    <button onClick={() => setDraft({ ...p, category: ((p as { category?: Category }).category) || "modern", featured: !!(p as { featured?: boolean }).featured })} className="flex-1 h-7 rounded-lg bg-[#F1F5F9] text-[#334155] text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-[#E2E8F0] transition-colors"><Pencil size={11} /> Edit</button>
                     <button onClick={() => makeDefault(p.id)} disabled={isDefault} title="Set default" className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${isDefault ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#0F172A] text-white hover:bg-[#1E293B]"}`}><Star size={12} /></button>
                     <button onClick={() => remove(p.id)} title="Delete" className="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors"><Trash2 size={12} /></button>
                   </div>
@@ -189,10 +192,25 @@ function PresetEditor({ draft, setDraft, onSave, saving, onClose }: {
               </div>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={draft.active} onChange={(e) => set({ active: e.target.checked })} className="rounded accent-[#F7B31C]" />
-              <span className="text-xs text-[#334155] font-medium">Visible to users</span>
-            </label>
+            <div>
+              <label className="block text-[11px] font-semibold text-[#64748B] mb-1">Category</label>
+              <div className="flex flex-wrap gap-1.5">
+                {CATEGORIES.map((c) => (
+                  <button key={c} onClick={() => set({ category: c })} className={`h-8 px-3 rounded-lg text-xs font-semibold capitalize transition-colors ${draft.category === c ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>{c}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-5">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={draft.active} onChange={(e) => set({ active: e.target.checked })} className="rounded accent-[#F7B31C]" />
+                <span className="text-xs text-[#334155] font-medium">Visible to users</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={draft.featured} onChange={(e) => set({ featured: e.target.checked })} className="rounded accent-[#F7B31C]" />
+                <span className="text-xs text-[#334155] font-medium">⭐ Featured</span>
+              </label>
+            </div>
           </div>
         </div>
 

@@ -8,9 +8,25 @@ import { eq, and } from "drizzle-orm";
    Each preset is a distinct template: a layout style (1–31) plus its
    OWN primary/secondary colour combination. Stored as a JSON list in
    app_settings so it applies to every user's card. */
-type Preset = { id: number; name: string; style: number; primary: string; secondary: string; active: boolean };
+export const TEMPLATE_CATEGORIES = ["basic", "modern", "bio", "professional", "premium"] as const;
+export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
+type Preset = { id: number; name: string; style: number; primary: string; secondary: string; active: boolean; category?: TemplateCategory; featured?: boolean };
 const K_PRESETS = "template_presets";
 const K_DEFAULT_PRESET = "default_preset_id";
+
+// Default categorisation for the built-in presets (admins can re-assign any).
+const SEED_CATEGORY: Record<number, TemplateCategory> = {
+  1: "professional", 9: "professional", 10: "professional", 13: "professional", 19: "professional", 22: "professional", 28: "professional", 30: "professional",
+  4: "premium", 14: "premium", 15: "premium", 18: "premium", 24: "premium", 29: "premium", 31: "premium",
+  3: "basic", 8: "basic", 11: "basic", 20: "basic", 23: "basic", 26: "basic",
+};
+const SEED_FEATURED = new Set<number>([1, 4, 21, 34, 48]);
+/** Fill in category/featured for presets that predate these fields (prod data). */
+function normalizePreset(p: Preset): Preset {
+  const category: TemplateCategory = p.category
+    ?? (p.style >= 48 ? "premium" : p.style >= 32 ? "bio" : (SEED_CATEGORY[p.id] || "modern"));
+  return { ...p, category, featured: p.featured ?? SEED_FEATURED.has(p.id) };
+}
 
 const SEED_PRESETS: Preset[] = [
   { id: 1, name: "Midnight Gold", style: 1, primary: "#F7B31C", secondary: "#0F172A", active: true },
@@ -85,7 +101,7 @@ async function loadPresets(db: ReturnType<typeof getDb>): Promise<Preset[]> {
   if (!raw) {
     await setSetting(db, K_PRESETS, JSON.stringify(SEED_PRESETS));
     await setSetting(db, K_LINKBIO_SEEN, JSON.stringify(builtinIds));
-    return SEED_PRESETS;
+    return SEED_PRESETS.map(normalizePreset);
   }
   let list: Preset[];
   try { const arr = JSON.parse(raw); list = Array.isArray(arr) ? arr : [...SEED_PRESETS]; } catch { return SEED_PRESETS; }
@@ -113,7 +129,7 @@ async function loadPresets(db: ReturnType<typeof getDb>): Promise<Preset[]> {
   } else if (!seenRaw) {
     await setSetting(db, K_LINKBIO_SEEN, JSON.stringify([...seen]));
   }
-  return list;
+  return list.map(normalizePreset);
 }
 async function defaultPresetId(db: ReturnType<typeof getDb>): Promise<number> {
   const raw = await getSetting(db, K_DEFAULT_PRESET);
@@ -127,6 +143,8 @@ const presetInput = z.object({
   primary: z.string(),
   secondary: z.string(),
   active: z.boolean().default(true),
+  category: z.enum(TEMPLATE_CATEGORIES).default("modern"),
+  featured: z.boolean().default(false),
 });
 
 export const templateRouter = createRouter({

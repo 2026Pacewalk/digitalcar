@@ -128,13 +128,27 @@ export default function CustomerTemplates() {
   // Custom backgrounds still apply to the real card — they're set in the Builder.
   const baseData = useMemo(() => ({ ...data, bg_type: "" }), [data]);
 
-  const thumbs = useMemo(() =>
-    presets.map((p) => buildCardThumb({
+  const thumbById = useMemo(() => {
+    const m: Record<number, string> = {};
+    for (const p of presets) m[p.id] = buildCardThumb({
       ...baseData,
       color: brandOn && brandPrimary ? brandPrimary : p.primary,
       color2: brandOn && brandSecondary ? brandSecondary : p.secondary,
-    }, p.style)),
-    [presets, baseData, brandOn, brandPrimary, brandSecondary]);
+    }, p.style);
+    return m;
+  }, [presets, baseData, brandOn, brandPrimary, brandSecondary]);
+
+  // Category filter (admin-assigned): All / Featured / Basic / Modern / Bio / Professional / Premium.
+  const CATS = ["all", "featured", "basic", "modern", "bio", "professional", "premium"] as const;
+  const [cat, setCat] = useState<(typeof CATS)[number]>("all");
+  const catCount = (c: (typeof CATS)[number]) => c === "all" ? presets.length
+    : c === "featured" ? presets.filter((p) => (p as { featured?: boolean }).featured).length
+    : presets.filter((p) => ((p as { category?: string }).category || "modern") === c).length;
+  const visible = useMemo(() => presets.filter((p) =>
+    cat === "all" ? true
+    : cat === "featured" ? !!(p as { featured?: boolean }).featured
+    : ((p as { category?: string }).category || "modern") === cat
+  ), [presets, cat]);
 
   // Full preview of the SELECTED template (not the applied one) — shown in a modal
   // so the user can see the design before committing.
@@ -189,11 +203,26 @@ export default function CustomerTemplates() {
             </div>
           </div>
         )}
+        {/* Category filter */}
+        {presets.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mb-4">
+            {CATS.filter((c) => catCount(c) > 0 || c === "all").map((c) => (
+              <button key={c} onClick={() => setCat(c)}
+                className={`h-8 px-3 rounded-lg text-xs font-semibold capitalize transition-colors inline-flex items-center gap-1.5 ${cat === c ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>
+                {c === "featured" ? "⭐ Featured" : c}
+                <span className={`text-[10px] font-bold ${cat === c ? "text-white/70" : "text-[#94A3B8]"}`}>{catCount(c)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {presets.length === 0 ? (
           <div className="text-center py-10"><Palette size={26} className="mx-auto text-[#CBD5E1] mb-2" /><p className="text-xs text-[#94A3B8]">No templates available yet.</p></div>
+        ) : visible.length === 0 ? (
+          <div className="text-center py-10"><Palette size={26} className="mx-auto text-[#CBD5E1] mb-2" /><p className="text-xs text-[#94A3B8]">No templates in this category yet.</p></div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {presets.map((p, i) => {
+            {visible.map((p) => {
               const isSel = selId === p.id;
               const isCurrent = currentId === p.id;
               return (
@@ -214,7 +243,8 @@ export default function CustomerTemplates() {
                   )}
                   {isCurrent && <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500 text-white shadow"><Check size={9} strokeWidth={3} /> APPLIED</span>}
                   {!isCurrent && defaultId === p.id && <span className="absolute top-2 left-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#0F172A] text-white">DEFAULT</span>}
-                  <ThumbFrame html={thumbs[i]} title={p.name} />
+                  {(p as { featured?: boolean }).featured && <span className="absolute bottom-9 right-2 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#F7B31C] text-[#0F172A] shadow">★</span>}
+                  <ThumbFrame html={thumbById[p.id]} title={p.name} />
                   <div className="px-2 py-2 flex items-center gap-1.5 justify-center">
                     <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: brandOn && brandPrimary ? brandPrimary : p.primary }} />
                     <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ background: brandOn && brandSecondary ? brandSecondary : p.secondary }} />
