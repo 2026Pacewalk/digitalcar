@@ -134,6 +134,31 @@ export const publishRouter = createRouter({
       return { ok: true, publicId };
     }),
 
+  // Authed: patch just the DESIGN (theme/colours) of an already-published card,
+  // so changing the template on the Templates page updates the LIVE card + QR
+  // immediately — no need to re-open the builder and hit Publish again.
+  updateDesign: authedQuery
+    .input(z.object({
+      cardId: z.number().int().positive().default(1),
+      theme: z.string(),
+      color: z.string().optional(),
+      color2: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const cardId = input.cardId || 1;
+      const owner = and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId));
+      const rows = await db.select().from(publishedCards).where(owner);
+      const row = rows[0];
+      if (!row) return { ok: true, published: false }; // not published yet — nothing live to update
+      const data = (row.data && typeof row.data === "object" ? row.data : {}) as Record<string, unknown>;
+      const customer = { ...((data.customer as Record<string, unknown>) || {}), theme: input.theme } as Record<string, unknown>;
+      if (input.color !== undefined) customer.color = input.color;
+      if (input.color2 !== undefined) customer.color2 = input.color2;
+      await db.update(publishedCards).set({ data: { ...data, customer } }).where(owner);
+      return { ok: true, published: true };
+    }),
+
   // Authed: is a slug free for this user's given card? (live check while editing)
   checkSlug: authedQuery
     .input(z.object({ slug: z.string(), cardId: z.number().int().positive().default(1) }))

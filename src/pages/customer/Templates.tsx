@@ -3,7 +3,7 @@ import { Link, useSearchParams, useNavigate } from "react-router";
 import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
-import { useCustomer } from "@/hooks/useCustomer";
+import { useCustomer, getActiveCardId } from "@/hooks/useCustomer";
 import { brandSecondaryFor } from "@/lib/brandColors";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
@@ -149,11 +149,20 @@ export default function CustomerTemplates() {
     const p = presets.find((x) => x.id === id);
     if (p) { setPrimary(""); setSecondary(p.secondary); } // reset custom to preset
   };
+  const updateDesign = trpc.publish.updateDesign.useMutation();
   const apply = () => {
     if (!selected) return;
-    update({ theme: String(selected.style), color: effPrimary, color2: effSecondary });
+    const color = effPrimary;
+    const color2 = effSecondary;
+    update({ theme: String(selected.style), color, color2 });
     setDirty(false);
     toast.success(`"${selected.name}" applied${brandOn ? " in your brand colours" : ""}`);
+    // Push the design to the LIVE published snapshot so the public card + QR
+    // reflect it immediately (no need to re-open the builder and Publish again).
+    updateDesign.mutate(
+      { cardId: getActiveCardId(), theme: String(selected.style), color, color2 },
+      { onSuccess: (r) => { if (r?.published) toast.success("Your live card & QR now show this design"); } },
+    );
   };
 
   return (
