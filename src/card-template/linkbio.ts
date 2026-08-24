@@ -11,6 +11,7 @@
  */
 
 import { resolveCardBg, cardBgOverrideCss } from "./cardBackground";
+import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
 
 type LBProduct = { name: string; button?: string; button_title?: string };
 type LBRecord = Record<string, unknown>;
@@ -198,6 +199,20 @@ body.lb{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-ser
 /* "Plain" logo: drop the circular disc + ring so a transparent PNG shows on its own. */
 .lb-avatar.is-plain{width:auto;max-width:180px;height:96px;border-radius:0;overflow:visible;background:none;box-shadow:none;}
 .lb-avatar.is-plain img{width:auto;max-width:100%;height:100%;object-fit:contain;}
+/* Avatar wrapper carries the plan badge so it isn't clipped by the avatar's overflow. */
+.lb-avatar-wrap{position:relative;display:inline-block;margin-bottom:16px;}
+.lb-avatar-wrap .lb-avatar{margin-bottom:0;}
+.lb-badge{position:absolute;top:0;right:0;z-index:6;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:9px;line-height:1;background:linear-gradient(135deg,#FCE4A0,#E8A317);color:#5b3d00;border:1.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.28);}
+.lb-badge i{font-size:9px;}
+/* Floating share button (top-right). */
+.lb-share{position:fixed;top:14px;right:14px;z-index:50;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--lb-btn-bg);color:var(--lb-social);border:var(--lb-btn-border);box-shadow:var(--lb-btn-shadow);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;font-size:16px;transition:transform .15s;}
+.lb-share:active{transform:scale(.92);}
+/* Inline QR card. */
+.lb-qr{display:flex;align-items:center;gap:14px;width:100%;margin-top:13px;padding:13px 14px;border-radius:var(--lb-radius);background:var(--lb-btn-bg);color:var(--lb-btn-text);border:var(--lb-btn-border);box-shadow:var(--lb-btn-shadow);text-align:left;}
+body[data-glass="1"] .lb-qr{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
+.lb-qr img{width:76px;height:76px;border-radius:11px;background:#fff;padding:5px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+.lb-qr-tx b{display:block;font-size:14.5px;font-weight:700;line-height:1.2;}
+.lb-qr-tx span{display:block;margin-top:3px;font-size:12px;opacity:.72;line-height:1.35;}
 .lb-name{font-family:var(--lb-name-font);font-weight:var(--lb-name-weight);font-size:26px;line-height:1.15;margin:2px 0 4px;letter-spacing:-.01em;color:var(--lb-text);}
 .lb-handle{font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--lb-sub);margin:0 0 10px;}
 .lb-bio{font-size:13.5px;line-height:1.5;color:var(--lb-sub);margin:0 0 22px;max-width:340px;}
@@ -229,6 +244,28 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
   const v = variants[Math.max(0, Math.min(variants.length - 1, variantIndex))];
   const glass = /--lb-glass:1/.test(v.css);
   const customBg = resolveCardBg(c);
+
+  // Plan badge (Platinum gem / Gold crown) on the avatar — owner can hide it.
+  const pkgId = Number(c.package_id);
+  const planBadge = Number(c.badge_on) === 0 ? "" : pkgId === 6
+    ? `<span class="lb-badge lb-badge-plat" title="Platinum member" aria-label="Platinum member"><i class="fa fa-gem"></i></span>`
+    : pkgId === 5
+      ? `<span class="lb-badge lb-badge-gold" title="Gold member" aria-label="Gold member"><i class="fa fa-crown"></i></span>`
+      : "";
+
+  // Owner-adjustable logo size (70–160%). Base avatar is 104px (96px tall for plain).
+  const logoScale = Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100;
+  const isPlainLogo = s(c.logo_shape) === "plain" && !!s(c.logo);
+  const avatarStyle = isPlainLogo
+    ? `height:${Math.round(96 * logoScale)}px`
+    : `width:${Math.round(104 * logoScale)}px;height:${Math.round(104 * logoScale)}px`;
+
+  const cardUrl = `https://digitalcarda.in/${s(c.slug) || "card"}`;
+  const showQr = Number(c.cardqr_on ?? 1) === 1 && !!s(c.slug);
+  const qrSrc = showQr ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=6&data=${encodeURIComponent(cardUrl)}` : "";
+  const showShare = Number(c.share_on ?? 1) !== 0 && !opts.thumb;
+  const shareName = s(c.company_name) || s(c.name) || "this business";
+  const waShareText = `Hi 👋\n\nTake a look at *${shareName}*'s digital card 📇\n\nEverything in one tap — call, WhatsApp, save the contact:\n${cardUrl}`;
 
   const name = esc(c.name) || "Your Name";
   const handle = s(c.username) || s(c.slug);
@@ -282,11 +319,13 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
 <style>${BASE_CSS}
 body{${v.css}}
 ${customBg ? cardBgOverrideCss(customBg) : ""}
+${showShare ? shareSheetCss("#111827") : ""}
 </style></head>
 <body class="lb" data-variant="${v.id}"${glass ? ' data-glass="1"' : ""}>
   ${customBg ? customBg.layerHtml : ""}
+  ${showShare ? `<button class="lb-share" onclick="openShare()" aria-label="Share this card"><i class="fa fa-share-alt"></i></button>` : ""}
   <div class="lb-wrap">
-    <div class="lb-avatar${s(c.logo_shape) === "plain" && s(c.logo) ? " is-plain" : ""}"><img src="${esc(c.logo) || avatarPh}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${avatarPh}'"></div>
+    <div class="lb-avatar-wrap"><div class="lb-avatar${isPlainLogo ? " is-plain" : ""}" style="${avatarStyle}"><img src="${esc(c.logo) || avatarPh}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${avatarPh}'"></div>${planBadge}</div>
     <h1 class="lb-name">${name}</h1>
     ${handle ? `<p class="lb-handle">@${esc(handle)}</p>` : ""}
     ${bio ? `<p class="lb-bio">${bio}</p>` : ""}
@@ -294,10 +333,13 @@ ${customBg ? cardBgOverrideCss(customBg) : ""}
       ${links}
       ${btn("fa fa-user-plus", vcardHref, "Save Contact")}
     </div>
+    ${qrSrc ? `<div class="lb-qr"><img src="${qrSrc}" alt="Scan to open this card" ${IMG}><div class="lb-qr-tx"><b>Scan my card</b><span>Point your camera to open &amp; save my card</span></div></div>` : ""}
     ${social ? `<ul class="lb-social">${social}</ul>` : ""}
     ${siteText ? `<a class="lb-site" href="${esc(s(c.url))}" target="_blank" rel="noopener">${esc(siteText)}</a>` : ""}
     <div class="lb-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
     ${chrome}
   </div>
+  ${showShare ? shareSheetHtml({ shareName, cardUrl, waShareText }) : ""}
+  ${showShare ? `<script>${shareSheetJs(cardUrl)}</script>` : ""}
 </body></html>`;
 }

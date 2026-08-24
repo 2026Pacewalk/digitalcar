@@ -674,7 +674,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 <main>
   <div class="page-wrapper">
     <section id="home-section">
-      <a href="javascript:void(0)" id="home-card-share" onclick="openShare()"><i class="fa fa-share-alt"></i></a>
+      ${Number(c.share_on ?? 1) !== 0 ? `<a href="javascript:void(0)" id="home-card-share" onclick="openShare()"><i class="fa fa-share-alt"></i></a>` : ""}
       <div class="home-section-content">
         <div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p id="dc-view-count">${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>
         <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" alt="${esc(c.name)}" style="border-radius:${s(c.logo_shape) === "round" ? "50%" : s(c.logo_shape) === "plain" ? "0" : "10px"}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'">${planBadge}</div></div>

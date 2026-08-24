@@ -191,6 +191,10 @@ export default function CardStudio() {
                     })}
                   </div>
                   <span className="block text-[10px] text-[#94A3B8] mt-1 max-w-[190px] leading-snug">Plain removes the circle/background so a transparent PNG shows on its own.</span>
+                  <div className="mt-3 max-w-[190px]">
+                    <div className="flex items-center justify-between mb-1"><span className="text-[10px] font-medium text-[#94A3B8]">Logo size</span><span className="text-[10px] tabular-nums text-[#94A3B8]">{val("logo_size") || 100}%</span></div>
+                    <input type="range" min={70} max={160} value={Number(val("logo_size") || 100)} onChange={(e) => set("logo_size", e.target.value)} className="w-full accent-[#F7B31C]" aria-label="Logo size" />
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-4 flex-1 min-w-0">
@@ -225,17 +229,30 @@ export default function CardStudio() {
               ))}
               <button onClick={() => navigate("/dashboard/templates")} className="h-9 px-3 rounded-xl border border-[#E2E8F0] text-[13px] font-semibold text-[#334155] hover:bg-[#F8FAFC] inline-flex items-center gap-1.5">More designs <ChevronRight size={14} /></button>
             </div>
-            {(Number(data.package_id) === 5 || Number(data.package_id) === 6) && (
-              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#F1F5F9]">
-                <button onClick={() => set("badge_on", val("badge_on") === "0" ? "1" : "0")} className={`w-11 h-6 rounded-full transition-colors shrink-0 relative ${val("badge_on") !== "0" ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`} aria-label="Toggle plan badge">
-                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${val("badge_on") !== "0" ? "left-[22px]" : "left-0.5"}`} />
-                </button>
-                <div>
-                  <span className="text-sm font-medium text-[#0F172A]">Plan badge</span>
-                  <p className="text-[11px] text-[#94A3B8]">Show your {Number(data.package_id) === 6 ? "Platinum" : "Gold"} badge on your card logo.</p>
-                </div>
-              </div>
-            )}
+            <div className="mt-4 pt-4 border-t border-[#F1F5F9] space-y-3.5">
+              {(() => {
+                const paid = Number(data.package_id) === 5 || Number(data.package_id) === 6;
+                const rows: [string, string, string, string][] = [
+                  ["cardqr_on", "1", "QR code", "Show a scannable QR of your card so visitors can open & save it."],
+                  ["share_on", "1", "Share button", "Show a share icon so visitors can send your card to others."],
+                ];
+                if (paid) rows.push(["badge_on", "1", "Plan badge", `Show your ${Number(data.package_id) === 6 ? "Platinum" : "Gold"} badge on your card logo.`]);
+                return rows.map(([field, def, title, desc]) => {
+                  const on = (val(field) || def) !== "0";
+                  return (
+                    <div key={field} className="flex items-center gap-3">
+                      <button type="button" onClick={() => set(field, on ? "0" : "1")} className={`w-11 h-6 rounded-full transition-colors shrink-0 relative ${on ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`} aria-label={`Toggle ${title}`}>
+                        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+                      </button>
+                      <div>
+                        <span className="text-sm font-medium text-[#0F172A]">{title}</span>
+                        <p className="text-[11px] text-[#94A3B8]">{desc}</p>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
           </Panel>
 
           <Panel title="Background" subtitle="Make it yours — a preset, colour, gradient or your own photo">
