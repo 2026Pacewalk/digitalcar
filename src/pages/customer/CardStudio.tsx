@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Wand2, User, Building2, Phone, MessageCircle, Mail, Globe, MapPin, Info, Palette,
   Eye, Check, Loader2, CloudOff, Rocket, X, ChevronRight, Gift, CalendarClock, Copy, Link2,
-  Image as ImageIcon, LayoutGrid, Sparkles,
+  Image as ImageIcon, LayoutGrid, Sparkles, Circle, Square, Briefcase,
 } from "lucide-react";
 import ModuleShell, { Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
@@ -150,34 +150,58 @@ export default function CardStudio() {
 
   /* ── Tool panels — one focused tool at a time (Canva-style) ── */
 
-  const shapeSizeLogo = (
-    <div className="flex flex-col items-center sm:items-start gap-2 mx-auto sm:mx-0">
-      <ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-24 h-24" label="Logo / Photo" fit="contain" />
-      <div>
-        <span className="block text-[10px] font-medium text-[#94A3B8] mb-1">Logo shape</span>
-        <div className="inline-flex rounded-lg border border-[#E2E8F0] overflow-hidden text-[11px] font-semibold">
-          {([["square", "Square"], ["round", "Round"], ["plain", "Plain PNG"]] as const).map(([v, label]) => {
-            const active = (val("logo_shape") || "square") === v;
-            return <button key={v} type="button" onClick={() => set("logo_shape", v)} className={`px-3 h-7 transition-colors ${active ? "bg-[#0F172A] text-white" : "bg-white text-[#64748B] hover:bg-[#F8FAFC]"}`}>{label}</button>;
-          })}
-        </div>
-        <span className="block text-[10px] text-[#94A3B8] mt-1 max-w-[190px] leading-snug">Plain removes the circle/background so a transparent PNG shows on its own.</span>
-        <div className="mt-3 max-w-[190px]">
-          <div className="flex items-center justify-between mb-1"><span className="text-[10px] font-medium text-[#94A3B8]">Logo size</span><span className="text-[10px] tabular-nums text-[#94A3B8]">{val("logo_size") || 100}%</span></div>
-          <input type="range" min={70} max={160} value={Number(val("logo_size") || 100)} onChange={(e) => set("logo_size", e.target.value)} className="w-full accent-[#F7B31C]" aria-label="Logo size" />
-          <span className="block text-[10px] text-[#94A3B8] mt-1 leading-snug">Shrink your logo so the full logo fits neatly inside the shape.</span>
-        </div>
-      </div>
-    </div>
-  );
+  const SHAPES: [string, string, typeof Circle][] = [["square", "Square", Square], ["round", "Round", Circle], ["plain", "Plain", Sparkles]];
+  const bigField = "h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-[14px] text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#94A3B8]";
 
   const renderBasics = () => (
     <div className="flex flex-col sm:flex-row gap-5">
-      {shapeSizeLogo}
-      <div className="grid grid-cols-1 gap-4 flex-1 min-w-0">
-        <Field label="Name"><div className="relative"><User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("name")} onChange={(e) => set("name", e.target.value)} className={`${fieldCls} pl-9`} placeholder="Full name" /></div></Field>
-        <Field label="Designation"><input value={val("designation")} onChange={(e) => set("designation", e.target.value)} className={fieldCls} placeholder="e.g. Founder / Managing Director" /></Field>
-        <Field label="Company"><div className="relative"><Building2 size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("company_name")} onChange={(e) => set("company_name", e.target.value)} className={`${fieldCls} pl-9`} placeholder="Your company" /></div></Field>
+      {/* Logo card */}
+      <div className="sm:w-[214px] shrink-0">
+        <div className="rounded-2xl border border-[#EEF2F7] bg-[#F8FAFC] p-4">
+          <div className="flex flex-col items-center gap-2">
+            <div className="rounded-2xl ring-4 ring-white shadow-sm"><ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-28 h-28 rounded-2xl" label="Add logo" fit="contain" /></div>
+            <span className="text-[11px] font-semibold text-[#64748B]">Logo or photo</span>
+          </div>
+          <div className="mt-4">
+            <span className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wide mb-1.5">Shape</span>
+            <div className="grid grid-cols-3 gap-1.5">
+              {SHAPES.map(([v, label, Icon]) => {
+                const on = (val("logo_shape") || "square") === v;
+                return (
+                  <button key={v} type="button" onClick={() => set("logo_shape", v)} className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[10px] font-semibold transition-all ${on ? "border-[#0F172A] bg-white text-[#0F172A] shadow-sm" : "border-[#E2E8F0] bg-white text-[#94A3B8] hover:border-[#CBD5E1]"}`}>
+                    <Icon size={15} /> {label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-[#94A3B8] mt-1.5 leading-snug">Plain shows a transparent PNG with no circle or background.</p>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wide">Logo size</span>
+              <span className="text-[11px] font-bold text-[#0F172A] tabular-nums px-1.5 py-0.5 rounded-md bg-[#FEF3C7]">{val("logo_size") || 100}%</span>
+            </div>
+            <input type="range" min={70} max={160} value={Number(val("logo_size") || 100)} onChange={(e) => set("logo_size", e.target.value)} className="w-full accent-[#F7B31C]" aria-label="Logo size" />
+            <p className="text-[10px] text-[#94A3B8] mt-1 leading-snug">Shrink your logo so it fits neatly inside the shape.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Fields */}
+      <div className="flex-1 min-w-0 space-y-4">
+        <div>
+          <label className="block text-[11px] font-semibold text-[#334155] mb-1.5">Full name</label>
+          <div className="relative"><User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("name")} onChange={(e) => set("name", e.target.value)} className={`${bigField} pl-10 pr-3 font-semibold`} placeholder="e.g. Shekhar Jain" /></div>
+        </div>
+        <div>
+          <label className="block text-[11px] font-semibold text-[#334155] mb-1.5">Designation</label>
+          <div className="relative"><Briefcase size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("designation")} onChange={(e) => set("designation", e.target.value)} className={`${bigField} pl-10 pr-3`} placeholder="e.g. Managing Director" /></div>
+        </div>
+        <div>
+          <label className="block text-[11px] font-semibold text-[#334155] mb-1.5">Company</label>
+          <div className="relative"><Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("company_name")} onChange={(e) => set("company_name", e.target.value)} className={`${bigField} pl-10 pr-3`} placeholder="Your company name" /></div>
+        </div>
+        <p className="text-[11px] text-[#94A3B8] flex items-center gap-1.5"><Sparkles size={12} className="text-[#F7B31C]" /> Your name &amp; company appear on the card banner — keep them short and clear.</p>
       </div>
     </div>
   );
