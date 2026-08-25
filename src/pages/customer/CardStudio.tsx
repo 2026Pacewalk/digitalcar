@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import {
@@ -58,6 +58,8 @@ export default function CardStudio() {
   const [realViews, setRealViews] = useState<number | null>(null);
   const timer = useRef<number | null>(null);
   const formRef = useRef(form); formRef.current = form;
+  const previewRef = useRef<HTMLIFrameElement>(null);
+  const savedScrollRef = useRef(0);
 
   const val = (k: string) => (form[k] !== undefined ? form[k] : String(data[k] ?? ""));
   const set = (k: string, v: string) => {
@@ -77,6 +79,9 @@ export default function CardStudio() {
   const merged = useMemo(() => ({ ...data, ...form, referral_code: program?.code || "", ...(realViews != null ? { views: realViews } : {}) }), [data, form, program?.code, realViews]);
   useEffect(() => {
     const t = setTimeout(() => {
+      // Remember where the user scrolled so a rebuild doesn't jump back to the top
+      // (so toggling a bottom section like the QR is visible right where they are).
+      try { savedScrollRef.current = previewRef.current?.contentWindow?.scrollY || savedScrollRef.current; } catch { /* cross-origin guard */ }
       setPreviewHtml(buildCardHtml(merged as Parameters<typeof buildCardHtml>[0], products.items, gallery.items, videos.items, offers.items, qrcodes.items, []));
     }, 300);
     return () => clearTimeout(t);
@@ -422,13 +427,14 @@ export default function CardStudio() {
   const active = TOOLS.find((t) => t.key === activeTool) || TOOLS[0];
   const ActiveIcon = active.icon;
 
-  const phoneMock = (h: number) => (
+  const phoneMock = (h: number, ref?: RefObject<HTMLIFrameElement | null>) => (
     <div className="relative rounded-[44px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-[9px] shadow-premium-lg ring-1 ring-black/5">
       <div className="absolute top-[9px] left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 h-6 px-4 rounded-b-2xl bg-[#0F172A]">
         <span className="w-1.5 h-1.5 rounded-full bg-[#334155]" />
         <span className="w-12 h-1 rounded-full bg-[#334155]" />
       </div>
-      <iframe srcDoc={previewHtml} title="Live preview" className="w-full rounded-[34px] bg-white border-0 block" style={{ height: h }} />
+      <iframe {...(ref ? { ref, onLoad: (e: SyntheticEvent<HTMLIFrameElement>) => { try { (e.currentTarget.contentWindow)?.scrollTo(0, savedScrollRef.current); } catch { /* guard */ } } } : {})}
+        srcDoc={previewHtml} title="Live preview" className="w-full rounded-[34px] bg-white border-0 block" style={{ height: h }} />
     </div>
   );
 
@@ -505,7 +511,7 @@ export default function CardStudio() {
 
         {/* Desktop sticky preview */}
         <div className="hidden lg:block order-1 lg:order-2 sticky top-[100px]">
-          <div className="mx-auto w-full max-w-[420px]">{phoneMock(720)}</div>
+          <div className="mx-auto w-full max-w-[420px]">{phoneMock(720, previewRef)}</div>
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live preview</span>
             <span className="text-[#CBD5E1]">·</span>
