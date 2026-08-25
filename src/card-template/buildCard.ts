@@ -171,6 +171,18 @@ const OFFER_CSS = `
 .dc-offer-desc{font-size:13.5px;line-height:1.62;color:#475569;margin:0;}
 `;
 
+/* Compact view: content sections become tap-to-open accordions (collapsed by
+   default). Open sections keep their natural author layout — only collapsed
+   sections hide everything below their header. Home section is untouched. */
+const COMPACT_CSS = `
+body.dc-compact .section-container{padding-top:10px;padding-bottom:10px;}
+body.dc-compact .section-container:not(.dc-open) > *:not(.section-header){display:none !important;}
+body.dc-compact .section-container > .section-header{cursor:pointer;position:relative;padding-right:38px;user-select:none;-webkit-tap-highlight-color:transparent;}
+body.dc-compact .section-container > .section-header::after{content:"\\f107";font-family:"Font Awesome 5 Free";font-weight:900;position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:15px;line-height:1;opacity:.55;transition:transform .25s ease;}
+body.dc-compact .section-container.dc-open > .section-header::after{transform:translateY(-50%) rotate(180deg);}
+body.dc-compact main{padding-bottom:78px;}
+`;
+
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
   // Link-in-bio and premium single-screen cards use completely different layouts.
   const tNum = Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1));
@@ -180,6 +192,9 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const accent = s(c.color) || "#F7B31C";
   const accentDark = darken(accent, 0.16);
   const secondary = s(c.color2);
+  // Compact view: collapse content sections into tap-to-open accordions so a
+  // content-heavy card stays short. "long" (default) keeps everything expanded.
+  const compact = s(c.layout_mode) === "compact";
   const theme = String(Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1)));
   // Sanitize to URL/identifier-safe chars: a no-op for valid slugs, but it
   // neutralises any injected quote / angle-bracket before slug (and cardUrl,
@@ -551,6 +566,7 @@ ${desigFontCss(Number(theme))}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 ${textIconOverrideCss(c)}
 ${offersSection ? OFFER_CSS : ""}
+${compact ? COMPACT_CSS : ""}
 html{scroll-behavior:smooth;scrollbar-gutter:stable;}
 body{background:#f1f1f1;}
 main{padding-bottom:78px;box-shadow:none;}
@@ -724,7 +740,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-save-fab{position:fixed;right:14px;bottom:150px;width:44px;height:44px;border-radius:50%;background:#14243E;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.28);z-index:1000;color:#fff;font-size:17px;text-decoration:none;transition:transform .15s;}
 .dc-save-fab:hover{transform:scale(1.08);}
 </style></head>
-<body data-theme="${theme}">
+<body data-theme="${theme}"${compact ? ' class="dc-compact"' : ""}>
 <main>
   <div class="page-wrapper">
     <section id="home-section">
@@ -939,7 +955,13 @@ function playVid(el,id,provider,vertical){ var ig=provider==='instagram';
   var src=ig?'https://www.instagram.com/reel/'+id+'/embed/':'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&playsinline=1'; var pad=ig?'125%':(vertical?'177.78%':'56.25%'); el.outerHTML='<div style="position:relative;padding-bottom:'+pad+';height:0;border-radius:12px;overflow:hidden;background:#000"><iframe src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe></div>'; }
 document.getElementById('lightbox').addEventListener('click', function(e){ if(e.target.id==='lightbox') lbClose(); });
 document.addEventListener('keydown', function(e){ var lb=document.getElementById('lightbox'); if(lb&&lb.style.display==='flex'){ if(e.key==='Escape')lbClose(); else if(e.key==='ArrowLeft')lbPrev(); else if(e.key==='ArrowRight')lbNext(); } });
-function goSection(id){ var el=document.getElementById(id); if(!el) return; var h=document.documentElement, b=document.body, prev=h.style.scrollBehavior; h.style.scrollBehavior='auto'; var y=el.getBoundingClientRect().top+(window.pageYOffset||h.scrollTop||b.scrollTop||0); window.scrollTo(0,y); h.style.scrollBehavior=prev; }
+function goSection(id){ var el=document.getElementById(id); if(!el) return; if(document.body.classList.contains('dc-compact')) el.classList.add('dc-open'); var h=document.documentElement, b=document.body, prev=h.style.scrollBehavior; h.style.scrollBehavior='auto'; var y=el.getBoundingClientRect().top+(window.pageYOffset||h.scrollTop||b.scrollTop||0); window.scrollTo(0,y); h.style.scrollBehavior=prev; }
+/* Compact view: tapping a section header toggles it open/closed. */
+(function(){ if(!document.body.classList.contains('dc-compact')) return;
+  document.querySelectorAll('.section-container > .section-header').forEach(function(hd){
+    hd.addEventListener('click', function(){ hd.parentElement.classList.toggle('dc-open'); });
+  });
+})();
 function dcSendEnquiry(form){
   try{
     function pad(n){return (n<10?'0':'')+n;}

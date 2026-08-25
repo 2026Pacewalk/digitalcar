@@ -292,6 +292,21 @@ export default function CardStudio() {
               <p className="text-[11px] text-[#94A3B8] mt-2 leading-snug">Use these if any text or icon is hard to read after applying brand colours. “Auto” keeps each template's own colours.</p>
             </div>
 
+            <div className="mt-4 pt-4 border-t border-[#F1F5F9]">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <span className="text-[12px] font-semibold text-[#0F172A]">Card layout</span>
+                  <p className="text-[11px] text-[#94A3B8] mt-0.5 max-w-[230px] leading-snug">Compact collapses sections into tap-to-open accordions so a long card stays short.</p>
+                </div>
+                <div className="inline-flex rounded-lg border border-[#E2E8F0] overflow-hidden text-[11px] font-semibold shrink-0">
+                  {([["", "Full"], ["compact", "Compact"]] as const).map(([v, label]) => {
+                    const active = (val("layout_mode") || "") === v;
+                    return <button key={v || "full"} type="button" onClick={() => set("layout_mode", v)} className={`px-3.5 h-8 transition-colors ${active ? "bg-[#0F172A] text-white" : "bg-white text-[#64748B] hover:bg-[#F8FAFC]"}`}>{label}</button>;
+                  })}
+                </div>
+              </div>
+            </div>
+
             <div className="mt-4 pt-4 border-t border-[#F1F5F9] space-y-3.5">
               {(() => {
                 const paid = Number(data.package_id) === 5 || Number(data.package_id) === 6;
