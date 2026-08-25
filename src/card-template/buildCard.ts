@@ -151,6 +151,26 @@ function textIconOverrideCss(c: Record<string, unknown>): string {
   return css;
 }
 
+/* Premium "Latest offers" cards — a media banner with an accent tag, a validity
+   pill (fresh vs ended), title and description. Self-contained (dc-offer* names). */
+const OFFER_CSS = `
+.dc-offers{display:flex;flex-direction:column;gap:16px;}
+.dc-offer{position:relative;background:#fff;border:1px solid #eef0f3;border-radius:18px;overflow:hidden;box-shadow:0 6px 22px rgba(16,24,40,.06);transition:transform .2s ease,box-shadow .2s ease;}
+.dc-offer:hover{transform:translateY(-3px);box-shadow:0 16px 36px rgba(16,24,40,.13);}
+.dc-offer-media{position:relative;line-height:0;}
+.dc-offer-media img{width:100%;display:block;}
+.dc-offer-media::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 62%,rgba(0,0,0,.28));pointer-events:none;}
+.dc-offer-tag{display:inline-flex;align-items:center;gap:6px;background:#0f172a;color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:6px 11px;border-radius:999px;box-shadow:0 4px 12px rgba(0,0,0,.22);}
+.dc-offer-tag i{color:var(--theme-color);font-size:11px;}
+.dc-offer-media .dc-offer-tag{position:absolute;top:12px;left:12px;z-index:2;}
+.dc-offer-body{padding:15px 17px 18px;}
+.dc-offer-title{font-size:16px;font-weight:800;color:#0f172a;margin:0 0 9px;line-height:1.32;letter-spacing:-.01em;}
+.dc-offer-body .dc-offer-tag{margin-bottom:11px;}
+.dc-offer-valid{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:#047857;background:#ecfdf5;border:1px solid #a7f3d0;padding:4px 10px;border-radius:8px;margin-bottom:11px;}
+.dc-offer-valid.ended{color:#64748b;background:#f1f5f9;border-color:#e2e8f0;}
+.dc-offer-desc{font-size:13.5px;line-height:1.62;color:#475569;margin:0;}
+`;
+
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
   // Link-in-bio and premium single-screen cards use completely different layouts.
   const tNum = Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1));
@@ -386,15 +406,26 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>
     </div>` : "";
 
+  const offerEnded = (v: string) => { const d = new Date(v); return !isNaN(d.getTime()) && d.getTime() < Date.now(); };
   const offersSection = on(c.offer_on) && offers.length ? `
     <div id="offers-section" class="section-container">
       <div class="section-header">${esc(s(c.offer) || "Offers")}</div>
-      ${offers.map((o) => `<div class="offer-card">
-        ${o.filename ? `<img src="${esc(o.filename)}" class="img-fluid" style="width:100%;border-radius:4px" ${IMG} onerror="this.style.display='none'">` : ""}
-        ${o.title ? `<h5 style="font-weight:700;margin-top:8px">${esc(o.title)}</h5>` : ""}
-        ${o.valid ? `<p style="font-size:12px;color:#666;margin-top:2px"><i class="fa fa-clock"></i> Valid till: ${esc(o.valid)}</p>` : ""}
-        ${o.description ? `<p style="font-size:13px;margin-top:4px">${sanitizeHtml(fixMojibake(o.description))}</p>` : ""}
-      </div>`).join("")}
+      <div class="dc-offers">
+      ${offers.map((o) => {
+        const ended = offerEnded(s(o.valid));
+        const tag = `<span class="dc-offer-tag"><i class="fa fa-tag"></i> Offer</span>`;
+        const validPill = o.valid ? `<span class="dc-offer-valid${ended ? " ended" : ""}"><i class="fa fa-${ended ? "hourglass-end" : "clock"}"></i> ${ended ? "Ended" : "Valid till"} ${esc(o.valid)}</span>` : "";
+        return `<div class="dc-offer">
+        ${o.filename ? `<div class="dc-offer-media">${tag}<img src="${esc(o.filename)}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
+        <div class="dc-offer-body">
+          ${o.filename ? "" : tag}
+          ${o.title ? `<h5 class="dc-offer-title">${esc(o.title)}</h5>` : ""}
+          ${validPill}
+          ${o.description ? `<p class="dc-offer-desc">${sanitizeHtml(fixMojibake(o.description))}</p>` : ""}
+        </div>
+      </div>`;
+      }).join("")}
+      </div>
     </div>` : "";
 
   const gallerySection = on(c.gallery_on) && gallery.length ? `
@@ -519,6 +550,7 @@ ${ownerHierarchyCss}
 ${desigFontCss(Number(theme))}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 ${textIconOverrideCss(c)}
+${offersSection ? OFFER_CSS : ""}
 html{scroll-behavior:smooth;scrollbar-gutter:stable;}
 body{background:#f1f1f1;}
 main{padding-bottom:78px;box-shadow:none;}
