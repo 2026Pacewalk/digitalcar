@@ -169,12 +169,17 @@ export default function CardStudio() {
   /* ── Tool panels — one focused tool at a time (Canva-style) ── */
 
   // Distinct callout for explanatory notes so they don't blend into the controls.
-  const Note = ({ children }: { children: ReactNode }) => (
-    <div className="flex items-start gap-2 rounded-xl bg-[#EFF6FF] border border-[#DBEAFE] px-3 py-2.5">
-      <Info size={13} className="text-[#3B82F6] mt-0.5 shrink-0" />
-      <p className="text-[11px] text-[#475569] leading-relaxed">{children}</p>
-    </div>
-  );
+  const Note = ({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "red" }) => {
+    const c = tone === "red"
+      ? { bg: "bg-[#FEF2F2]", border: "border-[#FECACA]", icon: "text-[#EF4444]", text: "text-[#991B1B]" }
+      : { bg: "bg-[#EFF6FF]", border: "border-[#DBEAFE]", icon: "text-[#3B82F6]", text: "text-[#475569]" };
+    return (
+      <div className={`flex items-start gap-2 rounded-xl ${c.bg} border ${c.border} px-3 py-2.5`}>
+        <Info size={13} className={`${c.icon} mt-0.5 shrink-0`} />
+        <p className={`text-[11px] ${c.text} leading-relaxed`}>{children}</p>
+      </div>
+    );
+  };
 
   const SHAPES: [string, string, typeof Circle][] = [["square", "Square", Square], ["round", "Round", Circle], ["plain", "Plain", Sparkles]];
   const bigField = "h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-[14px] text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#94A3B8]";
@@ -229,8 +234,8 @@ export default function CardStudio() {
 
       {/* Photo & card details — for the premium Business / ID / Membership card designs */}
       <div className="pt-4 border-t border-[#F1F5F9]">
-        <span className="block text-[12px] font-bold text-[#0F172A]">Photo &amp; card details</span>
-        <p className="text-[11px] text-[#94A3B8] mt-0.5 mb-3">For the premium Business / ID / Membership card designs.</p>
+        <span className="block text-[12px] font-bold text-[#0F172A] mb-2">Photo &amp; card details</span>
+        <div className="mb-3"><Note tone="red">For the premium Business / ID / Membership card designs.</Note></div>
         <div className="flex items-start gap-4">
           <ImagePick value={val("photo")} onChange={(u) => set("photo", u)} className="w-20 h-20 rounded-xl" label="Photo" fit="cover" />
           <p className="flex-1 text-[11px] text-[#64748B] pt-0.5 min-w-0 leading-relaxed">A clear headshot shown on the ID, Membership &amp; Business-card designs. Your <b>company logo</b> is set above — both appear together on the card.</p>
