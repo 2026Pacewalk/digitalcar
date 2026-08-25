@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { Sparkles, Wand2, RefreshCw, ArrowRight, ArrowLeft, Loader2, Check, Palette, Zap } from "lucide-react";
+import { Sparkles, Wand2, RefreshCw, ArrowRight, ArrowLeft, Loader2, Check, Palette, Zap, Globe, PenLine } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { buildCardHtml, buildCardThumb } from "@/card-template/buildCard";
 import { toast } from "sonner";
@@ -9,6 +9,11 @@ type AiCard = {
   tagline: string; about: string; services: { name: string; description: string }[];
   cta: string; seoTitle: string; seoDescription: string;
   theme: number; color: string; color2: string; avatarStyle: string; source: "ai" | "smart";
+};
+type WebExtract = {
+  businessName: string; logo: string; color?: string; color2?: string;
+  phone: string; email: string; address: string; city: string;
+  url: string; socials: Record<string, string>;
 };
 
 const CARD_STYLES = 31;
@@ -37,10 +42,14 @@ function TemplateThumb({ html, active, label, onClick }: { html: string; active:
 
 const PROFESSIONS = ["Real Estate Agent", "Doctor", "Chartered Accountant", "Interior Designer", "Photographer", "Digital Marketer", "Salon & Spa", "Restaurant", "Lawyer", "Fitness Trainer", "Insurance Advisor", "Boutique"];
 const GEN_MSGS = ["Understanding your business…", "Writing your bio & services…", "Matching a design & colours…", "Polishing your card…"];
+const WEB_MSGS = ["Reading your website…", "Finding your logo & brand colours…", "Pulling your services & contact details…", "Designing your card…"];
 
 export default function AIGenerator() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"form" | "generating" | "result">("form");
+  const [mode, setMode] = useState<"describe" | "website">("describe");
+  const [website, setWebsite] = useState("");
+  const [web, setWeb] = useState<WebExtract | null>(null);
   const [form, setForm] = useState({ businessName: "", profession: "", city: "", phone: "" });
   const [gen, setGen] = useState<AiCard | null>(null);
   const [theme, setTheme] = useState<number | null>(null); // user's override of the AI-picked design
@@ -49,6 +58,7 @@ export default function AIGenerator() {
   const [msgIdx, setMsgIdx] = useState(0);
   const genMut = trpc.ai.generate.useMutation();
   const regenMut = trpc.ai.regenerate.useMutation();
+  const webMut = trpc.ai.fromWebsite.useMutation();
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -62,11 +72,27 @@ export default function AIGenerator() {
     setStep("generating"); setMsgIdx(0);
     try {
       const res = await genMut.mutateAsync(form);
+      setWeb(null);
       setGen(res as AiCard);
       setTheme(null); // adopt the AI's design pick; user can change it below
       setCustomColor(null); setCustomColor2(null); // adopt the AI/design colours
       setStep("result");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Generation failed"); setStep("form"); }
+  };
+
+  const generateFromWebsite = async () => {
+    const url = website.trim();
+    if (!url) { toast.error("Paste your website address"); return; }
+    setStep("generating"); setMsgIdx(0);
+    try {
+      const res = await webMut.mutateAsync({ url });
+      const { web: w, ...card } = res as AiCard & { web: WebExtract };
+      setWeb(w);
+      setGen(card as AiCard);
+      setForm((f) => ({ ...f, businessName: w.businessName || f.businessName, city: w.city || f.city, phone: w.phone || f.phone }));
+      setTheme(null); setCustomColor(null); setCustomColor2(null);
+      setStep("result");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't read that website — try another URL."); setStep("form"); }
   };
 
   const regenSection = async (section: "tagline" | "about" | "services" | "cta") => {
@@ -87,13 +113,16 @@ export default function AIGenerator() {
   const pickTheme = (sn: number) => { setTheme(sn); setCustomColor(null); setCustomColor2(null); };
 
   const contentRec = useMemo(() => gen ? ({
-    name: form.businessName || "Your Business", designation: form.profession || "",
-    company_name: form.businessName || "", address: form.city || "", city: form.city || "",
+    name: web?.businessName || form.businessName || "Your Business", designation: form.profession || "",
+    company_name: web?.businessName || form.businessName || "",
+    logo: web?.logo || "", logo_shape: web?.logo ? "plain" : "square",
+    address: web?.address || form.city || "", city: web?.city || form.city || "",
     about: gen.about, about_on: 1, specialities: gen.services.map((s) => s.name).join(", "),
     product_on: 1, enquiry_on: 1,
-    slug: "ai-preview", mobile1: form.phone || "+91 98765 43210", mobile2: "",
-    email: "hello@yourbusiness.in", url: "yourbusiness.in", social_title: gen.tagline,
-  }) : null, [gen, form]);
+    slug: "ai-preview", mobile1: web?.phone || form.phone || "+91 98765 43210", mobile2: web?.phone || "",
+    email: web?.email || "hello@yourbusiness.in", url: web?.url || "yourbusiness.in", social_title: gen.tagline,
+    ...(web?.socials || {}),
+  }) : null, [gen, form, web]);
 
   const previewHtml = useMemo(() => {
     if (!gen || !contentRec) return "";
@@ -112,7 +141,7 @@ export default function AIGenerator() {
 
   const saveAndSignup = () => {
     if (!gen) return;
-    try { localStorage.setItem("dc_ai_draft", JSON.stringify({ form, gen: { ...gen, theme: effTheme, color: effColor, color2: effColor2 }, at: Date.now() })); } catch { /* ignore */ }
+    try { localStorage.setItem("dc_ai_draft", JSON.stringify({ form, web, gen: { ...gen, theme: effTheme, color: effColor, color2: effColor2 }, at: Date.now() })); } catch { /* ignore */ }
     navigate("/signup?ai=1");
   };
 
@@ -133,6 +162,30 @@ export default function AIGenerator() {
 
         {step === "form" && (
           <div className="mt-10 max-w-xl mx-auto bg-white rounded-3xl shadow-premium-lg border border-[#F1F5F9] p-7">
+            <div className="flex gap-1.5 p-1 bg-[#F1F5F9] rounded-xl mb-6">
+              {([["describe", "Describe my business", PenLine], ["website", "I have a website", Globe]] as const).map(([m, label, Icon]) => (
+                <button key={m} onClick={() => setMode(m)} className={`flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-lg text-[13px] font-semibold transition-all ${mode === m ? "bg-white text-[#0F172A] shadow-sm" : "text-[#64748B] hover:text-[#0F172A]"}`}>
+                  <Icon size={15} /> {label}
+                </button>
+              ))}
+            </div>
+
+            {mode === "website" ? (
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">Your website address</label>
+                  <div className="relative">
+                    <Globe size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                    <input value={website} onChange={(e) => setWebsite(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") generateFromWebsite(); }} placeholder="e.g. yourbusiness.com" inputMode="url" className="h-12 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] pl-10 pr-4 text-sm outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all" />
+                  </div>
+                  <p className="text-[12px] text-[#64748B] mt-2 leading-relaxed">Paste your website link — our AI reads it and pulls your <strong>logo, brand colours, services, contact details &amp; location</strong>, then designs your card automatically.</p>
+                </div>
+                <button onClick={generateFromWebsite} className="w-full py-3.5 rounded-xl gradient-gold text-[#0F172A] font-bold text-base flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.99]">
+                  <Wand2 size={19} /> Build my card from my website
+                </button>
+                <p className="text-center text-[11px] text-[#94A3B8]">Free · No signup needed to preview · Takes ~10 seconds</p>
+              </div>
+            ) : (
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">Business / your name</label>
@@ -162,6 +215,7 @@ export default function AIGenerator() {
               </button>
               <p className="text-center text-[11px] text-[#94A3B8]">Free · No signup needed to preview · Takes ~5 seconds</p>
             </div>
+            )}
           </div>
         )}
 
@@ -172,7 +226,7 @@ export default function AIGenerator() {
               <div className="relative w-24 h-24 rounded-full gradient-gold flex items-center justify-center"><Sparkles size={38} className="text-[#0F172A] animate-pulse" /></div>
             </div>
             <h2 className="mt-8 text-xl font-bold text-[#0F172A]">Creating your card…</h2>
-            <p className="mt-2 text-sm text-[#64748B] h-5 transition-all">{GEN_MSGS[msgIdx]}</p>
+            <p className="mt-2 text-sm text-[#64748B] h-5 transition-all">{(mode === "website" ? WEB_MSGS : GEN_MSGS)[msgIdx]}</p>
           </div>
         )}
 
@@ -184,7 +238,7 @@ export default function AIGenerator() {
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#16A34A]"><Check size={12} /> {gen.source === "ai" ? "AI-generated" : "Generated"}</span>
                 <h2 className="text-xl font-bold text-[#0F172A] mt-1">Your card is ready 🎉</h2>
               </div>
-              <button onClick={generate} className="h-10 px-4 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] flex items-center gap-2"><RefreshCw size={15} /> Regenerate all</button>
+              <button onClick={mode === "website" ? generateFromWebsite : generate} className="h-10 px-4 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] flex items-center gap-2"><RefreshCw size={15} /> Regenerate all</button>
             </div>
 
             {/* Design / template picker — on top, full width, each in its own colour */}

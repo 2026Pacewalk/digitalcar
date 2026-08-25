@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { lookup } from "node:dns/promises";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
@@ -130,6 +132,142 @@ function smartGenerate(input: Input): AiCard {
   };
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   "I have a website" — fetch the site and auto-extract everything for a card:
+   business name, logo, brand colours, contact details, address/location,
+   social links and content, then let Claude write the polished copy.
+   ────────────────────────────────────────────────────────────────────────── */
+
+export type WebExtract = {
+  businessName: string; logo: string; color?: string; color2?: string;
+  phone: string; email: string; address: string; city: string;
+  url: string; socials: Record<string, string>;
+};
+
+const isPrivateIp = (ip: string) =>
+  /^(127\.|10\.|192\.168\.|169\.254\.|0\.0\.0\.0|::1$|fc|fd|fe80)/i.test(ip) ||
+  /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
+
+/** Validate + DNS-resolve a user URL, rejecting non-http(s) and private/loopback
+    hosts (SSRF guard). Returns the normalised URL. */
+async function assertPublicUrl(raw: string): Promise<URL> {
+  let u: URL;
+  try { u = new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw.trim()); }
+  catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Please enter a valid website address." }); }
+  if (u.protocol !== "http:" && u.protocol !== "https:") throw new TRPCError({ code: "BAD_REQUEST", message: "Only http(s) websites are supported." });
+  const host = u.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".test"))
+    throw new TRPCError({ code: "BAD_REQUEST", message: "That address can't be reached." });
+  try { const { address } = await lookup(host); if (isPrivateIp(address)) throw new Error("private"); }
+  catch { throw new TRPCError({ code: "BAD_REQUEST", message: "We couldn't reach that website. Check the address and try again." }); }
+  return u;
+}
+
+async function fetchSiteHtml(u: URL): Promise<string> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 9000);
+  try {
+    const res = await fetch(u.toString(), {
+      signal: ctrl.signal, redirect: "follow",
+      headers: { "user-agent": "Mozilla/5.0 (compatible; DigitalCardaBot/1.0; +https://digitalcarda.in)", accept: "text/html,application/xhtml+xml" },
+    });
+    if (!res.ok) throw new TRPCError({ code: "BAD_REQUEST", message: `The website responded with ${res.status}. Try another URL.` });
+    if (!/text\/html|xhtml/i.test(res.headers.get("content-type") || "")) throw new TRPCError({ code: "BAD_REQUEST", message: "That link isn't a web page." });
+    return (await res.text()).slice(0, 1_500_000);
+  } catch (e) {
+    if (e instanceof TRPCError) throw e;
+    throw new TRPCError({ code: "BAD_REQUEST", message: "We couldn't load that website. It may be down or blocking bots." });
+  } finally { clearTimeout(timer); }
+}
+
+const absUrl = (src: string, base: URL) => { try { return new URL(src, base).toString(); } catch { return ""; } };
+const decodeEnt = (s: string) => s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&nbsp;/g, " ");
+const meta = (html: string, key: string) =>
+  html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1]
+  || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${key}["']`, "i"))?.[1] || "";
+
+function pickBrandColours(html: string): { color?: string; color2?: string } {
+  const lum = (h: string) => { const r = parseInt(h.slice(1, 3), 16) / 255, g = parseInt(h.slice(3, 5), 16) / 255, b = parseInt(h.slice(5, 7), 16) / 255; return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const sat = (h: string) => { const r = parseInt(h.slice(1, 3), 16), g = parseInt(h.slice(3, 5), 16), b = parseInt(h.slice(5, 7), 16); const mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx === 0 ? 0 : (mx - mn) / mx; };
+  const freq = new Map<string, number>();
+  for (const h of html.match(/#[0-9a-fA-F]{6}\b/g) || []) { const k = h.toLowerCase(); freq.set(k, (freq.get(k) || 0) + 1); }
+  const themeMeta = meta(html, "theme-color");
+  const vivid = [...freq.entries()].filter(([h]) => { const l = lum(h); return l > 0.12 && l < 0.88 && sat(h) > 0.28; })
+    .sort((a, b) => b[1] * (0.5 + sat(b[0])) - a[1] * (0.5 + sat(a[0])));
+  // Trust theme-color only when it's a usable accent (not near-black/white/grey);
+  // otherwise use the most prominent vivid colour on the page.
+  const usableTheme = !!themeMeta && HEX.test(themeMeta) && lum(themeMeta) > 0.18 && lum(themeMeta) < 0.85 && sat(themeMeta) > 0.22;
+  const color = usableTheme ? themeMeta.toLowerCase() : vivid[0]?.[0];
+  const color2 = [...freq.entries()].filter(([h]) => lum(h) < 0.22).sort((a, b) => b[1] - a[1])[0]?.[0];
+  return { color, color2 };
+}
+
+function extractSite(html: string, base: URL): WebExtract {
+  const strip = decodeEnt(html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+  const title = (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || "").trim();
+  const siteName = meta(html, "og:site_name") || title.split(/[|\-–—·]/)[0].trim() || base.hostname.replace(/^www\./, "");
+
+  // JSON-LD (schema.org) is the richest source for name / phone / address.
+  let ldName = "", ldPhone = "", ldStreet = "", ldCity = "", ldRegion = "", ldZip = "";
+  for (const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const walk = (o: unknown): void => {
+        if (!o || typeof o !== "object") return;
+        if (Array.isArray(o)) { o.forEach(walk); return; }
+        const r = o as Record<string, unknown>;
+        if (!ldName && typeof r.name === "string") ldName = r.name;
+        if (!ldPhone && typeof r.telephone === "string") ldPhone = r.telephone;
+        const a = r.address as Record<string, unknown> | undefined;
+        if (a && typeof a === "object") {
+          ldStreet = ldStreet || String(a.streetAddress || "");
+          ldCity = ldCity || String(a.addressLocality || "");
+          ldRegion = ldRegion || String(a.addressRegion || "");
+          ldZip = ldZip || String(a.postalCode || "");
+        }
+        Object.values(r).forEach(walk);
+      };
+      walk(JSON.parse(m[1]));
+    } catch { /* ignore malformed JSON-LD */ }
+  }
+
+  // Logo: a real <img> whose src/alt/class mentions "logo" wins over og:image (often a banner).
+  const logoImg = html.match(/<img[^>]*(?:class|id|alt|src)=["'][^"']*logo[^"']*["'][^>]*>/i)?.[0];
+  const logoSrc = logoImg?.match(/\ssrc=["']([^"']+)["']/i)?.[1]
+    || html.match(/<link[^>]+rel=["'][^"']*(?:apple-touch-icon|icon)[^"']*["'][^>]+href=["']([^"']+)["']/i)?.[1]
+    || meta(html, "og:image");
+  const logo = logoSrc ? absUrl(logoSrc, base) : "";
+
+  const telHref = html.match(/href=["']tel:([^"']+)["']/i)?.[1];
+  const phone = (telHref || ldPhone || strip.match(/(?:\+?91[\s-]?)?[6-9]\d{9}/)?.[0] || "").replace(/[^\d+]/g, "");
+  const mailHref = html.match(/href=["']mailto:([^"'?]+)["']/i)?.[1];
+  let email = mailHref || strip.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)?.[0] || "";
+  if (/\.(png|jpg|jpeg|gif|webp)$/i.test(email) || /sentry|example|wixpress|godaddy/i.test(email)) email = "";
+
+  const address = [ldStreet, ldCity, ldRegion, ldZip].filter(Boolean).join(", ");
+  const socials: Record<string, string> = {};
+  for (const [key, re] of [["facebook", "facebook\\.com"], ["instagram", "instagram\\.com"], ["twitter", "(?:twitter|x)\\.com"], ["youtube", "youtube\\.com|youtu\\.be"], ["linkedin", "linkedin\\.com"], ["pinterest", "pinterest\\."]] as const) {
+    const m = html.match(new RegExp(`href=["'](https?:\\/\\/[^"']*(?:${re})[^"']*)["']`, "i"));
+    if (m && !/sharer|intent|share\?/.test(m[1])) socials[key] = m[1];
+  }
+
+  const { color, color2 } = pickBrandColours(html);
+  return {
+    businessName: decodeEnt(ldName || siteName).slice(0, 80),
+    logo, color, color2, phone, email,
+    address: address.slice(0, 240), city: (ldCity || "").slice(0, 60),
+    url: base.origin, socials,
+  };
+}
+
+/** Compact site-content string used as the AI's source material. */
+function siteContentForAi(html: string): string {
+  const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || "";
+  const desc = meta(html, "description") || meta(html, "og:description");
+  const heads = [...html.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)].map((m) => decodeEnt(m[1].replace(/<[^>]+>/g, " ")).trim()).filter(Boolean).slice(0, 20);
+  const body = decodeEnt(html.replace(/<(script|style|nav|footer)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()).slice(0, 1800);
+  return `Title: ${title}\nDescription: ${desc}\nHeadings: ${heads.join(" | ")}\n\nPage text: ${body}`;
+}
+
 export const aiRouter = createRouter({
   // Generate a full card from business details (Claude, or smart fallback).
   generate: publicQuery
@@ -159,6 +297,39 @@ export const aiRouter = createRouter({
         });
       } catch { /* logging must never break generation */ }
       return result;
+    }),
+
+  // "I have a website" — fetch the site, extract branding + contacts + content,
+  // and let Claude (or the smart fallback) write the polished card copy.
+  fromWebsite: publicQuery
+    .input(z.object({ url: z.string().min(3).max(300) }))
+    .mutation(async ({ ctx, input }) => {
+      const ip = clientIp(ctx.req);
+      enforceRateLimit(`aiweb:${ip}`, 12, 60 * 60_000); // 12/hour per IP (fetch is heavier)
+      const u = await assertPublicUrl(input.url);
+      const html = await fetchSiteHtml(u);
+      const web = extractSite(html, u);
+      const content = siteContentForAi(html);
+
+      // Write the card copy from the real site content. Reuse the tested AI path
+      // (Claude when configured, else the smart generator) with the site as notes.
+      const gen = (await claudeGenerate({ businessName: web.businessName, profession: "", city: web.city, about: content }))
+        || smartGenerate({ businessName: web.businessName, profession: "business", city: web.city, about: content });
+
+      // Prefer the real brand colours pulled from the site when we found them.
+      const card: AiCard = { ...gen, color: safeHex(web.color, gen.color), color2: safeHex(web.color2, gen.color2) };
+
+      try {
+        const { getDb } = await import("./queries/connection");
+        const { aiGenerations } = await import("@db/schema");
+        await getDb().insert(aiGenerations).values({
+          businessName: web.businessName.slice(0, 120), profession: "website-import",
+          city: web.city.slice(0, 80) || null, phone: web.phone.slice(0, 30) || null,
+          source: card.source, ip: ip.slice(0, 64),
+        });
+      } catch { /* logging must never break generation */ }
+
+      return { ...card, web };
     }),
 
   // Regenerate a single piece (tagline / about / one service / cta).
