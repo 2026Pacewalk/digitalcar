@@ -259,13 +259,54 @@ function extractSite(html: string, base: URL): WebExtract {
   };
 }
 
+type SiteSignals = { title: string; description: string; headings: string[]; bodyText: string };
+
+/** Parse the reliable content signals out of a page. */
+function parseSiteSignals(html: string): SiteSignals {
+  const title = decodeEnt((html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || "").trim());
+  const description = decodeEnt(meta(html, "description") || meta(html, "og:description") || "");
+  const grab = (tag: string) => [...html.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi"))].map((m) => decodeEnt(m[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim()).filter(Boolean);
+  const headings = [...grab("h1"), ...grab("h2"), ...grab("h3")];
+  const bodyText = decodeEnt(html.replace(/<(script|style|nav|footer)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()).slice(0, 1800);
+  return { title, description, headings, bodyText };
+}
+
 /** Compact site-content string used as the AI's source material. */
-function siteContentForAi(html: string): string {
-  const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || "";
-  const desc = meta(html, "description") || meta(html, "og:description");
-  const heads = [...html.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)].map((m) => decodeEnt(m[1].replace(/<[^>]+>/g, " ")).trim()).filter(Boolean).slice(0, 20);
-  const body = decodeEnt(html.replace(/<(script|style|nav|footer)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()).slice(0, 1800);
-  return `Title: ${title}\nDescription: ${desc}\nHeadings: ${heads.join(" | ")}\n\nPage text: ${body}`;
+function siteContentForAi(sig: SiteSignals): string {
+  return `Title: ${sig.title}\nDescription: ${sig.description}\nHeadings: ${sig.headings.slice(0, 24).join(" | ")}\n\nPage text: ${sig.bodyText}`;
+}
+
+const SVC_NOISE = /currency|cart|password|log ?in|sign ?in|sign ?up|register|reset|regional|settings|menu|search|newsletter|subscribe|cookie|copyright|©|^home$|about ?us|about ?me|^about$|contact|privacy|terms|faq|blog|shipping|return|wishlist|checkout|my account|^account$|follow us|get in touch|read more/i;
+const SVC_IMPERATIVE = /^(explore|discover|welcome|create your|unlock|know more|view all|see all|shop|browse|find|start|get your|our story|why choose)/i;
+
+/** Build a card from the REAL extracted site content — used when Claude isn't
+    configured, so results still reflect the actual website (not generic copy). */
+function cardFromWebContent(web: WebExtract, sig: SiteSignals): AiCard {
+  const biz = web.businessName || sig.title || "Your Business";
+  const desc = sig.description.trim();
+  const titleBits = sig.title.split(/[|\-–—·:]/).map((x) => x.trim()).filter((p) => p && p.toLowerCase() !== biz.toLowerCase() && !/^home$/i.test(p));
+  let tagline = (titleBits.sort((a, b) => b.length - a.length)[0] || desc.split(/[.!?]/)[0] || biz).trim();
+  if (tagline.length > 60) tagline = tagline.slice(0, 57).trim() + "…";
+  const about = (desc || `Welcome to ${biz}. Explore what we offer and get in touch.`).slice(0, 400);
+
+  const seen = new Set<string>();
+  let services = sig.headings
+    .map((h) => h.replace(/\s*\|.*$/, "").replace(/\b(?:IM|R|P|IN)-?\d+.*$/i, "").trim())
+    .filter((h) => h.length >= 4 && h.length <= 42 && !SVC_NOISE.test(h) && !SVC_IMPERATIVE.test(h) && h.toLowerCase() !== biz.toLowerCase())
+    .filter((h) => { const k = h.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+    .slice(0, 6)
+    .map((name) => ({ name, description: "" }));
+  if (services.length < 2) services = [{ name: "Our Services", description: "Explore what we offer — get in touch to know more." }];
+
+  const pal = paletteFor(`${biz} ${desc} ${sig.title}`);
+  return {
+    tagline, about, services, cta: "Get in Touch",
+    seoTitle: (sig.title || biz).slice(0, 60),
+    seoDescription: desc.slice(0, 155),
+    theme: pal.theme, color: web.color || pal.color, color2: web.color2 || pal.color2,
+    avatarStyle: `Your logo from ${web.url.replace(/^https?:\/\//, "")}`,
+    source: "smart",
+  };
 }
 
 export const aiRouter = createRouter({
@@ -309,12 +350,13 @@ export const aiRouter = createRouter({
       const u = await assertPublicUrl(input.url);
       const html = await fetchSiteHtml(u);
       const web = extractSite(html, u);
-      const content = siteContentForAi(html);
+      const sig = parseSiteSignals(html);
 
-      // Write the card copy from the real site content. Reuse the tested AI path
-      // (Claude when configured, else the smart generator) with the site as notes.
-      const gen = (await claudeGenerate({ businessName: web.businessName, profession: "", city: web.city, about: content }))
-        || smartGenerate({ businessName: web.businessName, profession: "business", city: web.city, about: content });
+      // Write the card copy. With Claude configured it polishes the real site
+      // content; without it, we build the card from the extracted content itself
+      // (accurate tagline/about/services) — never the generic placeholder copy.
+      const gen = (await claudeGenerate({ businessName: web.businessName, profession: "", city: web.city, about: siteContentForAi(sig) }))
+        || cardFromWebContent(web, sig);
 
       // Prefer the real brand colours pulled from the site when we found them.
       const card: AiCard = { ...gen, color: safeHex(web.color, gen.color), color2: safeHex(web.color2, gen.color2) };

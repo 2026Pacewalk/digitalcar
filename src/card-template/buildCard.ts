@@ -327,7 +327,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
           <div class="heading-2"><h5>${esc(p.name)}</h5></div>
           ${(p.price || p.offer_price) ? `<div style="padding:2px 0 6px" class="heading-2">Price ${p.price && p.offer_price ? `<strike style="color:#666"> ₹${esc(p.price)}</strike>` : ""} <strong> ₹${esc(p.offer_price || p.price)}</strong></div>` : ""}
           ${p.filename ? `<img src="${esc(p.filename)}" class="img-fluid" style="width:100%;border-radius:4px" ${IMG} onerror="this.style.display='none'">` : ""}
-          ${p.description ? `<div class="heading-2" style="margin-top:14px"><h5>Other Detail</h5></div><div style="font-size:13px">${sanitizeHtml(fixMojibake(p.description))}</div>` : ""}
+          ${p.description ? `<div style="font-size:13px;margin-top:10px;color:#475569;line-height:1.55">${sanitizeHtml(fixMojibake(p.description))}</div>` : ""}
           <div class="text-right" style="margin-top:12px"><a href="${b.href}" class="product-enquiry-btn" target="${b.target}" rel="noopener"><i class="${b.icon}" style="margin-right:6px"></i>${esc(p.button_title || "Send Enquiry")}</a></div>
         </div>`;
       }).join("")}
@@ -1065,8 +1065,9 @@ function saveVCard(){
 
 /* Renders only the FIRST PAGE (home section) of a card with a given template —
    used for the template picker thumbnails. No scripts, no other sections. */
-export function buildCardThumb(c: CustomerRecord, themeNum: number): string {
+export function buildCardThumb(c: CustomerRecord, themeNum: number, opts: { chrome?: boolean } = {}): string {
   const theme = Math.min(TEMPLATE_COUNT, Math.max(1, Number(themeNum) || 1));
+  const chrome = !!opts.chrome; // show the view count + share icon (for the builder preview)
   // Premium single-screen cards + link-in-bio render their own compact preview.
   if (isPremiumCard(theme)) {
     const demo = [{ name: "Fraud Sentinel 360", tagline: "Fraud & risk management" }, { name: "Whistle Sentinel", tagline: "Secure whistle-blower app" }, { name: "MeCard.me", tagline: "Digital card solutions" }];
@@ -1104,15 +1105,19 @@ ${desigFontCss(theme)}
 ${textIconOverrideCss(c)}
 html,body{margin:0;background:#fff;overflow:hidden;}
 main{box-shadow:none;padding:0;}
-#home-card-share,.view,.footer{display:none !important;}
-/* Show the FULL first page top-to-bottom: fill the frame and pin the
-   Call/WhatsApp bar to the bottom, exactly like the live card's first screen. */
-#home-section{position:relative;min-height:100vh;padding-bottom:54px;box-sizing:border-box;}
-#home-section .home-call-whatsapp{position:absolute;left:0;right:0;bottom:0;}
+${chrome ? ".footer{display:none !important;}" : "#home-card-share,.view,.footer{display:none !important;}"}
+/* Fill the frame top-to-bottom: the contact panel grows so the Call/WhatsApp
+   bar sits at the very bottom — exactly like the live card's first screen, with
+   no empty gap even on a tall (iPhone-proportioned) frame. */
+#home-section{min-height:100vh;box-sizing:border-box;}
+#home-section .home-section-content{display:flex;flex-direction:column;min-height:100vh;box-sizing:border-box;}
+#home-section .home-details{flex:1 1 auto;}
 </style></head>
 <body data-theme="${theme}">
 <main><div class="page-wrapper"><section id="home-section">
+  ${chrome && Number(c.share_on ?? 1) !== 0 ? `<a href="javascript:void(0)" id="home-card-share"><i class="fa fa-share-alt"></i></a>` : ""}
   <div class="home-section-content">
+    ${chrome ? `<div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p>${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>` : ""}
     <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" style="border-radius:${s(c.logo_shape) === "round" ? "50%" : s(c.logo_shape) === "plain" ? "0" : "10px"}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'"></div></div>
     <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
     <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation) || "Designation"}</p></div>
