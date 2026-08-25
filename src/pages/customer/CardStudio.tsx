@@ -168,6 +168,14 @@ export default function CardStudio() {
 
   /* ── Tool panels — one focused tool at a time (Canva-style) ── */
 
+  // Distinct callout for explanatory notes so they don't blend into the controls.
+  const Note = ({ children }: { children: ReactNode }) => (
+    <div className="flex items-start gap-2 rounded-xl bg-[#EFF6FF] border border-[#DBEAFE] px-3 py-2.5">
+      <Info size={13} className="text-[#3B82F6] mt-0.5 shrink-0" />
+      <p className="text-[11px] text-[#475569] leading-relaxed">{children}</p>
+    </div>
+  );
+
   const SHAPES: [string, string, typeof Circle][] = [["square", "Square", Square], ["round", "Round", Circle], ["plain", "Plain", Sparkles]];
   const bigField = "h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-[14px] text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#94A3B8]";
 
@@ -216,7 +224,7 @@ export default function CardStudio() {
           <label className="block text-[11px] font-semibold text-[#334155] mb-1.5">Company</label>
           <div className="relative"><Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("company_name")} onChange={(e) => set("company_name", e.target.value)} className={`${bigField} pl-10 pr-3`} placeholder="Your company name" /></div>
         </div>
-        <p className="text-[11px] text-[#94A3B8] flex items-start gap-1.5"><Sparkles size={12} className="text-[#F7B31C] mt-0.5 shrink-0" /> Your name &amp; company show on the card banner — keep them short and clear.</p>
+        <Note>Your name &amp; company show on the card banner — keep them short and clear.</Note>
       </div>
 
       {/* Photo & card details — for the premium Business / ID / Membership card designs */}
@@ -303,7 +311,7 @@ export default function CardStudio() {
             </label>
           ))}
         </div>
-        <p className="text-[11px] text-[#94A3B8] mt-2 leading-snug">Use these if any text or icon is hard to read after applying brand colours. “Auto” keeps each template's own colours.</p>
+        <div className="mt-2.5"><Note>Use these if any text or icon is hard to read after applying brand colours. “Auto” keeps each template's own colours.</Note></div>
       </div>
 
       <div className="mt-4 pt-4 border-t border-[#F1F5F9]">
@@ -360,7 +368,7 @@ export default function CardStudio() {
             <button key={t} type="button" onClick={() => setType(t)} className={`px-3 h-8 rounded-lg text-[12px] font-semibold transition-colors ${bgType === t ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>{label}</button>
           ))}
         </div>
-        {bgType === "theme" && <p className="text-[12px] text-[#94A3B8]">Using the template's built-in background. Pick another option above to customise it.</p>}
+        {bgType === "theme" && <Note>Using the template's built-in background. Pick another option above to customise it.</Note>}
         {bgType === "preset" && (
           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
             {BG_PRESETS.map((p) => {
@@ -400,11 +408,11 @@ export default function CardStudio() {
             <div className="flex-1 space-y-3 min-w-0">
               {slider("bg_dim", "Darken", 0, 80, 35, "%")}
               {slider("bg_blur", "Blur", 0, 24, 0, "px")}
-              <p className="text-[11px] text-[#94A3B8]">A little darken keeps your name and buttons readable over the photo.</p>
+              <Note>A little darken keeps your name and buttons readable over the photo.</Note>
             </div>
           </div>
         )}
-        {bgType !== "theme" && <p className="text-[11px] text-[#94A3B8]">Custom backgrounds apply to the minimal “link-in-bio” templates. Buttons and text auto-adjust to stay readable.</p>}
+        {bgType !== "theme" && <Note>Custom backgrounds apply to the minimal “link-in-bio” templates. Buttons and text auto-adjust to stay readable.</Note>}
       </div>
     );
   };
@@ -412,7 +420,7 @@ export default function CardStudio() {
   const renderSections = () => (
     <div>
       <SectionArranger value={val("section_order")} onChange={(v) => set("section_order", v)} />
-      <p className="text-[11px] text-[#94A3B8] mt-3">Order applies to full-page templates. Empty sections are skipped automatically; toggle sections on/off in Settings → Card Sections.</p>
+      <div className="mt-3"><Note>Order applies to full-page templates. Empty sections are skipped automatically; toggle sections on/off in Settings → Card Sections.</Note></div>
     </div>
   );
 
