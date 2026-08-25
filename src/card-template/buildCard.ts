@@ -786,7 +786,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
     <section id="home-section">
       ${Number(c.share_on ?? 1) !== 0 ? `<a href="javascript:void(0)" id="home-card-share" onclick="openShare()"><i class="fa fa-share-alt"></i></a>` : ""}
       <div class="home-section-content">
-        <div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p id="dc-view-count">${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>
+        ${Number(c.views_on ?? 1) !== 0 ? `<div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p id="dc-view-count">${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>` : ""}
         <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" alt="${esc(c.name)}" style="border-radius:${s(c.logo_shape) === "round" ? "50%" : s(c.logo_shape) === "plain" ? "0" : "10px"}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'">${planBadge}</div></div>
         <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
         <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation)}</p></div>
@@ -1117,7 +1117,7 @@ ${chrome ? ".footer{display:none !important;}" : "#home-card-share,.view,.footer
 <main><div class="page-wrapper"><section id="home-section">
   ${chrome && Number(c.share_on ?? 1) !== 0 ? `<a href="javascript:void(0)" id="home-card-share"><i class="fa fa-share-alt"></i></a>` : ""}
   <div class="home-section-content">
-    ${chrome ? `<div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p>${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>` : ""}
+    ${chrome && Number(c.views_on ?? 1) !== 0 ? `<div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p>${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>` : ""}
     <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" style="border-radius:${s(c.logo_shape) === "round" ? "50%" : s(c.logo_shape) === "plain" ? "0" : "10px"}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'"></div></div>
     <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
     <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation) || "Designation"}</p></div>

@@ -55,6 +55,7 @@ export default function CardStudio() {
   type TrialInfo = { daysLeft: number; endsAt: string | Date | null; status: string } | undefined;
   const [publishInfo, setPublishInfo] = useState<{ first: boolean; trial: TrialInfo } | null>(null);
   const [previewHtml, setPreviewHtml] = useState("");
+  const [realViews, setRealViews] = useState<number | null>(null);
   const timer = useRef<number | null>(null);
   const formRef = useRef(form); formRef.current = form;
 
@@ -70,8 +71,10 @@ export default function CardStudio() {
   };
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  // Live preview — rebuilt a beat after edits so typing stays smooth.
-  const merged = useMemo(() => ({ ...data, ...form, referral_code: program?.code || "" }), [data, form, program?.code]);
+  // Live preview — rebuilt a beat after edits so typing stays smooth. Uses the
+  // REAL view count (base + tracked, from /api/views) so the preview matches the
+  // public card rather than the raw stored field.
+  const merged = useMemo(() => ({ ...data, ...form, referral_code: program?.code || "", ...(realViews != null ? { views: realViews } : {}) }), [data, form, program?.code, realViews]);
   useEffect(() => {
     const t = setTimeout(() => {
       setPreviewHtml(buildCardHtml(merged as Parameters<typeof buildCardHtml>[0], products.items, gallery.items, videos.items, offers.items, qrcodes.items, []));
@@ -101,6 +104,16 @@ export default function CardStudio() {
 
   const cur = (k: string) => String((form[k] ?? data[k]) || "").trim();
   const slug = String(data.slug || data.username || "your-card");
+  // Real view total (base + tracked) so the preview count matches the live card.
+  useEffect(() => {
+    if (!slug || slug === "your-card") return;
+    let cancelled = false;
+    fetch(`/api/views/${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && j && typeof j.views === "number") setRealViews(j.views); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [slug]);
   const cardUrl = `https://digitalcarda.in/${slug}`;
   const [linkCopied, setLinkCopied] = useState(false);
   const copyLink = async () => { try { await navigator.clipboard.writeText(cardUrl); setLinkCopied(true); toast.success("Card link copied"); setTimeout(() => setLinkCopied(false), 1800); } catch { toast.error("Copy failed"); } };
@@ -304,6 +317,7 @@ export default function CardStudio() {
         {(() => {
           const paid = Number(data.package_id) === 5 || Number(data.package_id) === 6;
           const rows: [string, string, string, string][] = [
+            ["views_on", "1", "View count", "Show how many times your card has been viewed."],
             ["cardqr_on", "1", "QR code", "Show a scannable QR of your card so visitors can open & save it."],
             ["share_on", "1", "Share button", "Show a share icon so visitors can send your card to others."],
           ];
