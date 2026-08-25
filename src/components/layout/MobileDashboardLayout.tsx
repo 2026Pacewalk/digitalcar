@@ -5,8 +5,9 @@ import {
   Plus, Eye, Share2, CreditCard, Menu, MessageSquare,
   Settings, LogOut, HelpCircle, ChevronLeft,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Star, Upload, Mail, Layers,
-  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode, Link2, Globe,
+  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode, Link2, Globe, ArrowLeft,
 } from "lucide-react";
+import { getToken, clearSession } from "@/lib/session";
 import { useAuth } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
 import ProfileMenu from "@/components/ProfileMenu";
@@ -405,6 +406,11 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
                   ))}
                 </div>
                 <div className="p-3 border-t border-[#F1F5F9] space-y-1 pb-safe">
+                  {!window.location.pathname.startsWith("/admin") && !!getToken("admin") && (
+                    <button onClick={() => { clearSession("main"); window.location.href = "/admin/customers"; }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-[#0F172A] bg-[#FEF3C7] active:brightness-105 transition-all">
+                      <ArrowLeft size={18} /> Return to admin
+                    </button>
+                  )}
                   <button onClick={() => { navigate(cfg.profile); setDrawerOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-[#64748B] active:bg-[#F1F5F9] transition-all">
                     <HelpCircle size={18} /> Help & Support
                   </button>

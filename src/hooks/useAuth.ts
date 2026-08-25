@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { getSessionUser, setSession, clearSession } from "@/lib/session";
+import { getSessionUser, getToken, setSession, clearSession } from "@/lib/session";
 
 interface AuthUser {
   id: number;
@@ -58,8 +58,14 @@ export function useAuth() {
 
   const logout = useCallback(() => {
     // Sign out of the CURRENT portal only, leaving the other session intact.
+    const onMain = typeof window !== "undefined" && !window.location.pathname.startsWith("/admin");
+    const adminActive = !!getToken("admin");
     clearSession();
     setUser(null);
+    // If a super-admin was impersonating a customer ("Login as Client"), their
+    // own admin session is still intact — send them back to the admin portal
+    // instead of the main login page (where admin sign-in is blocked).
+    if (onMain && adminActive) { window.location.href = "/admin/customers"; return; }
     window.location.href = "/login";
   }, []);
 

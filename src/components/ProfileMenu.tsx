@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { User, Settings, KeyRound, HelpCircle, LogOut } from "lucide-react";
+import { User, Settings, KeyRound, HelpCircle, LogOut, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { getToken, clearSession } from "@/lib/session";
 
 /* Role-aware profile / account dropdown — used in the desktop header and the mobile app bar. */
 export default function ProfileMenu() {
@@ -14,6 +15,11 @@ export default function ProfileMenu() {
   const profile = `${base}/profile`;
   const settings = role === "reseller" ? profile : `${base}/settings`;
   const initial = (user?.fullName || "U").charAt(0).toUpperCase();
+
+  // A super-admin using "Login as Client" keeps their admin session in the admin
+  // slot while viewing the customer portal — offer a clean way back.
+  const impersonating = typeof window !== "undefined" && !window.location.pathname.startsWith("/admin") && !!getToken("admin");
+  const returnToAdmin = () => { clearSession("main"); window.location.href = "/admin/customers"; };
 
   const items = [
     { icon: User, label: "My Profile", path: profile },
@@ -45,6 +51,12 @@ export default function ProfileMenu() {
                 <p className="text-[11px] text-[#94A3B8] truncate">{user?.email || ""}</p>
               </div>
             </div>
+            {impersonating && (
+              <button onClick={returnToAdmin} className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-[13px] font-bold text-[#0F172A] bg-[#FEF3C7] hover:brightness-105 transition-all text-left mb-1">
+                <span className="w-8 h-8 rounded-lg bg-[#F7B31C] flex items-center justify-center shrink-0"><ArrowLeft size={15} className="text-[#0F172A]" /></span>
+                Return to admin
+              </button>
+            )}
             {items.map((m) => (
               <button key={m.label} onClick={() => { setOpen(false); navigate(m.path); }} className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-[13px] font-medium text-[#334155] hover:bg-[#F8FAFC] active:bg-[#F8FAFC] transition-colors text-left">
                 <span className="w-8 h-8 rounded-lg bg-[#F1F5F9] flex items-center justify-center shrink-0"><m.icon size={15} className="text-[#64748B]" /></span>
