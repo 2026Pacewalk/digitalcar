@@ -171,16 +171,56 @@ const OFFER_CSS = `
 .dc-offer-desc{font-size:13.5px;line-height:1.62;color:#475569;margin:0;}
 `;
 
-/* Compact view: content sections become tap-to-open accordions (collapsed by
-   default). Open sections keep their natural author layout — only collapsed
-   sections hide everything below their header. Home section is untouched. */
+/* Compact view: content sections become clean, iconed accordion cards (collapsed
+   by default). The template's decorative section bars are hidden and each header
+   is rebuilt with a per-section icon badge + a chevron. Home section untouched. */
 const COMPACT_CSS = `
-body.dc-compact .section-container{padding-top:10px;padding-bottom:10px;}
+body.dc-compact{background:#eef1f6;}
+body.dc-compact main{padding-bottom:84px;background:transparent;box-shadow:none;}
+body.dc-compact .page-wrapper{padding-bottom:10px;}
+body.dc-compact .section-container::before,
+body.dc-compact .section-container::after{display:none !important;}
+body.dc-compact .section-container{
+  background:#fff;border:1px solid #e7ebf2;border-radius:16px;
+  margin:12px 12px !important;padding:0 15px !important;overflow:hidden;
+  box-shadow:0 2px 10px rgba(16,24,40,.05);transition:box-shadow .2s ease;
+}
+body.dc-compact .section-container.dc-open{box-shadow:0 12px 28px rgba(16,24,40,.11);padding-bottom:16px !important;}
+body.dc-compact .section-container > .section-header{
+  all:unset;box-sizing:border-box;display:flex;align-items:center;
+  margin:0 -15px !important;padding:15px 52px 15px 15px !important;position:relative;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  font-family:inherit;font-size:13.5px;font-weight:800;letter-spacing:.4px;
+  text-transform:uppercase;color:#0f172a !important;line-height:1.25;
+}
+body.dc-compact .section-container > .section-header::before{
+  font-family:"Font Awesome 5 Free";font-weight:900;content:"\\f0da";
+  width:30px;height:30px;line-height:30px;text-align:center;border-radius:9px;
+  margin-right:12px;font-size:13px;flex-shrink:0;position:static;transform:none;
+  color:var(--theme-color);background:#eef2f8;background:color-mix(in srgb,var(--theme-color) 14%,#fff);
+}
+body.dc-compact #about-section > .section-header::before{content:"\\f05a";}
+body.dc-compact #products-section > .section-header::before{content:"\\f49e";}
+body.dc-compact #offers-section > .section-header::before{content:"\\f02b";}
+body.dc-compact #payment-section > .section-header::before{content:"\\f09d";}
+body.dc-compact #gallery-section > .section-header::before{content:"\\f302";}
+body.dc-compact #video-section > .section-header::before{content:"\\f03d";}
+body.dc-compact #review-section > .section-header::before{content:"\\f005";}
+body.dc-compact #enquiry-section > .section-header::before{content:"\\f075";}
+body.dc-compact #cardqr-section > .section-header::before{content:"\\f029";}
+body.dc-compact .section-container > .section-header::after{
+  content:"\\f107";font-family:"Font Awesome 5 Free";font-weight:900;
+  position:absolute;right:13px;top:50%;transform:translateY(-50%);
+  width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;
+  font-size:12px;color:var(--theme-color);background:#eef2f8;background:color-mix(in srgb,var(--theme-color) 14%,#fff);
+  transition:transform .25s ease,background .2s ease,color .2s ease;
+}
+body.dc-compact .section-container.dc-open > .section-header::after{
+  transform:translateY(-50%) rotate(180deg);background:var(--theme-color);color:#fff;
+}
 body.dc-compact .section-container:not(.dc-open) > *:not(.section-header){display:none !important;}
-body.dc-compact .section-container > .section-header{cursor:pointer;position:relative;padding-right:38px;user-select:none;-webkit-tap-highlight-color:transparent;}
-body.dc-compact .section-container > .section-header::after{content:"\\f107";font-family:"Font Awesome 5 Free";font-weight:900;position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:15px;line-height:1;opacity:.55;transition:transform .25s ease;}
-body.dc-compact .section-container.dc-open > .section-header::after{transform:translateY(-50%) rotate(180deg);}
-body.dc-compact main{padding-bottom:78px;}
+body.dc-compact .section-container.dc-open > *:not(.section-header){animation:dcReveal .28s ease;}
+@keyframes dcReveal{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
 `;
 
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
