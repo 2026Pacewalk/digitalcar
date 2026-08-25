@@ -154,41 +154,38 @@ export default function CardStudio() {
   const bigField = "h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-[14px] text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#94A3B8]";
 
   const renderBasics = () => (
-    <div className="flex flex-col sm:flex-row gap-5">
-      {/* Logo card */}
-      <div className="sm:w-[214px] shrink-0">
-        <div className="rounded-2xl border border-[#EEF2F7] bg-[#F8FAFC] p-4">
-          <div className="flex flex-col items-center gap-2">
-            <div className="rounded-2xl ring-4 ring-white shadow-sm"><ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-28 h-28 rounded-2xl" label="Add logo" fit="contain" /></div>
-            <span className="text-[11px] font-semibold text-[#64748B]">Logo or photo</span>
+    <div className="space-y-5">
+      {/* Logo card (horizontal) */}
+      <div className="rounded-2xl border border-[#EEF2F7] bg-[#F8FAFC] p-4 flex flex-col sm:flex-row gap-4 sm:items-center">
+        <div className="flex flex-col items-center gap-2 shrink-0 mx-auto sm:mx-0">
+          <div className="rounded-2xl ring-4 ring-white shadow-sm"><ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-24 h-24 rounded-2xl" label="Add logo" fit="contain" /></div>
+          <span className="text-[11px] font-semibold text-[#64748B]">Logo or photo</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wide mb-1.5">Shape</span>
+          <div className="grid grid-cols-3 gap-1.5 max-w-[300px]">
+            {SHAPES.map(([v, label, Icon]) => {
+              const on = (val("logo_shape") || "square") === v;
+              return (
+                <button key={v} type="button" onClick={() => set("logo_shape", v)} className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[10px] font-semibold transition-all ${on ? "border-[#0F172A] bg-white text-[#0F172A] shadow-sm" : "border-[#E2E8F0] bg-white text-[#94A3B8] hover:border-[#CBD5E1]"}`}>
+                  <Icon size={15} /> {label}
+                </button>
+              );
+            })}
           </div>
-          <div className="mt-4">
-            <span className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wide mb-1.5">Shape</span>
-            <div className="grid grid-cols-3 gap-1.5">
-              {SHAPES.map(([v, label, Icon]) => {
-                const on = (val("logo_shape") || "square") === v;
-                return (
-                  <button key={v} type="button" onClick={() => set("logo_shape", v)} className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[10px] font-semibold transition-all ${on ? "border-[#0F172A] bg-white text-[#0F172A] shadow-sm" : "border-[#E2E8F0] bg-white text-[#94A3B8] hover:border-[#CBD5E1]"}`}>
-                    <Icon size={15} /> {label}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[10px] text-[#94A3B8] mt-1.5 leading-snug">Plain shows a transparent PNG with no circle or background.</p>
-          </div>
-          <div className="mt-4">
+          <div className="mt-3.5 max-w-[300px]">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wide">Logo size</span>
               <span className="text-[11px] font-bold text-[#0F172A] tabular-nums px-1.5 py-0.5 rounded-md bg-[#FEF3C7]">{val("logo_size") || 100}%</span>
             </div>
             <input type="range" min={70} max={160} value={Number(val("logo_size") || 100)} onChange={(e) => set("logo_size", e.target.value)} className="w-full accent-[#F7B31C]" aria-label="Logo size" />
-            <p className="text-[10px] text-[#94A3B8] mt-1 leading-snug">Shrink your logo so it fits neatly inside the shape.</p>
+            <p className="text-[10px] text-[#94A3B8] mt-1 leading-snug">Plain shows a transparent PNG; shrink so the full logo fits the shape.</p>
           </div>
         </div>
       </div>
 
-      {/* Fields */}
-      <div className="flex-1 min-w-0 space-y-4">
+      {/* Fields (full width) */}
+      <div className="space-y-4">
         <div>
           <label className="block text-[11px] font-semibold text-[#334155] mb-1.5">Full name</label>
           <div className="relative"><User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("name")} onChange={(e) => set("name", e.target.value)} className={`${bigField} pl-10 pr-3 font-semibold`} placeholder="e.g. Shekhar Jain" /></div>
@@ -201,7 +198,32 @@ export default function CardStudio() {
           <label className="block text-[11px] font-semibold text-[#334155] mb-1.5">Company</label>
           <div className="relative"><Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("company_name")} onChange={(e) => set("company_name", e.target.value)} className={`${bigField} pl-10 pr-3`} placeholder="Your company name" /></div>
         </div>
-        <p className="text-[11px] text-[#94A3B8] flex items-center gap-1.5"><Sparkles size={12} className="text-[#F7B31C]" /> Your name &amp; company appear on the card banner — keep them short and clear.</p>
+        <p className="text-[11px] text-[#94A3B8] flex items-start gap-1.5"><Sparkles size={12} className="text-[#F7B31C] mt-0.5 shrink-0" /> Your name &amp; company show on the card banner — keep them short and clear.</p>
+      </div>
+
+      {/* Photo & card details — for the premium Business / ID / Membership card designs */}
+      <div className="pt-4 border-t border-[#F1F5F9]">
+        <span className="block text-[12px] font-bold text-[#0F172A]">Photo &amp; card details</span>
+        <p className="text-[11px] text-[#94A3B8] mt-0.5 mb-3">For the premium Business / ID / Membership card designs.</p>
+        <div className="flex items-start gap-4">
+          <ImagePick value={val("photo")} onChange={(u) => set("photo", u)} className="w-20 h-20 rounded-xl" label="Photo" fit="cover" />
+          <p className="flex-1 text-[11px] text-[#64748B] pt-0.5 min-w-0 leading-relaxed">A clear headshot shown on the ID, Membership &amp; Business-card designs. Your <b>company logo</b> is set above — both appear together on the card.</p>
+        </div>
+
+        <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8] mt-4 mb-2">ID card details</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Field label="Employee ID"><input value={val("employee_id")} onChange={(e) => set("employee_id", e.target.value)} className={fieldCls} placeholder="DBT001" /></Field>
+          <Field label="Blood Group"><input value={val("blood_group")} onChange={(e) => set("blood_group", e.target.value)} className={fieldCls} placeholder="O+" /></Field>
+          <Field label="Joining Date"><input value={val("joining_date")} onChange={(e) => set("joining_date", e.target.value)} className={fieldCls} placeholder="01 Jan 2020" /></Field>
+        </div>
+
+        <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8] mt-4 mb-2">Membership card details</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Membership ID"><input value={val("membership_id")} onChange={(e) => set("membership_id", e.target.value)} className={fieldCls} placeholder="MEM2025" /></Field>
+          <Field label="Membership Type"><input value={val("membership_type")} onChange={(e) => set("membership_type", e.target.value)} className={fieldCls} placeholder="Premium" /></Field>
+          <Field label="Member Since"><input value={val("member_since")} onChange={(e) => set("member_since", e.target.value)} className={fieldCls} placeholder="01 Jan 2025" /></Field>
+          <Field label="Valid Till"><input value={val("valid_till")} onChange={(e) => set("valid_till", e.target.value)} className={fieldCls} placeholder="31 Dec 2025" /></Field>
+        </div>
       </div>
     </div>
   );
