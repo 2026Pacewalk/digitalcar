@@ -139,9 +139,14 @@ export const publishRouter = createRouter({
         if (input.baseTs) {
           const rowTs = existing[0].updatedAt ? new Date(existing[0].updatedAt).getTime() : 0;
           const baseTs = Date.parse(input.baseTs);
-          // 1.5s tolerance absorbs second-precision TIMESTAMP rounding.
-          if (Number.isFinite(baseTs) && rowTs > baseTs + 1500) {
-            throw new TRPCError({ code: "CONFLICT", message: "SNAPSHOT_STALE: this card was updated from another device — refresh to load the latest version." });
+          // The save must be based on the CURRENT stored version. Row newer =
+          // another device published since; row OLDER than the base = the DB
+          // lineage was replaced (e.g. local dev re-imported the live dump) and
+          // this client's copy is from the old lineage. Either way, a blind save
+          // would clobber the authoritative data — reject and let the client
+          // pull. 1.5s tolerance absorbs second-precision TIMESTAMP rounding.
+          if (Number.isFinite(baseTs) && Math.abs(rowTs - baseTs) > 1500) {
+            throw new TRPCError({ code: "CONFLICT", message: "SNAPSHOT_STALE: this card was updated elsewhere — refresh to load the latest version." });
           }
         }
         await db.update(publishedCards).set({ slug, data }).where(owner);

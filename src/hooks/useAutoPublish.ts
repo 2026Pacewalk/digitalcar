@@ -98,9 +98,16 @@ export function useAutoPublish(): void {
           if (ts) { try { localStorage.setItem(scopedKey("dc_snap_ts"), ts); } catch { /* ignore */ } }
         },
         onError: (err) => {
-          // Rejected as stale → the server has newer data. Pull it down (server
-          // wins) instead of retrying, so this browser catches up.
-          if (String((err as { message?: string })?.message || "").includes("SNAPSHOT_STALE")) void pullLatestSnapshot();
+          // Rejected as stale → the server snapshot is authoritative. Pull it
+          // down and RELOAD so the open pages' React state matches the fresh
+          // storage — otherwise the stale in-memory data would just be pushed
+          // again on the next edit. Rare (another device published, or local
+          // dev re-imported the live DB), so a one-off reload is fine.
+          if (String((err as { message?: string })?.message || "").includes("SNAPSHOT_STALE")) {
+            void pullLatestSnapshot().then((pulled) => {
+              if (pulled) window.location.reload();
+            });
+          }
         },
       });
     };
