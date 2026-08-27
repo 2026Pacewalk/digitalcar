@@ -537,12 +537,18 @@ export default function CardStudio() {
             </div>
           </div>
 
-          {/* Desktop tool tabs */}
-          <div className="hidden lg:flex flex-wrap gap-1.5">
+          {/* Desktop tool bar — one contained segmented control */}
+          <div className="hidden lg:flex items-center gap-1 p-1.5 bg-white rounded-2xl border border-[#F1F5F9] shadow-premium overflow-x-auto no-scrollbar">
             {TOOLS.map((t) => {
               const on = t.key === active.key;
               const Icon = t.icon;
-              return <button key={t.key} onClick={() => setActiveTool(t.key)} className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-[12.5px] font-semibold transition-all ${on ? "bg-[#0F172A] text-white shadow-sm" : "bg-white border border-[#E2E8F0] text-[#475569] hover:border-[#CBD5E1]"}`}><Icon size={14} /> {t.label}</button>;
+              return (
+                <button key={t.key} onClick={() => setActiveTool(t.key)}
+                  className={`flex items-center gap-2 h-10 px-3.5 rounded-xl text-[12.5px] font-semibold whitespace-nowrap transition-all duration-200 ${on ? "bg-[#0F172A] text-white shadow-md" : "text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]"}`}>
+                  <span className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${on ? "bg-[#F7B31C] text-[#0F172A]" : "bg-[#F1F5F9] text-[#94A3B8]"}`}><Icon size={13} /></span>
+                  {t.label}
+                </button>
+              );
             })}
           </div>
 
