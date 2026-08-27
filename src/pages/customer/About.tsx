@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Info, Plus, X } from "lucide-react";
-import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick, AutoSaveBadge } from "@/components/customer/ModuleShell";
+import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick, AutoSaveBadge, SectionToggle } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
 
 export default function CustomerAbout() {
@@ -56,6 +56,7 @@ export default function CustomerAbout() {
   return (
     <ModuleShell title="About Us" subtitle="Tell customers about your business" icon={Info}
       actions={<AutoSaveBadge status={status} />}>
+      <SectionToggle flag="about_on" label="About Us section" />
       <Panel title="About Us" subtitle="Section title and description">
         <div className="space-y-4">
           <Field label="Section Title"><input value={aboutTitleV} onChange={(e) => setAboutTitle(e.target.value)} className={fieldCls} placeholder="About Us" /></Field>

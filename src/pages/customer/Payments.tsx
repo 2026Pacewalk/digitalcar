@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Wallet, Save, Landmark, Smartphone, QrCode, Plus, Trash2, Pencil, X, ImageOff, Link2, AtSign } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { Panel, Field, fieldCls, ImagePick, LimitBar, Tip, AutoSaveBadge } from "@/components/customer/ModuleShell";
+import ModuleShell, { Panel, Field, fieldCls, ImagePick, LimitBar, Tip, AutoSaveBadge, SectionToggle } from "@/components/customer/ModuleShell";
 import { useLocalList, packageLimit } from "@/hooks/useCustomer";
 import { useCardAutosave } from "@/hooks/useCardAutosave";
 import { contentSeeder } from "@/lib/cardContent";
@@ -47,6 +47,7 @@ export default function CustomerPayments() {
     <ModuleShell title="Payments" subtitle="Let customers pay you directly from your card" icon={Wallet}
       actions={<AutoSaveBadge status={status} />}>
 
+      <SectionToggle flag="payment_on" label="Payment section" />
       <Tip>Offer more than one way to pay — multiple UPI IDs, bank accounts, wallets, links and a scannable QR. The easier you make paying, the faster you get paid.</Tip>
 
       {/* ── UPI IDs (multiple) ── */}

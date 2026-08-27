@@ -461,15 +461,17 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>
     </div>` : "";
 
-  const offerEnded = (v: string) => { const d = new Date(v); return !isNaN(d.getTime()) && d.getTime() < Date.now(); };
-  const offersSection = on(c.offer_on) && offers.length ? `
+  // An offer stays visible through the END of its valid-till day, then drops off
+  // the card automatically (the owner still sees & can renew it in the dashboard).
+  const offerEnded = (v: string) => { const d = new Date(v); return !isNaN(d.getTime()) && d.getTime() + 86_400_000 <= Date.now(); };
+  const liveOffers = offers.filter((o) => !offerEnded(s(o.valid)));
+  const offersSection = on(c.offer_on) && liveOffers.length ? `
     <div id="offers-section" class="section-container">
       <div class="section-header">${esc(s(c.offer) || "Offers")}</div>
       <div class="dc-offers">
-      ${offers.map((o) => {
-        const ended = offerEnded(s(o.valid));
+      ${liveOffers.map((o) => {
         const tag = `<span class="dc-offer-tag"><i class="fa fa-tag"></i> Offer</span>`;
-        const validPill = o.valid ? `<span class="dc-offer-valid${ended ? " ended" : ""}"><i class="fa fa-${ended ? "hourglass-end" : "clock"}"></i> ${ended ? "Ended" : "Valid till"} ${esc(o.valid)}</span>` : "";
+        const validPill = o.valid ? `<span class="dc-offer-valid"><i class="fa fa-clock"></i> Valid till ${esc(o.valid)}</span>` : "";
         return `<div class="dc-offer">
         ${o.filename ? `<div class="dc-offer-media">${tag}<img src="${esc(o.filename)}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
         <div class="dc-offer-body">

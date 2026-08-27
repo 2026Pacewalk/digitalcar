@@ -233,16 +233,16 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   ].join("");
   const about = !skip.includes("about") && on(c.about_on) && (s(c.company_name) || s(c.about_us)) ? sec("about-section", s(c.about) || "About Us", aboutBody) : "";
 
-  // Latest Offers.
-  const offers = (extras.offers || []).filter((o) => s(o.title) || s(o.filename));
-  const offerEnded = (v: string) => { const d = new Date(v); return !isNaN(d.getTime()) && d.getTime() < Date.now(); };
+  // Latest Offers. An offer stays visible through the END of its valid-till day,
+  // then drops off the card automatically (still editable in the dashboard).
+  const offerEnded = (v: string) => { const d = new Date(v); return !isNaN(d.getTime()) && d.getTime() + 86_400_000 <= Date.now(); };
+  const offers = (extras.offers || []).filter((o) => (s(o.title) || s(o.filename)) && !offerEnded(s(o.valid)));
   const offersHtml = on(c.offer_on, 0) && offers.length ? sec("offers-section", s(c.offer) || "Latest Offers", offers.map((o) => {
-    const ended = offerEnded(s(o.valid));
     return `<div class="pwx-offer">
       ${s(o.filename) ? `<div class="pwx-offer-media"><span class="pwx-offer-tag"><i class="fa fa-tag"></i> Offer</span><img class="pwx-offer-img" src="${esc(o.filename)}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
       <div class="pwx-offer-b">
         ${s(o.title) ? `<b>${esc(o.title)}</b>` : ""}
-        ${s(o.valid) ? `<span class="pwx-valid${ended ? " ended" : ""}"><i class="fa fa-${ended ? "hourglass-end" : "clock"}"></i> ${ended ? "Ended" : "Valid till"} ${esc(o.valid)}</span>` : ""}
+        ${s(o.valid) ? `<span class="pwx-valid"><i class="fa fa-clock"></i> Valid till ${esc(o.valid)}</span>` : ""}
         ${strip(o.description) ? `<p>${esc(strip(o.description))}</p>` : ""}
       </div>
     </div>`;
@@ -506,7 +506,17 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const vcardHref = `data:text/vcard;charset=utf-8,${encodeURIComponent(vcard)}`;
   const ref = s(c.referral_code) || slug;
   const brand = logo ? `<img src="${esc(logo)}" alt="${company || name}" ${IMG}>` : (company ? `<span class="pw-logo-txt">${company}</span>` : "");
-  const avatar = `<div class="pw-ava"><img src="${esc(photo) || initialPh(c, gold)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, gold)}'"></div>`;
+  // Owner toggles (Card Builder → Design) — same flags as the classic templates.
+  const showViews = Number(c.views_on ?? 1) !== 0 && !opts.thumb;
+  const showQr = Number(c.cardqr_on ?? 1) !== 0;
+  const showShare = Number(c.share_on ?? 1) !== 0;
+  const pkgId = Number(c.package_id);
+  const planBadge = Number(c.badge_on) === 0 ? "" : pkgId === 6
+    ? `<span class="pw-plan" title="Platinum member" aria-label="Platinum member"><i class="fa fa-gem"></i></span>`
+    : pkgId === 5
+      ? `<span class="pw-plan" title="Gold member" aria-label="Gold member"><i class="fa fa-crown"></i></span>`
+      : "";
+  const avatar = `<div class="pw-ava"><img src="${esc(photo) || initialPh(c, gold)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, gold)}'">${planBadge}</div>`;
 
   const css = `
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -528,8 +538,11 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .pw-logo img{max-height:34px;max-width:170px;object-fit:contain;}
   .pw-logo-txt{font-family:'Sora',sans-serif;font-weight:800;font-size:16px;letter-spacing:.4px;color:var(--gold);}
   .pw-idrow{display:flex;align-items:center;gap:15px;margin-bottom:18px;}
-  .pw-ava{width:76px;height:76px;border-radius:50%;padding:3px;background:linear-gradient(140deg,var(--gold),#fff6);flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.35);}
+  .pw-ava{position:relative;width:76px;height:76px;border-radius:50%;padding:3px;background:linear-gradient(140deg,var(--gold),#fff6);flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.35);}
   .pw-ava img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;border:2px solid var(--navy);}
+  .pw-plan{position:absolute;top:-3px;right:-3px;z-index:5;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;background:linear-gradient(135deg,#FCE4A0,#E8A317);color:#5b3d00;border:1.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);}
+  .pw-views{position:absolute;top:14px;left:16px;z-index:5;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);color:#fff;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:999px;}
+  .pw-views i{color:var(--gold);font-size:11px;}
   .pw-idtx{min-width:0;}
   .pw-name{font-family:'Sora',sans-serif;font-weight:800;font-size:23px;line-height:1.1;letter-spacing:-.01em;color:#fff;}
   .pw-name .u{color:var(--gold);}
@@ -603,20 +616,24 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     ${phone ? `<a href="tel:${phone}" aria-label="Call"><i class="fa fa-phone-alt g"></i> Call</a>` : ""}
     ${wa ? `<a href="https://wa.me/${wa}" target="_blank" rel="noopener" aria-label="WhatsApp"><i class="fab fa-whatsapp" style="color:#25D366"></i> WhatsApp</a>` : ""}
     <a href="${vcardHref}" download="${slug || "contact"}.vcf" aria-label="Save contact"><i class="fa fa-user-plus"></i> Save</a>
-    <button type="button" onclick="pwShare()" aria-label="Share profile"><i class="fa fa-share-alt"></i> Share</button>
+    ${showShare ? `<button type="button" onclick="pwShare()" aria-label="Share profile"><i class="fa fa-share-alt"></i> Share</button>` : ""}
   </nav>`;
 
   const shareName = s(c.company_name) || s(c.name) || "this business";
   const waShareText = `Hi 👋\n\nTake a look at *${shareName}*'s digital visiting card 📇\n\nEverything in one tap — call, WhatsApp, save the contact:\n${cardUrl}`;
-  const shareUi = opts.thumb ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: navy });
+  const shareUi = opts.thumb || !showShare ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: navy });
   // Full mini-website sections (About / Offers / Payments / Gallery / Videos /
   // Reviews / Enquiry) — same content set as the classic templates.
   const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, opts.extras || {}, slug);
-  const script = opts.thumb ? "" : `<script>${shareSheetJs(cardUrl)}${cx.js}</script>`;
+  // Live view count: the parent page fetches the real total and posts it in
+  // (same __dcViews message the classic card uses).
+  const viewsJs = showViews ? `window.addEventListener('message',function(e){try{if(e.data&&typeof e.data.__dcViews==='number'){var el=document.getElementById('pw-view-count');if(el)el.textContent=Number(e.data.__dcViews).toLocaleString('en-IN');}}catch(_){}});` : "";
+  const script = opts.thumb ? "" : `<script>${shareSheetJs(cardUrl)}${cx.js}${viewsJs}</script>`;
 
-  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${cx.css}${shareSheetCss(navy)}</style></head><body>
+  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${cx.css}${showShare && !opts.thumb ? shareSheetCss(navy) : ""}</style></head><body>
   <div class="pw">
     <header class="pw-hero">
+      ${showViews ? `<span class="pw-views"><i class="fa fa-eye"></i><span id="pw-view-count">${Number(c.views ?? 0).toLocaleString("en-IN")}</span></span>` : ""}
       <div class="pw-hero-in">
         <div class="pw-logo pw-rise">${brand}</div>
         <div class="pw-idrow pw-rise d1">
@@ -628,13 +645,13 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
           </div>
         </div>
         <div class="pw-contacts pw-rise d2">${contacts}</div>
-        <div class="pw-scan pw-rise d2">
+        ${showQr ? `<div class="pw-scan pw-rise d2">
           <div class="pw-scan-qr"><img src="${qrSrc}" alt="Scan to view this card" ${IMG}></div>
           <div class="pw-scan-tx"><b>Scan to connect</b><small>Open &amp; save my card in one tap</small></div>
-        </div>
+        </div>` : ""}
         <div class="pw-cta pw-rise d3">
           <a class="pw-btn pw-btn-gold" href="${vcardHref}" download="${slug || "contact"}.vcf" aria-label="Save contact"><i class="fa fa-user-plus"></i> Save Contact</a>
-          <button type="button" class="pw-btn pw-btn-ghost" onclick="pwShare()" aria-label="Share profile"><i class="fa fa-share-alt"></i> Share Profile</button>
+          ${showShare ? `<button type="button" class="pw-btn pw-btn-ghost" onclick="pwShare()" aria-label="Share profile"><i class="fa fa-share-alt"></i> Share Profile</button>` : ""}
         </div>
       </div>
     </header>

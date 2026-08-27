@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { ShoppingBag, Plus, Pencil, Trash2, X, Save, ImageOff, Tag, MousePointerClick, ChevronDown, Check, AlertTriangle, Type, Link2, Zap, Calendar, Repeat, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { Field, fieldCls, areaCls, ImagePick, LimitBar, Tip } from "@/components/customer/ModuleShell";
+import ModuleShell, { Field, fieldCls, areaCls, ImagePick, LimitBar, Tip, SectionToggle } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, packageLimit } from "@/hooks/useCustomer";
 import { contentSeeder, cleanPlain } from "@/lib/cardContent";
 
@@ -123,6 +123,9 @@ export default function CustomerProducts() {
         <button onClick={() => setTab("offers")} className={`flex-1 h-9 rounded-lg transition-colors ${isOfferTab ? "bg-white text-[#0F172A] shadow-sm" : "text-[#64748B]"}`}>Offers / Deals{offerCount ? ` (${offerCount})` : ""}</button>
       </div>
 
+      {isOfferTab
+        ? <SectionToggle flag="offer_on" label="Offers section" def={0} />
+        : <SectionToggle flag="product_on" label="Products / Services section" />}
       <LimitBar used={items.length} limit={limit} unit={isOfferTab ? "offers" : "products"} />
       <Tip>{isOfferTab ? "Give every offer a deadline — a little urgency turns browsers into buyers. Convert any product into an offer with the ↻ button." : "Lead with your best-sellers and use sharp, square photos with a clear price and a \"Buy Now\" button — visitors decide in seconds."}</Tip>
 

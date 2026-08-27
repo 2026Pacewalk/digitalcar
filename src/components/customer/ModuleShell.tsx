@@ -1,7 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import type { ReactNode } from "react";
-import { ImagePlus, Lightbulb } from "lucide-react";
-import { fileToDataUrl } from "@/hooks/useCustomer";
+import { ImagePlus, Lightbulb, Eye, EyeOff } from "lucide-react";
+import { fileToDataUrl, useCustomer } from "@/hooks/useCustomer";
 import NotificationBell from "@/components/NotificationBell";
 import ProfileMenu from "@/components/ProfileMenu";
 import CardSwitcher from "@/components/customer/CardSwitcher";
@@ -20,6 +20,35 @@ export function AutoSaveBadge({ status }: { status: "idle" | "saving" | "saved" 
         : status === "saved" ? <>✓ Saved</>
         : "Auto-save on"}
     </span>
+  );
+}
+
+/* Show/hide toggle for the card section this module edits — the same *_on flag
+   as Settings → Card Sections, surfaced where the user is actually editing so
+   they never have to hunt for it. Saves instantly (auto-publish picks it up). */
+export function SectionToggle({ flag, label, def = 1 }: { flag: string; label: string; def?: 0 | 1 }) {
+  const { data, update } = useCustomer();
+  const on = Number((data as Record<string, unknown>)[flag] ?? def) === 1;
+  return (
+    <div className={`rounded-2xl border px-4 py-3 flex items-center gap-3 transition-colors ${on ? "bg-white border-[#F1F5F9] shadow-premium" : "bg-[#F8FAFC] border-dashed border-[#CBD5E1]"}`}>
+      <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${on ? "bg-emerald-50 text-emerald-600" : "bg-[#F1F5F9] text-[#94A3B8]"}`}>
+        {on ? <Eye size={17} /> : <EyeOff size={17} />}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold text-[#0F172A]">{label}</p>
+        <p className={`text-[11px] ${on ? "text-emerald-600" : "text-[#94A3B8]"}`}>{on ? "Visible on your card" : "Hidden from your card — turn on to show it"}</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => update({ [flag]: on ? 0 : 1 })}
+        role="switch"
+        aria-checked={on}
+        aria-label={`${on ? "Hide" : "Show"} ${label}`}
+        className={`w-11 h-6 rounded-full transition-colors shrink-0 relative ${on ? "bg-[#F7B31C]" : "bg-[#E2E8F0]"}`}
+      >
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+      </button>
+    </div>
   );
 }
 

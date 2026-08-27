@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Image as ImageIcon, Video, Trash2, Plus, Play, ImagePlus, Instagram, Check } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { fieldCls, LimitBar, Tip, AutoSaveBadge } from "@/components/customer/ModuleShell";
+import ModuleShell, { fieldCls, LimitBar, Tip, AutoSaveBadge, SectionToggle } from "@/components/customer/ModuleShell";
 import { useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
 import { useCardAutosave } from "@/hooks/useCardAutosave";
 import { contentSeeder } from "@/lib/cardContent";
@@ -47,6 +47,10 @@ export default function CustomerMedia() {
   return (
     <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube, Shorts & Instagram videos" icon={ImageIcon}
       actions={<AutoSaveBadge status={status} />}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <SectionToggle flag="gallery_on" label="Gallery section" />
+        <SectionToggle flag="video_on" label="Videos section" />
+      </div>
       {/* Big, obvious section switch — which one you're editing is unmissable. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {tabs.map((t) => {

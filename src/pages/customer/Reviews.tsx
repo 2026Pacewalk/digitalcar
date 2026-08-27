@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Star, MapPin, ExternalLink, Info, Plus, Trash2, MessageSquareQuote } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { Panel, Field, fieldCls, areaCls , AutoSaveBadge } from "@/components/customer/ModuleShell";
+import ModuleShell, { Panel, Field, fieldCls, areaCls , AutoSaveBadge, SectionToggle } from "@/components/customer/ModuleShell";
 import { useLocalList } from "@/hooks/useCustomer";
 import { useCardAutosave } from "@/hooks/useCardAutosave";
 
@@ -56,6 +56,7 @@ export default function CustomerReviews() {
     <ModuleShell title="Google Reviews" subtitle="Show your rating, featured reviews & a one-tap review button" icon={Star}
       actions={<AutoSaveBadge status={status} />}>
 
+      <SectionToggle flag="review_on" label="Google Reviews section" />
       {/* ── Rating summary ── */}
       <Panel title="Your Google Rating" subtitle="Shown as a summary at the top of the reviews section">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
