@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Image as ImageIcon, Video, Trash2, Plus, Play, ImagePlus, Instagram, Check } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { fieldCls, LimitBar, Tip } from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
+import ModuleShell, { fieldCls, LimitBar, Tip, AutoSaveBadge } from "@/components/customer/ModuleShell";
+import { useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
+import { useCardAutosave } from "@/hooks/useCardAutosave";
 import { contentSeeder } from "@/lib/cardContent";
 import { parseVideo, isVideoUrl } from "@/lib/video";
 
@@ -10,8 +11,8 @@ type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
 
 export default function CustomerMedia() {
-  const { data, update } = useCustomer();
-  const videoLayout = String(data.video_layout ?? "stack").toLowerCase() === "swipe" ? "swipe" : "stack";
+  const { data, val, set, status } = useCardAutosave();
+  const videoLayout = (val("video_layout") || "stack").toLowerCase() === "swipe" ? "swipe" : "stack";
   const gLimit = packageLimit(Number(data.package_id), "gallery");
   const vLimit = packageLimit(Number(data.package_id), "video");
   const [tab, setTab] = useState<"gallery" | "video">("gallery");
@@ -19,8 +20,7 @@ export default function CustomerMedia() {
   const videos = useLocalList<Vid>("dc_videos", [], contentSeeder("videos"));
   const [vt, setVt] = useState(""); const [vu, setVu] = useState("");
   const [playing, setPlaying] = useState<number | null>(null); // video played inline in the dashboard
-  const [secTitle, setSecTitle] = useState<string | null>(null); // local edit of the section heading
-  const secTitleVal = secTitle !== null ? secTitle : String(data.video ?? "");
+  const secTitleVal = val("video"); // section heading — auto-saves as you type
   const videoFull = videos.items.length >= vLimit;
 
   const onPickImages = async (files: FileList | null) => {
@@ -45,7 +45,8 @@ export default function CustomerMedia() {
   ];
 
   return (
-    <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube, Shorts & Instagram videos" icon={ImageIcon}>
+    <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube, Shorts & Instagram videos" icon={ImageIcon}
+      actions={<AutoSaveBadge status={status} />}>
       {/* Big, obvious section switch — which one you're editing is unmissable. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {tabs.map((t) => {
@@ -100,42 +101,52 @@ export default function CustomerMedia() {
               {/* Rename the section heading shown on the public card */}
               <p className="text-sm font-semibold text-[#0F172A]">Section name</p>
               <p className="text-xs text-[#64748B] mt-0.5 mb-2">The heading shown above your videos on the public card.</p>
-              <input value={secTitleVal} onChange={(e) => setSecTitle(e.target.value)}
-                onBlur={() => { if (secTitle !== null) { update({ video: secTitle.trim() }); toast.success("Section name updated"); } }}
+              <input value={secTitleVal} onChange={(e) => set("video", e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                 className={`${fieldCls} max-w-lg`} placeholder="Video Portfolio" />
 
               <div className="h-px bg-[#F1F5F9] my-4" />
 
               <p className="text-sm font-semibold text-[#0F172A]">Video Portfolio layout</p>
-              <p className="text-xs text-[#64748B] mt-0.5 mb-3">How your videos appear on your public card link — changes go live automatically.</p>
-              <div className="grid grid-cols-2 gap-3 max-w-lg">
+              <p className="text-xs text-[#64748B] mt-0.5 mb-3">How your videos appear on your public card — saves & goes live automatically.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
                 {[
-                  { key: "stack", name: "Stacked", desc: "One below another (full width)" },
-                  { key: "swipe", name: "Swipe (compact)", desc: "Swipe sideways, one at a time" },
+                  { key: "stack", name: "Stacked", desc: "Full-width videos, one below another" },
+                  { key: "swipe", name: "Swipe (compact)", desc: "A sideways carousel — swipe one at a time" },
                 ].map((opt) => {
                   const selected = videoLayout === opt.key;
                   return (
-                    <button key={opt.key} type="button" onClick={() => update({ video_layout: opt.key })}
-                      className={`text-left rounded-xl border-2 p-3 transition-all ${selected ? "border-[#F7B31C] bg-[#FEF3C7]/40 shadow-gold" : "border-[#E2E8F0] bg-white hover:border-[#F7B31C]/50"}`}>
-                      <span className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-[#0F172A]">{opt.name}</span>
-                        {selected && <Check size={15} className="text-[#F7B31C]" />}
-                      </span>
-                      <span className="flex gap-1.5 mt-2.5 mb-2">
+                    <button key={opt.key} type="button" onClick={() => set("video_layout", opt.key)}
+                      className={`relative text-left rounded-2xl border-2 p-3.5 transition-all ${selected ? "border-[#F7B31C] bg-[#0F172A] shadow-premium" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}>
+                      {selected && <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-[#F7B31C] text-[#0F172A] flex items-center justify-center"><Check size={12} strokeWidth={3} /></span>}
+                      <span className={`block text-sm font-bold ${selected ? "text-white" : "text-[#0F172A]"}`}>{opt.name}</span>
+                      {/* Mini preview of how the public card renders this layout */}
+                      <span className={`block rounded-xl p-2 mt-2.5 mb-2 ${selected ? "bg-white/10" : "bg-[#F8FAFC]"}`}>
                         {opt.key === "stack" ? (
-                          <span className="flex flex-col gap-1 w-full">
-                            <span className="h-3 rounded bg-[#CBD5E1] w-full" />
-                            <span className="h-3 rounded bg-[#CBD5E1] w-full" />
+                          <span className="flex flex-col gap-1.5">
+                            {[0, 1].map((i) => (
+                              <span key={i} className={`relative h-8 rounded-lg flex items-center justify-center ${selected ? "bg-white/20" : "bg-[#CBD5E1]"}`}>
+                                <span className={`w-4 h-4 rounded-full flex items-center justify-center ${selected ? "bg-[#F7B31C] text-[#0F172A]" : "bg-white text-[#64748B]"}`}><Play size={8} fill="currentColor" /></span>
+                              </span>
+                            ))}
                           </span>
                         ) : (
-                          <span className="flex gap-1 w-full items-center">
-                            <span className="h-6 rounded bg-[#CBD5E1] w-4/5" />
-                            <span className="h-6 rounded bg-[#E2E8F0] w-1/5" />
+                          <span className="block">
+                            <span className="flex gap-1.5 items-center">
+                              <span className={`relative h-12 rounded-lg flex-[4] flex items-center justify-center ${selected ? "bg-white/20" : "bg-[#CBD5E1]"}`}>
+                                <span className={`w-4 h-4 rounded-full flex items-center justify-center ${selected ? "bg-[#F7B31C] text-[#0F172A]" : "bg-white text-[#64748B]"}`}><Play size={8} fill="currentColor" /></span>
+                              </span>
+                              <span className={`h-12 rounded-l-lg flex-1 ${selected ? "bg-white/10" : "bg-[#E2E8F0]"}`} />
+                            </span>
+                            <span className="flex gap-1 justify-center mt-1.5">
+                              <span className={`w-3 h-1 rounded-full ${selected ? "bg-[#F7B31C]" : "bg-[#94A3B8]"}`} />
+                              <span className={`w-1 h-1 rounded-full ${selected ? "bg-white/40" : "bg-[#CBD5E1]"}`} />
+                              <span className={`w-1 h-1 rounded-full ${selected ? "bg-white/40" : "bg-[#CBD5E1]"}`} />
+                            </span>
                           </span>
                         )}
                       </span>
-                      <span className="block text-[11px] text-[#64748B] leading-snug">{opt.desc}</span>
+                      <span className={`block text-[11px] leading-snug ${selected ? "text-[#CBD5E1]" : "text-[#64748B]"}`}>{opt.desc}</span>
                     </button>
                   );
                 })}

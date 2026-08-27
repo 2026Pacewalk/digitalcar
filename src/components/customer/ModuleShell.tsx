@@ -8,6 +8,21 @@ import CardSwitcher from "@/components/customer/CardSwitcher";
 import { useMobileChrome } from "@/components/layout/MobileDashboardLayout";
 import { JourneyStrip, JourneyContinue } from "@/components/customer/EditCardJourney";
 
+/* Auto-save status pill for module pages (no Save buttons — edits persist
+   automatically; this shows the user that it happened). */
+export function AutoSaveBadge({ status }: { status: "idle" | "saving" | "saved" }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-semibold border ${
+      status === "saving" ? "bg-[#FFFBEB] border-[#FDE68A] text-[#92400E]"
+      : status === "saved" ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+      : "bg-white border-[#E2E8F0] text-[#94A3B8]"}`}>
+      {status === "saving" ? <><span className="w-3 h-3 border-2 border-[#D97706] border-t-transparent rounded-full animate-spin" /> Saving…</>
+        : status === "saved" ? <>✓ Saved</>
+        : "Auto-save on"}
+    </span>
+  );
+}
+
 /* Reusable smart-tip banner shown at the top of a module. */
 export function Tip({ children }: { children: ReactNode }) {
   return (

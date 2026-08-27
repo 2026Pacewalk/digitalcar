@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Star, Save, MapPin, ExternalLink, Info, Plus, Trash2, MessageSquareQuote } from "lucide-react";
+import { Star, MapPin, ExternalLink, Info, Plus, Trash2, MessageSquareQuote } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { Panel, Field, fieldCls, areaCls } from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList } from "@/hooks/useCustomer";
+import ModuleShell, { Panel, Field, fieldCls, areaCls , AutoSaveBadge } from "@/components/customer/ModuleShell";
+import { useLocalList } from "@/hooks/useCustomer";
+import { useCardAutosave } from "@/hooks/useCardAutosave";
 
 type Review = { id: number; name: string; rating: number; text: string; date?: string };
 
@@ -32,12 +33,8 @@ function Stars({ value, onPick, size = 18 }: { value: number; onPick?: (n: numbe
 }
 
 export default function CustomerReviews() {
-  const { data, update } = useCustomer();
+  const { val, set, status } = useCardAutosave();
   const reviews = useLocalList<Review>("dc_reviews", []);
-  const [form, setForm] = useState<Record<string, string>>({});
-  const val = (k: string) => (form[k] !== undefined ? form[k] : String(data[k] ?? ""));
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
-  const save = () => { update(form); toast.success("Reviews settings saved"); setForm({}); };
 
   const reviewLink = val("google_review");
   const rating = Number(val("google_rating")) || 0;
@@ -57,7 +54,7 @@ export default function CustomerReviews() {
 
   return (
     <ModuleShell title="Google Reviews" subtitle="Show your rating, featured reviews & a one-tap review button" icon={Star}
-      actions={<button onClick={save} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save</button>}>
+      actions={<AutoSaveBadge status={status} />}>
 
       {/* ── Rating summary ── */}
       <Panel title="Your Google Rating" subtitle="Shown as a summary at the top of the reviews section">

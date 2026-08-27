@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
-import { Info, Save, Plus, X } from "lucide-react";
-import { toast } from "sonner";
-import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
+import { useState, useEffect, useRef } from "react";
+import { Info, Plus, X } from "lucide-react";
+import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick, AutoSaveBadge } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
 
 export default function CustomerAbout() {
@@ -27,23 +26,36 @@ export default function CustomerAbout() {
   const aboutV = about ?? String(data.about_us ?? "");
   const specTitleV = specTitle ?? String(data.specialties_title ?? "Our Specialties");
 
-  const addSpec = () => { const v = newSpec.trim(); if (!v) return; setSpecs((s) => [...s, v]); setNewSpec(""); };
-  const removeSpec = (i: number) => setSpecs((s) => s.filter((_, idx) => idx !== i));
+  const specsTouched = useRef(false);
+  const addSpec = () => { const v = newSpec.trim(); if (!v) return; specsTouched.current = true; setSpecs((s) => [...s, v]); setNewSpec(""); };
+  const removeSpec = (i: number) => { specsTouched.current = true; setSpecs((s) => s.filter((_, idx) => idx !== i)); };
 
-  const save = () => {
-    update({
-      about: aboutTitleV, about_us: aboutV, specialties_title: specTitleV, specialities: specs.join(","),
-      photo: photoV,
-      employee_id: fval("employee_id"), blood_group: fval("blood_group"), joining_date: fval("joining_date"),
-      membership_id: fval("membership_id"), membership_type: fval("membership_type"),
-      member_since: fval("member_since"), valid_till: fval("valid_till"),
-    });
-    toast.success("Saved");
-  };
+  // AUTO-SAVE: persist a beat after the last change — no Save button. Skips
+  // until the user actually edits something (nulls = untouched hydration state).
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const timer = useRef<number | null>(null);
+  const touched = aboutTitle !== null || about !== null || specTitle !== null || photo !== null || Object.keys(fields).length > 0 || specsTouched.current;
+  useEffect(() => {
+    if (!touched) return;
+    setStatus("saving");
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      update({
+        about: aboutTitleV, about_us: aboutV, specialties_title: specTitleV, specialities: specs.join(","),
+        photo: photoV,
+        employee_id: fval("employee_id"), blood_group: fval("blood_group"), joining_date: fval("joining_date"),
+        membership_id: fval("membership_id"), membership_type: fval("membership_type"),
+        member_since: fval("member_since"), valid_till: fval("valid_till"),
+      });
+      setStatus("saved");
+    }, 700);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aboutTitle, about, specTitle, specs, photo, fields]);
 
   return (
     <ModuleShell title="About Us" subtitle="Tell customers about your business" icon={Info}
-      actions={<button onClick={save} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save</button>}>
+      actions={<AutoSaveBadge status={status} />}>
       <Panel title="About Us" subtitle="Section title and description">
         <div className="space-y-4">
           <Field label="Section Title"><input value={aboutTitleV} onChange={(e) => setAboutTitle(e.target.value)} className={fieldCls} placeholder="About Us" /></Field>
@@ -93,9 +105,6 @@ export default function CustomerAbout() {
         </div>
       </Panel>
 
-      <div className="flex justify-end">
-        <button onClick={save} className="flex items-center gap-2 h-11 px-6 gradient-gold text-[#0F172A] rounded-xl text-sm font-bold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save Changes</button>
-      </div>
     </ModuleShell>
   );
 }

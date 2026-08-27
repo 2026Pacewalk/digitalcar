@@ -176,7 +176,11 @@ export const publishRouter = createRouter({
       if (input.color !== undefined) customer.color = input.color;
       if (input.color2 !== undefined) customer.color2 = input.color2;
       await db.update(publishedCards).set({ data: { ...data, customer } }).where(owner);
-      return { ok: true, published: true };
+      // Return the fresh version stamp so the client can keep its dc_snap_ts in
+      // step — otherwise the next freshness check would see "server changed" and
+      // pull the snapshot down OVER any not-yet-published local edits.
+      const fresh = await db.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner);
+      return { ok: true, published: true, updatedAt: fresh[0]?.updatedAt ? new Date(fresh[0].updatedAt).toISOString() : null };
     }),
 
   // Authed: is a slug free for this user's given card? (live check while editing)

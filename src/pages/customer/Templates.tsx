@@ -3,7 +3,7 @@ import { Link, useSearchParams, useNavigate } from "react-router";
 import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil, Lock } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList, getActiveCardId } from "@/hooks/useCustomer";
+import { useCustomer, useLocalList, getActiveCardId, scopedKey } from "@/hooks/useCustomer";
 import { contentSeeder } from "@/lib/cardContent";
 import { brandSecondaryFor } from "@/lib/brandColors";
 import { buildCardThumb } from "@/card-template/buildCard";
@@ -197,7 +197,13 @@ export default function CustomerTemplates() {
     // reflect it immediately (no need to re-open the builder and Publish again).
     updateDesign.mutate(
       { cardId: getActiveCardId(), theme: String(selected.style), color, color2 },
-      { onSuccess: (r) => { if (r?.published) toast.success("Your live card & QR now show this design"); } },
+      { onSuccess: (r) => {
+        // Keep the freshness marker in step with the server-side design write, so
+        // the next dashboard load doesn't pull the snapshot over local edits.
+        const ts = (r as { updatedAt?: string | null })?.updatedAt;
+        if (ts) { try { localStorage.setItem(scopedKey("dc_snap_ts"), ts); } catch { /* ignore */ } }
+        if (r?.published) toast.success("Your live card & QR now show this design");
+      } },
     );
   };
 

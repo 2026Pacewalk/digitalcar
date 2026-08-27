@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Wallet, Save, Landmark, Smartphone, QrCode, Plus, Trash2, Pencil, X, ImageOff, Link2, AtSign } from "lucide-react";
 import { toast } from "sonner";
-import ModuleShell, { Panel, Field, fieldCls, ImagePick, LimitBar, Tip } from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList, packageLimit } from "@/hooks/useCustomer";
+import ModuleShell, { Panel, Field, fieldCls, ImagePick, LimitBar, Tip, AutoSaveBadge } from "@/components/customer/ModuleShell";
+import { useLocalList, packageLimit } from "@/hooks/useCustomer";
+import { useCardAutosave } from "@/hooks/useCardAutosave";
 import { contentSeeder } from "@/lib/cardContent";
 
 type Upi = { id: number; label: string; upi: string };
@@ -11,11 +12,7 @@ type Qr = { id: number; name: string; filename: string };
 const blankQr: Omit<Qr, "id"> = { name: "Pay Online", filename: "" };
 
 export default function CustomerPayments() {
-  const { data, update } = useCustomer();
-  const [form, setForm] = useState<Record<string, string>>({});
-  const val = (k: string) => (form[k] !== undefined ? form[k] : String(data[k] ?? ""));
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
-  const save = () => { update(form); toast.success("Payment details saved"); setForm({}); };
+  const { data, val, set, status } = useCardAutosave();
 
   // ── Multiple UPI IDs ──
   const { items: upis, add: addUpi, update: updateUpi, remove: removeUpi } = useLocalList<Upi>("dc_upi", []);
@@ -48,7 +45,7 @@ export default function CustomerPayments() {
 
   return (
     <ModuleShell title="Payments" subtitle="Let customers pay you directly from your card" icon={Wallet}
-      actions={<button onClick={save} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save</button>}>
+      actions={<AutoSaveBadge status={status} />}>
 
       <Tip>Offer more than one way to pay — multiple UPI IDs, bank accounts, wallets, links and a scannable QR. The easier you make paying, the faster you get paid.</Tip>
 
@@ -148,9 +145,6 @@ export default function CustomerPayments() {
         )}
       </Panel>
 
-      <div className="flex justify-end">
-        <button onClick={save} className="flex items-center gap-2 h-11 px-6 gradient-gold text-[#0F172A] rounded-xl text-sm font-bold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save Changes</button>
-      </div>
 
       {/* QR add/edit modal */}
       {qrOpen && (

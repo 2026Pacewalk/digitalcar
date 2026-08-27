@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Share2, Save, Trash2, Palette, Plus, Check } from "lucide-react";
-import { toast } from "sonner";
-import ModuleShell, { Panel, Field, fieldCls, Tip } from "@/components/customer/ModuleShell";
-import { useCustomer } from "@/hooks/useCustomer";
+import { Share2, Trash2, Palette, Plus, Check } from "lucide-react";
+import ModuleShell, { Panel, Field, fieldCls, Tip, AutoSaveBadge } from "@/components/customer/ModuleShell";
+import { useCardAutosave } from "@/hooks/useCardAutosave";
 import { SOCIAL_PLATFORMS, SOCIAL_BY_KEY, readSocialLinks, type SocialLink, type SocialPlatform } from "@/lib/socialPlatforms";
 
 // Render a platform's real brand glyph — an inline SVG (X, TikTok) or a Font
@@ -13,17 +12,21 @@ function PlatformIcon({ p, size = 16 }: { p: SocialPlatform; size?: number }) {
 }
 
 export default function CustomerSocial() {
-  const { data, update } = useCustomer();
-  const [form, setForm] = useState<Record<string, string>>({});
-  const val = (k: string) => (form[k] !== undefined ? form[k] : String(data[k] ?? ""));
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const { data, val, set, setMany, status } = useCardAutosave();
 
   // Seed the list from the saved record, re-seeding as the record hydrates —
   // until the user edits (then we stop so their changes aren't overwritten).
   const [links, setLinks] = useState<SocialLink[]>([]);
   const dirty = useRef(false);
   useEffect(() => { if (!dirty.current) setLinks(readSocialLinks(data as Record<string, unknown>)); }, [data]);
-  const mutate = (next: SocialLink[]) => { dirty.current = true; setLinks(next); };
+  // Every link change AUTO-SAVES (debounced): serialize the valid links along
+  // with the rest of the pending form — no Save button needed.
+  const mutate = (next: SocialLink[]) => {
+    dirty.current = true;
+    setLinks(next);
+    const clean = next.filter((l) => l.platform && l.url.trim()).map((l) => ({ platform: l.platform, url: l.url.trim() }));
+    setMany({ social_links: JSON.stringify(clean) });
+  };
 
   const style = val("social_icon_style") === "brand" ? "brand" : "theme";
   const heading = val("social_title") || "Follow Us";
@@ -39,16 +42,10 @@ export default function CustomerSocial() {
   // Preview icon colours — mirror how the card renders theme vs brand.
   const chipStyle = (p: SocialPlatform) => (style === "brand" ? { background: p.color, color: p.fg || "#fff" } : { background: "#F7B31C", color: "#fff" });
 
-  const save = () => {
-    const clean = links.filter((l) => l.platform && l.url.trim()).map((l) => ({ platform: l.platform, url: l.url.trim() }));
-    update({ ...form, social_links: JSON.stringify(clean) });
-    toast.success("Social links saved");
-    setForm({});
-  };
 
   return (
     <ModuleShell title="Social Links" subtitle="Add every profile you want on your card" icon={Share2}
-      actions={<button onClick={save} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save</button>}>
+      actions={<AutoSaveBadge status={status} />}>
       <Tip>Tap a platform to add it, then paste your profile link. Add as many as you like, choose your icon style, then Save — it all goes live instantly.</Tip>
 
       {/* Live preview — exactly how the "Follow Us" row appears on the card */}
@@ -143,9 +140,6 @@ export default function CustomerSocial() {
         )}
       </Panel>
 
-      <div className="flex justify-end">
-        <button onClick={save} className="flex items-center gap-2 h-11 px-6 gradient-gold text-[#0F172A] rounded-xl text-sm font-bold hover:shadow-gold transition-all active:scale-[0.98]"><Save size={16} /> Save Changes</button>
-      </div>
     </ModuleShell>
   );
 }
