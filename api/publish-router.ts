@@ -201,7 +201,7 @@ export const publishRouter = createRouter({
   publicState: publicQuery.input(z.object({ slug: z.string() })).query(async ({ input }) => {
     const db = getDb();
     const mode = (await setting(db, "expiry_mode")) || "deactivate";
-    const rows = await db.select({ userId: publishedCards.userId }).from(publishedCards).where(eq(publishedCards.slug, input.slug)).orderBy(publishedCards.id).limit(1);
+    const rows = await db.select({ userId: publishedCards.userId, data: publishedCards.data }).from(publishedCards).where(eq(publishedCards.slug, input.slug)).orderBy(publishedCards.id).limit(1);
     if (!rows[0]) return { paused: false, mode };
     const uid = rows[0].userId;
     const now = Date.now();
@@ -210,6 +210,21 @@ export const publishRouter = createRouter({
     const subs = await db.select().from(subscriptions).where(eq(subscriptions.userId, uid)).orderBy(desc(subscriptions.createdAt)).limit(1);
     const sub = subs[0];
     if (sub && sub.status === "active" && (!sub.currentPeriodEnd || new Date(sub.currentPeriodEnd).getTime() > now)) return { paused: false, mode };
+
+    // Manual / legacy paid plans: admin-set packages live on the card record
+    // itself (Gold=5 / Platinum=6 + expired_on) with NO subscriptions row. A
+    // valid paid package must keep the card live even after the old trial clock
+    // runs out — otherwise paying customers get paused (real prod incident).
+    try {
+      const cust = ((rows[0].data as { customer?: Record<string, unknown> })?.customer) || {};
+      const pkg = Number(cust.package_id);
+      if (pkg === 5 || pkg === 6) {
+        const exp = String(cust.expired_on || "").trim();
+        const expMs = exp ? Date.parse(exp) : NaN;
+        // No expiry recorded → treat as live; else valid through the end of that day.
+        if (!exp || (Number.isFinite(expMs) && expMs + DAY > now)) return { paused: false, mode };
+      }
+    } catch { /* malformed snapshot — fall through to trial gating */ }
 
     const tr = await db.select().from(cardTrials).where(eq(cardTrials.userId, uid));
     const t = tr[0];
