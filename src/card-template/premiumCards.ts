@@ -534,6 +534,8 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .pw-hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:30px 30px;mask-image:radial-gradient(120% 90% at 80% 0,#000,transparent 70%);opacity:.5;pointer-events:none;}
   .pw-hero::after{content:"";position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,var(--gold)33 0%,transparent 70%);pointer-events:none;}
   .pw-hero-in{position:relative;z-index:1;}
+  .pw-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px;}
+  .pw-top .pw-logo{margin-bottom:0;}
   .pw-logo{min-height:30px;margin-bottom:18px;}
   .pw-logo img{max-height:34px;max-width:170px;object-fit:contain;}
   .pw-logo-txt{font-family:'Sora',sans-serif;font-weight:800;font-size:16px;letter-spacing:.4px;color:var(--gold);}
@@ -541,7 +543,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .pw-ava{position:relative;width:76px;height:76px;border-radius:50%;padding:3px;background:linear-gradient(140deg,var(--gold),#fff6);flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.35);}
   .pw-ava img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;border:2px solid var(--navy);}
   .pw-plan{position:absolute;top:-3px;right:-3px;z-index:5;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;background:linear-gradient(135deg,#FCE4A0,#E8A317);color:#5b3d00;border:1.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);}
-  .pw-views{position:absolute;top:14px;left:16px;z-index:5;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);color:#fff;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:999px;}
+  .pw-views{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;background:rgba(255,255,255,.1);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);color:#fff;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:999px;}
   .pw-views i{color:var(--gold);font-size:11px;}
   .pw-idtx{min-width:0;}
   .pw-name{font-family:'Sora',sans-serif;font-weight:800;font-size:23px;line-height:1.1;letter-spacing:-.01em;color:#fff;}
@@ -633,9 +635,11 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${cx.css}${showShare && !opts.thumb ? shareSheetCss(navy) : ""}</style></head><body>
   <div class="pw">
     <header class="pw-hero">
-      ${showViews ? `<span class="pw-views"><i class="fa fa-eye"></i><span id="pw-view-count">${Number(c.views ?? 0).toLocaleString("en-IN")}</span></span>` : ""}
       <div class="pw-hero-in">
-        <div class="pw-logo pw-rise">${brand}</div>
+        <div class="pw-top pw-rise">
+          <div class="pw-logo">${brand}</div>
+          ${showViews ? `<span class="pw-views"><i class="fa fa-eye"></i><span id="pw-view-count">${Number(c.views ?? 0).toLocaleString("en-IN")}</span></span>` : ""}
+        </div>
         <div class="pw-idrow pw-rise d1">
           ${avatar}
           <div class="pw-idtx">
