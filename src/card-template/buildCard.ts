@@ -1083,6 +1083,8 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number, opts: { chro
           button: s(p.button),
           button_title: s(p.button_title),
           filename: s(p.filename),
+          price: s(p.price),
+          offer_price: s(p.offer_price),
         }))
       : demo;
     return buildPremiumCardHtml(c as Record<string, unknown>, items, theme - PREMIUM_START, { thumb: true });

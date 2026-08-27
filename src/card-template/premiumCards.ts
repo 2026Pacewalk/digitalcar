@@ -8,7 +8,7 @@
 import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
 import { parseVideo } from "@/lib/video";
 
-type PCProduct = { name: string; tagline?: string; description?: string; button?: string; button_title?: string; filename?: string };
+type PCProduct = { name: string; tagline?: string; description?: string; button?: string; button_title?: string; filename?: string; price?: string; offer_price?: string };
 type PCRecord = Record<string, unknown>;
 /* Full mini-website content passed through from buildCardHtml, so the premium
    designs can render the SAME sections as the classic templates. */
@@ -188,15 +188,36 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   const on = (v: unknown, def = 1) => Number(v ?? def) === 1;
   const skip = o.skip || [];
   const strip = (v: unknown) => s(v).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  // Compact layout: sections collapse into tap-to-open accordions (same option
+  // the classic templates honour — Card Builder → Design → Card layout).
+  const compact = s(c.layout_mode) === "compact";
   const sec = (id: string, title: string, body: string) =>
-    body ? `<section id="${id}" class="pwx-sec"><h2 class="pwx-h2">${esc(title)}</h2>${body}</section>` : "";
+    !body ? "" : compact
+      ? `<section id="${id}" class="pwx-sec pwx-acc"><button type="button" class="pwx-h2 pwx-acc-h" onclick="pwxAcc(this)" aria-expanded="false">${esc(title)}<i class="fa fa-chevron-down pwx-acc-c"></i></button><div class="pwx-acc-b">${body}</div></section>`
+      : `<section id="${id}" class="pwx-sec"><h2 class="pwx-h2">${esc(title)}</h2>${body}</section>`;
 
   // Services / products — for designs that don't render their own product list.
+  // Products WITH an uploaded image get a full media card (image, name, price,
+  // description, CTA); image-less ones stay as slim rows.
   const prods = (o.products || []).filter((p) => s(p.name));
   const servicesHtml = !skip.includes("services") && on(c.product_on) && prods.length
     ? sec("products-section", s(c.product) || "Services", prods.map((p) => {
-        const d = strip(p.tagline) || strip(p.description).slice(0, 80);
         const href = s(p.button);
+        const img = s(p.filename);
+        if (img) {
+          const priceRow = (s(p.price) || s(p.offer_price))
+            ? `<div class="pwx-prod-price">${s(p.price) && s(p.offer_price) ? `<s>₹${esc(p.price)}</s>` : ""}<b>₹${esc(p.offer_price) || esc(p.price)}</b></div>` : "";
+          const d = strip(p.description) || strip(p.tagline);
+          return `<div class="pwx-prod">
+            <div class="pwx-prod-media"><img src="${esc(img)}" alt="${esc(p.name)}" loading="lazy" ${IMG} onerror="this.parentNode.style.display='none'"></div>
+            <div class="pwx-prod-b">
+              <div class="pwx-prod-top"><b>${esc(p.name)}</b>${priceRow}</div>
+              ${d ? `<p>${esc(d.slice(0, 220))}</p>` : ""}
+              ${href ? `<a class="pwx-prod-cta" href="${esc(href)}" target="_blank" rel="noopener">${esc(p.button_title) || "Know More"} <i class="fa fa-arrow-right"></i></a>` : ""}
+            </div>
+          </div>`;
+        }
+        const d = strip(p.tagline) || strip(p.description).slice(0, 80);
         const inner = `<span class="pwx-svc-tx"><b>${esc(p.name)}</b>${d ? `<small>${esc(d)}</small>` : ""}</span><i class="fa fa-arrow-right pwx-svc-ar"></i>`;
         return href ? `<a class="pwx-svc" href="${esc(href)}" target="_blank" rel="noopener">${inner}</a>` : `<div class="pwx-svc">${inner}</div>`;
       }).join("")) : "";
@@ -323,6 +344,33 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   .pwx-svc-ar{width:30px;height:30px;border-radius:50%;background:color-mix(in srgb,var(--gold) 14%,#fff);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;transition:background .2s,transform .2s;}
   .pwx-svc:hover .pwx-svc-ar{background:var(--gold);transform:translateX(2px);}
 
+  /* Product media cards (services with an uploaded image) */
+  .pwx-prod{background:linear-gradient(180deg,#ffffff,#fafbfd);border:1px solid #e8ecf3;border-radius:18px;overflow:hidden;margin-bottom:13px;box-shadow:0 1px 2px rgba(14,27,52,.05),0 14px 34px -14px rgba(14,27,52,.14);transition:transform .18s ease,box-shadow .22s ease;}
+  .pwx-prod:hover{transform:translateY(-2px);box-shadow:0 3px 6px rgba(14,27,52,.06),0 22px 48px -16px rgba(14,27,52,.22);}
+  .pwx-prod-media{line-height:0;background:#f2f4f8;}
+  .pwx-prod-media img{width:100%;display:block;}
+  .pwx-prod-b{padding:14px 16px 16px;}
+  .pwx-prod-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  .pwx-prod-top > b{font-family:'Sora',sans-serif;font-size:15px;color:var(--ink);letter-spacing:-.01em;line-height:1.3;}
+  .pwx-prod-price{display:flex;align-items:center;gap:7px;flex-shrink:0;}
+  .pwx-prod-price s{font-size:11.5px;color:#98a1b1;}
+  .pwx-prod-price b{font-family:'Sora',sans-serif;font-size:13px;color:var(--navy);background:linear-gradient(180deg,color-mix(in srgb,var(--gold) 22%,#fff),color-mix(in srgb,var(--gold) 10%,#fff));border:1px solid color-mix(in srgb,var(--gold) 40%,#fff);border-radius:999px;padding:4px 11px;}
+  .pwx-prod-b p{font-size:12.5px;color:#4c5567;line-height:1.65;margin-top:8px;}
+  .pwx-prod-cta{display:inline-flex;align-items:center;gap:8px;margin-top:12px;height:40px;padding:0 18px;border-radius:11px;background:linear-gradient(135deg,#1c3358,var(--navy) 60%);color:#fff;font-family:'Sora',sans-serif;font-weight:700;font-size:12px;text-decoration:none;box-shadow:0 2px 4px rgba(7,13,28,.14),0 10px 22px -8px rgba(7,13,28,.4);transition:transform .16s,box-shadow .2s;}
+  .pwx-prod-cta:hover{transform:translateY(-1px);}
+  .pwx-prod-cta i{color:var(--gold);font-size:11px;}
+  .pwx-prod-cta:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+
+  /* Compact layout — sections as tap-to-open accordion cards */
+  .pwx-acc{background:linear-gradient(180deg,#ffffff,#fafbfd);border:1px solid #e8ecf3;border-radius:18px;box-shadow:0 1px 2px rgba(14,27,52,.05),0 12px 30px -14px rgba(14,27,52,.13);margin-bottom:13px;overflow:hidden;}
+  .pwx-acc-h{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;padding:16px 17px;cursor:pointer;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;letter-spacing:.16em;color:#3d4655;text-transform:uppercase;-webkit-tap-highlight-color:transparent;}
+  .pwx-acc-h::before{content:"";width:26px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--gold),color-mix(in srgb,var(--gold) 45%,#fff));flex-shrink:0;}
+  .pwx-acc-h .pwx-acc-c{margin-left:auto;width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--gold) 14%,#fff);color:var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:11px;transition:transform .25s ease,background .2s,color .2s;}
+  .pwx-acc.open .pwx-acc-c{transform:rotate(180deg);background:var(--gold);color:#141414;}
+  .pwx-acc-h:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;}
+  .pwx-acc-b{display:none;padding:2px 15px 17px;}
+  .pwx-acc.open .pwx-acc-b{display:block;animation:pwxUp .3s ease both;}
+
   /* Latest Offers — media card with floating ribbon */
   .pwx-offer{overflow:hidden;margin-bottom:14px;transition:transform .18s ease,box-shadow .22s ease;}
   .pwx-offer:hover{transform:translateY(-2px);box-shadow:0 3px 6px rgba(14,27,52,.06),0 22px 48px -16px rgba(14,27,52,.22);}
@@ -401,6 +449,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   const galUrls = gallery.map((g) => s(g.filename));
   const js = `
   var PWX_GAL=${JSON.stringify(galUrls)};
+  function pwxAcc(h){var sec=h.parentElement;var open=sec.classList.toggle('open');h.setAttribute('aria-expanded',open?'true':'false');}
   function pwxLb(i){var el=document.getElementById('pwxLb');if(!el||!PWX_GAL[i])return;el.querySelector('img').src=PWX_GAL[i];el.style.display='flex';}
   function pwxLbClose(){var el=document.getElementById('pwxLb');if(el)el.style.display='none';}
   function pwxPlay(el,id){el.innerHTML='<iframe src="https://www.youtube.com/embed/'+id+'?autoplay=1&playsinline=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>';el.onclick=null;}
