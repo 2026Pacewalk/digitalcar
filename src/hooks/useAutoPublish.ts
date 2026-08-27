@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { trpc } from "@/providers/trpc";
 import { readCustomer, scopedKey, getActiveCardId } from "@/hooks/useCustomer";
+import { pullLatestSnapshot } from "@/hooks/useCardHydration";
 import { healUploadUrl } from "@/lib/img";
 
 // Remember the last slug we did an initial sync for, so navigating between
@@ -87,6 +88,20 @@ export function useAutoPublish(): void {
         slug,
         cardId: getActiveCardId(),
         data: { customer: data, products, gallery, videos, offers, qrcodes },
+        // Optimistic-concurrency base: the server rejects this save if the card
+        // was published from another device since this browser last synced —
+        // a stale browser can never silently roll the live card back.
+        baseTs: localStorage.getItem(scopedKey("dc_snap_ts")) || undefined,
+      }, {
+        onSuccess: (res) => {
+          const ts = (res as { updatedAt?: string | null })?.updatedAt;
+          if (ts) { try { localStorage.setItem(scopedKey("dc_snap_ts"), ts); } catch { /* ignore */ } }
+        },
+        onError: (err) => {
+          // Rejected as stale → the server has newer data. Pull it down (server
+          // wins) instead of retrying, so this browser catches up.
+          if (String((err as { message?: string })?.message || "").includes("SNAPSHOT_STALE")) void pullLatestSnapshot();
+        },
       });
     };
 

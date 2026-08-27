@@ -104,14 +104,15 @@ export async function loadMyLegacyProfile(): Promise<Record<string, unknown> | n
 }
 
 /* Fetch the signed-in user's published SNAPSHOT (customer + products + gallery +
-   videos + offers + qrcodes). Used to hydrate new-flow users whose data isn't in
-   the legacy customers.json. Returns { slug, data } or null. */
-export async function loadMySnapshot(): Promise<{ slug?: string; data?: Record<string, unknown> } | null> {
+   videos + offers + qrcodes). The snapshot is the LIVE card's data — the primary
+   copy the dashboard hydrates from. Returns { slug, data, updatedAt } or null. */
+export type MySnapshot = { slug?: string; data?: Record<string, unknown>; updatedAt?: string };
+export async function loadMySnapshot(): Promise<MySnapshot | null> {
   try {
     const token = getToken("main");
     const r = await fetch("/api/my/snapshot", { headers: { "x-auth-token": token } });
     if (!r.ok) return null;
-    return (await r.json()) as { slug?: string; data?: Record<string, unknown> } | null;
+    return (await r.json()) as MySnapshot | null;
   } catch { return null; }
 }
 

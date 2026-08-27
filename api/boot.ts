@@ -347,7 +347,7 @@ app.get("/api/my/snapshot", async (c) => {
     const { publishedCards } = await import("@db/schema");
     const { eq } = await import("drizzle-orm");
     const db = getDb();
-    const rows = await db.select({ slug: publishedCards.slug, data: publishedCards.data, cardId: publishedCards.cardId })
+    const rows = await db.select({ slug: publishedCards.slug, data: publishedCards.data, cardId: publishedCards.cardId, updatedAt: publishedCards.updatedAt })
       .from(publishedCards).where(eq(publishedCards.userId, Number(user.userId)));
     if (!rows.length) return c.json(null);
     rows.sort((a, b) => Number(a.cardId) - Number(b.cardId)); // primary card first

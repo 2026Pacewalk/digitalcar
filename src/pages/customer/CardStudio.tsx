@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import ModuleShell, { Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
-import { useCustomer, useLocalList, getActiveCardId } from "@/hooks/useCustomer";
+import { useCustomer, useLocalList, getActiveCardId, scopedKey } from "@/hooks/useCustomer";
 import { useValidityDays } from "@/hooks/useValidityDays";
 import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
@@ -134,10 +134,14 @@ export default function CardStudio() {
     setStatus("saved");
     if (first) logFunnel("published", String(data.product_slug || ""));
     try {
-      await saveSnapshot.mutateAsync({ slug, cardId: getActiveCardId(), data: {
+      const res = await saveSnapshot.mutateAsync({ slug, cardId: getActiveCardId(), data: {
         customer: { ...data, ...formRef.current, referral_code: program?.code || "" },
         products: products.items, gallery: gallery.items, videos: videos.items, offers: offers.items, qrcodes: qrcodes.items,
       } });
+      // Record which server version local content is now based on, so the
+      // freshness check + auto-publish concurrency guard stay in step.
+      const ts = (res as { updatedAt?: string | null })?.updatedAt;
+      if (ts) { try { localStorage.setItem(scopedKey("dc_snap_ts"), ts); } catch { /* ignore */ } }
     } catch (e) {
       const msg = (e as { message?: string })?.message || "";
       if (/taken/i.test(msg)) { toast.error("That card link is already taken — pick another in Settings."); return; }

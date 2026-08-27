@@ -110,7 +110,17 @@ export async function slugTakenByOther(
 export const publishRouter = createRouter({
   // Authed: upsert the signed-in user's snapshot; mint public_id once.
   saveSnapshot: authedQuery
-    .input(z.object({ slug: z.string().min(1).max(191), data: z.any(), cardId: z.number().int().positive().default(1) }))
+    .input(z.object({
+      slug: z.string().min(1).max(191),
+      data: z.any(),
+      cardId: z.number().int().positive().default(1),
+      // Optimistic-concurrency base: the snapshot updatedAt this client last
+      // synced from. When provided and the stored row is NEWER, the save is
+      // rejected — so a browser holding stale localStorage can never silently
+      // overwrite content published from another device ("old images return").
+      // Omitted = force (the user's deliberate Publish click).
+      baseTs: z.string().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const cardId = input.cardId || 1;
@@ -126,12 +136,22 @@ export const publishRouter = createRouter({
       const owner = and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId));
       const existing = await db.select().from(publishedCards).where(owner);
       if (existing[0]) {
+        if (input.baseTs) {
+          const rowTs = existing[0].updatedAt ? new Date(existing[0].updatedAt).getTime() : 0;
+          const baseTs = Date.parse(input.baseTs);
+          // 1.5s tolerance absorbs second-precision TIMESTAMP rounding.
+          if (Number.isFinite(baseTs) && rowTs > baseTs + 1500) {
+            throw new TRPCError({ code: "CONFLICT", message: "SNAPSHOT_STALE: this card was updated from another device — refresh to load the latest version." });
+          }
+        }
         await db.update(publishedCards).set({ slug, data }).where(owner);
-        return { ok: true, publicId: existing[0].publicId };
+        const fresh = await db.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner);
+        return { ok: true, publicId: existing[0].publicId, updatedAt: fresh[0]?.updatedAt ? new Date(fresh[0].updatedAt).toISOString() : null };
       }
       const publicId = nanoid(10);
       await db.insert(publishedCards).values({ userId: ctx.user.id, cardId, slug, publicId, data });
-      return { ok: true, publicId };
+      const fresh = await db.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner);
+      return { ok: true, publicId, updatedAt: fresh[0]?.updatedAt ? new Date(fresh[0].updatedAt).toISOString() : null };
     }),
 
   // Authed: patch just the DESIGN (theme/colours) of an already-published card,

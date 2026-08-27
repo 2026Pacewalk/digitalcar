@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getAuthUser, scopedKey } from "./useCustomer";
-import { loadMyLegacyProfile, loadMySnapshot, loadCustomerContent, imgUrl, decodeSpecialities } from "@/lib/cardContent";
+import { loadMyLegacyProfile, loadMySnapshot, loadCustomerContent, imgUrl, decodeSpecialities, type MySnapshot } from "@/lib/cardContent";
 
 const s = (v: unknown) => String(v ?? "");
 
@@ -65,12 +65,47 @@ function mapProfile(row: Record<string, unknown>, u: { id: number; fullName: str
   };
 }
 
-/* One-time hydration of the dashboard from the user's REAL legacy card.
-   The dashboard is a per-browser localStorage editor; a returning customer on a
-   clean browser has no local card, so without this it seeds a blank one. This
-   loads their real profile + content (products, gallery, videos, offers, QR,
-   uploads, payment) once and writes it into the scoped localStorage keys the
-   module pages read. Read-only against the backend; runs once per user. */
+/* Write a published snapshot (the LIVE card's data — the primary copy) into the
+   scoped localStorage keys the dashboard reads, and record which server version
+   local content is based on (dc_snap_ts). Used by first-load hydration, by the
+   freshness re-pull on every later load, and by auto-publish conflict recovery. */
+export function applySnapshotToLocal(u: { id: number; email: string }, snap: MySnapshot): boolean {
+  const d = snap?.data as Record<string, unknown> | undefined;
+  if (!d || !d.customer) return false;
+  const put = (base: string, arr: unknown[]) => {
+    localStorage.setItem(scopedKey(base), JSON.stringify(arr || []));
+    localStorage.setItem(scopedKey(base) + "::seeded", "1");
+  };
+  const cust = { ...(d.customer as Record<string, unknown>), id: u.id, email: (d.customer as Record<string, unknown>).email || u.email, slug: s(snap.slug) };
+  localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(cust));
+  put("dc_products", (d.products as unknown[]) || []);
+  put("dc_gallery", (d.gallery as unknown[]) || []);
+  put("dc_videos", (d.videos as unknown[]) || []);
+  put("dc_offers", (d.offers as unknown[]) || []);
+  put("dc_qrcode", (d.qrcodes as unknown[]) || []);
+  localStorage.setItem(scopedKey("dc_snap_ts"), s(snap.updatedAt));
+  localStorage.setItem(scopedKey("dc_hydrated"), "1");
+  return true;
+}
+
+/* Pull the latest server snapshot into local storage (server wins). Returns
+   true when local content was replaced. Used by auto-publish when its save is
+   rejected as stale (the card was updated from another device). */
+export async function pullLatestSnapshot(): Promise<boolean> {
+  const u = getAuthUser();
+  if (!u || u.role !== "customer") return false;
+  const snap = await loadMySnapshot();
+  if (!snap) return false;
+  return applySnapshotToLocal(u, snap);
+}
+
+/* Hydration of the dashboard from the user's REAL card.
+   The dashboard is a per-browser localStorage editor; the published snapshot on
+   the server is the PRIMARY copy (it's what the public card shows). First load
+   on a clean browser hydrates from the snapshot (falling back to the legacy
+   customers.json card). Every later load does a freshness check: if the server
+   snapshot changed since this browser last synced (edited from another device,
+   or local dev re-synced from live), the newer server data replaces local. */
 export function useCardHydration(): boolean {
   const [ready, setReady] = useState(false);
 
@@ -79,7 +114,22 @@ export function useCardHydration(): boolean {
     // Only real customers hydrate from a legacy card (admins/resellers skip).
     if (!u || u.role !== "customer") { setReady(true); return; }
     const marker = scopedKey("dc_hydrated");
-    if (localStorage.getItem(marker) === "1") { setReady(true); return; }
+    if (localStorage.getItem(marker) === "1") {
+      // Already hydrated — but the SERVER snapshot is primary. If it moved on
+      // since this browser last synced (another device published, or local dev
+      // pulled a fresh live DB), replace local content with the newer version.
+      let cancelled = false;
+      (async () => {
+        try {
+          const snap = await loadMySnapshot();
+          const localTs = localStorage.getItem(scopedKey("dc_snap_ts")) || "";
+          const serverTs = s(snap?.updatedAt);
+          if (!cancelled && snap && serverTs && serverTs !== localTs) applySnapshotToLocal(u, snap);
+        } catch { /* offline / no snapshot — keep local */ }
+        if (!cancelled) setReady(true);
+      })();
+      return () => { cancelled = true; };
+    }
     // Never clobber a card that already exists locally — e.g. one the signup just
     // seeded with the chosen design, or one the user has been editing this
     // session. Hydration is only for a genuinely EMPTY browser (a returning user
@@ -100,43 +150,36 @@ export function useCardHydration(): boolean {
         localStorage.setItem(scopedKey(base) + "::seeded", "1");
       };
       try {
-        const row = await loadMyLegacyProfile();
-        if (row && !cancelled) {
-          const slug = s(row.slug).toLowerCase();
-          localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(mapProfile(row, u)));
-
-          if (slug) {
-            const content = await loadCustomerContent(slug);
-            put("dc_products", content.products);
-            put("dc_offers", content.offers);
-            put("dc_gallery", content.gallery);
-            put("dc_videos", content.videos);
-            put("dc_qrcode", content.qrcodes);
-            put("dc_uploads", content.uploads);
-            // Legacy keeps a single UPI + bank account on the profile itself.
-            put("dc_upi", row.upi ? [{ id: 1, label: "UPI", upi: s(row.upi) }] : []);
-            put("dc_banks", (row.bank_name || row.account_number)
-              ? [{ id: 1, holder: s(row.account_holder), bank: s(row.bank_name), account: s(row.account_number), ifsc: s(row.ifsc), type: s(row.account_type) || "current" }]
-              : []);
-          }
+        // The published SNAPSHOT is the primary copy — it is exactly what the
+        // live public card shows, and it moves with every publish from any
+        // device. Hydrate from it first; the frozen legacy customers.json is
+        // only a fallback for accounts that were never snapshot-published.
+        const snap = await loadMySnapshot();
+        if (snap && !cancelled && applySnapshotToLocal(u, snap)) {
+          hydrated = true;
         } else if (!cancelled) {
-          // NEW-FLOW user (not in customers.json): hydrate from their published
-          // snapshot so the full mini-website loads on any device — not just the
-          // browser it was built in. This fixes "I only see links, where's my
-          // products/gallery/about" for server-backed cards.
-          const snap = await loadMySnapshot();
-          const d = snap?.data as Record<string, unknown> | undefined;
-          if (d && d.customer && !cancelled) {
-            const cust = { ...(d.customer as Record<string, unknown>), id: u.id, email: (d.customer as Record<string, unknown>).email || u.email, slug: s(snap?.slug) };
-            localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(cust));
-            put("dc_products", (d.products as unknown[]) || []);
-            put("dc_gallery", (d.gallery as unknown[]) || []);
-            put("dc_videos", (d.videos as unknown[]) || []);
-            put("dc_offers", (d.offers as unknown[]) || []);
-            put("dc_qrcode", (d.qrcodes as unknown[]) || []);
+          const row = await loadMyLegacyProfile();
+          if (row && !cancelled) {
+            const slug = s(row.slug).toLowerCase();
+            localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(mapProfile(row, u)));
+
+            if (slug) {
+              const content = await loadCustomerContent(slug);
+              put("dc_products", content.products);
+              put("dc_offers", content.offers);
+              put("dc_gallery", content.gallery);
+              put("dc_videos", content.videos);
+              put("dc_qrcode", content.qrcodes);
+              put("dc_uploads", content.uploads);
+              // Legacy keeps a single UPI + bank account on the profile itself.
+              put("dc_upi", row.upi ? [{ id: 1, label: "UPI", upi: s(row.upi) }] : []);
+              put("dc_banks", (row.bank_name || row.account_number)
+                ? [{ id: 1, holder: s(row.account_holder), bank: s(row.bank_name), account: s(row.account_number), ifsc: s(row.ifsc), type: s(row.account_type) || "current" }]
+                : []);
+            }
           }
+          hydrated = true; // reached the end without throwing
         }
-        hydrated = true; // reached the end without throwing
       } catch { /* leave whatever's there — never block the dashboard on this */ }
       finally {
         if (!cancelled) {
