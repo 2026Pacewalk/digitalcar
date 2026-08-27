@@ -46,7 +46,7 @@ export function buildPremiumCardHtml(c: PCRecord, products: PCProduct[] = [], in
   switch (index) {
     case 1: return idCard(c);
     case 2: return membershipCard(c);
-    case 3: return professionalProfile(c, opts);
+    case 3: return professionalProfile(c, products, opts);
     default: return businessCard(c, products, opts);
   }
 }
@@ -184,11 +184,22 @@ function svcMeta(nm: string): { icon: string; desc: string } {
    Reviews / Enquiry) in the premium aesthetic, so a premium card is the same
    complete mini-website as the classic templates — not just a first screen.
    Gated by the owner's per-section flags; empty sections are skipped. ── */
-function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string): { css: string; html: string; js: string } {
+function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: { skip?: string[]; products?: PCProduct[] } = {}): { css: string; html: string; js: string } {
   const on = (v: unknown, def = 1) => Number(v ?? def) === 1;
+  const skip = o.skip || [];
   const strip = (v: unknown) => s(v).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   const sec = (id: string, title: string, body: string) =>
-    body ? `<section id="${id}" class="pw-sec pw-rise"><h2 class="pw-h2">${esc(title)}</h2>${body}</section>` : "";
+    body ? `<section id="${id}" class="pwx-sec"><h2 class="pwx-h2">${esc(title)}</h2>${body}</section>` : "";
+
+  // Services / products — for designs that don't render their own product list.
+  const prods = (o.products || []).filter((p) => s(p.name));
+  const servicesHtml = !skip.includes("services") && on(c.product_on) && prods.length
+    ? sec("products-section", s(c.product) || "Services", prods.map((p) => {
+        const d = strip(p.tagline) || strip(p.description).slice(0, 80);
+        const href = s(p.button);
+        const inner = `<span class="pwx-svc-tx"><b>${esc(p.name)}</b>${d ? `<small>${esc(d)}</small>` : ""}</span><i class="fa fa-arrow-right pwx-svc-ar"></i>`;
+        return href ? `<a class="pwx-svc" href="${esc(href)}" target="_blank" rel="noopener">${inner}</a>` : `<div class="pwx-svc">${inner}</div>`;
+      }).join("")) : "";
 
   // About Us — info rows + quote text + speciality chips.
   const info = (icon: string, k: string, v: string) => v ? `<div class="pwx-info"><span class="pwx-info-ic"><i class="fa ${icon}"></i></span><span class="pwx-info-tx"><small>${esc(k)}</small><b>${esc(v)}</b></span></div>` : "";
@@ -198,7 +209,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string): { 
     strip(c.about_us) ? `<p class="pwx-about">${esc(strip(c.about_us))}</p>` : "",
     specs.length ? `<div class="pwx-chips">${specs.map((x) => `<span class="pwx-chip"><i class="fa fa-check"></i>${esc(x)}</span>`).join("")}</div>` : "",
   ].join("");
-  const about = on(c.about_on) && (s(c.company_name) || s(c.about_us)) ? sec("about-section", s(c.about) || "About Us", aboutBody) : "";
+  const about = !skip.includes("about") && on(c.about_on) && (s(c.company_name) || s(c.about_us)) ? sec("about-section", s(c.about) || "About Us", aboutBody) : "";
 
   // Latest Offers.
   const offers = (extras.offers || []).filter((o) => s(o.title) || s(o.filename));
@@ -265,10 +276,23 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string): { 
       <button type="submit"><i class="fa fa-paper-plane"></i> Send Enquiry</button>
     </form>`) : "";
 
-  const html = about + offersHtml + payment + galleryHtml + videosHtml + reviewsHtml + enquiryHtml;
+  const html = about + servicesHtml + offersHtml + payment + galleryHtml + videosHtml + reviewsHtml + enquiryHtml;
   if (!html) return { css: "", html: "", js: "" };
 
   const css = `
+  /* Self-contained section chrome — works inside any premium design that
+     provides --navy/--gold/--ink/--muted/--line/--soft (or aliases them). */
+  @keyframes pwxUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  .pwx-sec{margin-bottom:26px;animation:pwxUp .5s cubic-bezier(.2,.7,.2,1) both;}
+  @media(prefers-reduced-motion:reduce){.pwx-sec{animation:none;}}
+  .pwx-h2{display:flex;align-items:center;gap:12px;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-bottom:16px;}
+  .pwx-h2::before{content:"";width:22px;height:3px;border-radius:3px;background:var(--gold);flex-shrink:0;}
+  .pwx-svc{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:10px;background:#fff;text-decoration:none;transition:transform .15s,box-shadow .2s;}
+  .pwx-svc:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(16,24,40,.08);}
+  .pwx-svc-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .pwx-svc-tx b{font-size:13.5px;color:var(--ink);}
+  .pwx-svc-tx small{font-size:11.5px;color:var(--muted);line-height:1.45;}
+  .pwx-svc-ar{color:var(--gold);font-size:13px;flex-shrink:0;}
   .pwx-info{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);}
   .pwx-info:last-of-type{border-bottom:none;}
   .pwx-info-ic{width:34px;height:34px;border-radius:10px;background:var(--soft);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
@@ -530,7 +554,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
 
 // ── Professional Profile (image #4): cover banner, overlapping circular photo,
 // 3 contact buttons, social row, 4 action tiles, QR modal, website + address cards ──
-function professionalProfile(c: PCRecord, opts: { thumb?: boolean }): string {
+function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolean; extras?: PremiumExtras }): string {
   const brand = s(c.color) || "#2563eb";
   const dark = s(c.color2) || "#0f2747";
   const nameCol = lum(brand) < 0.62 ? brand : dark; // keep the name readable on white
@@ -657,12 +681,17 @@ function professionalProfile(c: PCRecord, opts: { thumb?: boolean }): string {
   const shareName = s(c.company_name) || s(c.name) || "this business";
   const waShareText = `Hi 👋\n\nTake a look at *${shareName}*'s digital visiting card 📇\n\nEverything in one tap — call, WhatsApp, save the contact:\n${cardUrl}`;
   const shareUi = opts.thumb ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: dark });
+  // Full mini-website sections — same content set as the classic templates. The
+  // pwx styles read --navy/--gold, so alias them onto this design's palette.
+  const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, opts.extras || {}, slug, { skip: ["about"], products });
+  const cxCss = cx.css ? `:root{--navy:${dark};--gold:${brand};}${cx.css}\n.pwx-sec{padding:0 4px;}` : "";
   const script = opts.thumb ? "" : `<script>
   function ppQR(o){var m=document.getElementById('ppqr');if(m)m.style.display=o?'flex':'none';}
   ${shareSheetJs(cardUrl)}
+  ${cx.js}
   </script>`;
 
-  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${shareSheetCss(dark)}</style></head><body>
+  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${cxCss}${shareSheetCss(dark)}</style></head><body>
   <div class="pp">
     <div class="pp-cover">
       <div class="pp-cover-logo">${brandTxt}</div>
@@ -682,6 +711,7 @@ function professionalProfile(c: PCRecord, opts: { thumb?: boolean }): string {
       ${url ? `<a class="pp-cta pp-rise" href="${esc(/^https?:/i.test(url) ? url : "https://" + url)}" target="_blank" rel="noopener"><span class="pp-cta-ic"><i class="fa fa-globe"></i></span><span class="pp-cta-tx"><b>Check Out My Website!</b><small>${esc(url.replace(/^https?:\/\//i, "").replace(/\/$/, ""))}</small></span><i class="fa fa-arrow-right pp-cta-ar"></i></a>` : ""}
       ${s(c.address) ? `<div class="pp-addr pp-rise"><span class="pp-addr-map"><i class="fa fa-map-marked-alt"></i></span><span class="pp-addr-tx"><b>Visit Us</b><p>${esc(c.address)}</p></span>${mapHref ? `<a class="pp-go" href="${esc(mapHref)}" target="_blank" rel="noopener"><i class="fa fa-location-arrow"></i> Go</a>` : ""}</div>` : ""}
       ${about ? `<div id="pp-about" class="pp-about pp-rise"><h3>About</h3><p>${esc(about.slice(0, 420))}</p></div>` : ""}
+      ${cx.html}
       <div class="pp-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
       ${chrome}
     </div>

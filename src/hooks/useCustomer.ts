@@ -1,6 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { healUploadUrl } from "@/lib/img";
 import { getSessionUser } from "@/lib/session";
+
+/* Persist to localStorage, SURFACING a quota failure instead of swallowing it.
+   A silent failure here meant "my new image reverted after refresh" — the UI
+   showed the in-memory change while storage (and the published card) kept the
+   old data. */
+let quotaWarned = 0;
+function persistOrWarn(key: string, json: string): boolean {
+  try { localStorage.setItem(key, json); return true; }
+  catch {
+    const now = Date.now();
+    if (now - quotaWarned > 4000) { // don't spam a toast per keystroke
+      quotaWarned = now;
+      toast.error("Couldn't save — browser storage is full. Use smaller images or remove unused photos, then try again.");
+    }
+    return false;
+  }
+}
 
 /* Re-point stored image URLs (baked with a possibly-stale host at hydration
    time) to the current image base, so dashboard tiles never break when the
@@ -302,7 +320,7 @@ export function useCustomer() {
   const update = useCallback((patch: Partial<CustomerRecord>) => {
     setData((prev) => {
       const next = { ...prev, ...patch };
-      try { localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(next)); } catch { /* ignore */ }
+      persistOrWarn(scopedKey("dc_customer"), JSON.stringify(next));
       // Keep the card registry's label/slug in step with profile edits.
       if (patch.name !== undefined || patch.company_name !== undefined || patch.slug !== undefined) {
         syncCardMeta({ name: String(next.company_name || next.name || "My Card"), slug: String(next.slug || "card") });
@@ -355,7 +373,7 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
 
   const persist = useCallback((next: T[]) => {
     setItems(next);
-    try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
+    persistOrWarn(key, JSON.stringify(next));
     signalContentChanged();
   }, [key]);
 
@@ -363,7 +381,7 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
     setItems((cur) => {
       const id = Math.max(0, ...cur.map((i) => i.id)) + 1;
       const next = [...cur, { ...item, id } as T];
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
+      persistOrWarn(key, JSON.stringify(next));
       return next;
     });
     signalContentChanged();
@@ -372,7 +390,7 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
   const update = useCallback((id: number, patch: Partial<T>) => {
     setItems((cur) => {
       const next = cur.map((i) => (i.id === id ? { ...i, ...patch } : i));
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
+      persistOrWarn(key, JSON.stringify(next));
       return next;
     });
     signalContentChanged();
@@ -381,7 +399,7 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
   const remove = useCallback((id: number) => {
     setItems((cur) => {
       const next = cur.filter((i) => i.id !== id);
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
+      persistOrWarn(key, JSON.stringify(next));
       return next;
     });
     signalContentChanged();
@@ -390,12 +408,50 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
   return { items, ready, add, update, remove, persist };
 }
 
-/* Read a data URL from a file input (for demo image uploads, no backend) */
-export function fileToDataUrl(file: File): Promise<string> {
+/* Read an image file as a data URL, COMPRESSED to fit browser storage.
+
+   Card images are stored as data URLs in localStorage (≈5MB quota per site) and
+   inside the published snapshot. A raw phone photo is 3–8MB of base64 — one
+   upload blew the quota, the setItem silently failed, and on refresh the image
+   "reverted" to the old one (while auto-publish kept publishing the stale list).
+   Downscaling to ≤1400px JPEG (~100–300KB) fixes the whole class: small PNGs
+   (logos) pass through untouched so transparency stays crisp. */
+const RAW_KEEP_BYTES = 200_000;   // ~150KB binary — small enough to store as-is
+const MAX_EDGE = 1400;            // longest image edge after resize
+const PNG_FALLBACK_BYTES = 900_000; // a resized PNG bigger than this becomes JPEG
+
+function rawDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result as string);
     r.onerror = reject;
     r.readAsDataURL(file);
   });
+}
+
+async function compressDataUrl(src: string, mime: string): Promise<string> {
+  if (src.length < RAW_KEEP_BYTES) return src;
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("decode failed"));
+    i.src = src;
+  });
+  const scale = Math.min(1, MAX_EDGE / Math.max(img.width || 1, img.height || 1));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round((img.width || 1) * scale));
+  canvas.height = Math.max(1, Math.round((img.height || 1) * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return src;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  // Keep PNG (transparency) unless it stays huge even after the resize.
+  let out = mime === "image/png" ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", 0.82);
+  if (out.length > PNG_FALLBACK_BYTES) out = canvas.toDataURL("image/jpeg", 0.8);
+  return out.length < src.length ? out : src; // never make it bigger
+}
+
+export async function fileToDataUrl(file: File): Promise<string> {
+  const raw = await rawDataUrl(file);
+  if (!/^image\//.test(file.type) || file.type === "image/svg+xml" || file.type === "image/gif") return raw;
+  try { return await compressDataUrl(raw, file.type); } catch { return raw; }
 }
