@@ -516,7 +516,13 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     : pkgId === 5
       ? `<span class="pw-plan" title="Gold member" aria-label="Gold member"><i class="fa fa-crown"></i></span>`
       : "";
-  const avatar = `<div class="pw-ava"><img src="${esc(photo) || initialPh(c, gold)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, gold)}'">${planBadge}</div>`;
+  // Honor the builder's Logo shape + Logo size controls on the hero photo:
+  // round (default) / square tile / plain PNG, scaled 70–160%.
+  const avaScale = Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100;
+  const avaPx = Math.round(76 * avaScale);
+  const avaShape = s(c.logo_shape);
+  const avaCls = avaShape === "square" ? " sq" : (avaShape === "plain" && photo) ? " plain" : "";
+  const avatar = `<div class="pw-ava${avaCls}" style="width:${avaPx}px;height:${avaPx}px"><img src="${esc(photo) || initialPh(c, gold)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, gold)}'">${planBadge}</div>`;
 
   const css = `
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -542,6 +548,11 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .pw-idrow{display:flex;align-items:center;gap:15px;margin-bottom:18px;}
   .pw-ava{position:relative;width:76px;height:76px;border-radius:50%;padding:3px;background:linear-gradient(140deg,var(--gold),#fff6);flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.35);}
   .pw-ava img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;border:2px solid var(--navy);}
+  /* Logo shape overrides (builder → Basics → Shape) */
+  .pw-ava.sq{border-radius:20px;}
+  .pw-ava.sq img{border-radius:17px;}
+  .pw-ava.plain{background:none;box-shadow:none;padding:0;}
+  .pw-ava.plain img{border:none;border-radius:0;object-fit:contain;background:transparent;}
   .pw-plan{position:absolute;top:-3px;right:-3px;z-index:5;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;background:linear-gradient(135deg,#FCE4A0,#E8A317);color:#5b3d00;border:1.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);}
   .pw-views{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;background:rgba(255,255,255,.1);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);color:#fff;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:999px;}
   .pw-views i{color:var(--gold);font-size:11px;}
@@ -734,6 +745,11 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   .pp-photo{position:absolute;top:-52px;left:50%;transform:translateX(-50%);width:104px;height:104px;border-radius:50%;padding:4px;background:#fff;box-shadow:0 10px 26px rgba(16,24,40,.18);}
   .pp-photo::before{content:"";position:absolute;inset:0;border-radius:50%;border:2.5px solid var(--brand);}
   .pp-photo img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
+  /* Logo shape overrides (builder → Basics → Shape) */
+  .pp-photo.sq{border-radius:26px;}
+  .pp-photo.sq img{border-radius:22px;}
+  .pp-photo.plain{background:none;box-shadow:none;padding:0;}
+  .pp-photo.plain img{border-radius:0;object-fit:contain;background:transparent;}
   .pp-name{font-family:'Sora',sans-serif;font-weight:800;font-size:23px;line-height:1.15;color:var(--name);letter-spacing:-.01em;}
   .pp-role{font-size:13.5px;font-weight:600;color:var(--ink);margin-top:5px;}
   .pp-org{font-size:12.5px;color:var(--muted);margin-top:2px;}
@@ -820,7 +836,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
     </div>
     <div class="pp-in">
       <div class="pp-card pp-rise">
-        <div class="pp-photo"><img src="${esc(photo) || initialPh(c, brand)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, brand)}'"></div>
+        <div class="pp-photo${s(c.logo_shape) === "square" ? " sq" : (s(c.logo_shape) === "plain" && photo) ? " plain" : ""}" style="transform:translateX(-50%) scale(${Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100});transform-origin:50% 100%"><img src="${esc(photo) || initialPh(c, brand)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, brand)}'"></div>
         <h1 class="pp-name">${name}</h1>
         ${desig ? `<p class="pp-role">${desig}</p>` : ""}
         ${company ? `<p class="pp-org">${company}</p>` : ""}

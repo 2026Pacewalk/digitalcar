@@ -24,7 +24,7 @@ type Vid = { id: number; title: string; url: string };
 type Offer = { id: number; title: string; description: string; valid: string; filename: string };
 type Qr = { id: number; name: string; filename: string };
 
-type ToolKey = "basics" | "contact" | "about" | "design" | "background" | "sections";
+type ToolKey = "basics" | "contact" | "design" | "background" | "sections";
 
 const PROGRESS_FIELDS = ["logo", "name", "designation", "company_name", "mobile1", "email", "address", "about_us"];
 const COLORS = ["#F7B31C", "#3B82F6", "#16A34A", "#A21CAF", "#EF4444", "#06B6D4", "#F97316", "#EC4899", "#0F172A"];
@@ -121,6 +121,11 @@ export default function CardStudio() {
   }, [slug]);
   const cardUrl = `https://digitalcarda.in/${slug}`;
   const [linkCopied, setLinkCopied] = useState(false);
+  // Specialities chips (About block inside Basics).
+  const [newSpec, setNewSpec] = useState("");
+  const specList = val("specialities").split(",").map((x) => x.trim()).filter(Boolean);
+  const addSpec = () => { const v = newSpec.trim(); if (!v) return; set("specialities", [...specList, v].join(",")); setNewSpec(""); };
+  const removeSpec = (i: number) => set("specialities", specList.filter((_, idx) => idx !== i).join(","));
   const copyLink = async () => { try { await navigator.clipboard.writeText(cardUrl); setLinkCopied(true); toast.success("Card link copied"); setTimeout(() => setLinkCopied(false), 1800); } catch { toast.error("Copy failed"); } };
 
   const publish = async () => {
@@ -260,6 +265,36 @@ export default function CardStudio() {
           <Field label="Valid Till"><input value={val("valid_till")} onChange={(e) => set("valid_till", e.target.value)} className={fieldCls} placeholder="31 Dec 2025" /></Field>
         </div>
       </div>
+
+      {/* About your business — the full About Us set, right inside Basics */}
+      <div className="pt-4 border-t border-[#F1F5F9]">
+        <span className="block text-[12px] font-bold text-[#0F172A]">About your business</span>
+        <p className="text-[11px] text-[#94A3B8] mt-0.5 mb-3">Shown in the About Us section of your card.</p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Section Title"><input value={val("about") || "About Us"} onChange={(e) => set("about", e.target.value)} className={fieldCls} placeholder="About Us" /></Field>
+            <Field label="Business nature"><div className="relative"><Info size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("nature")} onChange={(e) => set("nature", e.target.value)} className={`${fieldCls} pl-9`} placeholder="e.g. Real Estate Advisory" /></div></Field>
+          </div>
+          <Field label="Description"><textarea value={val("about_us")} onChange={(e) => set("about_us", e.target.value)} className={areaCls} placeholder="Describe your business, mission and what makes you unique…" /></Field>
+          <div>
+            <Field label="Specialities Title"><input value={val("specialties_title") || "Our Specialties"} onChange={(e) => set("specialties_title", e.target.value)} className={fieldCls} placeholder="Our Specialties" /></Field>
+            {specList.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {specList.map((sp, i) => (
+                  <span key={`${sp}-${i}`} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full bg-[#FEF3C7] text-[#92400E] text-xs font-medium">
+                    {sp}
+                    <button type="button" onClick={() => removeSpec(i)} className="w-5 h-5 rounded-full hover:bg-[#F7B31C]/20 flex items-center justify-center" aria-label={`Remove ${sp}`}><X size={12} /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 mt-3">
+              <input value={newSpec} onChange={(e) => setNewSpec(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSpec(); } }} className={fieldCls} placeholder="Add a speciality and press Enter" />
+              <button type="button" onClick={addSpec} className="h-10 px-4 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold shrink-0">+ Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -275,12 +310,6 @@ export default function CardStudio() {
     </div>
   );
 
-  const renderAbout = () => (
-    <div className="grid grid-cols-1 gap-4">
-      <Field label="Business nature"><div className="relative"><Info size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("nature")} onChange={(e) => set("nature", e.target.value)} className={`${fieldCls} pl-9`} placeholder="e.g. Real Estate Advisory" /></div></Field>
-      <Field label="About us"><textarea value={val("about_us")} onChange={(e) => set("about_us", e.target.value)} className={areaCls} placeholder="A short line about what you do and why customers love you." /></Field>
-    </div>
-  );
 
   const renderDesign = () => (
     <div>
@@ -438,7 +467,6 @@ export default function CardStudio() {
   const TOOLS: { key: ToolKey; label: string; icon: typeof User; render: () => ReactNode }[] = [
     { key: "basics", label: "Basics", icon: User, render: renderBasics },
     { key: "contact", label: "Contact", icon: Phone, render: renderContact },
-    { key: "about", label: "About", icon: Info, render: renderAbout },
     { key: "design", label: "Design", icon: Palette, render: renderDesign },
     { key: "background", label: "Background", icon: ImageIcon, render: renderBackground },
     { key: "sections", label: "Sections", icon: LayoutGrid, render: renderSections },
