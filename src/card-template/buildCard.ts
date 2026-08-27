@@ -226,7 +226,7 @@ body.dc-compact .section-container.dc-open > *:not(.section-header){animation:dc
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
   // Link-in-bio and premium single-screen cards use completely different layouts.
   const tNum = Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1));
-  if (isPremiumCard(tNum)) return buildPremiumCardHtml(c as Record<string, unknown>, products as unknown as Parameters<typeof buildPremiumCardHtml>[1], tNum - PREMIUM_START);
+  if (isPremiumCard(tNum)) return buildPremiumCardHtml(c as Record<string, unknown>, products as unknown as Parameters<typeof buildPremiumCardHtml>[1], tNum - PREMIUM_START, { extras: { gallery, videos, offers } });
   if (isLinkBio(tNum)) return buildLinkBioHtml(c as Record<string, unknown>, products, tNum - LINKBIO_START);
 
   const accent = s(c.color) || "#F7B31C";

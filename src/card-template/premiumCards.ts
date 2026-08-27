@@ -6,9 +6,17 @@
  * optional fields (photo, employee id, blood group, membership id…).
  */
 import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
+import { parseVideo } from "@/lib/video";
 
 type PCProduct = { name: string; tagline?: string; description?: string; button?: string; button_title?: string; filename?: string };
 type PCRecord = Record<string, unknown>;
+/* Full mini-website content passed through from buildCardHtml, so the premium
+   designs can render the SAME sections as the classic templates. */
+export type PremiumExtras = {
+  gallery?: { name?: string; filename: string }[];
+  videos?: { title?: string; url: string }[];
+  offers?: { title?: string; description?: string; valid?: string; filename?: string }[];
+};
 
 const s = (v: unknown) => String(v ?? "").trim();
 const esc = (v: unknown) => s(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -34,7 +42,7 @@ const initialPh = (c: PCRecord, bg: string) => {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='200' height='220'><rect width='200' height='220' fill='${bg}'/><text x='50%' y='50%' font-size='96' fill='#fff' text-anchor='middle' font-family='Arial' dominant-baseline='central'>${i}</text></svg>`)}`;
 };
 
-export function buildPremiumCardHtml(c: PCRecord, products: PCProduct[] = [], index = 0, opts: { thumb?: boolean } = {}): string {
+export function buildPremiumCardHtml(c: PCRecord, products: PCProduct[] = [], index = 0, opts: { thumb?: boolean; extras?: PremiumExtras } = {}): string {
   switch (index) {
     case 1: return idCard(c);
     case 2: return membershipCard(c);
@@ -172,7 +180,169 @@ function svcMeta(nm: string): { icon: string; desc: string } {
   return { icon: "fa-star", desc: "Explore how we can help your business grow." };
 }
 
-function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolean }): string {
+/* ── Full content sections (About / Offers / Payments / Gallery / Videos /
+   Reviews / Enquiry) in the premium aesthetic, so a premium card is the same
+   complete mini-website as the classic templates — not just a first screen.
+   Gated by the owner's per-section flags; empty sections are skipped. ── */
+function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string): { css: string; html: string; js: string } {
+  const on = (v: unknown, def = 1) => Number(v ?? def) === 1;
+  const strip = (v: unknown) => s(v).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const sec = (id: string, title: string, body: string) =>
+    body ? `<section id="${id}" class="pw-sec pw-rise"><h2 class="pw-h2">${esc(title)}</h2>${body}</section>` : "";
+
+  // About Us — info rows + quote text + speciality chips.
+  const info = (icon: string, k: string, v: string) => v ? `<div class="pwx-info"><span class="pwx-info-ic"><i class="fa ${icon}"></i></span><span class="pwx-info-tx"><small>${esc(k)}</small><b>${esc(v)}</b></span></div>` : "";
+  const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean);
+  const aboutBody = [
+    [info("fa-building", "Company", s(c.company_name)), info("fa-briefcase", "Business", s(c.nature)), info("fa-calendar-alt", "Established", s(c.establishment)), info("fa-file-invoice", "GST Number", s(c.gst))].join("") || "",
+    strip(c.about_us) ? `<p class="pwx-about">${esc(strip(c.about_us))}</p>` : "",
+    specs.length ? `<div class="pwx-chips">${specs.map((x) => `<span class="pwx-chip"><i class="fa fa-check"></i>${esc(x)}</span>`).join("")}</div>` : "",
+  ].join("");
+  const about = on(c.about_on) && (s(c.company_name) || s(c.about_us)) ? sec("about-section", s(c.about) || "About Us", aboutBody) : "";
+
+  // Latest Offers.
+  const offers = (extras.offers || []).filter((o) => s(o.title) || s(o.filename));
+  const offerEnded = (v: string) => { const d = new Date(v); return !isNaN(d.getTime()) && d.getTime() < Date.now(); };
+  const offersHtml = on(c.offer_on, 0) && offers.length ? sec("offers-section", s(c.offer) || "Latest Offers", offers.map((o) => {
+    const ended = offerEnded(s(o.valid));
+    return `<div class="pwx-offer">
+      ${s(o.filename) ? `<img class="pwx-offer-img" src="${esc(o.filename)}" ${IMG} onerror="this.style.display='none'">` : ""}
+      <div class="pwx-offer-b">
+        ${s(o.title) ? `<b>${esc(o.title)}</b>` : ""}
+        ${s(o.valid) ? `<span class="pwx-valid${ended ? " ended" : ""}"><i class="fa fa-${ended ? "hourglass-end" : "clock"}"></i> ${ended ? "Ended" : "Valid till"} ${esc(o.valid)}</span>` : ""}
+        ${strip(o.description) ? `<p>${esc(strip(o.description))}</p>` : ""}
+      </div>
+    </div>`;
+  }).join("")) : "";
+
+  // Payment Details — UPI-style rows with copy + bank details.
+  const payRow = (label: string, v: string) => v ? `<div class="pwx-pay"><span class="pwx-pay-n">${esc(label)}</span><span class="pwx-pay-v">${esc(v)}</span><button type="button" class="pwx-copy" data-copy="${esc(v)}" onclick="pwxCopy(this)"><i class="fa fa-copy"></i></button></div>` : "";
+  const bankRow = (k: string, v: string) => v ? `<div class="pwx-bank-r"><span>${esc(k)}</span><b>${esc(v)}</b></div>` : "";
+  const hasPay = s(c.upi) || s(c.paytm_number) || s(c.phone_pe) || s(c.google_pay);
+  const hasBank = s(c.account_number) || s(c.bank_name);
+  const payBody = [
+    hasPay ? [payRow("BHIM UPI", s(c.upi)), payRow("Paytm", s(c.paytm_number)), payRow("PhonePe", s(c.phone_pe)), payRow("Google Pay", s(c.google_pay))].join("") : "",
+    hasBank ? `<div class="pwx-bank"><div class="pwx-bank-h"><i class="fa fa-university"></i> Bank Account Details</div>
+      ${bankRow("A/c Holder", s(c.account_holder))}${bankRow("A/c Number", s(c.account_number))}${bankRow("Bank", s(c.bank_name))}${bankRow("IFSC", s(c.ifsc))}${bankRow("GST", s(c.gst))}
+    </div>` : "",
+  ].join("");
+  const payment = on(c.payment_on) && (hasPay || hasBank) ? sec("payment-section", "Payment Details", payBody) : "";
+
+  // Gallery — grid with a minimal lightbox.
+  const gallery = (extras.gallery || []).filter((g) => s(g.filename));
+  const galleryHtml = on(c.gallery_on) && gallery.length ? sec("gallery-section", s(c.gallery) || "Gallery",
+    `<div class="pwx-gal">${gallery.map((g, i) => `<img src="${esc(g.filename)}" loading="lazy" ${IMG} onclick="pwxLb(${i})" onerror="this.style.display='none'">`).join("")}</div>`) : "";
+
+  // Videos — YouTube plays inline; anything else opens in a new tab.
+  const videos = (extras.videos || []).filter((v) => s(v.url));
+  const videoCard = (v: { title?: string; url: string }) => {
+    const inf = parseVideo(v.url);
+    if (inf?.provider === "youtube") {
+      return `<div class="pwx-vid" onclick="pwxPlay(this,'${inf.id}')"><img src="${inf.thumb}" loading="lazy" ${IMG}><span class="pwx-vid-p"><i class="fa fa-play"></i></span>${s(v.title) ? `<span class="pwx-vid-t">${esc(v.title)}</span>` : ""}</div>`;
+    }
+    return `<a class="pwx-vid pwx-vid-ext" href="${esc(v.url)}" target="_blank" rel="noopener"><span class="pwx-vid-p"><i class="fa fa-play"></i></span>${s(v.title) ? `<span class="pwx-vid-t">${esc(v.title)}</span>` : ""}</a>`;
+  };
+  const videosHtml = on(c.video_on) && videos.length ? sec("video-section", s(c.video) || "Videos", `<div class="pwx-vids">${videos.map(videoCard).join("")}</div>`) : "";
+
+  // Google Reviews — rating summary (when set) + Write a Review CTA.
+  const rating = Number(s(c.google_rating)) || 0;
+  const reviewBody = [
+    rating > 0
+      ? `<div class="pwx-rev"><span class="pwx-rev-score">${rating.toFixed(1)}</span><span class="pwx-rev-stars"><span style="width:${Math.max(0, Math.min(100, (rating / 5) * 100))}%">★★★★★</span>★★★★★</span>${s(c.google_review_count) ? `<small>Based on ${esc(c.google_review_count)} Google reviews</small>` : ""}</div>`
+      : `<div class="pwx-rev pwx-rev-empty"><span class="pwx-rev-stars"><span style="width:100%">★★★★★</span>★★★★★</span><small>Loved our service? Rate us on Google!</small></div>`,
+    s(c.google_review) ? `<a class="pwx-rev-btn" href="${esc(c.google_review)}" target="_blank" rel="noopener"><i class="fab fa-google"></i> Write a Review</a>` : "",
+  ].join("");
+  const reviewsHtml = on(c.review_on) && s(c.google_review) ? sec("review-section", s(c.review) || "Google Reviews", reviewBody) : "";
+
+  // Enquiry form — posts to the same /api/enquiry endpoint as the classic card
+  // (with the sandboxed-iframe postMessage fallback so no lead is ever lost).
+  const enquiryHtml = on(c.enquiry_on) ? sec("enquiry-section", s(c.enquiry) || "Enquiry Form", `
+    <form class="pwx-form" onsubmit="return pwxEnq(this)">
+      <input name="name" placeholder="Your Name" required>
+      <input name="contact" placeholder="Contact Number" required>
+      <input name="email" type="email" placeholder="Email">
+      <textarea name="description" placeholder="Your requirement" rows="3"></textarea>
+      <button type="submit"><i class="fa fa-paper-plane"></i> Send Enquiry</button>
+    </form>`) : "";
+
+  const html = about + offersHtml + payment + galleryHtml + videosHtml + reviewsHtml + enquiryHtml;
+  if (!html) return { css: "", html: "", js: "" };
+
+  const css = `
+  .pwx-info{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .pwx-info:last-of-type{border-bottom:none;}
+  .pwx-info-ic{width:34px;height:34px;border-radius:10px;background:var(--soft);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+  .pwx-info-tx{display:flex;flex-direction:column;min-width:0;}
+  .pwx-info-tx small{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .pwx-info-tx b{font-size:13.5px;color:var(--ink);word-break:break-word;}
+  .pwx-about{margin-top:12px;font-size:13.5px;line-height:1.7;color:#475467;}
+  .pwx-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+  .pwx-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--navy);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:5px 11px;}
+  .pwx-chip i{color:var(--gold);font-size:10px;}
+  .pwx-offer{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:12px;background:#fff;}
+  .pwx-offer-img{width:100%;display:block;}
+  .pwx-offer-b{padding:12px 14px;}
+  .pwx-offer-b b{font-size:14.5px;color:var(--ink);display:block;margin-bottom:6px;}
+  .pwx-offer-b p{font-size:12.5px;color:#475467;line-height:1.6;margin-top:6px;}
+  .pwx-valid{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#047857;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:3px 9px;}
+  .pwx-valid.ended{color:#64748b;background:#f1f5f9;border-color:#e2e8f0;}
+  .pwx-pay{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:#fff;}
+  .pwx-pay-n{font-size:12px;font-weight:700;color:var(--navy);flex-shrink:0;}
+  .pwx-pay-v{flex:1;min-width:0;font-size:12.5px;color:#475467;word-break:break-all;}
+  .pwx-copy{border:none;background:var(--soft);color:var(--navy);width:30px;height:30px;border-radius:9px;cursor:pointer;flex-shrink:0;}
+  .pwx-copy.ok{background:#16a34a;color:#fff;}
+  .pwx-bank{border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-top:10px;background:#fff;}
+  .pwx-bank-h{font-size:12.5px;font-weight:800;color:var(--navy);margin-bottom:8px;}
+  .pwx-bank-h i{color:var(--gold);margin-right:6px;}
+  .pwx-bank-r{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:6px 0;border-bottom:1px dashed var(--line);}
+  .pwx-bank-r:last-child{border-bottom:none;}
+  .pwx-bank-r span{color:var(--muted);}
+  .pwx-bank-r b{color:var(--ink);text-align:right;word-break:break-all;}
+  .pwx-gal{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+  .pwx-gal img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;cursor:pointer;display:block;}
+  #pwxLb{display:none;position:fixed;inset:0;background:rgba(7,13,28,.94);z-index:99999;align-items:center;justify-content:center;padding:18px;}
+  #pwxLb img{max-width:100%;max-height:86vh;border-radius:10px;}
+  #pwxLb .x{position:absolute;top:14px;right:16px;color:#fff;font-size:30px;cursor:pointer;line-height:1;}
+  .pwx-vids{display:grid;gap:12px;}
+  .pwx-vid{position:relative;border-radius:14px;overflow:hidden;background:#0b1220;aspect-ratio:16/9;cursor:pointer;display:block;}
+  .pwx-vid img,.pwx-vid iframe{width:100%;height:100%;object-fit:cover;display:block;border:0;}
+  .pwx-vid-p{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+  .pwx-vid-p i{width:52px;height:52px;border-radius:50%;background:rgba(255,0,0,.92);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;padding-left:4px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .pwx-vid-t{position:absolute;left:0;right:0;bottom:0;padding:22px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;font-size:12.5px;font-weight:600;}
+  .pwx-rev{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--line);border-radius:14px;padding:14px;background:#fff;}
+  .pwx-rev-score{font-size:30px;font-weight:800;color:var(--ink);}
+  .pwx-rev-stars{position:relative;display:inline-block;font-size:19px;color:#e4e7ec;letter-spacing:2px;line-height:1;}
+  .pwx-rev-stars > span{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;color:#f5b301;}
+  .pwx-rev small{display:block;width:100%;font-size:12px;color:var(--muted);}
+  .pwx-rev-empty{flex-direction:column;align-items:flex-start;gap:6px;}
+  .pwx-rev-btn{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:11px;height:46px;border-radius:12px;background:var(--navy);color:#fff;font-weight:700;font-size:13.5px;text-decoration:none;}
+  .pwx-rev-btn i{color:var(--gold);}
+  .pwx-form{display:grid;gap:10px;}
+  .pwx-form input,.pwx-form textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13.5px;font-family:inherit;outline:none;background:var(--soft);color:var(--ink);}
+  .pwx-form input:focus,.pwx-form textarea:focus{border-color:var(--gold);background:#fff;}
+  .pwx-form button{height:50px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--gold),#d99400);color:#1a1a1a;font-weight:800;font-size:14.5px;cursor:pointer;font-family:inherit;}
+  .pwx-sent{text-align:center;font-weight:700;color:#16a34a;padding:16px 0;}`;
+
+  const galUrls = gallery.map((g) => s(g.filename));
+  const js = `
+  var PWX_GAL=${JSON.stringify(galUrls)};
+  function pwxLb(i){var el=document.getElementById('pwxLb');if(!el||!PWX_GAL[i])return;el.querySelector('img').src=PWX_GAL[i];el.style.display='flex';}
+  function pwxLbClose(){var el=document.getElementById('pwxLb');if(el)el.style.display='none';}
+  function pwxPlay(el,id){el.innerHTML='<iframe src="https://www.youtube.com/embed/'+id+'?autoplay=1&playsinline=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>';el.onclick=null;}
+  function pwxCopy(b){var t=b.getAttribute('data-copy')||'';function ok(){b.classList.add('ok');var i=b.querySelector('i');if(i)i.className='fa fa-check';setTimeout(function(){b.classList.remove('ok');if(i)i.className='fa fa-copy';},1300);}
+    function ex(){try{var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();var r=document.execCommand('copy');document.body.removeChild(ta);return r;}catch(_){return false;}}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,function(){if(ex())ok();});}else{if(ex())ok();}}
+  function pwxEnq(form){try{
+    var d={slug:${JSON.stringify(slug)},name:(form.name.value||'').trim(),contact:(form.contact.value||'').trim(),email:(form.email.value||'').trim(),description:(form.description.value||'').trim()};
+    var sb=false;try{sb=(window.origin==='null');}catch(_){sb=true;}
+    if(sb){try{if(window.parent&&window.parent!==window)window.parent.postMessage({__dcEnquiry:d},'*');}catch(_){}}
+    else{try{fetch('/api/enquiry',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(d),keepalive:true}).catch(function(){});}catch(_){}}
+  }catch(_){}form.innerHTML='<p class="pwx-sent">✓ Thank you! We will get back to you shortly.</p>';return false;}`;
+
+  return { css, html: html + `<div id="pwxLb" onclick="pwxLbClose()"><span class="x">&times;</span><img alt=""></div>`, js };
+}
+
+function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolean; extras?: PremiumExtras }): string {
   const gold = s(c.color) || "#F7B31C";
   const navy = s(c.color2) || "#0e1b34";
   const name = esc(c.name) || "Your Name";
@@ -315,9 +485,12 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const shareName = s(c.company_name) || s(c.name) || "this business";
   const waShareText = `Hi 👋\n\nTake a look at *${shareName}*'s digital visiting card 📇\n\nEverything in one tap — call, WhatsApp, save the contact:\n${cardUrl}`;
   const shareUi = opts.thumb ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: navy });
-  const script = opts.thumb ? "" : `<script>${shareSheetJs(cardUrl)}</script>`;
+  // Full mini-website sections (About / Offers / Payments / Gallery / Videos /
+  // Reviews / Enquiry) — same content set as the classic templates.
+  const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, opts.extras || {}, slug);
+  const script = opts.thumb ? "" : `<script>${shareSheetJs(cardUrl)}${cx.js}</script>`;
 
-  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${shareSheetCss(navy)}</style></head><body>
+  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${cx.css}${shareSheetCss(navy)}</style></head><body>
   <div class="pw">
     <header class="pw-hero">
       <div class="pw-hero-in">
@@ -344,6 +517,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     <main class="pw-body">
       ${socials ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">Connect With Me</h2><div class="pw-socials">${socials}</div></section>` : ""}
       ${services ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">Our Solutions</h2><div class="pw-svcs">${services}</div></section>` : ""}
+      ${cx.html}
       <div class="pw-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
       ${chrome}
     </main>
