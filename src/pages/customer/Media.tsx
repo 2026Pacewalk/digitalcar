@@ -40,22 +40,32 @@ export default function CustomerMedia() {
   };
 
   const tabs = [
-    { id: "gallery" as const, label: "Gallery", icon: ImageIcon, count: gallery.items.length },
-    { id: "video" as const, label: "Videos", icon: Video, count: videos.items.length },
+    { id: "gallery" as const, label: "Photo Gallery", desc: "Photos of your work, shop & products", icon: ImageIcon, count: gallery.items.length },
+    { id: "video" as const, label: "Videos", desc: "YouTube, Shorts & Instagram reels", icon: Video, count: videos.items.length },
   ];
 
   return (
-    <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube, Shorts & Instagram videos" icon={ImageIcon}
-      actions={
-        <div className="relative flex rounded-xl bg-[#F1F5F9] p-1">
-          <span className="absolute top-1 bottom-1 rounded-lg bg-white shadow-sm transition-all duration-300" style={{ width: "calc((100% - 0.5rem) / 2)", left: `calc(0.25rem + ${tab === "video" ? 1 : 0} * ((100% - 0.5rem) / 2))` }} />
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`relative z-10 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab === t.id ? "text-[#0F172A]" : "text-[#64748B]"}`}>
-              <t.icon size={14} /> {t.label} <span className="text-[10px] px-1.5 rounded-full bg-[#E2E8F0]">{t.count}</span>
+    <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube, Shorts & Instagram videos" icon={ImageIcon}>
+      {/* Big, obvious section switch — which one you're editing is unmissable. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {tabs.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`relative flex items-center gap-3.5 rounded-2xl border-2 p-4 text-left transition-all ${active ? "border-[#F7B31C] bg-[#0F172A] shadow-premium" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}>
+              <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${active ? "bg-[#F7B31C] text-[#0F172A]" : "bg-[#F1F5F9] text-[#64748B]"}`}><t.icon size={20} /></span>
+              <span className="min-w-0">
+                <span className={`flex items-center gap-2 text-[14px] font-bold ${active ? "text-white" : "text-[#0F172A]"}`}>
+                  {t.label}
+                  <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded-full ${active ? "bg-white/15 text-[#FDE68A]" : "bg-[#F1F5F9] text-[#64748B]"}`}>{t.count}</span>
+                </span>
+                <span className={`block text-[11.5px] mt-0.5 leading-snug ${active ? "text-[#CBD5E1]" : "text-[#94A3B8]"}`}>{t.desc}</span>
+              </span>
+              {active && <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-[#F7B31C] text-[#0F172A] flex items-center justify-center"><Check size={12} strokeWidth={3} /></span>}
             </button>
-          ))}
-        </div>
-      }>
+          );
+        })}
+      </div>
       <LimitBar used={tab === "gallery" ? gallery.items.length : videos.items.length} limit={tab === "gallery" ? gLimit : vLimit} unit={tab === "gallery" ? "gallery images" : "videos"} />
       <Tip>A short intro or product video keeps visitors on your card far longer — and the longer they stay, the more they enquire.</Tip>
       {tab === "gallery" ? (
