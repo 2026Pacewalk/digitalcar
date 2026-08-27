@@ -121,11 +121,6 @@ export default function CardStudio() {
   }, [slug]);
   const cardUrl = `https://digitalcarda.in/${slug}`;
   const [linkCopied, setLinkCopied] = useState(false);
-  // Specialities chips (About block inside Basics).
-  const [newSpec, setNewSpec] = useState("");
-  const specList = val("specialities").split(",").map((x) => x.trim()).filter(Boolean);
-  const addSpec = () => { const v = newSpec.trim(); if (!v) return; set("specialities", [...specList, v].join(",")); setNewSpec(""); };
-  const removeSpec = (i: number) => set("specialities", specList.filter((_, idx) => idx !== i).join(","));
   const copyLink = async () => { try { await navigator.clipboard.writeText(cardUrl); setLinkCopied(true); toast.success("Card link copied"); setTimeout(() => setLinkCopied(false), 1800); } catch { toast.error("Copy failed"); } };
 
   const publish = async () => {
@@ -247,7 +242,13 @@ export default function CardStudio() {
         <div className="mb-3"><Note tone="red">For the premium Business / ID / Membership card designs.</Note></div>
         <div className="flex items-start gap-4">
           <ImagePick value={val("photo")} onChange={(u) => set("photo", u)} className="w-20 h-20 rounded-xl" label="Photo" fit="cover" />
-          <p className="flex-1 text-[11px] text-[#64748B] pt-0.5 min-w-0 leading-relaxed">A clear headshot shown on the ID, Membership &amp; Business-card designs. Your <b>company logo</b> is set above — both appear together on the card.</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-[#64748B] pt-0.5 leading-relaxed">A clear headshot shown on the ID, Membership &amp; Business-card designs. Your <b>company logo</b> is set above — both appear together on the card.</p>
+            <div className="mt-3 max-w-[240px]">
+              <div className="flex items-center justify-between mb-1"><span className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wide">Photo size</span><span className="text-[11px] font-bold text-[#0F172A] tabular-nums px-1.5 py-0.5 rounded-md bg-[#FEF3C7]">{val("photo_size") || 100}%</span></div>
+              <input type="range" min={70} max={160} value={Number(val("photo_size") || 100)} onChange={(e) => set("photo_size", e.target.value)} className="w-full accent-[#F7B31C]" aria-label="Photo size" />
+            </div>
+          </div>
         </div>
 
         <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8] mt-4 mb-2">ID card details</p>
@@ -266,35 +267,6 @@ export default function CardStudio() {
         </div>
       </div>
 
-      {/* About your business — the full About Us set, right inside Basics */}
-      <div className="pt-4 border-t border-[#F1F5F9]">
-        <span className="block text-[12px] font-bold text-[#0F172A]">About your business</span>
-        <p className="text-[11px] text-[#94A3B8] mt-0.5 mb-3">Shown in the About Us section of your card.</p>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Section Title"><input value={val("about") || "About Us"} onChange={(e) => set("about", e.target.value)} className={fieldCls} placeholder="About Us" /></Field>
-            <Field label="Business nature"><div className="relative"><Info size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("nature")} onChange={(e) => set("nature", e.target.value)} className={`${fieldCls} pl-9`} placeholder="e.g. Real Estate Advisory" /></div></Field>
-          </div>
-          <Field label="Description"><textarea value={val("about_us")} onChange={(e) => set("about_us", e.target.value)} className={areaCls} placeholder="Describe your business, mission and what makes you unique…" /></Field>
-          <div>
-            <Field label="Specialities Title"><input value={val("specialties_title") || "Our Specialties"} onChange={(e) => set("specialties_title", e.target.value)} className={fieldCls} placeholder="Our Specialties" /></Field>
-            {specList.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {specList.map((sp, i) => (
-                  <span key={`${sp}-${i}`} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full bg-[#FEF3C7] text-[#92400E] text-xs font-medium">
-                    {sp}
-                    <button type="button" onClick={() => removeSpec(i)} className="w-5 h-5 rounded-full hover:bg-[#F7B31C]/20 flex items-center justify-center" aria-label={`Remove ${sp}`}><X size={12} /></button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="flex gap-2 mt-3">
-              <input value={newSpec} onChange={(e) => setNewSpec(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSpec(); } }} className={fieldCls} placeholder="Add a speciality and press Enter" />
-              <button type="button" onClick={addSpec} className="h-10 px-4 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold shrink-0">+ Add</button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 

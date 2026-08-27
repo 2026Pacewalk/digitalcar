@@ -505,7 +505,6 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     `TEL;TYPE=CELL:${s(c.mobile1)}`, `EMAIL:${s(c.email)}`, `URL:${s(c.url)}`, `ADR:;;${s(c.address)};;;;`, "END:VCARD"].join("\n");
   const vcardHref = `data:text/vcard;charset=utf-8,${encodeURIComponent(vcard)}`;
   const ref = s(c.referral_code) || slug;
-  const brand = logo ? `<img src="${esc(logo)}" alt="${company || name}" ${IMG}>` : (company ? `<span class="pw-logo-txt">${company}</span>` : "");
   // Owner toggles (Card Builder → Design) — same flags as the classic templates.
   const showViews = Number(c.views_on ?? 1) !== 0 && !opts.thumb;
   const showQr = Number(c.cardqr_on ?? 1) !== 0;
@@ -516,13 +515,22 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     : pkgId === 5
       ? `<span class="pw-plan" title="Gold member" aria-label="Gold member"><i class="fa fa-crown"></i></span>`
       : "";
-  // Honor the builder's Logo shape + Logo size controls on the hero photo:
-  // round (default) / square tile / plain PNG, scaled 70–160%.
-  const avaScale = Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100;
+  // Photo size (its own control — Basics → Photo & card details) scales the
+  // hero headshot; it stays round by design.
+  const avaScale = Math.max(70, Math.min(160, Number(s(c.photo_size)) || 100)) / 100;
   const avaPx = Math.round(76 * avaScale);
-  const avaShape = s(c.logo_shape);
-  const avaCls = avaShape === "square" ? " sq" : (avaShape === "plain" && photo) ? " plain" : "";
-  const avatar = `<div class="pw-ava${avaCls}" style="width:${avaPx}px;height:${avaPx}px"><img src="${esc(photo) || initialPh(c, gold)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, gold)}'">${planBadge}</div>`;
+  const avatar = `<div class="pw-ava" style="width:${avaPx}px;height:${avaPx}px"><img src="${esc(photo) || initialPh(c, gold)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, gold)}'">${planBadge}</div>`;
+  // Logo shape + Logo size (Basics → Shape / Logo size) style the BRAND MARK:
+  // default = the raw (transparent) logo; square/round wrap it in a white chip
+  // so the shape reads on the dark hero. Size scales the logo height 70–160%.
+  const logoH = Math.round(34 * (Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100));
+  const logoShape = s(c.logo_shape);
+  const brandImg = logo ? `<img src="${esc(logo)}" alt="${company || name}" style="max-height:${logoH}px;max-width:${logoH * 5}px" ${IMG}>` : "";
+  const brand = logo
+    ? (logoShape === "square" || logoShape === "round"
+        ? `<span class="pw-logo-chip${logoShape === "round" ? " rd" : ""}">${brandImg}</span>`
+        : brandImg)
+    : (company ? `<span class="pw-logo-txt">${company}</span>` : "");
 
   const css = `
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -548,11 +556,11 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .pw-idrow{display:flex;align-items:center;gap:15px;margin-bottom:18px;}
   .pw-ava{position:relative;width:76px;height:76px;border-radius:50%;padding:3px;background:linear-gradient(140deg,var(--gold),#fff6);flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.35);}
   .pw-ava img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;border:2px solid var(--navy);}
-  /* Logo shape overrides (builder → Basics → Shape) */
-  .pw-ava.sq{border-radius:20px;}
-  .pw-ava.sq img{border-radius:17px;}
-  .pw-ava.plain{background:none;box-shadow:none;padding:0;}
-  .pw-ava.plain img{border:none;border-radius:0;object-fit:contain;background:transparent;}
+  /* Brand-mark shape chip (builder → Basics → Shape): square tile / round pill
+     on a white ground so the shape reads on the dark hero. */
+  .pw-logo-chip{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:12px;padding:7px 12px;box-shadow:0 6px 18px rgba(0,0,0,.3);}
+  .pw-logo-chip.rd{border-radius:999px;padding:8px 16px;}
+  .pw-logo-chip img{display:block;}
   .pw-plan{position:absolute;top:-3px;right:-3px;z-index:5;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;background:linear-gradient(135deg,#FCE4A0,#E8A317);color:#5b3d00;border:1.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);}
   .pw-views{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;background:rgba(255,255,255,.1);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);color:#fff;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:999px;}
   .pw-views i{color:var(--gold);font-size:11px;}
@@ -723,7 +731,14 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   ].filter(Boolean).map((t) => { const x = t as { ic: string; lb: string; attr: string; tag: string }; return `<${x.tag} class="pp-tile" ${x.attr} aria-label="${x.lb}"><span class="pp-tile-ic"><i class="${x.ic}"></i></span><span>${x.lb}</span></${x.tag}>`; }).join("");
 
   const ref = s(c.referral_code) || slug;
-  const brandTxt = logo ? `<img src="${esc(logo)}" alt="${company || name}" ${IMG}>` : (company ? `<span class="pp-cover-txt">${company}</span>` : "");
+  // Logo size scales the cover mark; square/round wrap it in a white chip
+  // (chip shows the logo's REAL colours — the white-invert only suits raw marks).
+  const ppLogoH = Math.round(30 * (Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100));
+  const ppShape = s(c.logo_shape);
+  const ppBrandImg = logo ? `<img src="${esc(logo)}" alt="${company || name}" style="max-height:${ppLogoH}px;max-width:${ppLogoH * 5}px" ${IMG}>` : "";
+  const brandTxt = logo
+    ? (ppShape === "square" || ppShape === "round" ? `<span class="pp-logo-chip${ppShape === "round" ? " rd" : ""}">${ppBrandImg}</span>` : ppBrandImg)
+    : (company ? `<span class="pp-cover-txt">${company}</span>` : "");
 
   const css = `
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -739,17 +754,15 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   .pp-cover::after{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 80% 10%,rgba(255,255,255,.18),transparent 55%);}
   .pp-cover-logo{position:absolute;top:14px;left:16px;z-index:2;}
   .pp-cover-logo img{max-height:30px;max-width:140px;object-fit:contain;filter:brightness(0) invert(1);opacity:.96;}
+  .pp-logo-chip{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:11px;padding:6px 11px;box-shadow:0 6px 16px rgba(16,24,40,.25);}
+  .pp-logo-chip.rd{border-radius:999px;padding:7px 14px;}
+  .pp-logo-chip img{filter:none!important;opacity:1!important;}
   .pp-cover-txt{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:15px;letter-spacing:.3px;}
   .pp-share{position:absolute;top:14px;right:16px;z-index:2;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;backdrop-filter:blur(4px);}
   .pp-card{position:relative;background:#fff;border-radius:22px;margin-top:-26px;padding:64px 20px 22px;text-align:center;box-shadow:0 10px 30px rgba(16,24,40,.06);}
   .pp-photo{position:absolute;top:-52px;left:50%;transform:translateX(-50%);width:104px;height:104px;border-radius:50%;padding:4px;background:#fff;box-shadow:0 10px 26px rgba(16,24,40,.18);}
   .pp-photo::before{content:"";position:absolute;inset:0;border-radius:50%;border:2.5px solid var(--brand);}
   .pp-photo img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
-  /* Logo shape overrides (builder → Basics → Shape) */
-  .pp-photo.sq{border-radius:26px;}
-  .pp-photo.sq img{border-radius:22px;}
-  .pp-photo.plain{background:none;box-shadow:none;padding:0;}
-  .pp-photo.plain img{border-radius:0;object-fit:contain;background:transparent;}
   .pp-name{font-family:'Sora',sans-serif;font-weight:800;font-size:23px;line-height:1.15;color:var(--name);letter-spacing:-.01em;}
   .pp-role{font-size:13.5px;font-weight:600;color:var(--ink);margin-top:5px;}
   .pp-org{font-size:12.5px;color:var(--muted);margin-top:2px;}
@@ -836,7 +849,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
     </div>
     <div class="pp-in">
       <div class="pp-card pp-rise">
-        <div class="pp-photo${s(c.logo_shape) === "square" ? " sq" : (s(c.logo_shape) === "plain" && photo) ? " plain" : ""}" style="transform:translateX(-50%) scale(${Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100});transform-origin:50% 100%"><img src="${esc(photo) || initialPh(c, brand)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, brand)}'"></div>
+        <div class="pp-photo" style="transform:translateX(-50%) scale(${Math.max(70, Math.min(160, Number(s(c.photo_size)) || 100)) / 100});transform-origin:50% 100%"><img src="${esc(photo) || initialPh(c, brand)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, brand)}'"></div>
         <h1 class="pp-name">${name}</h1>
         ${desig ? `<p class="pp-role">${desig}</p>` : ""}
         ${company ? `<p class="pp-org">${company}</p>` : ""}
