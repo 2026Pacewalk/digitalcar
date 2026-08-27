@@ -1065,16 +1065,32 @@ function saveVCard(){
 
 /* Renders only the FIRST PAGE (home section) of a card with a given template —
    used for the template picker thumbnails. No scripts, no other sections. */
-export function buildCardThumb(c: CustomerRecord, themeNum: number, opts: { chrome?: boolean } = {}): string {
+export function buildCardThumb(c: CustomerRecord, themeNum: number, opts: { chrome?: boolean; products?: Product[] } = {}): string {
   const theme = Math.min(TEMPLATE_COUNT, Math.max(1, Number(themeNum) || 1));
   const chrome = !!opts.chrome; // show the view count + share icon (for the builder preview)
+  // The owner's REAL products when we have them, so a preview matches the live
+  // card. The generic samples are only a stand-in for an empty catalogue (and
+  // for the tiny gallery thumbnails of a brand-new card).
+  const real = (opts.products || []).filter((p) => s(p.name));
   // Premium single-screen cards + link-in-bio render their own compact preview.
   if (isPremiumCard(theme)) {
     const demo = [{ name: "Fraud Sentinel 360", tagline: "Fraud & risk management" }, { name: "Whistle Sentinel", tagline: "Secure whistle-blower app" }, { name: "MeCard.me", tagline: "Digital card solutions" }];
-    return buildPremiumCardHtml(c as Record<string, unknown>, demo, theme - PREMIUM_START, { thumb: true });
+    const items = real.length
+      ? real.map((p) => ({
+          name: s(p.name),
+          tagline: s(p.description).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 60),
+          description: s(p.description),
+          button: s(p.button),
+          button_title: s(p.button_title),
+          filename: s(p.filename),
+        }))
+      : demo;
+    return buildPremiumCardHtml(c as Record<string, unknown>, items, theme - PREMIUM_START, { thumb: true });
   }
   if (isLinkBio(theme)) {
-    const sampleProducts = [{ name: "Our Services", button: "", button_title: "View Services" }];
+    const sampleProducts = real.length
+      ? real.map((p) => ({ name: s(p.name), button: s(p.button), button_title: s(p.button_title) }))
+      : [{ name: "Our Services", button: "", button_title: "View Services" }];
     return buildLinkBioHtml(c as Record<string, unknown>, sampleProducts, theme - LINKBIO_START, { thumb: true });
   }
   const accent = s(c.color) || "#F7B31C";

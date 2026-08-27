@@ -3,7 +3,8 @@ import { Link, useSearchParams, useNavigate } from "react-router";
 import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil, Lock } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
-import { useCustomer, getActiveCardId } from "@/hooks/useCustomer";
+import { useCustomer, useLocalList, getActiveCardId } from "@/hooks/useCustomer";
+import { contentSeeder } from "@/lib/cardContent";
 import { brandSecondaryFor } from "@/lib/brandColors";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
@@ -73,6 +74,10 @@ function ThumbFrame({ html, title }: { html: string; title: string }) {
 export default function CustomerTemplates() {
   const navigate = useNavigate();
   const { data, update } = useCustomer();
+  // The owner's real products, so template previews match the live card instead
+  // of showing generic sample services.
+  type TProduct = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
+  const products = useLocalList<TProduct>("dc_products", [], contentSeeder("products"));
   const { data: presetData } = trpc.template.presets.useQuery();
   const presets = useMemo(() => (presetData?.list ?? []).filter((p) => p.active), [presetData]);
   const defaultId = presetData?.defaultId ?? 1;
@@ -134,9 +139,9 @@ export default function CustomerTemplates() {
       ...baseData,
       color: brandOn && brandPrimary ? brandPrimary : p.primary,
       color2: brandOn && brandSecondary ? brandSecondary : p.secondary,
-    }, p.style);
+    }, p.style, { products: products.items });
     return m;
-  }, [presets, baseData, brandOn, brandPrimary, brandSecondary]);
+  }, [presets, baseData, brandOn, brandPrimary, brandSecondary, products.items]);
 
   // Category filter (admin-assigned): All / Featured / Basic / Modern / Bio / Professional / Premium.
   const CATS = ["all", "featured", "basic", "modern", "bio", "professional", "premium"] as const;
@@ -154,8 +159,8 @@ export default function CustomerTemplates() {
   // so the user can see the design before committing.
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewHtml = useMemo(
-    () => (selected ? buildCardThumb({ ...baseData, color: effPrimary, color2: effSecondary }, selected.style) : ""),
-    [selected, baseData, effPrimary, effSecondary],
+    () => (selected ? buildCardThumb({ ...baseData, color: effPrimary, color2: effSecondary }, selected.style, { products: products.items }) : ""),
+    [selected, baseData, effPrimary, effSecondary, products.items],
   );
 
   // ── Add-on gated designs ──────────────────────────────────────────
