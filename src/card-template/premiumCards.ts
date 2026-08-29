@@ -639,6 +639,9 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .pw-sec{margin-bottom:26px;}
   .pw-socials{display:flex;flex-wrap:wrap;gap:10px;}
   .pw-soc{width:46px;height:46px;border-radius:13px;display:inline-flex;align-items:center;justify-content:center;font-size:18px;color:var(--navy);background:var(--soft);border:1px solid var(--line);text-decoration:none;transition:transform .16s,box-shadow .2s,color .2s,background .2s;}
+  /* Inline-SVG glyphs (X, TikTok) carry no width/height — size them to match
+     the Font Awesome icons, or they render at the browser default and overflow. */
+  .pw-soc svg{width:18px;height:18px;display:block;fill:currentColor;}
   .pw-soc:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(16,24,40,.12);color:var(--gold);}
   .pw-soc:active{transform:translateY(0);}
   .pw-svcs{display:grid;grid-template-columns:1fr;gap:11px;}
@@ -687,7 +690,15 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const shareUi = opts.thumb || !showShare ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: navy });
   // Full mini-website sections (About / Offers / Payments / Gallery / Videos /
   // Reviews / Enquiry) — same content set as the classic templates.
-  const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, opts.extras || {}, slug);
+  // Services presentation (Products / Services → "Layout on your card"):
+  //   "icons"  = the compact icon tiles below ("Our Solutions")
+  //   default  = rich cards showing each service's photo (pwContentSections),
+  //              falling back to a clean text card when a service has no image.
+  // Exactly ONE of the two renders — previously BOTH did, so a card with
+  // products showed the services twice.
+  const svcIconsOnly = s(c.product_layout) === "icons";
+  const cx = opts.thumb ? { css: "", html: "", js: "" }
+    : pwContentSections(c, opts.extras || {}, slug, { skip: svcIconsOnly ? ["services"] : [], products });
   // Live view count: the parent page fetches the real total and posts it in
   // (same __dcViews message the classic card uses).
   const viewsJs = showViews ? `window.addEventListener('message',function(e){try{if(e.data&&typeof e.data.__dcViews==='number'){var el=document.getElementById('pw-view-count');if(el)el.textContent=Number(e.data.__dcViews).toLocaleString('en-IN');}}catch(_){}});` : "";
@@ -722,7 +733,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     </header>
     <main class="pw-body">
       ${socials ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">Connect With Me</h2><div class="pw-socials">${socials}</div></section>` : ""}
-      ${services ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">Our Solutions</h2><div class="pw-svcs">${services}</div></section>` : ""}
+      ${svcIconsOnly && services ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">${esc(s(c.product) || "Our Solutions")}</h2><div class="pw-svcs">${services}</div></section>` : ""}
       ${cx.html}
       <div class="pw-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
       ${chrome}
@@ -815,6 +826,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   .pp-act:active .pp-act-ic{transform:scale(.92);}
   .pp-socials{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:22px;}
   .pp-soc{width:40px;height:40px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;color:var(--dark);background:var(--soft);border:1px solid var(--line);text-decoration:none;transition:transform .15s,color .2s,box-shadow .2s;}
+  .pp-soc svg{width:16px;height:16px;display:block;fill:currentColor;}
   .pp-soc:hover{transform:translateY(-2px);color:var(--brand);box-shadow:0 8px 18px rgba(16,24,40,.1);}
   .pp-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:22px;}
   .pp-tile{display:flex;flex-direction:column;align-items:center;gap:7px;padding:13px 4px;border:1px solid var(--line);border-radius:15px;background:#fff;color:var(--ink);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.04);transition:transform .15s,box-shadow .2s,border-color .2s;font-family:inherit;}
@@ -875,7 +887,8 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   const shareUi = opts.thumb ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: dark });
   // Full mini-website sections — same content set as the classic templates. The
   // pwx styles read --navy/--gold, so alias them onto this design's palette.
-  const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, opts.extras || {}, slug, { skip: ["about"], products });
+  const cx = opts.thumb ? { css: "", html: "", js: "" }
+    : pwContentSections(c, opts.extras || {}, slug, { skip: ["about"], products });
   const cxCss = cx.css ? `:root{--navy:${dark};--gold:${brand};}${cx.css}\n.pwx-sec{padding:0 4px;}` : "";
   const script = opts.thumb ? "" : `<script>
   function ppQR(o){var m=document.getElementById('ppqr');if(m)m.style.display=o?'flex':'none';}

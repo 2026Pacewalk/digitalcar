@@ -33,7 +33,7 @@ const ctaHint = (title: string) => {
 };
 
 export default function CustomerProducts() {
-  const { data } = useCustomer();
+  const { data, update: updateCard } = useCustomer();
   const [searchParams, setSearchParams] = useSearchParams();
   const isOfferTab = searchParams.get("tab") === "offers";
   const setTab = (t: "products" | "offers") => setSearchParams({ tab: t }, { replace: true });
@@ -126,6 +126,48 @@ export default function CustomerProducts() {
       {isOfferTab
         ? <SectionToggle flag="offer_on" label="Offers section" def={0} />
         : <SectionToggle flag="product_on" label="Products / Services section" />}
+      {/* How services appear on the card — with their photos, or compact icons */}
+      {!isOfferTab && items.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5">
+          <p className="text-sm font-semibold text-[#0F172A]">Layout on your card</p>
+          <p className="text-xs text-[#64748B] mt-0.5 mb-2.5">Show each service with its photo, or as a compact icon list — saves automatically.</p>
+          <div className="grid grid-cols-2 gap-2.5 max-w-md">
+            {[
+              { key: "", name: "With images", desc: "Show service photos" },
+              { key: "icons", name: "Without images", desc: "Compact icon list" },
+            ].map((opt) => {
+              const selected = (String(data.product_layout ?? "") === "icons" ? "icons" : "") === opt.key;
+              return (
+                <button key={opt.key || "img"} type="button" onClick={() => updateCard({ product_layout: opt.key })}
+                  className={`relative flex items-center gap-2.5 rounded-xl border-2 p-2.5 text-left transition-all ${selected ? "border-[#F7B31C] bg-[#0F172A]" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}>
+                  <span className={`w-10 h-10 shrink-0 rounded-lg p-1 flex ${selected ? "bg-white/10" : "bg-[#F1F5F9]"}`}>
+                    {opt.key === "" ? (
+                      <span className="flex flex-col gap-0.5 w-full">
+                        <span className={`flex-[2] rounded-sm ${selected ? "bg-white/30" : "bg-[#CBD5E1]"}`} />
+                        <span className={`flex-1 rounded-sm ${selected ? "bg-white/20" : "bg-[#E2E8F0]"}`} />
+                      </span>
+                    ) : (
+                      <span className="flex flex-col gap-0.5 w-full justify-center">
+                        {[0, 1].map((i) => (
+                          <span key={i} className="flex gap-0.5 items-center">
+                            <span className={`w-2 h-2 rounded-sm ${selected ? "bg-white/30" : "bg-[#CBD5E1]"}`} />
+                            <span className={`flex-1 h-1 rounded-sm ${selected ? "bg-white/20" : "bg-[#E2E8F0]"}`} />
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className={`block text-[12.5px] font-bold ${selected ? "text-white" : "text-[#0F172A]"}`}>{opt.name}</span>
+                    <span className={`block text-[10.5px] leading-tight ${selected ? "text-[#CBD5E1]" : "text-[#94A3B8]"}`}>{opt.desc}</span>
+                  </span>
+                  {selected && <Check size={13} strokeWidth={3} className="absolute top-1.5 right-1.5 text-[#F7B31C]" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <LimitBar used={items.length} limit={limit} unit={isOfferTab ? "offers" : "products"} />
       <Tip>{isOfferTab ? "Give every offer a deadline — a little urgency turns browsers into buyers. Convert any product into an offer with the ↻ button." : "Lead with your best-sellers and use sharp, square photos with a clear price and a \"Buy Now\" button — visitors decide in seconds."}</Tip>
 
