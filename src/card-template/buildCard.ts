@@ -171,6 +171,30 @@ const OFFER_CSS = `
 .dc-offer-desc{font-size:13.5px;line-height:1.62;color:#475569;margin:0;}
 `;
 
+/* Premium service/product cards for the classic templates — a real card with a
+   media banner, clear price + savings, readable copy and a gradient CTA.
+   `.product-card` stays on the element (analytics resolves the product from it);
+   the `.dc-prod` companion class carries the styling and wins over the legacy
+   per-style rules on specificity. */
+const PRODUCT_CSS = `
+.product-card.dc-prod{background:#fff;border:1px solid #eceff4;border-radius:18px;overflow:hidden;padding:0;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 12px 28px -14px rgba(16,24,40,.18);transition:transform .2s ease,box-shadow .25s ease,border-color .25s ease;}
+.product-card.dc-prod:hover{transform:translateY(-3px);border-color:var(--theme-color);box-shadow:0 4px 8px rgba(16,24,40,.06),0 22px 46px -18px rgba(16,24,40,.28);}
+.dc-prod-media{position:relative;line-height:0;background:#f6f8fb;}
+.dc-prod-media img{width:100%;display:block;}
+.dc-prod-body{padding:15px 17px 17px;}
+.dc-prod-name{font-size:16.5px;font-weight:800;color:#0f172a;margin:0 0 9px;line-height:1.3;letter-spacing:-.01em;}
+.dc-prod-price{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+.dc-prod-price s{font-size:13px;color:#98a2b3;}
+.dc-prod-price b{font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-.02em;}
+.dc-prod-save{font-size:11px;font-weight:800;color:#047857;background:#ecfdf5;border:1px solid #a7f3d0;padding:3px 9px;border-radius:999px;}
+.dc-prod-desc{font-size:13.5px;line-height:1.65;color:#475467;margin:0 0 14px;}
+.dc-prod-desc a{color:var(--theme-color);font-weight:600;}
+.product-card.dc-prod .dc-prod-cta{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 18px;border-radius:11px;background:var(--theme-color);background:linear-gradient(135deg,var(--theme-color),color-mix(in srgb,var(--theme-color) 78%,#000));color:#111;font-size:13.5px;font-weight:800;text-decoration:none;box-shadow:0 8px 18px -8px var(--theme-color);transition:transform .16s ease,filter .2s ease;}
+.product-card.dc-prod .dc-prod-cta:hover{transform:translateY(-1px);filter:brightness(1.06);}
+.product-card.dc-prod .dc-prod-cta:active{transform:translateY(0);}
+.dc-prod-cta i{font-size:12px;}
+`;
+
 /* Gallery "Compact" layout — a uniform square grid instead of the default
    full-width masonry, so a long portfolio stays short and scannable. */
 const GALLERY_GRID_CSS = `
@@ -334,13 +358,22 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       <div class="section-header">${esc(s(c.product) || "Services")}</div>
       ${products.map((p) => {
         const b = smartBtn(p);
+        const mrp = Number(String(p.price).replace(/[^\d.]/g, ""));
+        const now = Number(String(p.offer_price).replace(/[^\d.]/g, ""));
+        const save = mrp > 0 && now > 0 && now < mrp ? Math.round(mrp - now) : 0;
         return `
-        <div class="product-card">
-          <div class="heading-2"><h5>${esc(p.name)}</h5></div>
-          ${(p.price || p.offer_price) ? `<div style="padding:2px 0 6px" class="heading-2">Price ${p.price && p.offer_price ? `<strike style="color:#666"> ₹${esc(p.price)}</strike>` : ""} <strong> ₹${esc(p.offer_price || p.price)}</strong></div>` : ""}
-          ${p.filename && !svcIconsOnly ? `<img src="${esc(p.filename)}" class="img-fluid" style="width:100%;border-radius:4px" ${IMG} onerror="this.style.display='none'">` : ""}
-          ${p.description ? `<div style="font-size:13px;margin-top:10px;color:#475569;line-height:1.55">${sanitizeHtml(fixMojibake(p.description))}</div>` : ""}
-          <div class="text-right" style="margin-top:12px"><a href="${b.href}" class="product-enquiry-btn" target="${b.target}" rel="noopener"><i class="${b.icon}" style="margin-right:6px"></i>${esc(p.button_title || "Send Enquiry")}</a></div>
+        <div class="product-card dc-prod">
+          ${p.filename && !svcIconsOnly ? `<div class="dc-prod-media"><img src="${esc(p.filename)}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
+          <div class="dc-prod-body">
+            <h5 class="dc-prod-name">${esc(p.name)}</h5>
+            ${(p.price || p.offer_price) ? `<div class="dc-prod-price">
+              ${p.price && p.offer_price ? `<s>₹${esc(p.price)}</s>` : ""}
+              <b>₹${esc(p.offer_price || p.price)}</b>
+              ${save > 0 ? `<span class="dc-prod-save">Save ₹${save.toLocaleString("en-IN")}</span>` : ""}
+            </div>` : ""}
+            ${p.description ? `<p class="dc-prod-desc">${sanitizeHtml(fixMojibake(p.description))}</p>` : ""}
+            <a href="${b.href}" class="product-enquiry-btn dc-prod-cta" target="${b.target}" rel="noopener"><i class="${b.icon}"></i>${esc(p.button_title || "Send Enquiry")}</a>
+          </div>
         </div>`;
       }).join("")}
     </div>` : "";
@@ -623,6 +656,7 @@ ${desigFontCss(Number(theme))}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 ${textIconOverrideCss(c)}
 ${offersSection ? OFFER_CSS : ""}
+${servicesSection ? PRODUCT_CSS : ""}
 ${galleryCompact && gallerySection ? GALLERY_GRID_CSS : ""}
 ${compact ? COMPACT_CSS : ""}
 html{scroll-behavior:smooth;scrollbar-gutter:stable;}
