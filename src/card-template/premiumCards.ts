@@ -7,6 +7,7 @@
  */
 import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
 import { parseVideo } from "@/lib/video";
+import { SOCIAL_BY_KEY, readSocialLinks } from "@/lib/socialPlatforms";
 
 type PCProduct = { name: string; tagline?: string; description?: string; button?: string; button_title?: string; filename?: string; price?: string; offer_price?: string };
 type PCRecord = Record<string, unknown>;
@@ -23,10 +24,27 @@ const esc = (v: unknown) => s(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").re
 // Perceived brightness of a #rrggbb colour (0 dark … 1 light) — pick readable text.
 const lum = (hex: string) => { const h = s(hex).replace("#", ""); if (h.length < 6) return 1; const r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255; return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 const IMG = 'referrerpolicy="no-referrer"';
-const SOCIAL_FA: Record<string, string> = {
-  facebook: "fab fa-facebook-f", instagram: "fab fa-instagram", youtube: "fab fa-youtube",
-  twitter: "fab fa-twitter", pinterest: "fab fa-pinterest-p", linkedin: "fab fa-linkedin",
+/* Social icons for the premium designs — reads the SAME source as the classic
+   templates (the Social Links page's saved list, with the legacy per-platform
+   fields as fallback) and honours the owner's "Icon style" choice: theme colour
+   (the template's own look) vs each platform's real brand colour. Shared by all
+   premium templates so the setting keeps working for future designs too. */
+const safeHref = (u: string) => {
+  const t = String(u ?? "").trim();
+  if (/^(https?:|mailto:|tel:)/i.test(t)) return t;
+  if (/^[\w-]+(\.[\w-]+)+(\/|$)/.test(t)) return "https://" + t;
+  return "#"; // block javascript:/data: etc.
 };
+function premiumSocials(c: PCRecord, cls: string): string {
+  const brand = s(c.social_icon_style) === "brand";
+  return readSocialLinks(c as Record<string, unknown>).map(({ platform, url }) => {
+    const p = SOCIAL_BY_KEY[platform];
+    if (!p) return "";
+    const ic = p.svg || `<i class="${p.fa}"></i>`;
+    const st = brand ? ` style="background:${p.color};color:${p.fg || "#fff"};border-color:${p.color}"` : "";
+    return `<a class="${cls}" href="${esc(safeHref(url))}" target="_blank" rel="noopener" aria-label="${esc(p.label)}"${st}>${ic}</a>`;
+  }).join("");
+}
 
 /* Design names — the count drives the template gallery. Add more here + a branch
    in buildPremiumCardHtml to introduce the ID / Membership cards later. */
@@ -515,7 +533,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   ].join("");
 
   const socials = [
-    ...Object.keys(SOCIAL_FA).filter((k) => s(c[k])).map((k) => `<a class="pw-soc" href="${esc(c[k])}" target="_blank" rel="noopener" aria-label="${k}"><i class="${SOCIAL_FA[k]}"></i></a>`),
+    premiumSocials(c, "pw-soc"),
   ].join("");
 
   const services = products.slice(0, 8).map((p) => {
@@ -745,7 +763,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
     email ? { ic: "fa fa-envelope", lb: "Email", href: `mailto:${email}`, ext: false } : null,
   ].filter(Boolean).map((a) => `<a class="pp-act" href="${esc((a as { href: string }).href)}"${(a as { ext: boolean }).ext ? ' target="_blank" rel="noopener"' : ""} aria-label="${(a as { lb: string }).lb}"><span class="pp-act-ic"><i class="${(a as { ic: string }).ic}"></i></span><span>${(a as { lb: string }).lb}</span></a>`).join("");
 
-  const socials = Object.keys(SOCIAL_FA).filter((k) => s(c[k])).map((k) => `<a class="pp-soc" href="${esc(c[k])}" target="_blank" rel="noopener" aria-label="${k}"><i class="${SOCIAL_FA[k]}"></i></a>`).join("");
+  const socials = premiumSocials(c, "pp-soc");
 
   const tiles = [
     { ic: "fa fa-user-plus", lb: "Save", attr: `href="data:text/vcard;charset=utf-8,${encodeURIComponent(["BEGIN:VCARD", "VERSION:3.0", `FN:${s(c.name)}`, `ORG:${s(c.company_name)}`, `TITLE:${s(c.designation)}`, `TEL;TYPE=CELL:${s(c.mobile1)}`, `EMAIL:${s(c.email)}`, `URL:${s(c.url)}`, `ADR:;;${s(c.address)};;;;`, "END:VCARD"].join("\n"))}" download="${slug || "contact"}.vcf"`, tag: "a" },
