@@ -326,6 +326,9 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     return { href: "#enquiry-section", target: "_self", icon: "fa fa-paper-plane" };
   };
 
+  // Products / Services → "Layout on your card": "icons" hides the service
+  // photos for a compact text list; default shows each service's image.
+  const svcIconsOnly = s(c.product_layout) === "icons";
   const servicesSection = on(c.product_on) && products.length ? `
     <div id="products-section" class="section-container">
       <div class="section-header">${esc(s(c.product) || "Services")}</div>
@@ -335,7 +338,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
         <div class="product-card">
           <div class="heading-2"><h5>${esc(p.name)}</h5></div>
           ${(p.price || p.offer_price) ? `<div style="padding:2px 0 6px" class="heading-2">Price ${p.price && p.offer_price ? `<strike style="color:#666"> ₹${esc(p.price)}</strike>` : ""} <strong> ₹${esc(p.offer_price || p.price)}</strong></div>` : ""}
-          ${p.filename ? `<img src="${esc(p.filename)}" class="img-fluid" style="width:100%;border-radius:4px" ${IMG} onerror="this.style.display='none'">` : ""}
+          ${p.filename && !svcIconsOnly ? `<img src="${esc(p.filename)}" class="img-fluid" style="width:100%;border-radius:4px" ${IMG} onerror="this.style.display='none'">` : ""}
           ${p.description ? `<div style="font-size:13px;margin-top:10px;color:#475569;line-height:1.55">${sanitizeHtml(fixMojibake(p.description))}</div>` : ""}
           <div class="text-right" style="margin-top:12px"><a href="${b.href}" class="product-enquiry-btn" target="${b.target}" rel="noopener"><i class="${b.icon}" style="margin-right:6px"></i>${esc(p.button_title || "Send Enquiry")}</a></div>
         </div>`;
