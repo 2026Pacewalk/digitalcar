@@ -275,7 +275,17 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
     }
     return `<a class="pwx-vid pwx-vid-ext" href="${esc(v.url)}" target="_blank" rel="noopener"><span class="pwx-vid-p"><i class="fa fa-play"></i></span>${s(v.title) ? `<span class="pwx-vid-t">${esc(v.title)}</span>` : ""}</a>`;
   };
-  const videosHtml = on(c.video_on) && videos.length ? sec("video-section", s(c.video) || "Videos", `<div class="pwx-vids">${videos.map(videoCard).join("")}</div>`) : "";
+  // Owner-chosen layout (Gallery & Videos → Layout): "swipe" is a compact
+  // scroll-snap carousel, default is the full-width stack.
+  const vidSwipe = s(c.video_layout).toLowerCase() === "swipe";
+  const videosBody = vidSwipe
+    ? `<div class="pwx-vswrap">
+        ${videos.length > 1 ? `<button type="button" class="pwx-vnav prev" onclick="pwxVScroll(this,-1)" aria-label="Previous video"><i class="fa fa-chevron-left"></i></button>` : ""}
+        <div class="pwx-vswipe">${videos.map((v) => `<div class="pwx-vslide">${videoCard(v)}</div>`).join("")}</div>
+        ${videos.length > 1 ? `<button type="button" class="pwx-vnav next" onclick="pwxVScroll(this,1)" aria-label="Next video"><i class="fa fa-chevron-right"></i></button>` : ""}
+      </div>${videos.length > 1 ? `<div class="pwx-vhint"><i class="fa fa-arrows-alt-h"></i> Swipe or use the arrows</div>` : ""}`
+    : `<div class="pwx-vids">${videos.map(videoCard).join("")}</div>`;
+  const videosHtml = on(c.video_on) && videos.length ? sec("video-section", s(c.video) || "Videos", videosBody) : "";
 
   // Google Reviews — rating summary (when set) + Write a Review CTA.
   const rating = Number(s(c.google_rating)) || 0;
@@ -417,6 +427,17 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
 
   /* Videos — glass play chip */
   .pwx-vids{display:grid;gap:14px;}
+  /* Swipe layout — scroll-snap carousel (mirrors the classic templates) */
+  .pwx-vswrap{position:relative;}
+  .pwx-vswipe{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;scrollbar-width:none;}
+  .pwx-vswipe::-webkit-scrollbar{display:none;}
+  .pwx-vslide{flex:0 0 74%;scroll-snap-align:center;}
+  .pwx-vswipe .pwx-vid{aspect-ratio:9/16;}
+  .pwx-vnav{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.94);color:var(--navy);display:none;align-items:center;justify-content:center;cursor:pointer;font-size:13px;box-shadow:0 6px 18px rgba(14,27,52,.18);}
+  .pwx-vnav.prev{left:-6px;} .pwx-vnav.next{right:-6px;}
+  @media(hover:hover) and (pointer:fine){.pwx-vnav{display:flex;}}
+  .pwx-vhint{text-align:center;font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .pwx-vhint i{margin-right:5px;color:var(--gold);}
   .pwx-vid{position:relative;border-radius:18px;overflow:hidden;background:#0b1220;aspect-ratio:16/9;cursor:pointer;display:block;border:1px solid #e8ecf3;box-shadow:0 1px 2px rgba(14,27,52,.05),0 16px 36px -14px rgba(14,27,52,.2);}
   .pwx-vid img,.pwx-vid iframe{width:100%;height:100%;object-fit:cover;display:block;border:0;}
   .pwx-vid-p{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(7,13,28,.04),rgba(7,13,28,.32));transition:background .25s;}
@@ -455,6 +476,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   function pwxLb(i){var el=document.getElementById('pwxLb');if(!el||!PWX_GAL[i])return;el.querySelector('img').src=PWX_GAL[i];el.style.display='flex';}
   function pwxLbClose(){var el=document.getElementById('pwxLb');if(el)el.style.display='none';}
   function pwxPlay(el,id){el.innerHTML='<iframe src="https://www.youtube.com/embed/'+id+'?autoplay=1&playsinline=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>';el.onclick=null;}
+  function pwxVScroll(btn,dir){var w=btn.parentNode.querySelector('.pwx-vswipe');if(w)w.scrollBy({left:dir*w.clientWidth*0.9,behavior:'smooth'});}
   function pwxCopy(b){var t=b.getAttribute('data-copy')||'';function ok(){b.classList.add('ok');var i=b.querySelector('i');if(i)i.className='fa fa-check';setTimeout(function(){b.classList.remove('ok');if(i)i.className='fa fa-copy';},1300);}
     function ex(){try{var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();var r=document.execCommand('copy');document.body.removeChild(ta);return r;}catch(_){return false;}}
     if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,function(){if(ex())ok();});}else{if(ex())ok();}}
