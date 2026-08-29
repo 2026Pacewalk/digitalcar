@@ -3,7 +3,7 @@ import type { CustomerRecord } from "@/hooks/useCustomer";
 import { fixMojibake } from "@/lib/cardContent";
 import { parseVideo } from "@/lib/video";
 import { buildLinkBioHtml, LINKBIO_START, LINKBIO_COUNT } from "./linkbio";
-import { buildPremiumCardHtml, PREMIUM_COUNT } from "./premiumCards";
+import { buildPremiumCardHtml, PREMIUM_COUNT, svcMeta } from "./premiumCards";
 import { SOCIAL_BY_KEY, readSocialLinks } from "@/lib/socialPlatforms";
 
 /* All 31 legacy templates (style1.css … style31.css) loaded as raw strings. */
@@ -193,6 +193,16 @@ const PRODUCT_CSS = `
 .product-card.dc-prod .dc-prod-cta:hover{transform:translateY(-1px);filter:brightness(1.06);}
 .product-card.dc-prod .dc-prod-cta:active{transform:translateY(0);}
 .dc-prod-cta i{font-size:12px;}
+/* "Without images" — compact icon tiles, two across (matches the premium cards) */
+.dc-svc-grid{display:grid;grid-template-columns:1fr;gap:11px;}
+@media(min-width:400px){.dc-svc-grid{grid-template-columns:1fr 1fr;}}
+.product-card.dc-svc{position:relative;display:flex;flex-direction:column;gap:9px;background:#fff;border:1px solid #eceff4;border-radius:16px;padding:15px 15px 16px;margin:0;text-decoration:none;box-shadow:0 1px 2px rgba(16,24,40,.04);transition:transform .18s ease,box-shadow .22s ease,border-color .22s ease;}
+.product-card.dc-svc:hover{transform:translateY(-2px);border-color:var(--theme-color);box-shadow:0 3px 6px rgba(16,24,40,.06),0 18px 38px -16px rgba(16,24,40,.24);}
+.dc-svc-ic{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#0f172a;color:var(--theme-color);font-size:17px;flex-shrink:0;}
+.dc-svc-name{font-size:14.5px;font-weight:800;color:#0f172a;line-height:1.3;margin:0;}
+.dc-svc-desc{font-size:12px;line-height:1.55;color:#667085;margin:0;}
+.dc-svc-ar{position:absolute;top:15px;right:14px;font-size:12px;color:#cbd5e1;transition:color .2s,transform .2s;}
+.product-card.dc-svc:hover .dc-svc-ar{color:var(--theme-color);transform:translateX(2px);}
 `;
 
 /* Gallery "Compact" layout — a uniform square grid instead of the default
@@ -356,7 +366,17 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const servicesSection = on(c.product_on) && products.length ? `
     <div id="products-section" class="section-container">
       <div class="section-header">${esc(s(c.product) || "Services")}</div>
-      ${products.map((p) => {
+      ${svcIconsOnly ? `<div class="dc-svc-grid">${products.map((p) => {
+        const b = smartBtn(p);
+        const m = svcMeta(s(p.name));
+        const d = s(p.description).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 70) || m.desc;
+        return `<a class="product-card dc-svc" href="${b.href}" target="${b.target}" rel="noopener">
+          <span class="dc-svc-ic"><i class="fa ${m.icon}"></i></span>
+          <span class="dc-svc-name">${esc(p.name)}</span>
+          <span class="dc-svc-desc">${esc(d)}</span>
+          <i class="fa fa-arrow-right dc-svc-ar"></i>
+        </a>`;
+      }).join("")}</div>` : products.map((p) => {
         const b = smartBtn(p);
         const mrp = Number(String(p.price).replace(/[^\d.]/g, ""));
         const now = Number(String(p.offer_price).replace(/[^\d.]/g, ""));

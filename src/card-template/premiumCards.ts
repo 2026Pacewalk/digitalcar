@@ -177,7 +177,7 @@ function membershipCard(c: PCRecord): string {
 }
 
 // Distinct, relevant icon + a professional fallback description per service.
-function svcMeta(nm: string): { icon: string; desc: string } {
+export function svcMeta(nm: string): { icon: string; desc: string } {
   const n = nm.toLowerCase();
   const M: [RegExp, string, string][] = [
     [/social|smm|instagram|facebook/, "fa-bullhorn", "Grow reach & engagement across every platform."],
