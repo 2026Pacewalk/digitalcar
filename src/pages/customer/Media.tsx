@@ -13,6 +13,7 @@ type Vid = { id: number; title: string; url: string };
 export default function CustomerMedia() {
   const { data, val, set, status } = useCardAutosave();
   const videoLayout = (val("video_layout") || "stack").toLowerCase() === "swipe" ? "swipe" : "stack";
+  const galleryLayout = val("gallery_layout").toLowerCase() === "compact" ? "compact" : "";
   const gLimit = packageLimit(Number(data.package_id), "gallery");
   const vLimit = packageLimit(Number(data.package_id), "video");
   const [tab, setTab] = useState<"gallery" | "video">("gallery");
@@ -88,6 +89,57 @@ export default function CustomerMedia() {
             ))}
           </div>
           {gallery.items.length === 0 && <p className="text-center text-xs text-[#94A3B8] mt-4">Upload images to show a gallery on your card.</p>}
+
+          {/* How the Graphic Portfolio appears on the public card */}
+          {gallery.items.length > 0 && (
+            <>
+              <div className="h-px bg-[#F1F5F9] my-5" />
+              <p className="text-sm font-semibold text-[#0F172A]">Section name</p>
+              <p className="text-xs text-[#64748B] mt-0.5 mb-2">The heading shown above your images on the public card.</p>
+              <input value={val("gallery")} onChange={(e) => set("gallery", e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                className={`${fieldCls} max-w-lg`} placeholder="Graphic Portfolio" />
+
+              <div className="h-px bg-[#F1F5F9] my-4" />
+
+              <p className="text-sm font-semibold text-[#0F172A]">Graphic Portfolio layout</p>
+              <p className="text-xs text-[#64748B] mt-0.5 mb-3">How your images appear on your public card — saves &amp; goes live automatically.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
+                {[
+                  { key: "", name: "Full", desc: "Large showcase images, full width" },
+                  { key: "compact", name: "Compact", desc: "A neat 3-across grid — more images, less scrolling" },
+                ].map((opt) => {
+                  const selected = galleryLayout === opt.key;
+                  return (
+                    <button key={opt.key || "full"} type="button" onClick={() => set("gallery_layout", opt.key)}
+                      className={`relative text-left rounded-2xl border-2 p-3.5 transition-all ${selected ? "border-[#F7B31C] bg-[#0F172A] shadow-premium" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}>
+                      {selected && <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-[#F7B31C] text-[#0F172A] flex items-center justify-center"><Check size={12} strokeWidth={3} /></span>}
+                      <span className={`block text-sm font-bold ${selected ? "text-white" : "text-[#0F172A]"}`}>{opt.name}</span>
+                      {/* Mini preview of how the public card renders this layout */}
+                      <span className={`block rounded-xl p-2 mt-2.5 mb-2 ${selected ? "bg-white/10" : "bg-[#F8FAFC]"}`}>
+                        {opt.key === "" ? (
+                          <span className="flex flex-col gap-1.5">
+                            <span className={`block h-10 rounded-lg ${selected ? "bg-white/20" : "bg-[#CBD5E1]"}`} />
+                            <span className="flex gap-1.5">
+                              <span className={`h-6 rounded-lg flex-1 ${selected ? "bg-white/20" : "bg-[#CBD5E1]"}`} />
+                              <span className={`h-6 rounded-lg flex-1 ${selected ? "bg-white/20" : "bg-[#CBD5E1]"}`} />
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="grid grid-cols-3 gap-1">
+                            {Array.from({ length: 9 }).map((_, i) => (
+                              <span key={i} className={`aspect-square rounded ${selected ? "bg-white/20" : "bg-[#CBD5E1]"}`} />
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                      <span className={`block text-[11px] leading-snug ${selected ? "text-[#CBD5E1]" : "text-[#64748B]"}`}>{opt.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-4">

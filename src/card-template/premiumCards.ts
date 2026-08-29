@@ -264,7 +264,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   // Gallery — grid with a minimal lightbox.
   const gallery = (extras.gallery || []).filter((g) => s(g.filename));
   const galleryHtml = on(c.gallery_on) && gallery.length ? sec("gallery-section", s(c.gallery) || "Gallery",
-    `<div class="pwx-gal">${gallery.map((g, i) => `<img src="${esc(g.filename)}" alt="${esc(g.name) || "Gallery image"}" loading="lazy" ${IMG} onclick="pwxLb(${i})" onerror="this.style.display='none'">`).join("")}</div>`) : "";
+    `<div class="pwx-gal${s(c.gallery_layout) === "compact" ? " compact" : ""}">${gallery.map((g, i) => `<img src="${esc(g.filename)}" alt="${esc(g.name) || "Gallery image"}" loading="lazy" ${IMG} onclick="pwxLb(${i})" onerror="this.style.display='none'">`).join("")}</div>`) : "";
 
   // Videos — YouTube plays inline; anything else opens in a new tab.
   const videos = (extras.videos || []).filter((v) => s(v.url));
@@ -406,6 +406,8 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
 
   /* Gallery — editorial grid (lead image wide) */
   .pwx-gal{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .pwx-gal.compact{grid-template-columns:repeat(3,1fr);gap:7px;}
+  .pwx-gal.compact img{border-radius:10px;}
   .pwx-gal img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;cursor:pointer;display:block;border:1px solid #e8ecf3;box-shadow:0 1px 2px rgba(14,27,52,.05),0 10px 24px -12px rgba(14,27,52,.14);transition:transform .2s ease,box-shadow .25s ease,filter .25s ease;}
   .pwx-gal img:first-child{grid-column:span 2;aspect-ratio:16/9;}
   .pwx-gal img:hover{transform:translateY(-2px) scale(1.01);filter:brightness(1.04);box-shadow:0 4px 8px rgba(14,27,52,.08),0 22px 44px -14px rgba(14,27,52,.26);}

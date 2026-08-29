@@ -171,6 +171,15 @@ const OFFER_CSS = `
 .dc-offer-desc{font-size:13.5px;line-height:1.62;color:#475569;margin:0;}
 `;
 
+/* Gallery "Compact" layout — a uniform square grid instead of the default
+   full-width masonry, so a long portfolio stays short and scannable. */
+const GALLERY_GRID_CSS = `
+.gallery.dc-gal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;column-count:initial;}
+.gallery.dc-gal-grid .card{margin:0;border:none;background:none;box-shadow:none;padding:0;break-inside:auto;}
+.gallery.dc-gal-grid .card img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;display:block;}
+@media(max-width:360px){.gallery.dc-gal-grid{gap:5px;}}
+`;
+
 /* Compact view: content sections become clean, iconed accordion cards (collapsed
    by default). The template's decorative section bars are hidden and each header
    is rebuilt with a per-section icon badge + a chevron. Home section untouched. */
@@ -485,10 +494,13 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>
     </div>` : "";
 
+  // Owner-chosen gallery layout: "compact" = uniform square grid, default =
+  // full-width masonry.
+  const galleryCompact = s(c.gallery_layout) === "compact";
   const gallerySection = on(c.gallery_on) && gallery.length ? `
     <div id="gallery-section" class="section-container">
       <div class="section-header">${esc(s(c.gallery) || "Graphic Portfolio")}</div>
-      <div class="gallery card-columns">
+      <div class="gallery ${galleryCompact ? "dc-gal-grid" : "card-columns"}">
         ${gallery.map((g, gi) => `<div class="card"><img src="${esc(g.filename)}" class="img-fluid" style="width:100%;border-radius:4px;cursor:pointer" ${IMG} onclick="lbOpen(${gi})" onerror="this.parentNode.style.display='none'"></div>`).join("")}
       </div>
     </div>` : "";
@@ -608,6 +620,7 @@ ${desigFontCss(Number(theme))}
 :root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
 ${textIconOverrideCss(c)}
 ${offersSection ? OFFER_CSS : ""}
+${galleryCompact && gallerySection ? GALLERY_GRID_CSS : ""}
 ${compact ? COMPACT_CSS : ""}
 html{scroll-behavior:smooth;scrollbar-gutter:stable;}
 body{background:#f1f1f1;}
