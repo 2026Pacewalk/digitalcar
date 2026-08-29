@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { trpc } from "@/providers/trpc";
 import { readCustomer, scopedKey, getActiveCardId } from "@/hooks/useCustomer";
-import { pullLatestSnapshot } from "@/hooks/useCardHydration";
 import { healUploadUrl } from "@/lib/img";
 
 // Remember the last slug we did an initial sync for, so navigating between
@@ -98,16 +97,21 @@ export function useAutoPublish(): void {
           if (ts) { try { localStorage.setItem(scopedKey("dc_snap_ts"), ts); } catch { /* ignore */ } }
         },
         onError: (err) => {
-          // Rejected as stale → the server snapshot is authoritative. Pull it
-          // down and RELOAD so the open pages' React state matches the fresh
-          // storage — otherwise the stale in-memory data would just be pushed
-          // again on the next edit. Rare (another device published, or local
-          // dev re-imported the live DB), so a one-off reload is fine.
-          if (String((err as { message?: string })?.message || "").includes("SNAPSHOT_STALE")) {
-            void pullLatestSnapshot().then((pulled) => {
-              if (pulled) window.location.reload();
-            });
-          }
+          // Rejected as stale → the card was published elsewhere since this
+          // browser last synced. Re-send the SAME payload without a base
+          // (force) so the owner's just-made edit still lands: pulling the
+          // server copy here instead would overwrite the edit they just made,
+          // which read as "nothing saves". Retried once only.
+          if (!String((err as { message?: string })?.message || "").includes("SNAPSHOT_STALE")) return;
+          saveRef.current.mutate({
+            slug, cardId: getActiveCardId(),
+            data: { customer: data, products, gallery, videos, offers, qrcodes },
+          }, {
+            onSuccess: (res) => {
+              const ts = (res as { updatedAt?: string | null })?.updatedAt;
+              if (ts) { try { localStorage.setItem(scopedKey("dc_snap_ts"), ts); } catch { /* ignore */ } }
+            },
+          });
         },
       });
     };

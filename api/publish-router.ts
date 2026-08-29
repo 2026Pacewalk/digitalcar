@@ -139,13 +139,13 @@ export const publishRouter = createRouter({
         if (input.baseTs) {
           const rowTs = existing[0].updatedAt ? new Date(existing[0].updatedAt).getTime() : 0;
           const baseTs = Date.parse(input.baseTs);
-          // The save must be based on the CURRENT stored version. Row newer =
-          // another device published since; row OLDER than the base = the DB
-          // lineage was replaced (e.g. local dev re-imported the live dump) and
-          // this client's copy is from the old lineage. Either way, a blind save
-          // would clobber the authoritative data — reject and let the client
-          // pull. 1.5s tolerance absorbs second-precision TIMESTAMP rounding.
-          if (Number.isFinite(baseTs) && Math.abs(rowTs - baseTs) > 1500) {
+          // Reject ONLY when the stored row is meaningfully NEWER than the base
+          // this client synced from — i.e. someone else published in between.
+          // Deliberately one-sided and generously tolerant: an older row (a
+          // restored/re-imported DB) or small clock skew must never block a
+          // save, or the client deadlocks and the owner's edits never reach
+          // their live card.
+          if (Number.isFinite(baseTs) && rowTs - baseTs > 10_000) {
             throw new TRPCError({ code: "CONFLICT", message: "SNAPSHOT_STALE: this card was updated elsewhere — refresh to load the latest version." });
           }
         }
