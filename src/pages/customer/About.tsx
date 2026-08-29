@@ -42,6 +42,7 @@ export default function CustomerAbout() {
     timer.current = window.setTimeout(() => {
       update({
         about: aboutTitleV, about_us: aboutV, specialties_title: specTitleV, specialities: specs.join(","),
+        nature: fval("nature"),
         photo: photoV,
         employee_id: fval("employee_id"), blood_group: fval("blood_group"), joining_date: fval("joining_date"),
         membership_id: fval("membership_id"), membership_type: fval("membership_type"),
@@ -59,7 +60,12 @@ export default function CustomerAbout() {
       <SectionToggle flag="about_on" label="About Us section" />
       <Panel title="About Us" subtitle="Section title and description">
         <div className="space-y-4">
-          <Field label="Section Title"><input value={aboutTitleV} onChange={(e) => setAboutTitle(e.target.value)} className={fieldCls} placeholder="About Us" /></Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Section Title"><input value={aboutTitleV} onChange={(e) => setAboutTitle(e.target.value)} className={fieldCls} placeholder="About Us" /></Field>
+            <Field label="Business nature" hint="Shown under your name on the card — e.g. “Digital Marketing Agency”">
+              <div className="relative"><Info size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={fval("nature")} onChange={(e) => fset("nature", e.target.value)} className={`${fieldCls} pl-9`} placeholder="e.g. Real Estate Advisory" /></div>
+            </Field>
+          </div>
           <Field label="Description"><textarea value={aboutV} onChange={(e) => setAbout(e.target.value)} className={areaCls} placeholder="Describe your business, mission and what makes you unique…" /></Field>
         </div>
       </Panel>
