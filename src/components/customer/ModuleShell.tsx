@@ -1,7 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, X } from "lucide-react";
+import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, ChevronUp, ChevronDown } from "lucide-react";
 import { fileToDataUrl, useCustomer } from "@/hooks/useCustomer";
 import NotificationBell from "@/components/NotificationBell";
 import ProfileMenu from "@/components/ProfileMenu";
@@ -146,7 +146,16 @@ export default function ModuleShell({
   /* Set false for pages that render their own preview (the Card Builder). */
   preview?: boolean;
 }) {
-  const [sheet, setSheet] = useState(false);
+  // Mobile "canvas": the card stays pinned above the form while you edit, the
+  // way a design tool keeps the artboard in view. Remembered across pages.
+  const [canvas, setCanvas] = useState(() => {
+    try { return localStorage.getItem("dc_preview_open") !== "0"; } catch { return true; }
+  });
+  const toggleCanvas = () => setCanvas((v) => {
+    const n = !v;
+    try { localStorage.setItem("dc_preview_open", n ? "1" : "0"); } catch { /* ignore */ }
+    return n;
+  });
   return (
     <ResponsiveDashboardLayout>
       {/* Rendered below MobileDashboardLayout's provider, so it can hoist this
@@ -172,6 +181,27 @@ export default function ModuleShell({
 
         <div className={preview ? "grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start" : ""}>
           <div className="min-w-0 space-y-4 sm:space-y-5">
+            {/* Mobile/tablet: sticky live canvas — edit below, watch it change */}
+            {preview && (
+              <div
+                className="xl:hidden sticky z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-2 pb-2 bg-[#F8FAFC]/95 backdrop-blur-md border-b border-[#E2E8F0]"
+                style={{ top: "calc(env(safe-area-inset-top, 0px) + 3.5rem)" }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <button type="button" onClick={toggleCanvas}
+                    className="inline-flex items-center gap-2 text-[12px] font-bold text-[#0F172A]"
+                    aria-expanded={canvas}>
+                    <span className="w-6 h-6 rounded-lg bg-[#0F172A] flex items-center justify-center">
+                      <Smartphone size={13} className="text-[#F7B31C]" />
+                    </span>
+                    Live card
+                    {canvas ? <ChevronUp size={15} className="text-[#94A3B8]" /> : <ChevronDown size={15} className="text-[#94A3B8]" />}
+                  </button>
+                  <span className="text-[11px] text-[#94A3B8]">{canvas ? "Tap to hide" : "Tap to show"}</span>
+                </div>
+                {canvas && <div className="mt-2"><LivePreview height="38vh" frame={false} /></div>}
+              </div>
+            )}
             <JourneyStrip />
             {children}
             <JourneyContinue />
@@ -186,28 +216,6 @@ export default function ModuleShell({
         </div>
       </div>
 
-      {/* Mobile / tablet: same preview, one tap away */}
-      {preview && !sheet && (
-        <button type="button" onClick={() => setSheet(true)}
-          className="xl:hidden fixed right-4 bottom-24 z-40 inline-flex items-center gap-2 h-12 px-4 rounded-full bg-[#0F172A] text-white text-[13px] font-bold shadow-premium-lg active:scale-95 transition-transform"
-          aria-label="Preview my card">
-          <Smartphone size={16} className="text-[#F7B31C]" /> Preview
-        </button>
-      )}
-      {preview && sheet && (
-        <div className="xl:hidden fixed inset-0 z-[70] flex flex-col" role="dialog" aria-modal="true" aria-label="Card preview">
-          <div className="absolute inset-0 bg-[#0F172A]/60 backdrop-blur-sm" onClick={() => setSheet(false)} />
-          <div className="relative mt-auto bg-white rounded-t-3xl p-4 pb-6 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-[#0F172A]">Your card</p>
-              <button type="button" onClick={() => setSheet(false)}
-                className="w-9 h-9 rounded-xl bg-[#F1F5F9] text-[#334155] flex items-center justify-center active:scale-95 transition-transform"
-                aria-label="Close preview"><X size={17} /></button>
-            </div>
-            <div className="max-w-[360px] mx-auto"><LivePreview height={560} /></div>
-          </div>
-        </div>
-      )}
     </ResponsiveDashboardLayout>
   );
 }

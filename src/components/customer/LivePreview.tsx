@@ -26,7 +26,7 @@ function readList(base: string): Item[] {
   } catch { return []; }
 }
 
-export default function LivePreview({ height = 620 }: { height?: number }) {
+export default function LivePreview({ height = 620, frame = true }: { height?: number | string; frame?: boolean }) {
   const { data: program } = trpc.referral.myProgram.useQuery();
   const [html, setHtml] = useState("");
   const [views, setViews] = useState<number | null>(null);
@@ -77,6 +77,23 @@ export default function LivePreview({ height = 620 }: { height?: number }) {
     return () => clearTimeout(t);
   }, [tick, program?.code, views]);
 
+  const iframe = (
+    <iframe
+      ref={frameRef}
+      onLoad={(e: SyntheticEvent<HTMLIFrameElement>) => {
+        try { e.currentTarget.contentWindow?.scrollTo(0, scrollRef.current); } catch { /* guard */ }
+      }}
+      srcDoc={html}
+      title="Live card preview"
+      className={`w-full bg-white border-0 block ${frame ? "rounded-[33px]" : "rounded-2xl"}`}
+      style={{ height }}
+    />
+  );
+
+  if (!frame) {
+    return <div className="rounded-2xl overflow-hidden border border-[#E2E8F0] shadow-sm bg-white">{iframe}</div>;
+  }
+
   return (
     <div>
       <div className="relative rounded-[42px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-[9px] shadow-premium-lg ring-1 ring-black/5">
@@ -84,16 +101,7 @@ export default function LivePreview({ height = 620 }: { height?: number }) {
           <span className="w-1.5 h-1.5 rounded-full bg-[#334155]" />
           <span className="w-12 h-1 rounded-full bg-[#334155]" />
         </div>
-        <iframe
-          ref={frameRef}
-          onLoad={(e: SyntheticEvent<HTMLIFrameElement>) => {
-            try { e.currentTarget.contentWindow?.scrollTo(0, scrollRef.current); } catch { /* guard */ }
-          }}
-          srcDoc={html}
-          title="Live card preview"
-          className="w-full rounded-[33px] bg-white border-0 block"
-          style={{ height }}
-        />
+        {iframe}
       </div>
       <div className="flex items-center justify-center gap-3 mt-2.5 text-[11px]">
         <span className="inline-flex items-center gap-1.5 text-emerald-600 font-semibold">
