@@ -6,7 +6,7 @@ import { contentSeeder } from "@/lib/cardContent";
 
 type Up = { id: number; name: string; filename: string; kind: string };
 
-export default function CustomerUploads() {
+export function UploadsEditor() {
   const { data } = useCustomer();
   const limit = packageLimit(Number(data.package_id), "uploads");
   const { items, add, remove } = useLocalList<Up>("dc_uploads", [], contentSeeder("uploads"));
@@ -25,7 +25,7 @@ export default function CustomerUploads() {
   };
 
   return (
-    <ModuleShell title="Uploads" subtitle="Attach brochures, catalogues, PDFs & images" icon={Upload}>
+    <div className="space-y-4 sm:space-y-5">
       <SectionToggle flag="uploads_on" label="Uploads section" def={0} />
       <LimitBar used={items.length} limit={limit} unit="uploads" />
       <Tip>Upload your brochure, catalogue or price list as a PDF — customers can view and download it in one tap, even offline.</Tip>
@@ -52,6 +52,15 @@ export default function CustomerUploads() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* Page wrapper — the same editor, framed by the dashboard shell. */
+export default function CustomerUploads() {
+  return (
+    <ModuleShell title="Uploads" subtitle="Attach brochures, catalogues, PDFs & images" icon={Upload}>
+      <UploadsEditor />
     </ModuleShell>
   );
 }

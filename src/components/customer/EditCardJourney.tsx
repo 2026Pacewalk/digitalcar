@@ -17,6 +17,9 @@ import { EDIT_CARD_STEPS, currentStepIndex } from "./editCardSteps";
 
 export function JourneyStrip() {
   const { pathname } = useLocation();
+  // The unified editor has its own grouped navigation; a second step strip
+  // there would just offer a way to leave the editor mid-edit.
+  const inEditor = pathname.startsWith("/dashboard/build");
   const navigate = useNavigate();
   const idx = currentStepIndex(pathname);
   const scroller = useRef<HTMLDivElement>(null);
@@ -27,7 +30,7 @@ export function JourneyStrip() {
     if (activeChip.current) activeChip.current.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
   }, [idx]);
 
-  if (idx < 0) return null;
+  if (idx < 0 || inEditor) return null;
   const total = EDIT_CARD_STEPS.length;
   const pct = Math.round(((idx + 1) / total) * 100);
 

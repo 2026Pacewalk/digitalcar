@@ -11,7 +11,7 @@ function PlatformIcon({ p, size = 16 }: { p: SocialPlatform; size?: number }) {
   return <i className={p.fa} style={{ fontSize: Math.round(size * 0.92) }} aria-hidden />;
 }
 
-export default function CustomerSocial() {
+export function SocialEditor() {
   const { data, val, set, setMany, status } = useCardAutosave();
 
   // Seed the list from the saved record, re-seeding as the record hydrates —
@@ -41,8 +41,8 @@ export default function CustomerSocial() {
 
 
   return (
-    <ModuleShell title="Social Links" subtitle="Add every profile you want on your card" icon={Share2}
-      actions={<AutoSaveBadge status={status} />}>
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex items-center justify-end gap-2"><AutoSaveBadge status={status} /></div>
       <Tip>Tap a platform to add it, then paste your profile link. Add as many as you like, choose your icon style, then Save — it all goes live instantly.</Tip>
 
       <Panel title="Social Profiles" subtitle="Heading, icon style and your links">
@@ -120,6 +120,16 @@ export default function CustomerSocial() {
         )}
       </Panel>
 
+    </div>
+  );
+}
+
+/* Page wrapper — the same editor, framed by the dashboard shell. */
+export default function CustomerSocial() {
+  return (
+    <ModuleShell title="Social Links" subtitle="Add every profile you want on your card" icon={Share2}
+      >
+      <SocialEditor />
     </ModuleShell>
   );
 }

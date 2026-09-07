@@ -71,7 +71,7 @@ function ThumbFrame({ html, title }: { html: string; title: string }) {
   );
 }
 
-export default function CustomerTemplates() {
+export function TemplatesEditor() {
   const navigate = useNavigate();
   const { data, update } = useCustomer();
   // The owner's real products, so template previews match the live card instead
@@ -208,8 +208,8 @@ export default function CustomerTemplates() {
   };
 
   return (
-    <ModuleShell title="Templates" subtitle="Pick a ready-made design — each with its own colour combination" icon={LayoutGrid}
-      actions={<button onClick={apply} disabled={!dirty || !selected} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-50"><Save size={16} /> {dirty ? "Apply" : "Applied"}</button>}>
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex items-center justify-end gap-2"><button onClick={apply} disabled={!dirty || !selected} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-50"><Save size={16} /> {dirty ? "Apply" : "Applied"}</button></div>
 
       {/* Gallery of prebuilt templates — each shown in its OWN colours */}
       <Panel title="Choose a template" subtitle={`${presets.length} ready-made designs, previewed with your details`}
@@ -346,6 +346,16 @@ export default function CustomerTemplates() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* Page wrapper — the same editor, framed by the dashboard shell. */
+export default function CustomerTemplates() {
+  return (
+    <ModuleShell title="Templates" subtitle="Pick a ready-made design — each with its own colour combination" icon={LayoutGrid}
+      >
+      <TemplatesEditor />
     </ModuleShell>
   );
 }

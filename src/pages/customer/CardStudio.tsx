@@ -5,6 +5,7 @@ import {
   Wand2, User, Building2, Phone, MessageCircle, Mail, Globe, MapPin, Info, Palette,
   Eye, Check, Loader2, CloudOff, Rocket, X, ChevronRight, Gift, CalendarClock, Copy, Link2,
   Image as ImageIcon, LayoutGrid, Sparkles, Circle, Square, Briefcase,
+  Share2, ShoppingBag, Wallet, Star, Upload, ChevronLeft,
 } from "lucide-react";
 import ModuleShell, { Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
@@ -14,6 +15,14 @@ import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { BG_PRESETS } from "@/card-template/cardBackground";
 import SectionArranger from "@/components/customer/SectionArranger";
+import { TemplatesEditor } from "@/pages/customer/Templates";
+import { SocialEditor } from "@/pages/customer/Social";
+import { AboutEditor } from "@/pages/customer/About";
+import { ProductsEditor } from "@/pages/customer/Products";
+import { PaymentsEditor } from "@/pages/customer/Payments";
+import { MediaEditor } from "@/pages/customer/Media";
+import { ReviewsEditor } from "@/pages/customer/Reviews";
+import { UploadsEditor } from "@/pages/customer/Uploads";
 import { extractBrandColors, brandSecondaryFor } from "@/lib/brandColors";
 import { trpc } from "@/providers/trpc";
 import { logFunnel } from "@/lib/funnel";
@@ -24,7 +33,18 @@ type Vid = { id: number; title: string; url: string };
 type Offer = { id: number; title: string; description: string; valid: string; filename: string };
 type Qr = { id: number; name: string; filename: string };
 
-type ToolKey = "basics" | "contact" | "design" | "background" | "sections";
+type ToolKey =
+  | "basics" | "contact" | "about"                    // who you are
+  | "templates" | "design" | "background" | "sections" // how it looks
+  | "social" | "products" | "payments" | "media" | "reviews" | "uploads"; // what's on it
+
+/* Tools are grouped so a first-time user reads the editor as three plain
+   questions instead of one long list of features. */
+const TOOL_GROUPS: { label: string; keys: ToolKey[] }[] = [
+  { label: "Your details", keys: ["basics", "contact", "about"] },
+  { label: "Look & feel", keys: ["templates", "design", "background", "sections"] },
+  { label: "Add to your card", keys: ["social", "products", "payments", "media", "reviews", "uploads"] },
+];
 
 const PROGRESS_FIELDS = ["logo", "name", "designation", "company_name", "mobile1", "email", "address", "about_us"];
 const COLORS = ["#F7B31C", "#3B82F6", "#16A34A", "#A21CAF", "#EF4444", "#06B6D4", "#F97316", "#EC4899", "#0F172A"];
@@ -52,6 +72,10 @@ export default function CardStudio() {
   const [showPreview, setShowPreview] = useState(false);
   const [activeTool, setActiveTool] = useState<ToolKey>("basics");
   const [sheetOpen, setSheetOpen] = useState(false);
+  // The mobile sheet has two levels: a plain list of sections, then the editor
+  // for the one you tapped. Two taps, but a new user always knows where they are.
+  const [sheetGroup, setSheetGroup] = useState(0);
+  const [sheetView, setSheetView] = useState<"menu" | "tool">("menu");
   type TrialInfo = { daysLeft: number; endsAt: string | Date | null; status: string } | undefined;
   const [publishInfo, setPublishInfo] = useState<{ first: boolean; trial: TrialInfo } | null>(null);
   const [previewHtml, setPreviewHtml] = useState("");
@@ -442,8 +466,47 @@ export default function CardStudio() {
     { key: "design", label: "Design", icon: Palette, render: renderDesign },
     { key: "background", label: "Background", icon: ImageIcon, render: renderBackground },
     { key: "sections", label: "Sections", icon: LayoutGrid, render: renderSections },
+    { key: "about", label: "About Us", icon: Info, render: () => <AboutEditor /> },
+    { key: "templates", label: "Templates", icon: LayoutGrid, render: () => <TemplatesEditor /> },
+    { key: "social", label: "Social Links", icon: Share2, render: () => <SocialEditor /> },
+    { key: "products", label: "Products", icon: ShoppingBag, render: () => <ProductsEditor /> },
+    { key: "payments", label: "Payments", icon: Wallet, render: () => <PaymentsEditor /> },
+    { key: "media", label: "Gallery", icon: ImageIcon, render: () => <MediaEditor /> },
+    { key: "reviews", label: "Reviews", icon: Star, render: () => <ReviewsEditor /> },
+    { key: "uploads", label: "Uploads", icon: Upload, render: () => <UploadsEditor /> },
   ];
+  // One plain-language line per tool, so nothing is guessed at from an icon.
+  const TOOL_HINT: Record<ToolKey, string> = {
+    basics: "Your name, photo, logo & company",
+    contact: "Phone, WhatsApp, email, address",
+    about: "Your story and what you do best",
+    templates: "Pick a ready-made card design",
+    design: "Colours, layout and what shows",
+    background: "Card background & photo",
+    sections: "Reorder the sections on your card",
+    social: "Facebook, Instagram, LinkedIn…",
+    products: "What you sell — with photos & prices",
+    payments: "UPI, bank details & payment QR",
+    media: "Photo gallery and videos",
+    reviews: "Your Google rating & reviews",
+    uploads: "Brochures, menus & PDFs to share",
+  };
+  const socialCount = (() => { try { const a = JSON.parse(String(val("social_links") || "[]")); return Array.isArray(a) ? a.length : 0; } catch { return 0; } })();
+  // A green tick means "you've put something here" — the fastest way for a new
+  // user to see what is left to do.
+  const TOOL_DONE: Partial<Record<ToolKey, boolean>> = {
+    basics: !!cur("name"),
+    contact: !!(cur("mobile1") || cur("email")),
+    about: !!cur("about_us"),
+    social: socialCount > 0,
+    products: products.items.length > 0,
+    payments: !!(cur("upi") || cur("account_number")),
+    media: gallery.items.length + videos.items.length > 0,
+    reviews: !!cur("google_review"),
+  };
   const active = TOOLS.find((t) => t.key === activeTool) || TOOLS[0];
+  const groupOf = (k: ToolKey) => TOOL_GROUPS.findIndex((g) => g.keys.includes(k));
+  const openTool = (k: ToolKey) => { setActiveTool(k); setSheetGroup(Math.max(0, groupOf(k))); setSheetView("tool"); setSheetOpen(true); };
   const ActiveIcon = active.icon;
 
   const phoneMock = (h: number, ref?: RefObject<HTMLIFrameElement | null>) => (
@@ -495,40 +558,53 @@ export default function CardStudio() {
         </div>
       </div>
 
-      {/* Canva-style editor */}
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-5 items-start">
-        {/* Editor column */}
-        <div className="order-2 lg:order-1 min-w-0 space-y-4">
-          {/* Mobile canvas (tap for full preview) */}
-          <div className="lg:hidden">
-            <div className="mx-auto w-full max-w-[360px]">{phoneMock(500)}</div>
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <button onClick={() => setShowPreview(true)} className="text-[11px] font-semibold text-[#64748B] inline-flex items-center gap-1"><Eye size={12} /> Full preview</button>
-              <span className="text-[#CBD5E1]">·</span>
-              <a href={cardUrl} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#64748B]">Open card</a>
-            </div>
-          </div>
+      {/* -- Editor -----------------------------------------------------
+          Mobile-first: the card stays on screen and every section is reached
+          from one bottom bar of three plain questions. Desktop shows the same
+          grouped list as a permanent side rail. */}
+      <div className="grid lg:grid-cols-[210px_minmax(0,1fr)_400px] gap-5 items-start">
 
-          {/* Desktop tool bar — one contained segmented control */}
-          <div className="hidden lg:flex items-center gap-1 p-1.5 bg-white rounded-2xl border border-[#F1F5F9] shadow-premium overflow-x-auto no-scrollbar">
-            {TOOLS.map((t) => {
-              const on = t.key === active.key;
-              const Icon = t.icon;
-              return (
-                <button key={t.key} onClick={() => setActiveTool(t.key)}
-                  className={`flex items-center gap-2 h-10 px-3.5 rounded-xl text-[12.5px] font-semibold whitespace-nowrap transition-all duration-200 ${on ? "bg-[#0F172A] text-white shadow-md" : "text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]"}`}>
-                  <span className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${on ? "bg-[#F7B31C] text-[#0F172A]" : "bg-[#F1F5F9] text-[#94A3B8]"}`}><Icon size={13} /></span>
-                  {t.label}
-                </button>
-              );
-            })}
+        {/* Desktop: grouped section rail */}
+        <nav className="hidden lg:block bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-2 sticky top-[100px]">
+          {TOOL_GROUPS.map((g) => (
+            <div key={g.label} className="mb-1.5 last:mb-0">
+              <p className="px-2.5 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">{g.label}</p>
+              {g.keys.map((k) => {
+                const t = TOOLS.find((x) => x.key === k); if (!t) return null;
+                const on = activeTool === k; const Icon = t.icon; const done = TOOL_DONE[k];
+                return (
+                  <button key={k} onClick={() => setActiveTool(k)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-colors ${on ? "bg-[#0F172A]" : "hover:bg-[#F8FAFC]"}`}>
+                    <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${on ? "bg-[#F7B31C] text-[#0F172A]" : "bg-[#F1F5F9] text-[#64748B]"}`}><Icon size={14} /></span>
+                    <span className={`flex-1 min-w-0 text-[12.5px] font-semibold truncate ${on ? "text-white" : "text-[#334155]"}`}>{t.label}</span>
+                    {done && <Check size={13} className={on ? "text-emerald-400" : "text-emerald-500"} strokeWidth={3} />}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* Editor column */}
+        <div className="order-2 lg:order-1 min-w-0 space-y-4 pb-24 lg:pb-0">
+          {/* Mobile canvas -- always visible while you edit */}
+          <div className="lg:hidden">
+            <div className="mx-auto w-full max-w-[360px]">{phoneMock(440)}</div>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Updates as you edit</span>
+              <span className="text-[#CBD5E1]">.</span>
+              <button onClick={() => setShowPreview(true)} className="text-[11px] font-semibold text-[#64748B] inline-flex items-center gap-1"><Eye size={12} /> Full screen</button>
+            </div>
           </div>
 
           {/* Desktop active panel */}
           <div className="hidden lg:block bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5">
             <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-[#F1F5F9]">
               <span className="w-8 h-8 rounded-xl bg-[#FEF3C7] flex items-center justify-center"><ActiveIcon size={15} className="text-[#B45309]" /></span>
-              <h3 className="text-[14px] font-bold text-[#0F172A]">{active.label}</h3>
+              <div className="min-w-0">
+                <h3 className="text-[14px] font-bold text-[#0F172A]">{active.label}</h3>
+                <p className="text-[11px] text-[#94A3B8] truncate">{TOOL_HINT[active.key]}</p>
+              </div>
             </div>
             {active.render()}
           </div>
@@ -536,41 +612,80 @@ export default function CardStudio() {
 
         {/* Desktop sticky preview */}
         <div className="hidden lg:block order-1 lg:order-2 sticky top-[100px]">
-          <div className="mx-auto w-full max-w-[420px]">{phoneMock(720, previewRef)}</div>
+          <div className="mx-auto w-full max-w-[400px]">{phoneMock(700, previewRef)}</div>
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live preview</span>
-            <span className="text-[#CBD5E1]">·</span>
+            <span className="text-[#CBD5E1]">.</span>
             <a href={cardUrl} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#64748B] hover:text-[#F7B31C] inline-flex items-center gap-1">Open card <ChevronRight size={12} /></a>
           </div>
         </div>
       </div>
 
-      {/* Mobile tool bar (fixed) */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#E2E8F0]" style={{ paddingBottom: "max(0.3rem, env(safe-area-inset-bottom))" }}>
-        <div className="flex gap-1 overflow-x-auto no-scrollbar px-2 pt-1.5">
-          {TOOLS.map((t) => {
-            const Icon = t.icon;
-            const on = t.key === activeTool && sheetOpen;
+      {/* Mobile bottom bar -- three plain questions instead of 13 icons */}
+      <div className="lg:hidden fixed inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#E2E8F0] pb-1.5" style={{ bottom: "calc(4rem + env(safe-area-inset-bottom, 0px))" }}>
+        <div className="grid grid-cols-3 gap-1.5 px-2.5 pt-2">
+          {TOOL_GROUPS.map((g, i) => {
+            const Icon = i === 0 ? User : i === 1 ? Palette : LayoutGrid;
+            const left = g.keys.filter((k) => TOOL_DONE[k] === false).length;
             return (
-              <button key={t.key} onClick={() => { setActiveTool(t.key); setSheetOpen(true); }} className="flex flex-col items-center gap-1 shrink-0 min-w-[62px] py-1.5">
-                <span className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${on ? "bg-[#FEF3C7] text-[#B45309]" : "bg-[#F1F5F9] text-[#64748B]"}`}><Icon size={17} /></span>
-                <span className={`text-[10px] font-semibold ${on ? "text-[#B45309]" : "text-[#64748B]"}`}>{t.label}</span>
+              <button key={g.label}
+                onClick={() => { setSheetGroup(i); setSheetView("menu"); setSheetOpen(true); }}
+                className="relative flex flex-col items-center gap-1 py-1.5 rounded-xl active:bg-[#F8FAFC] transition-colors">
+                <span className="w-9 h-9 rounded-xl bg-[#F1F5F9] text-[#334155] flex items-center justify-center"><Icon size={17} /></span>
+                <span className="text-[10.5px] font-bold text-[#334155] leading-tight text-center">{g.label}</span>
+                {left > 0 && <span className="absolute top-0.5 right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#F7B31C] text-[#0F172A] text-[9px] font-bold flex items-center justify-center">{left}</span>}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Mobile bottom sheet */}
+      {/* Mobile sheet: section list -> that section's editor */}
       <div className={`lg:hidden fixed inset-0 z-[60] ${sheetOpen ? "" : "pointer-events-none"}`}>
         <div onClick={() => setSheetOpen(false)} className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${sheetOpen ? "opacity-100" : "opacity-0"}`} />
-        <div className={`absolute bottom-0 inset-x-0 bg-[#F8FAFC] rounded-t-3xl shadow-premium-lg flex flex-col max-h-[85vh] transition-transform duration-300 ${sheetOpen ? "translate-y-0" : "translate-y-full"}`}>
+        <div className={`absolute bottom-0 inset-x-0 bg-[#F8FAFC] rounded-t-3xl shadow-premium-lg flex flex-col max-h-[88vh] transition-transform duration-300 ${sheetOpen ? "translate-y-0" : "translate-y-full"}`}>
           <div className="pt-3 flex justify-center shrink-0"><span className="w-10 h-1.5 rounded-full bg-[#CBD5E1]" /></div>
-          <div className="px-4 py-3 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2.5"><span className="w-8 h-8 rounded-xl bg-[#FEF3C7] flex items-center justify-center"><ActiveIcon size={15} className="text-[#B45309]" /></span><h3 className="text-[15px] font-bold text-[#0F172A]">{active.label}</h3></div>
-            <button onClick={() => setSheetOpen(false)} className="h-9 px-4 rounded-lg bg-[#0F172A] text-white text-[13px] font-semibold">Done</button>
+
+          <div className="px-4 py-3 flex items-center justify-between gap-2 shrink-0 border-b border-[#E2E8F0]">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {sheetView === "tool" && (
+                <button onClick={() => setSheetView("menu")} aria-label="Back to sections"
+                  className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-center shrink-0 active:scale-95 transition-transform">
+                  <ChevronLeft size={17} className="text-[#334155]" />
+                </button>
+              )}
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-bold text-[#0F172A] truncate">{sheetView === "menu" ? TOOL_GROUPS[sheetGroup].label : active.label}</h3>
+                <p className="text-[11px] text-[#94A3B8] truncate">{sheetView === "menu" ? "Choose what to edit" : TOOL_HINT[active.key]}</p>
+              </div>
+            </div>
+            <button onClick={() => setSheetOpen(false)} className="h-9 px-4 rounded-lg bg-[#0F172A] text-white text-[13px] font-semibold shrink-0">Done</button>
           </div>
-          <div className="overflow-y-auto px-4 pb-8 pt-1">{active.render()}</div>
+
+          <div className="overflow-y-auto px-4 pb-8 pt-3">
+            {sheetView === "menu" ? (
+              <div className="space-y-2">
+                {TOOL_GROUPS[sheetGroup].keys.map((k) => {
+                  const t = TOOLS.find((x) => x.key === k); if (!t) return null;
+                  const Icon = t.icon; const done = TOOL_DONE[k];
+                  return (
+                    <button key={k} onClick={() => openTool(k)}
+                      className="w-full flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-2xl p-3.5 text-left active:scale-[0.99] transition-transform">
+                      <span className="w-11 h-11 rounded-xl bg-[#0F172A] text-[#F7B31C] flex items-center justify-center shrink-0"><Icon size={19} /></span>
+                      <span className="flex-1 min-w-0">
+                        <span className="flex items-center gap-2">
+                          <span className="text-[14px] font-bold text-[#0F172A]">{t.label}</span>
+                          {done && <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600"><Check size={11} strokeWidth={3} /> Added</span>}
+                        </span>
+                        <span className="block text-[11.5px] text-[#94A3B8] leading-snug mt-0.5">{TOOL_HINT[k]}</span>
+                      </span>
+                      <ChevronRight size={17} className="text-[#CBD5E1] shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : active.render()}
+          </div>
         </div>
       </div>
 

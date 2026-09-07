@@ -11,7 +11,7 @@ type Bank = { id: number; holder: string; bank: string; account: string; ifsc: s
 type Qr = { id: number; name: string; filename: string };
 const blankQr: Omit<Qr, "id"> = { name: "Pay Online", filename: "" };
 
-export default function CustomerPayments() {
+export function PaymentsEditor() {
   const { data, val, set, status } = useCardAutosave();
 
   // ── Multiple UPI IDs ──
@@ -44,8 +44,8 @@ export default function CustomerPayments() {
   );
 
   return (
-    <ModuleShell title="Payments" subtitle="Let customers pay you directly from your card" icon={Wallet}
-      actions={<AutoSaveBadge status={status} />}>
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex items-center justify-end gap-2"><AutoSaveBadge status={status} /></div>
 
       <SectionToggle flag="payment_on" label="Payment section" />
       <Tip>Offer more than one way to pay — multiple UPI IDs, bank accounts, wallets, links and a scannable QR. The easier you make paying, the faster you get paid.</Tip>
@@ -180,6 +180,16 @@ export default function CustomerPayments() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* Page wrapper — the same editor, framed by the dashboard shell. */
+export default function CustomerPayments() {
+  return (
+    <ModuleShell title="Payments" subtitle="Let customers pay you directly from your card" icon={Wallet}
+      >
+      <PaymentsEditor />
     </ModuleShell>
   );
 }

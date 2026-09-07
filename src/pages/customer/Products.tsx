@@ -32,7 +32,7 @@ const ctaHint = (title: string) => {
   return "Opens WhatsApp enquiry";
 };
 
-export default function CustomerProducts() {
+export function ProductsEditor() {
   const { data, update: updateCard } = useCustomer();
   const [searchParams, setSearchParams] = useSearchParams();
   const isOfferTab = searchParams.get("tab") === "offers";
@@ -114,8 +114,8 @@ export default function CustomerProducts() {
   const set = (k: keyof Omit<Product, "id">, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
-    <ModuleShell title={isOfferTab ? "Offers / Deals" : "Products / Services"} subtitle={isOfferTab ? "Promote limited-time offers on your card" : "Showcase what you sell on your card"} icon={isOfferTab ? Tag : ShoppingBag}
-      actions={<button onClick={openAdd} disabled={full} className={`flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${full ? "bg-[#F1F5F9] text-[#94A3B8] cursor-not-allowed" : "gradient-gold text-[#0F172A] hover:shadow-gold"}`}><Plus size={16} /> {isOfferTab ? "Add Offer" : "Add Product"}</button>}>
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex items-center justify-end gap-2"><button onClick={openAdd} disabled={full} className={`flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${full ? "bg-[#F1F5F9] text-[#94A3B8] cursor-not-allowed" : "gradient-gold text-[#0F172A] hover:shadow-gold"}`}><Plus size={16} /> {isOfferTab ? "Add Offer" : "Add Product"}</button></div>
 
       {/* Tab switcher */}
       <div className="flex rounded-xl bg-[#F1F5F9] p-1 text-[13px] font-semibold">
@@ -402,6 +402,19 @@ export default function CustomerProducts() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* Page wrapper — the same editor, framed by the dashboard shell. */
+export default function CustomerProducts() {
+  // The shell title follows the active tab, which the editor owns.
+  const [sp] = useSearchParams();
+  const isOfferTab = sp.get("tab") === "offers";
+  return (
+    <ModuleShell title={isOfferTab ? "Offers / Deals" : "Products / Services"} subtitle={isOfferTab ? "Promote limited-time offers on your card" : "Showcase what you sell on your card"} icon={isOfferTab ? Tag : ShoppingBag}
+      >
+      <ProductsEditor />
     </ModuleShell>
   );
 }

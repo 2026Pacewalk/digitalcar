@@ -3,7 +3,7 @@ import { Info, Plus, X } from "lucide-react";
 import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick, AutoSaveBadge, SectionToggle } from "@/components/customer/ModuleShell";
 import { useCustomer } from "@/hooks/useCustomer";
 
-export default function CustomerAbout() {
+export function AboutEditor() {
   const { data, update } = useCustomer();
   const [aboutTitle, setAboutTitle] = useState<string | null>(null);
   const [about, setAbout] = useState<string | null>(null);
@@ -55,8 +55,8 @@ export default function CustomerAbout() {
   }, [aboutTitle, about, specTitle, specs, photo, fields]);
 
   return (
-    <ModuleShell title="About Us" subtitle="Tell customers about your business" icon={Info}
-      actions={<AutoSaveBadge status={status} />}>
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex items-center justify-end gap-2"><AutoSaveBadge status={status} /></div>
       <SectionToggle flag="about_on" label="About Us section" />
       <Panel title="About Us" subtitle="Section title and description">
         <div className="space-y-4">
@@ -112,6 +112,16 @@ export default function CustomerAbout() {
         </div>
       </Panel>
 
+    </div>
+  );
+}
+
+/* Page wrapper — the same editor, framed by the dashboard shell. */
+export default function CustomerAbout() {
+  return (
+    <ModuleShell title="About Us" subtitle="Tell customers about your business" icon={Info}
+      >
+      <AboutEditor />
     </ModuleShell>
   );
 }

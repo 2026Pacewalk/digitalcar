@@ -32,7 +32,7 @@ function Stars({ value, onPick, size = 18 }: { value: number; onPick?: (n: numbe
   );
 }
 
-export default function CustomerReviews() {
+export function ReviewsEditor() {
   const { val, set, status } = useCardAutosave();
   const reviews = useLocalList<Review>("dc_reviews", []);
 
@@ -53,8 +53,8 @@ export default function CustomerReviews() {
   };
 
   return (
-    <ModuleShell title="Google Reviews" subtitle="Show your rating, featured reviews & a one-tap review button" icon={Star}
-      actions={<AutoSaveBadge status={status} />}>
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex items-center justify-end gap-2"><AutoSaveBadge status={status} /></div>
 
       <SectionToggle flag="review_on" label="Google Reviews section" />
       {/* ── Rating summary ── */}
@@ -179,6 +179,16 @@ export default function CustomerReviews() {
           {reviewLink && <a href={reviewLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 ml-1 font-semibold underline">Test your link <ExternalLink size={11} /></a>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* Page wrapper — the same editor, framed by the dashboard shell. */
+export default function CustomerReviews() {
+  return (
+    <ModuleShell title="Google Reviews" subtitle="Show your rating, featured reviews & a one-tap review button" icon={Star}
+      >
+      <ReviewsEditor />
     </ModuleShell>
   );
 }

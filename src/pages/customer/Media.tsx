@@ -10,7 +10,7 @@ import { parseVideo, isVideoUrl } from "@/lib/video";
 type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
 
-export default function CustomerMedia() {
+export function MediaEditor() {
   const { data, val, set, status } = useCardAutosave();
   const videoLayout = (val("video_layout") || "stack").toLowerCase() === "swipe" ? "swipe" : "stack";
   const galleryLayout = val("gallery_layout").toLowerCase() === "compact" ? "compact" : "";
@@ -46,8 +46,8 @@ export default function CustomerMedia() {
   ];
 
   return (
-    <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube, Shorts & Instagram videos" icon={ImageIcon}
-      actions={<AutoSaveBadge status={status} />}>
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex items-center justify-end gap-2"><AutoSaveBadge status={status} /></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <SectionToggle flag="gallery_on" label="Gallery section" />
         <SectionToggle flag="video_on" label="Videos section" />
@@ -252,6 +252,16 @@ export default function CustomerMedia() {
           {videos.items.length === 0 && <p className="text-center text-xs text-[#94A3B8]">Add YouTube, Shorts or Instagram videos to feature them on your card.</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+/* Page wrapper — the same editor, framed by the dashboard shell. */
+export default function CustomerMedia() {
+  return (
+    <ModuleShell title="Gallery (Images / Videos)" subtitle="Gallery images and YouTube, Shorts & Instagram videos" icon={ImageIcon}
+      >
+      <MediaEditor />
     </ModuleShell>
   );
 }
