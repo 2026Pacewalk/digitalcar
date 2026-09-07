@@ -29,7 +29,6 @@ export default function CustomerSocial() {
   };
 
   const style = val("social_icon_style") === "brand" ? "brand" : "theme";
-  const heading = val("social_title") || "Follow Us";
   const used = new Set(links.map((l) => l.platform));
   const websiteCount = links.filter((l) => l.platform === "website").length;
   // Website is a repeatable "custom link" (up to 6 total); every other platform once.
@@ -39,31 +38,12 @@ export default function CustomerSocial() {
   const setUrl = (i: number, url: string) => mutate(links.map((l, idx) => (idx === i ? { ...l, url } : l)));
   const removeLink = (i: number) => mutate(links.filter((_, idx) => idx !== i));
 
-  // Preview icon colours — mirror how the card renders theme vs brand.
-  const chipStyle = (p: SocialPlatform) => (style === "brand" ? { background: p.color, color: p.fg || "#fff" } : { background: "#F7B31C", color: "#fff" });
 
 
   return (
     <ModuleShell title="Social Links" subtitle="Add every profile you want on your card" icon={Share2}
       actions={<AutoSaveBadge status={status} />}>
       <Tip>Tap a platform to add it, then paste your profile link. Add as many as you like, choose your icon style, then Save — it all goes live instantly.</Tip>
-
-      {/* Live preview — exactly how the "Follow Us" row appears on the card */}
-      <div className="rounded-2xl border border-[#E2E8F0] bg-gradient-to-b from-[#F8FAFC] to-white p-5 text-center shadow-premium">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8] mb-3">Live preview</p>
-        <p className="text-[13px] font-semibold text-[#475569] mb-3">{heading}</p>
-        {links.length === 0 ? (
-          <p className="text-[12px] text-[#94A3B8] py-2">Your icons will appear here as you add them.</p>
-        ) : (
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            {links.map((l, i) => {
-              const p = SOCIAL_BY_KEY[l.platform];
-              if (!p) return null;
-              return <span key={i} className="w-9 h-9 rounded-full flex items-center justify-center" style={chipStyle(p)}><PlatformIcon p={p} size={16} /></span>;
-            })}
-          </div>
-        )}
-      </div>
 
       <Panel title="Social Profiles" subtitle="Heading, icon style and your links">
         <Field label="Section Heading" hint="Shown above your social icons — e.g. “Follow Us” or “Follow Me”."><input value={val("social_title")} onChange={(e) => set("social_title", e.target.value)} className={fieldCls} placeholder="Follow Us" /></Field>

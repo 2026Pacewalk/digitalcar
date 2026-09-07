@@ -14,7 +14,7 @@ import LivePreview from "@/components/customer/LivePreview";
    automatically; this shows the user that it happened). */
 export function AutoSaveBadge({ status }: { status: "idle" | "saving" | "saved" }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-semibold border ${
+    <span className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-semibold border whitespace-nowrap shrink-0 ${
       status === "saving" ? "bg-[#FFFBEB] border-[#FDE68A] text-[#92400E]"
       : status === "saved" ? "bg-emerald-50 border-emerald-200 text-emerald-700"
       : "bg-white border-[#E2E8F0] text-[#94A3B8]"}`}>
@@ -184,22 +184,23 @@ export default function ModuleShell({
             {/* Mobile/tablet: sticky live canvas — edit below, watch it change */}
             {preview && (
               <div
-                className="xl:hidden sticky z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-2 pb-2 bg-[#F8FAFC]/95 backdrop-blur-md border-b border-[#E2E8F0]"
+                className="xl:hidden sticky z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-1.5 pb-2 bg-[#F8FAFC]/95 backdrop-blur-md border-b border-[#E2E8F0]"
                 style={{ top: "calc(env(safe-area-inset-top, 0px) + 3.5rem)" }}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <button type="button" onClick={toggleCanvas}
-                    className="inline-flex items-center gap-2 text-[12px] font-bold text-[#0F172A]"
-                    aria-expanded={canvas}>
-                    <span className="w-6 h-6 rounded-lg bg-[#0F172A] flex items-center justify-center">
-                      <Smartphone size={13} className="text-[#F7B31C]" />
+                <button type="button" onClick={toggleCanvas} aria-expanded={canvas}
+                  className="w-full flex items-center justify-between gap-2 py-1">
+                  <span className="inline-flex items-center gap-2 text-[12px] font-bold text-[#0F172A]">
+                    <span className="w-5 h-5 rounded-md bg-[#0F172A] flex items-center justify-center">
+                      <Smartphone size={11} className="text-[#F7B31C]" />
                     </span>
                     Live card
-                    {canvas ? <ChevronUp size={15} className="text-[#94A3B8]" /> : <ChevronDown size={15} className="text-[#94A3B8]" />}
-                  </button>
-                  <span className="text-[11px] text-[#94A3B8]">{canvas ? "Tap to hide" : "Tap to show"}</span>
-                </div>
-                {canvas && <div className="mt-2"><LivePreview height="38vh" frame={false} /></div>}
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> updates as you edit
+                    </span>
+                  </span>
+                  {canvas ? <ChevronUp size={16} className="text-[#94A3B8] shrink-0" /> : <ChevronDown size={16} className="text-[#94A3B8] shrink-0" />}
+                </button>
+                {canvas && <div className="mt-1.5"><LivePreview height={200} frame={false} /></div>}
               </div>
             )}
             <JourneyStrip />
