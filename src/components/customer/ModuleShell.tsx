@@ -1,12 +1,14 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import type { ReactNode } from "react";
-import { ImagePlus, Lightbulb, Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
+import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, X } from "lucide-react";
 import { fileToDataUrl, useCustomer } from "@/hooks/useCustomer";
 import NotificationBell from "@/components/NotificationBell";
 import ProfileMenu from "@/components/ProfileMenu";
 import CardSwitcher from "@/components/customer/CardSwitcher";
 import { useMobileChrome } from "@/components/layout/MobileDashboardLayout";
 import { JourneyStrip, JourneyContinue } from "@/components/customer/EditCardJourney";
+import LivePreview from "@/components/customer/LivePreview";
 
 /* Auto-save status pill for module pages (no Save buttons — edits persist
    automatically; this shows the user that it happened). */
@@ -137,19 +139,22 @@ export function ImagePick({ value, onChange, className = "w-24 h-24", label = "U
 }
 
 export default function ModuleShell({
-  title, subtitle, icon: Icon, children, actions,
+  title, subtitle, icon: Icon, children, actions, preview = true,
 }: {
   title: string; subtitle?: string; icon: React.ComponentType<{ size?: number; className?: string }>;
   children: ReactNode; actions?: ReactNode;
+  /* Set false for pages that render their own preview (the Card Builder). */
+  preview?: boolean;
 }) {
+  const [sheet, setSheet] = useState(false);
   return (
     <ResponsiveDashboardLayout>
       {/* Rendered below MobileDashboardLayout's provider, so it can hoist this
           page's Save action into the native app bar on mobile. */}
       <MobileChromeRegistrar action={actions ?? null} />
-      <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4 sm:space-y-5">
+      <div className={`p-4 sm:p-6 mx-auto w-full ${preview ? "max-w-[1360px]" : "max-w-4xl"}`}>
         {/* Desktop header (hidden on mobile — the app bar shows the title instead) */}
-        <header className="hidden md:flex items-center justify-between gap-3">
+        <header className="hidden md:flex items-center justify-between gap-3 mb-4 sm:mb-5">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-[#FEF3C7] flex items-center justify-center shrink-0"><Icon size={20} className="text-[#F7B31C]" /></div>
             <div>
@@ -164,10 +169,45 @@ export default function ModuleShell({
             <ProfileMenu />
           </div>
         </header>
-        <JourneyStrip />
-        {children}
-        <JourneyContinue />
+
+        <div className={preview ? "grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start" : ""}>
+          <div className="min-w-0 space-y-4 sm:space-y-5">
+            <JourneyStrip />
+            {children}
+            <JourneyContinue />
+          </div>
+
+          {/* Desktop: the card updates as you edit, right beside the form */}
+          {preview && (
+            <aside className="hidden xl:block sticky top-6">
+              <LivePreview height={620} />
+            </aside>
+          )}
+        </div>
       </div>
+
+      {/* Mobile / tablet: same preview, one tap away */}
+      {preview && !sheet && (
+        <button type="button" onClick={() => setSheet(true)}
+          className="xl:hidden fixed right-4 bottom-24 z-40 inline-flex items-center gap-2 h-12 px-4 rounded-full bg-[#0F172A] text-white text-[13px] font-bold shadow-premium-lg active:scale-95 transition-transform"
+          aria-label="Preview my card">
+          <Smartphone size={16} className="text-[#F7B31C]" /> Preview
+        </button>
+      )}
+      {preview && sheet && (
+        <div className="xl:hidden fixed inset-0 z-[70] flex flex-col" role="dialog" aria-modal="true" aria-label="Card preview">
+          <div className="absolute inset-0 bg-[#0F172A]/60 backdrop-blur-sm" onClick={() => setSheet(false)} />
+          <div className="relative mt-auto bg-white rounded-t-3xl p-4 pb-6 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-[#0F172A]">Your card</p>
+              <button type="button" onClick={() => setSheet(false)}
+                className="w-9 h-9 rounded-xl bg-[#F1F5F9] text-[#334155] flex items-center justify-center active:scale-95 transition-transform"
+                aria-label="Close preview"><X size={17} /></button>
+            </div>
+            <div className="max-w-[360px] mx-auto"><LivePreview height={560} /></div>
+          </div>
+        </div>
+      )}
     </ResponsiveDashboardLayout>
   );
 }

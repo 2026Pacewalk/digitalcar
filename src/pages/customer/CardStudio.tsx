@@ -458,7 +458,7 @@ export default function CardStudio() {
   );
 
   return (
-    <ModuleShell title="Card Builder" subtitle="Design your card — updates live" icon={Wand2}
+    <ModuleShell title="Card Builder" subtitle="Design your card — updates live" icon={Wand2} preview={false}
       actions={<div className="flex items-center gap-3"><span className="hidden sm:inline-flex"><SaveStatus /></span><PublishBtn /></div>}>
 
       {/* Progress + card link (compact) */}

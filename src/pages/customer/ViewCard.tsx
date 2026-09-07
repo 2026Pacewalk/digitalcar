@@ -100,7 +100,7 @@ export default function CustomerViewCard() {
 
   /* ── Desktop: sidebar + phone frame ── */
   return (
-    <ModuleShell title="View Card" subtitle="Exact live preview of your digital business card" icon={Eye}
+    <ModuleShell title="View Card" subtitle="Exact live preview of your digital business card" icon={Eye} preview={false}
       actions={
         <div className="flex items-center gap-2">
           <button onClick={refresh} className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors"><RefreshCw size={15} /> Refresh</button>
