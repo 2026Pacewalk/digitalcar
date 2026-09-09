@@ -61,7 +61,10 @@ function layout(opts: { preheader: string; badge?: string; heading: string; body
         <!-- header -->
         <tr><td style="background:${BRAND.navy};padding:22px 32px">
           <table role="presentation" width="100%"><tr>
-            <td style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#fff;letter-spacing:.2px">Digital<span style="color:${BRAND.gold}">Carda</span></td>
+            <td>
+              <img src="${SITE}/logo.png" width="150" height="48" alt="DigitalCarda"
+                   style="display:block;border:0;outline:none;text-decoration:none;height:48px;width:150px;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#ffffff;letter-spacing:.2px">
+            </td>
             <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#93a4bd">Digital Business Cards</td>
           </tr></table>
         </td></tr>
