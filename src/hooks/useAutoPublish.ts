@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { trpc } from "@/providers/trpc";
 import { readCustomer, scopedKey, getActiveCardId } from "@/hooks/useCustomer";
 import { healUploadUrl } from "@/lib/img";
+import { loadMySnapshot } from "@/lib/cardContent";
 
 // Remember the last slug we did an initial sync for, so navigating between
 // dashboard pages doesn't re-snapshot on every mount — only once per card.
@@ -46,11 +47,20 @@ export function useAutoPublish(): void {
 
     const isLive = async (data: Record<string, unknown>, slug: string): Promise<boolean> => {
       if (Number(data.published) === 1 || Number(data.status) === 1) return true;
-      // Fall back to a one-time server check: a live legacy card exists at /api/card/:slug.
+      // One-time server check, cached for the session.
       if (legacyLive.current === undefined) {
         try {
-          const r = await fetch(`/api/card/${encodeURIComponent(slug)}`);
-          legacyLive.current = r.ok && !!(await r.json())?.name;
+          // A published SNAPSHOT means the card is already public. This is the
+          // new-flow case: /api/card/:slug only knows legacy customers.json
+          // cards, so it 404s for every account created through signup — which
+          // made auto-publish decide their live card "isn't live" and return
+          // without ever pushing their edits.
+          const snap = await loadMySnapshot();
+          if (snap?.slug) { legacyLive.current = true; }
+          else {
+            const r = await fetch(`/api/card/${encodeURIComponent(slug)}`);
+            legacyLive.current = r.ok && !!(await r.json())?.name;
+          }
         } catch { legacyLive.current = false; }
       }
       return legacyLive.current === true;
