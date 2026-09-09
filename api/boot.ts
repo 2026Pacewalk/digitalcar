@@ -116,6 +116,7 @@ const ogHandler = async (c: { req: { param: (k: string) => string } }): Promise<
       logo: (cust.logo as string) || null,
       photo: (cust.photo as string) || null,
       accent: (cust.color as string) || null,
+      second: (cust.color2 as string) || null,
     });
     ogCache.set(slug, { png, at: Date.now() });
     if (ogCache.size > 500) ogCache.clear();   // crude bound; it refills lazily
