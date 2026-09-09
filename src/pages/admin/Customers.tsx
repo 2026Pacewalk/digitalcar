@@ -741,14 +741,23 @@ export default function AdminCustomers() {
               <>
                 <input value={sharePwd} onChange={(e) => setSharePwd(e.target.value)} placeholder="Password to share"
                   className="h-10 w-full mt-2.5 rounded-xl bg-white border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]" />
+                {/* Older customers.json accounts kept the password in readable form, so
+                    it can be shared as-is. Accounts created through signup store only a
+                    bcrypt hash, which cannot be reversed — for those a new one must be set. */}
+                {shareModal.password ? (
+                  <p className="text-[11px] text-emerald-600 font-semibold leading-snug mt-1.5">
+                    ✓ This is the password saved for this account — share it as it is.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-[#B45309] leading-snug mt-1.5">
+                    This account has no readable password saved — it's stored encrypted (one-way), so
+                    nobody can read the original back. Set a new one below to share.
+                  </p>
+                )}
                 <button type="button" onClick={generateAndSetPassword} disabled={sending}
                   className="mt-2 h-9 w-full rounded-xl border border-[#F7B31C] bg-[#FEF3C7]/60 text-[12.5px] font-bold text-[#92400E] hover:bg-[#FEF3C7] disabled:opacity-60">
-                  {sending ? "Setting…" : "Generate & set a new password"}
+                  {sending ? "Setting…" : shareModal.password ? "Set a different password instead" : "Generate & set a new password"}
                 </button>
-                <p className="text-[11px] text-[#94A3B8] leading-snug mt-1.5">
-                  Saved passwords are encrypted one-way, so an existing password can never be read back — not by us either.
-                  Use this to set a fresh one and share that.
-                </p>
               </>
             )}
           </div>
