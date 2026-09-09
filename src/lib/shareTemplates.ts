@@ -7,6 +7,11 @@
 
 const SITE = "https://digitalcarda.in";
 
+/* Emoji here must stay within Unicode 6.0 (2010) and carry no variation
+   selectors. WhatsApp renders with the device's own emoji font, and Windows
+   Segoe UI Emoji / older Android have no glyph for newer code points — they
+   draw a replacement box instead. Anything from 2014 onwards is a gamble. */
+
 /** Everything a new customer needs: greeting, login, card link. */
 export function accountDetailsWhatsApp(o: {
   name?: string | null;
@@ -26,12 +31,12 @@ export function accountDetailsWhatsApp(o: {
     `📧 Email: ${o.loginEmail}`,
     ...(o.password ? [`🔑 Password: ${o.password}`] : []),
     `🔗 Login: ${SITE}/login`,
-    ...(cardUrl ? ["", "*Your card link*", `🪪 ${cardUrl}`] : []),
+    ...(cardUrl ? ["", "*Your card link*", `📇 ${cardUrl}`] : []),
     "",
     ...(o.password ? ["_Please change your password after your first sign-in (Dashboard → Settings)._", ""] : []),
     "Share your card on WhatsApp, email or with your QR code — one link shows everything about your business.",
     "",
-    "Need help setting it up? Just reply to this message 😊",
+    "Need help setting it up? Just reply to this message",
     "",
     "— Team DigitalCarda",
     SITE,
@@ -43,12 +48,12 @@ export function accountDetailsWhatsApp(o: {
 const FEATURES: [string, string][] = [
   ["🎨", "*Brand-new card editor* — everything on one screen with a live preview, and it saves itself"],
   ["✨", "*New premium designs* + a Compact layout for long cards"],
-  ["🖼️", "*Gallery & video layouts* — full-width or grid, stacked or swipe"],
-  ["🛍️", "*Better services* — price, savings badge & buttons, or a compact icon list"],
+  ["📷", "*Gallery & video layouts* — full-width or grid, stacked or swipe"],
+  ["💼", "*Better services* — price, savings badge & buttons, or a compact icon list"],
   ["🌈", "*Your brand colours* picked automatically from your logo, plus custom backgrounds"],
-  ["🤖", "*AI card generator* — paste your website link and we build the card"],
+  ["⚡", "*AI card generator* — paste your website link and we build the card"],
   ["📍", "*Tap-to-navigate address* with your Google Maps link"],
-  ["🎛️", "*You control what shows* — QR, share, views, plan badge & section order"],
+  ["🔧", "*You control what shows* — QR, share, views, plan badge & section order"],
 ];
 
 /** "What's new" announcement for existing customers. */
@@ -62,10 +67,10 @@ export function featureUpdateWhatsApp(o: { name?: string | null; slug?: string |
     ...FEATURES.map(([icon, text]) => `${icon} ${text}`),
     "",
     `👉 Open your dashboard: ${SITE}/dashboard/build`,
-    ...(cardUrl ? [`🪪 Your card (same link & QR): ${cardUrl}`] : []),
+    ...(cardUrl ? [`📇 Your card (same link & QR): ${cardUrl}`] : []),
     "",
     "It's all included in your current plan — nothing extra to pay.",
-    "Reply here if you'd like a quick walkthrough 😊",
+    "Reply here if you'd like a quick walkthrough",
     "",
     "— Team DigitalCarda",
   ];

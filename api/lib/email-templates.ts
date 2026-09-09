@@ -715,7 +715,7 @@ export function resellerApplicationAdminEmail(o: { name?: string; email?: string
     button("Review application", `${SITE}/admin/reseller-applications`);
   return {
     subject: `Reseller application: ${o.name || o.email || "New partner"}`,
-    html: layout({ preheader: `${o.name} wants to become a reseller.`, badge: "Action needed", heading: "New reseller application 🤝", bodyHtml, accent: "#8B5CF6" }),
+    html: layout({ preheader: `${o.name} wants to become a reseller.`, badge: "Action needed", heading: "New reseller application 👋", bodyHtml, accent: "#8B5CF6" }),
     text: `New reseller application.\n\nName: ${o.name}\nEmail: ${o.email}\nPhone: ${o.phone || "—"}\nCompany: ${o.companyName || "—"}\nMessage: ${o.message || "—"}\n\nReview: ${SITE}/admin/reseller-applications`,
   };
 }
@@ -723,12 +723,12 @@ export function resellerApplicationAdminEmail(o: { name?: string; email?: string
 export function resellerApplicationReceivedEmail(o: { name?: string }): Email {
   const bodyHtml =
     hi(o.name) +
-    p("Thanks for applying to become a <strong>DigitalCarda reseller partner</strong>! 🤝") +
+    p("Thanks for applying to become a <strong>DigitalCarda reseller partner</strong>! 👋") +
     p("Our team is reviewing your application. We'll email you as soon as it's approved — usually within 1–2 business days.") +
     p(`<span style="color:${BRAND.sub};font-size:13px">Questions? Just reply to this email.</span>`);
   return {
-    subject: "We received your reseller application 🤝",
-    html: layout({ preheader: "Thanks for applying — we're reviewing your application.", badge: "Application received", heading: "Application received 🤝", bodyHtml, accent: "#8B5CF6" }),
+    subject: "We received your reseller application 👋",
+    html: layout({ preheader: "Thanks for applying — we're reviewing your application.", badge: "Application received", heading: "Application received 👋", bodyHtml, accent: "#8B5CF6" }),
     text: `Hi ${o.name || "there"},\n\nThanks for applying to become a DigitalCarda reseller. We're reviewing your application and will email you once it's approved.`,
   };
 }
