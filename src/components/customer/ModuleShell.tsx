@@ -139,12 +139,14 @@ export function ImagePick({ value, onChange, className = "w-24 h-24", label = "U
 }
 
 export default function ModuleShell({
-  title, subtitle, icon: Icon, children, actions, preview = true,
+  title, subtitle, icon: Icon, children, actions, preview = true, wide = false,
 }: {
   title: string; subtitle?: string; icon: React.ComponentType<{ size?: number; className?: string }>;
   children: ReactNode; actions?: ReactNode;
   /* Set false for pages that render their own preview (the Card Builder). */
   preview?: boolean;
+  /* Use the full-width canvas even without the built-in preview column. */
+  wide?: boolean;
 }) {
   // Mobile "canvas": the card stays pinned above the form while you edit, the
   // way a design tool keeps the artboard in view. Remembered across pages.
@@ -161,7 +163,7 @@ export default function ModuleShell({
       {/* Rendered below MobileDashboardLayout's provider, so it can hoist this
           page's Save action into the native app bar on mobile. */}
       <MobileChromeRegistrar action={actions ?? null} />
-      <div className={`p-4 sm:p-6 mx-auto w-full ${preview ? "max-w-[1360px]" : "max-w-4xl"}`}>
+      <div className={`p-4 sm:p-6 mx-auto w-full ${preview || wide ? "max-w-[1360px]" : "max-w-4xl"}`}>
         {/* Desktop header (hidden on mobile — the app bar shows the title instead) */}
         <header className="hidden md:flex items-center justify-between gap-3 mb-4 sm:mb-5">
           <div className="flex items-center gap-3">
