@@ -58,6 +58,14 @@ export function metaFor(pathname: string, distPath: string): CardMeta | null {
 }
 
 /** Returns OG meta for a card path, or null if the path isn't a known card. */
+/** Short content hash → cache-busting token for the OG image URL. */
+function ogVersion(parts: unknown[]): string {
+  const s = parts.map((p) => String(p ?? "")).join("|");
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36).slice(0, 6);
+}
+
 export function cardMetaFor(pathname: string, distPath: string): CardMeta | null {
   const m = pathname.match(/^\/(?:c\/)?([^/]+)\/?$/);
   if (!m) return null;
@@ -74,7 +82,7 @@ export function cardMetaFor(pathname: string, distPath: string): CardMeta | null
   const logo = String(row.logo || "");
   // Generated per card (name, role, company, logo + a QR of this card's URL)
   // so a shared link previews as that person's card, not a stock photo.
-  const image = `${SITE}/og/${encodeURIComponent(slug)}.png`;
+  const image = `${SITE}/og/${encodeURIComponent(slug)}.png?v=${ogVersion([name, row.company_name, row.designation, logo])}`;
   const url = `${SITE}/${slug}`;
   // Genuine Person structured data — helps rich results / AI answers (§52).
   const jsonLd = JSON.stringify({
