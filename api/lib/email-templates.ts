@@ -294,6 +294,163 @@ export function featureUpdateEmail(o: { name?: string | null; slug?: string | nu
   };
 }
 
+/* ── Sent on the CUSTOMER's behalf ─────────────────────────────────────
+   When a visitor fills the enquiry form on someone's card, the card owner gets
+   a lead notification — but until now the visitor got nothing at all, which
+   makes our customer look unresponsive. This is the reply they never had to
+   write: it carries the BUSINESS's name and details, not ours. */
+export function enquiryAutoReplyEmail(o: {
+  visitorName?: string | null; message?: string | null;
+  business: string; ownerPhone?: string | null; ownerEmail?: string | null;
+  slug?: string | null; whatsapp?: string | null;
+}): Email {
+  const cardUrl = o.slug ? `${SITE}/${o.slug}` : "";
+  const rows: [string, string][] = [];
+  if (o.ownerPhone) rows.push(["Phone", `<a href="tel:${esc(o.ownerPhone)}" style="color:${BRAND.ink};text-decoration:none">${esc(o.ownerPhone)}</a>`]);
+  if (o.ownerEmail) rows.push(["Email", `<a href="mailto:${esc(o.ownerEmail)}" style="color:${BRAND.ink};text-decoration:none">${esc(o.ownerEmail)}</a>`]);
+  if (o.whatsapp) rows.push(["WhatsApp", `<a href="https://wa.me/${esc(String(o.whatsapp).replace(/\D/g, ""))}" style="color:${BRAND.goldDark};text-decoration:none">Message on WhatsApp</a>`]);
+
+  const bodyHtml =
+    hi(o.visitorName) +
+    p(`Thank you for getting in touch with <strong style="color:${BRAND.ink}">${esc(o.business)}</strong>. We've received your enquiry and someone will get back to you shortly.`) +
+    (o.message ? note(`<span style="font-size:11px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:.9px;display:block;margin-bottom:6px">Your message</span>${esc(o.message)}`) : "") +
+    (rows.length ? `<div style="font-family:${FONT};font-size:11px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:1px;margin:26px 0 -6px">Reach us directly</div>` + detailTable(rows) : "") +
+    (cardUrl ? button(`View ${o.business}`, cardUrl) : "");
+
+  return {
+    subject: `We've received your enquiry — ${o.business}`,
+    html: layout({
+      preheader: `Thanks for contacting ${o.business}. We'll be in touch shortly.`,
+      badge: "Enquiry received", heading: "Thanks for reaching out 🙏", bodyHtml,
+      footer: `This confirmation was sent on behalf of ${esc(o.business)}, who use DigitalCarda for their digital business card.`,
+    }),
+    text: [`Hi ${o.visitorName || "there"},`, "", `Thank you for contacting ${o.business}. We've received your enquiry and will get back to you shortly.`,
+      ...(o.message ? ["", `Your message: ${o.message}`] : []),
+      ...(o.ownerPhone ? ["", `Phone: ${o.ownerPhone}`] : []),
+      ...(o.ownerEmail ? [`Email: ${o.ownerEmail}`] : []),
+      ...(cardUrl ? ["", `${o.business}: ${cardUrl}`] : [])].join("\n"),
+  };
+}
+
+/* Their plan changed (usually because an admin upgraded them). Until now this
+   happened silently and the customer only found out by looking. */
+export function planUpgradedEmail(o: { name?: string | null; planName: string; validTill?: string | null; slug?: string | null }): Email {
+  const rows: [string, string][] = [["Your plan", `<strong style="color:${BRAND.ink}">${esc(o.planName)}</strong>`]];
+  if (o.validTill) rows.push(["Valid until", esc(o.validTill)]);
+  const bodyHtml =
+    hi(o.name) +
+    p(`Good news — your DigitalCarda account is now on the <strong style="color:${BRAND.ink}">${esc(o.planName)}</strong> plan. Everything is already active; there's nothing you need to do.`) +
+    detailTable(rows) +
+    p("Your higher limits apply straight away — more products, gallery images, videos, offers and uploads on your card.") +
+    button("Open your dashboard", `${SITE}/dashboard/build`) +
+    (o.slug ? note(`Your card stays at <a href="${SITE}/${esc(o.slug)}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:700">digitalcarda.in/${esc(o.slug)}</a> — same link, same QR code.`) : "");
+  return {
+    subject: `Your plan is now ${o.planName} 🎉`,
+    html: layout({ preheader: `${o.planName} is active on your DigitalCarda account.`, badge: "Plan updated", heading: `You're on ${esc(o.planName)} now 🎉`, bodyHtml }),
+    text: [`Hi ${o.name || "there"},`, "", `Your DigitalCarda account is now on the ${o.planName} plan.`,
+      ...(o.validTill ? [`Valid until: ${o.validTill}`] : []),
+      "", `Dashboard: ${SITE}/dashboard/build`].join("\n"),
+  };
+}
+
+/* The activation moment: their card just went public. Give them the link, the
+   QR, and the two or three things that actually get a card shared. */
+export function cardPublishedEmail(o: { name?: string | null; slug: string; company?: string | null }): Email {
+  const cardUrl = `${SITE}/${o.slug}`;
+  const qr = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(cardUrl)}`;
+  const bodyHtml =
+    hi(o.name) +
+    p(`${o.company ? `<strong style="color:${BRAND.ink}">${esc(o.company)}</strong> is` : "You're"} live 🎉 Your digital business card is published and ready to share with anyone, anywhere.`) +
+    linkPanel("Your card is live at", cardUrl) +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0">
+      <tr><td align="center" style="border:1px solid ${BRAND.line};border-radius:14px;padding:22px">
+        <img src="${qr}" width="180" height="180" alt="QR code for your card" style="display:block;border:0;border-radius:10px">
+        <div style="font-family:${FONT};font-size:12.5px;color:${BRAND.sub};padding-top:12px">Save this QR — print it on your card, shop board or invoice.<br>Every scan opens your card.</div>
+      </td></tr>
+    </table>` +
+    `<div style="font-family:${FONT};font-size:11px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:1px;margin:26px 0 4px">Get your first enquiries</div>` +
+    featureRow(1, "Set it as your WhatsApp link", "Put your card link in your WhatsApp Business profile and status — it's the fastest source of enquiries.") +
+    featureRow(2, "Add it to your email signature", "One line under your name turns every email you send into a shopfront.") +
+    featureRow(3, "Print the QR where customers stand", "Reception, counter, packaging, visiting cards, vehicle — anywhere a phone camera can reach.") +
+    button("Share your card", `${SITE}/dashboard/qr`);
+  return {
+    subject: "🎉 Your digital card is live",
+    html: layout({ preheader: `Your card is live at digitalcarda.in/${o.slug} — here's your QR code.`, badge: "You're live", heading: "Your card is live 🎉", bodyHtml }),
+    text: [`Hi ${o.name || "there"},`, "", `Your digital business card is live: ${cardUrl}`, "",
+      "Get your first enquiries:", "1. Put the link in your WhatsApp Business profile & status",
+      "2. Add it to your email signature", "3. Print the QR where customers stand", "",
+      `Share it: ${SITE}/dashboard/qr`].join("\n"),
+  };
+}
+
+/* Monthly retention digest — the numbers a card owner actually cares about. */
+export function monthlyDigestEmail(o: {
+  name?: string | null; month: string; slug?: string | null;
+  views: number; leads: number; saves?: number; topProduct?: string | null;
+}): Email {
+  const stat = (n: number | string, label: string) => `
+    <td align="center" width="33%" style="padding:18px 8px;background:${BRAND.soft};border-radius:12px">
+      <div style="font-family:${FONT};font-size:28px;font-weight:800;color:${BRAND.ink};line-height:1.1">${esc(String(n))}</div>
+      <div style="font-family:${FONT};font-size:11px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:.9px;padding-top:5px">${esc(label)}</div>
+    </td>`;
+  const bodyHtml =
+    hi(o.name) +
+    p(`Here's how your digital card performed in <strong style="color:${BRAND.ink}">${esc(o.month)}</strong>.`) +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0">
+      <tr>${stat(o.views.toLocaleString("en-IN"), "Card views")}<td width="10"></td>${stat(o.leads.toLocaleString("en-IN"), "Enquiries")}<td width="10"></td>${stat((o.saves ?? 0).toLocaleString("en-IN"), "Contacts saved")}</tr>
+    </table>` +
+    (o.topProduct ? note(`Your most-viewed item was <strong style="color:${BRAND.ink}">${esc(o.topProduct)}</strong> — worth featuring first on your card.`) : "") +
+    (o.leads === 0
+      ? p("No enquiries yet this month? Share your card link on WhatsApp and add your QR where customers can see it — that's where most enquiries start.")
+      : p("Keep it going: add a fresh photo or offer this month so returning visitors see something new.")) +
+    button("Open your dashboard", `${SITE}/dashboard`) +
+    (o.slug ? p(`<span style="font-size:13.5px;color:${BRAND.sub}">Your card: <a href="${SITE}/${esc(o.slug)}" style="color:${BRAND.goldDark};text-decoration:none">digitalcarda.in/${esc(o.slug)}</a></span>`) : "");
+  return {
+    subject: `Your card in ${o.month}: ${o.views.toLocaleString("en-IN")} views, ${o.leads} enquiries`,
+    html: layout({ preheader: `${o.views} views and ${o.leads} enquiries in ${o.month}.`, badge: "Monthly report", heading: `Your ${esc(o.month)} report 📊`, bodyHtml }),
+    text: [`Hi ${o.name || "there"},`, "", `Your card in ${o.month}:`,
+      `- Views: ${o.views}`, `- Enquiries: ${o.leads}`, `- Contacts saved: ${o.saves ?? 0}`,
+      "", `Dashboard: ${SITE}/dashboard`].join("\n"),
+  };
+}
+
+/* Gentle nudge for a card nobody has touched in a while. */
+export function dormantCardEmail(o: { name?: string | null; slug?: string | null; days: number }): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p(`Your digital card hasn't changed in about ${o.days} days — and a card that looks current gets far more enquiries than one that looks abandoned.`) +
+    `<div style="font-family:${FONT};font-size:11px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:1px;margin:24px 0 4px">Three quick wins</div>` +
+    featureRow(1, "Add a recent photo or two", "New work in your gallery is the easiest way to look active.") +
+    featureRow(2, "Put up one offer", "A simple limited-time offer gives visitors a reason to call today.") +
+    featureRow(3, "Check your details are current", "Phone, address and timings — the things people actually came for.") +
+    button("Update your card", `${SITE}/dashboard/build`) +
+    (o.slug ? p(`<span style="font-size:13.5px;color:${BRAND.sub}">It takes two minutes, and your link stays exactly the same: digitalcarda.in/${esc(o.slug)}</span>`) : "");
+  return {
+    subject: "Your card could use a refresh ✨",
+    html: layout({ preheader: "A couple of quick updates keep your card working for you.", badge: "Quick nudge", heading: "Time for a quick refresh ✨", bodyHtml }),
+    text: [`Hi ${o.name || "there"},`, "", `Your card hasn't changed in about ${o.days} days.`, "",
+      "Three quick wins: add recent photos, put up one offer, check your contact details are current.", "",
+      `Update it: ${SITE}/dashboard/build`].join("\n"),
+  };
+}
+
+/* Ask a happy customer for a public review. Sent manually, never on a timer. */
+export function reviewRequestEmail(o: { name?: string | null; reviewUrl?: string | null }): Email {
+  const url = o.reviewUrl || "https://g.page/r/digitalcarda/review";
+  const bodyHtml =
+    hi(o.name) +
+    p("We hope your digital card is bringing you enquiries. If it's been useful, would you take a minute to leave us a review?") +
+    p(`<span style="font-size:13.5px;color:${BRAND.sub}">Reviews from real business owners are how other small businesses decide whether to trust us — it genuinely helps.</span>`) +
+    button("Write a review", url) +
+    note("Not happy with something? Reply to this email instead and we'll put it right — we'd much rather fix it than read about it later.");
+  return {
+    subject: "Would you review DigitalCarda?",
+    html: layout({ preheader: "If your card has been useful, a quick review would mean a lot.", badge: "A small favour", heading: "Would you share your experience? ⭐", bodyHtml }),
+    text: [`Hi ${o.name || "there"},`, "", "If DigitalCarda has been useful, would you leave us a quick review?", "", url, "",
+      "Not happy with something? Reply to this email and we'll put it right."].join("\n"),
+  };
+}
+
 export function leadNotificationEmail(o: { name: string; email?: string | null; contact?: string | null; message?: string | null; slug?: string | null; cardName?: string | null }): Email {
   const label = o.cardName || o.slug || "your card";
   const bodyHtml =

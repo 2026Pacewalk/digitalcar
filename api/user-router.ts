@@ -6,7 +6,7 @@ import { getDb } from "./queries/connection";
 import { users, resellerProfiles, cards, subscriptions, publishedCards, cardTrials } from "@db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { sendEmail } from "./lib/mail";
-import { accountDetailsEmail, featureUpdateEmail } from "./lib/email-templates";
+import { accountDetailsEmail, featureUpdateEmail, planUpgradedEmail } from "./lib/email-templates";
 
 export const userRouter = createRouter({
   list: adminQuery
@@ -205,6 +205,15 @@ export const userRouter = createRouter({
         if (!isTrial) await db.update(cardTrials).set({ status: "converted" }).where(eq(cardTrials.userId, user.id));
       } catch { /* ignore */ }
 
+      // Let the customer know — this used to change silently.
+      try {
+        const u = await db.query.users.findFirst({ where: eq(users.id, user.id), columns: { fullName: true, email: true } });
+        const planName = input.packageId === 6 ? "Platinum" : input.packageId === 5 ? "Gold" : "Trial";
+        if (u?.email && !isTrial) {
+          await sendEmail(u.email, planUpgradedEmail({ name: u.fullName, planName, validTill: expiredOn, slug: null }));
+        }
+      } catch { /* the plan change already succeeded — never fail it on email */ }
+
       return { ok: true as const, packageId: input.packageId, expiredOn };
     }),
 
@@ -248,6 +257,26 @@ export const userRouter = createRouter({
       const pub = await db.select({ slug: publishedCards.slug }).from(publishedCards).where(eq(publishedCards.userId, user.id)).limit(1);
       const res = await sendEmail(user.email, featureUpdateEmail({ name: user.fullName, slug: pub[0]?.slug || null }));
       return { ok: res.ok, error: res.error, sentTo: user.email };
+    }),
+
+  /* ─── Super-admin: set a customer's password ───
+     Stored passwords are bcrypt hashes and cannot be read back — by design, so
+     a database leak never exposes anyone's password. To share working
+     credentials the admin therefore SETS a new one, and we return the plain
+     value exactly once, in this response, so it can be passed to the customer.
+     It is never stored in plain text and never logged.
+     The admin UI previously only changed the row in React state, so password
+     changes silently did nothing. */
+  setPassword: adminQuery
+    .input(z.object({ email: z.string().email(), password: z.string().min(6).max(200) }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase().trim();
+      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } });
+      if (!user) return { ok: false as const, reason: "no_account" as const };
+      const hashed = await bcrypt.hash(input.password, 12);
+      await db.update(users).set({ password: hashed }).where(eq(users.id, user.id));
+      return { ok: true as const, password: input.password };
     }),
 
   extendValidity: adminQuery

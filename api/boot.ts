@@ -116,8 +116,40 @@ app.post("/api/enquiry", async (c) => {
       console.error("[enquiry] DB store skipped:", (e as Error).message);
     }
 
-    const { sendLeadNotification } = await import("./lib/mail");
+    const { sendLeadNotification, sendEmail } = await import("./lib/mail");
     await sendLeadNotification({ name, email: body.email, contact: body.contact, message: body.description, slug });
+
+    /* Reply to the VISITOR on the card owner's behalf. Until now only the owner
+       was emailed, so whoever filled the form heard nothing back and our
+       customer looked unresponsive. Best-effort: a failure here must never fail
+       the enquiry, which is already stored. */
+    try {
+      const visitorEmail = String(body.email || "").trim();
+      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(visitorEmail)) {
+        const { getDb } = await import("./queries/connection");
+        const { publishedCards } = await import("@db/schema");
+        const { eq } = await import("drizzle-orm");
+        const rows = await getDb().select({ data: publishedCards.data })
+          .from(publishedCards).where(eq(publishedCards.slug, slug)).limit(1);
+        const cust = ((rows[0]?.data as { customer?: Record<string, unknown> })?.customer) || {};
+        const business = String(cust.company_name || cust.name || "").trim();
+        if (business) {
+          const { enquiryAutoReplyEmail } = await import("./lib/email-templates");
+          await sendEmail(visitorEmail, enquiryAutoReplyEmail({
+            visitorName: name,
+            message: body.description || null,
+            business,
+            ownerPhone: (cust.mobile1 as string) || null,
+            ownerEmail: (cust.email as string) || null,
+            whatsapp: (cust.mobile2 as string) || (cust.mobile1 as string) || null,
+            slug,
+          }), (cust.email as string) || null);
+        }
+      }
+    } catch (e) {
+      console.error("[enquiry] auto-reply skipped:", (e as Error).message);
+    }
+
     return c.json({ ok: true });
   } catch (e) {
     console.error("[enquiry] error:", (e as Error).message);

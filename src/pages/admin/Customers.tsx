@@ -213,6 +213,7 @@ export default function AdminCustomers() {
   const impersonate = trpc.auth.impersonate.useMutation();
   const extendMut = trpc.user.extendValidity.useMutation();
   const pkgMut = trpc.user.setPackage.useMutation();
+  const setPwdMut = trpc.user.setPassword.useMutation();
   const sendDetailsMut = trpc.user.sendAccountDetails.useMutation();
   const sendUpdateMut = trpc.user.sendFeatureUpdate.useMutation();
   // "Share with customer": one place to send their login + card link, or the
@@ -284,12 +285,44 @@ export default function AdminCustomers() {
     toast.success(`Logged in as ${c.name}`);
     navigate("/dashboard");
   };
-  const savePassword = () => {
+  /* Readable but strong: no look-alike characters, easy to read out on a call. */
+  const makePassword = () => {
+    const words = ["Bright", "Swift", "Solid", "Prime", "Clear", "Sharp", "Bold", "Fresh"];
+    const w = words[Math.floor(Math.random() * words.length)];
+    const n = String(Math.floor(1000 + Math.random() * 8999));
+    return `${w}@${n}`;
+  };
+
+  const savePassword = async () => {
     if (!pwdModal) return;
+    const c = pwdModal;
     if (pwdValue.length < 6) { toast.error("Password must be at least 6 characters"); return; }
-    setRows((r) => r.map((c) => (c.id === pwdModal.id ? { ...c, password: pwdValue } : c)));
-    toast.success(`Password updated for ${pwdModal.name}`);
-    setPwdModal(null);
+    try {
+      const res = await setPwdMut.mutateAsync({ email: c.email, password: pwdValue });
+      if (res.ok) {
+        setRows((r) => r.map((x) => (x.id === c.id ? { ...x, password: pwdValue } : x)));
+        toast.success(`Password updated for ${c.name}`);
+        setPwdModal(null);
+      } else toast.error(`No live account matched ${c.email} — password not changed.`);
+    } catch { toast.error("Could not update the password."); }
+  };
+
+  /* Stored passwords are bcrypt hashes, so an existing one can never be read
+     back to share. Setting a fresh one is the only way to hand over working
+     credentials — do it and drop the new value straight into the message. */
+  const generateAndSetPassword = async () => {
+    const c = shareModal; if (!c) return;
+    const pwd = makePassword();
+    setSending(true);
+    try {
+      const res = await setPwdMut.mutateAsync({ email: c.email, password: pwd });
+      if (res.ok) {
+        setSharePwd(pwd); setShareIncludePwd(true);
+        setRows((r) => r.map((x) => (x.id === c.id ? { ...x, password: pwd } : x)));
+        toast.success("New password set — it's in the message below.");
+      } else toast.error(`No live account matched ${c.email}.`);
+    } catch { toast.error("Could not set a new password."); }
+    finally { setSending(false); }
   };
   const savePackage = async () => {
     if (!pkgModal) return;
@@ -705,8 +738,18 @@ export default function AdminCustomers() {
               </span>
             </label>
             {shareIncludePwd && (
-              <input value={sharePwd} onChange={(e) => setSharePwd(e.target.value)} placeholder="Password to share"
-                className="h-10 w-full mt-2.5 rounded-xl bg-white border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]" />
+              <>
+                <input value={sharePwd} onChange={(e) => setSharePwd(e.target.value)} placeholder="Password to share"
+                  className="h-10 w-full mt-2.5 rounded-xl bg-white border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]" />
+                <button type="button" onClick={generateAndSetPassword} disabled={sending}
+                  className="mt-2 h-9 w-full rounded-xl border border-[#F7B31C] bg-[#FEF3C7]/60 text-[12.5px] font-bold text-[#92400E] hover:bg-[#FEF3C7] disabled:opacity-60">
+                  {sending ? "Setting…" : "Generate & set a new password"}
+                </button>
+                <p className="text-[11px] text-[#94A3B8] leading-snug mt-1.5">
+                  Saved passwords are encrypted one-way, so an existing password can never be read back — not by us either.
+                  Use this to set a fresh one and share that.
+                </p>
+              </>
             )}
           </div>
         )}
