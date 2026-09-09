@@ -6,13 +6,14 @@ import {
   Search, Plus, Eye, Lock, LogIn, Database, ChevronLeft, ChevronRight,
   X, ExternalLink, Users, UserCheck, Clock, Building2, KeyRound, Globe,
   CalendarPlus, Trash2, AlertTriangle, Mail, Phone, MoreVertical,
-  LayoutGrid, List, Download, ArrowUpDown, Activity, Layers,
+  LayoutGrid, List, Download, ArrowUpDown, Activity, Layers, Send, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { fetchAdminData, hideAdminRecords } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
+import { accountDetailsWhatsApp, featureUpdateWhatsApp, whatsappLink } from "@/lib/shareTemplates";
 import { scopedKey } from "@/hooks/useCustomer";
 import { setSession } from "@/lib/session";
 
@@ -212,6 +213,36 @@ export default function AdminCustomers() {
   const impersonate = trpc.auth.impersonate.useMutation();
   const extendMut = trpc.user.extendValidity.useMutation();
   const pkgMut = trpc.user.setPackage.useMutation();
+  const sendDetailsMut = trpc.user.sendAccountDetails.useMutation();
+  const sendUpdateMut = trpc.user.sendFeatureUpdate.useMutation();
+  // "Share with customer": one place to send their login + card link, or the
+  // what's-new announcement, by email or WhatsApp.
+  const [shareModal, setShareModal] = useState<Customer | null>(null);
+  const [shareKind, setShareKind] = useState<"welcome" | "update">("welcome");
+  const [sharePwd, setSharePwd] = useState("");
+  const [shareIncludePwd, setShareIncludePwd] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const shareMessage = (c: Customer | null) =>
+    !c ? "" : shareKind === "update"
+      ? featureUpdateWhatsApp({ name: c.name, slug: c.slug })
+      : accountDetailsWhatsApp({
+          name: c.name, loginEmail: c.email, slug: c.slug,
+          password: shareIncludePwd && sharePwd ? sharePwd : null,
+        });
+
+  const sendShareEmail = async () => {
+    const c = shareModal; if (!c) return;
+    setSending(true);
+    try {
+      const res = shareKind === "update"
+        ? await sendUpdateMut.mutateAsync({ email: c.email })
+        : await sendDetailsMut.mutateAsync({ email: c.email, password: sharePwd || undefined, includePassword: shareIncludePwd });
+      if (res.ok) { toast.success(`Email sent to ${res.sentTo || c.email}`); setShareModal(null); }
+      else toast.error(res.reason === "no_account" ? `No live account matched ${c.email}` : (res.error || "Could not send the email."));
+    } catch { toast.error("Could not send the email."); }
+    finally { setSending(false); }
+  };
   const deactivateMut = trpc.user.deactivateCustomer.useMutation();
   const setLimitMut = trpc.user.setCardLimit.useMutation();
   const deleteAppUserMut = trpc.admin.deleteAppUser.useMutation();
@@ -370,6 +401,7 @@ export default function AdminCustomers() {
     { icon: <Eye size={15} className="text-[#B45309]" />, label: "View Card", onClick: () => setCardModal(c) },
     { icon: <CalendarPlus size={15} className="text-[#15803D]" />, label: "Extend Validity", onClick: () => { setExpModal(c); setExpDays(30); } },
     { icon: <Lock size={15} className="text-[#7C3AED]" />, label: "Change Password", onClick: () => { setPwdModal(c); setPwdValue(c.password || ""); } },
+    { icon: <Send size={15} className="text-[#0EA5E9]" />, label: "Share with Customer", onClick: () => { setShareModal(c); setShareKind("welcome"); setSharePwd(c.password || ""); setShareIncludePwd(false); } },
     { icon: <Database size={15} className="text-[#2563EB]" />, label: "Change Package", onClick: () => { setPkgModal(c); setPkgValue(packageName(c.package_id)); } },
     { icon: <Layers size={15} className="text-[#7C3AED]" />, label: "Card Limit", onClick: () => { setLimitModal(c); setLimitValue(3); } },
     { icon: <Trash2 size={15} className="text-[#DC2626]" />, label: "Delete Customer", onClick: () => setDelModal(c), danger: true },
@@ -650,6 +682,52 @@ export default function AdminCustomers() {
           <button onClick={() => setPwdModal(null)} className="flex-1 h-11 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]">Cancel</button>
           <button onClick={savePassword} className="flex-1 h-11 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold hover:shadow-gold">Update</button>
         </div>
+      </Modal>}
+
+      {/* Share with Customer — login details or the what's-new announcement */}
+      {shareModal && <Modal onClose={() => setShareModal(null)} icon={<Send size={20} className="text-[#0EA5E9]" />} iconBg="bg-[#E0F2FE]" title="Share with Customer" subtitle={`${shareModal.name} · ${shareModal.email}`}>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {([["welcome", "Login & card link"], ["update", "What's new"]] as const).map(([k, label]) => (
+            <button key={k} type="button" onClick={() => setShareKind(k)}
+              className={`h-10 rounded-xl text-[13px] font-semibold border-2 transition-all ${shareKind === k ? "border-[#F7B31C] bg-[#FEF3C7]/50 text-[#92400E]" : "border-[#E2E8F0] text-[#334155] hover:border-[#F7B31C]/50"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {shareKind === "welcome" && (
+          <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 mb-3">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input type="checkbox" checked={shareIncludePwd} onChange={(e) => setShareIncludePwd(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#F7B31C]" />
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold text-[#0F172A]">Include the password in the message</span>
+                <span className="block text-[11px] text-[#64748B] leading-snug">Off by default. Sending a password over email or WhatsApp is not secure — prefer telling them to use “Forgot password”. The message always asks them to change it after signing in.</span>
+              </span>
+            </label>
+            {shareIncludePwd && (
+              <input value={sharePwd} onChange={(e) => setSharePwd(e.target.value)} placeholder="Password to share"
+                className="h-10 w-full mt-2.5 rounded-xl bg-white border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]" />
+            )}
+          </div>
+        )}
+
+        <label className="block text-xs font-semibold text-[#334155] mb-1.5">Message preview</label>
+        <textarea readOnly value={shareMessage(shareModal)} rows={9}
+          className="w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3 text-[12px] leading-relaxed text-[#334155] outline-none font-mono" />
+
+        <div className="grid grid-cols-3 gap-2 mt-4">
+          <button onClick={() => { navigator.clipboard.writeText(shareMessage(shareModal)).then(() => toast.success("Message copied")).catch(() => toast.error("Copy failed")); }}
+            className="h-11 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] flex items-center justify-center gap-1.5"><Copy size={15} /> Copy</button>
+          <a href={shareModal.mobile1 ? whatsappLink(shareModal.mobile1, shareMessage(shareModal)) : undefined}
+            target="_blank" rel="noopener noreferrer"
+            onClick={(e) => { if (!shareModal.mobile1) { e.preventDefault(); toast.error("This customer has no mobile number saved."); } }}
+            className="h-11 rounded-xl bg-[#25D366] text-white text-sm font-bold flex items-center justify-center gap-1.5 hover:brightness-105">WhatsApp</a>
+          <button onClick={sendShareEmail} disabled={sending}
+            className="h-11 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold hover:shadow-gold flex items-center justify-center gap-1.5 disabled:opacity-60">
+            {sending ? "Sending…" : <><Mail size={15} /> Email</>}
+          </button>
+        </div>
+        <p className="text-[11px] text-[#94A3B8] mt-2.5 text-center">Email is sent from DigitalCarda with full branding. WhatsApp opens with the message ready to send.</p>
       </Modal>}
 
       {/* Change Package modal */}

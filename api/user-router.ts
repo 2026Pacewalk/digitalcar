@@ -5,6 +5,8 @@ import { createRouter, adminQuery, authedQuery, resellerQuery } from "./middlewa
 import { getDb } from "./queries/connection";
 import { users, resellerProfiles, cards, subscriptions, publishedCards, cardTrials } from "@db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
+import { sendEmail } from "./lib/mail";
+import { accountDetailsEmail, featureUpdateEmail } from "./lib/email-templates";
 
 export const userRouter = createRouter({
   list: adminQuery
@@ -204,6 +206,48 @@ export const userRouter = createRouter({
       } catch { /* ignore */ }
 
       return { ok: true as const, packageId: input.packageId, expiredOn };
+    }),
+
+  /* ─── Super-admin: email a customer their login + card link ───
+     The password is optional and is NEVER stored or logged here — it is passed
+     straight through to the message the admin chose to send, exactly as they
+     typed it. Sending credentials is the admin's call; we always include the
+     "change it after signing in" line in the template. */
+  sendAccountDetails: adminQuery
+    .input(z.object({
+      email: z.string().email(),
+      password: z.string().max(200).optional(),
+      includePassword: z.boolean().default(false),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase().trim();
+      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true, fullName: true, email: true } });
+      if (!user) return { ok: false as const, reason: "no_account" as const };
+      const pub = await db.select({ slug: publishedCards.slug, data: publishedCards.data })
+        .from(publishedCards).where(eq(publishedCards.userId, user.id)).limit(1);
+      const cust = ((pub[0]?.data as { customer?: Record<string, unknown> })?.customer) || {};
+      const res = await sendEmail(user.email, accountDetailsEmail({
+        name: user.fullName,
+        loginEmail: user.email,
+        password: input.includePassword ? (input.password || null) : null,
+        slug: pub[0]?.slug || null,
+        company: (cust.company_name as string) || null,
+      }));
+      return { ok: res.ok, error: res.error, sentTo: user.email };
+    }),
+
+  /* ─── Super-admin: "what's new" announcement to an existing customer ─── */
+  sendFeatureUpdate: adminQuery
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase().trim();
+      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true, fullName: true, email: true } });
+      if (!user) return { ok: false as const, reason: "no_account" as const };
+      const pub = await db.select({ slug: publishedCards.slug }).from(publishedCards).where(eq(publishedCards.userId, user.id)).limit(1);
+      const res = await sendEmail(user.email, featureUpdateEmail({ name: user.fullName, slug: pub[0]?.slug || null }));
+      return { ok: res.ok, error: res.error, sentTo: user.email };
     }),
 
   extendValidity: adminQuery

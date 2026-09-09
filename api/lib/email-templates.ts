@@ -111,6 +111,114 @@ export function welcomeEmail(o: { name?: string; role?: string }): Email {
   };
 }
 
+/* Super-admin hand-off: everything a new customer needs to get started —
+   their login, their card link, and a warm welcome. The password is OPTIONAL:
+   pass it only when the admin has just set one, and we always tell the customer
+   to change it after signing in. */
+export function accountDetailsEmail(o: {
+  name?: string | null; loginEmail: string; password?: string | null;
+  slug?: string | null; company?: string | null;
+}): Email {
+  const cardUrl = o.slug ? `${SITE}/${o.slug}` : "";
+  const who = o.company || o.name || "your business";
+  const heading = "Your digital card is ready 🎉";
+
+  const rows: [string, string][] = [
+    ["Login email", `<a href="mailto:${esc(o.loginEmail)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.loginEmail)}</a>`],
+  ];
+  if (o.password) rows.push(["Password", `<span style="font-family:'Courier New',monospace;font-size:15px;font-weight:bold;letter-spacing:.5px">${esc(o.password)}</span>`]);
+  rows.push(["Dashboard", `<a href="${SITE}/login" style="color:${BRAND.goldDark};text-decoration:none">${SITE.replace(/^https:\/\//, "")}/login</a>`]);
+  if (cardUrl) rows.push(["Your card link", `<a href="${esc(cardUrl)}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:bold">${esc(cardUrl.replace(/^https:\/\//, ""))}</a>`]);
+
+  const bodyHtml =
+    hi(o.name) +
+    p(`Welcome to <strong>DigitalCarda</strong> — we're delighted to have ${esc(who)} on board. Your digital business card is live and ready to share.`) +
+    detailTable(rows) +
+    (o.password
+      ? p(`<span style="color:${BRAND.sub};font-size:13px">For your security, please sign in and change this password from <strong>Dashboard → Settings</strong>.</span>`)
+      : "") +
+    button("Sign in to your dashboard", `${SITE}/login`) +
+    (cardUrl ? p(`<span style="font-size:13px;color:${BRAND.sub}">Share your card anywhere — WhatsApp, email, or your QR code. Every scan opens <a href="${esc(cardUrl)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(cardUrl.replace(/^https:\/\//, ""))}</a>.</span>`) : "") +
+    p(`<span style="font-size:13px;color:${BRAND.sub}">Need a hand getting set up? Just reply to this email — we're happy to help.</span>`);
+
+  const textLines = [
+    `Hi ${o.name || "there"},`, "",
+    `Welcome to DigitalCarda! Your digital business card is live and ready to share.`, "",
+    `Login email: ${o.loginEmail}`,
+    ...(o.password ? [`Password: ${o.password}`, "(Please change it after your first sign-in.)"] : []),
+    `Dashboard: ${SITE}/login`,
+    ...(cardUrl ? [`Your card: ${cardUrl}`] : []),
+    "", "Need help getting set up? Just reply to this email.", "", "— Team DigitalCarda",
+  ];
+
+  return {
+    subject: `Your DigitalCarda account & card link`,
+    html: layout({ preheader: "Your login details and your live card link — everything to get started.", badge: "Welcome aboard", heading, bodyHtml }),
+    text: textLines.join("\n"),
+  };
+}
+
+/* "What's new" announcement for existing customers. Keep FEATURE_HIGHLIGHTS as
+   the single source of truth — the WhatsApp version (src/lib/shareTemplates.ts)
+   mirrors the same list, so the two never drift apart. */
+export const FEATURE_HIGHLIGHTS: { icon: string; title: string; body: string }[] = [
+  { icon: "🎨", title: "A brand-new card editor",
+    body: "Everything in one screen — your details, look &amp; feel, and what's on your card — with a live preview that updates as you type. Nothing to save; it saves itself." },
+  { icon: "✨", title: "New premium designs",
+    body: "Fresh single-screen card designs, plus a Compact layout that collapses long cards into neat tap-to-open sections." },
+  { icon: "🖼️", title: "Gallery &amp; video layouts",
+    body: "Show your photo gallery full-width or as a tidy 3-across grid, and your videos stacked or as a swipe carousel." },
+  { icon: "🛍️", title: "Better products &amp; services",
+    body: "Redesigned service cards with price, savings badge and a clear button — or switch to a compact icon list with one tap." },
+  { icon: "🌈", title: "Your brand colours, automatically",
+    body: "Upload your logo and we pick your brand colours from it, then preview every template in them. Custom card backgrounds too." },
+  { icon: "🤖", title: "AI card generator",
+    body: "Paste your website link and we build your card for you — content, services, contact details and branding." },
+  { icon: "📍", title: "Tap-to-navigate address",
+    body: "Add your Google Maps link and visitors can tap your address to get directions straight away." },
+  { icon: "🎛️", title: "You control what shows",
+    body: "Show or hide your QR code, share button, view count and plan badge — and drag your card sections into any order." },
+];
+
+export function featureUpdateEmail(o: { name?: string | null; slug?: string | null }): Email {
+  const cardUrl = o.slug ? `${SITE}/${o.slug}` : "";
+  const heading = "What's new on DigitalCarda ✨";
+
+  const list = FEATURE_HIGHLIGHTS.map((f) => `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px">
+      <tr>
+        <td width="34" valign="top" style="font-size:20px;line-height:1.2;padding-top:2px">${f.icon}</td>
+        <td style="font-family:Arial,Helvetica,sans-serif">
+          <div style="font-size:15px;font-weight:bold;color:${BRAND.ink};margin-bottom:3px">${f.title}</div>
+          <div style="font-size:13.5px;line-height:1.6;color:${BRAND.sub}">${f.body}</div>
+        </td>
+      </tr>
+    </table>`).join("");
+
+  const bodyHtml =
+    hi(o.name) +
+    p("We've been busy. Your digital card just got a lot more powerful — and a lot easier to edit. Here's what's new:") +
+    list +
+    button("Open your dashboard", `${SITE}/dashboard/build`) +
+    (cardUrl ? p(`<span style="font-size:13px;color:${BRAND.sub}">Your card is still at <a href="${esc(cardUrl)}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:bold">${esc(cardUrl.replace(/^https:\/\//, ""))}</a> — same link, same QR code. Nothing you've shared stops working.</span>`) : "") +
+    p(`<span style="font-size:13px;color:${BRAND.sub}">All of this is already included in your plan. Reply to this email if you'd like a quick walkthrough.</span>`);
+
+  const textLines = [
+    `Hi ${o.name || "there"},`, "",
+    "Your DigitalCarda card just got a big update. What's new:", "",
+    ...FEATURE_HIGHLIGHTS.map((f) => `• ${f.title.replace(/&amp;/g, "&")} — ${f.body.replace(/&amp;/g, "&")}`),
+    "", `Open your dashboard: ${SITE}/dashboard/build`,
+    ...(cardUrl ? [`Your card (unchanged): ${cardUrl}`] : []),
+    "", "All included in your plan. Reply if you'd like a walkthrough.", "", "— Team DigitalCarda",
+  ];
+
+  return {
+    subject: "New on your DigitalCarda card ✨ (all included in your plan)",
+    html: layout({ preheader: "A brand-new editor, live preview, new designs and more — already in your account.", badge: "Product update", heading, bodyHtml }),
+    text: textLines.join("\n"),
+  };
+}
+
 export function leadNotificationEmail(o: { name: string; email?: string | null; contact?: string | null; message?: string | null; slug?: string | null; cardName?: string | null }): Email {
   const label = o.cardName || o.slug || "your card";
   const bodyHtml =
