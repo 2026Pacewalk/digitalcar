@@ -72,9 +72,7 @@ export function cardMetaFor(pathname: string, distPath: string): CardMeta | null
     ? `${row.designation}${row.company_name ? " at " + row.company_name : ""}`
     : String(row.about_us || "").replace(/<[^>]*>/g, "").slice(0, 150)) || "View my digital business card.";
   const logo = String(row.logo || "");
-  // Generated per card (name, role, company, logo + a QR of this card's URL)
-  // so a shared link previews as that person's card, not a stock photo.
-  const image = `${SITE}/og/${encodeURIComponent(slug)}.png`;
+  const image = logo ? (/^https?:/.test(logo) ? logo : `${IMG_BASE}/home/${encodeURIComponent(logo)}`) : `${SITE}/why-businessman.png`;
   const url = `${SITE}/${slug}`;
   // Genuine Person structured data — helps rich results / AI answers (§52).
   const jsonLd = JSON.stringify({
@@ -83,8 +81,7 @@ export function cardMetaFor(pathname: string, distPath: string): CardMeta | null
     ...(row.company_name ? { worksFor: { "@type": "Organization", name: String(row.company_name) } } : {}),
     ...(logo ? { image } : {}),
   });
-  return { title, description, image, url, jsonLd, ogType: "profile", h1: name, locale: "en_IN",
-    imageW: 1200, imageH: 630, imageType: "image/png", imageAlt: `${name}'s digital business card` };
+  return { title, description, image, url, jsonLd, ogType: "profile", h1: name, locale: "en_IN" };
 }
 
 /** Inject the meta (+ optional JSON-LD) into an index.html string. */
