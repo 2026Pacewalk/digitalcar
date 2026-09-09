@@ -317,6 +317,23 @@ export function useCustomer() {
     try { localStorage.setItem(key, JSON.stringify(seed)); } catch { /* ignore */ }
   }, []);
 
+  /* Every screen that edits the card holds its OWN useCustomer instance, each
+     with its own copy of the record. Without this, an edit made in one place
+     (say the Social editor embedded in the card builder) is invisible to the
+     other (the builder's live preview), so the card appeared not to update.
+     Re-read the shared record whenever any instance signals a change. */
+  useEffect(() => {
+    const resync = () => {
+      try {
+        const raw = localStorage.getItem(scopedKey("dc_customer"));
+        if (!raw) return;
+        setData(healCustomerImgs({ ...BLANK_CUSTOMER, ...JSON.parse(raw) } as CustomerRecord));
+      } catch { /* keep what we have */ }
+    };
+    window.addEventListener("dc:content-changed", resync);
+    return () => window.removeEventListener("dc:content-changed", resync);
+  }, []);
+
   const update = useCallback((patch: Partial<CustomerRecord>) => {
     setData((prev) => {
       const next = { ...prev, ...patch };
@@ -369,6 +386,20 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
     setReady(true);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  /* Mirror of the useCustomer resync above: keep every list instance (and so
+     the live preview) in step when another screen adds or edits an item. */
+  useEffect(() => {
+    const resync = () => {
+      try {
+        const raw = localStorage.getItem(key);
+        const parsed = raw ? (JSON.parse(raw) as T[]) : null;
+        if (Array.isArray(parsed)) setItems(healItemImgs(parsed));
+      } catch { /* keep what we have */ }
+    };
+    window.addEventListener("dc:content-changed", resync);
+    return () => window.removeEventListener("dc:content-changed", resync);
   }, [key]);
 
   const persist = useCallback((next: T[]) => {
