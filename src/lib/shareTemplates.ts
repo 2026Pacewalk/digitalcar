@@ -10,7 +10,11 @@
       tappable link when it can cleanly find the start of it — a label, colon or
       symbol in front of it on the same line can leave it as plain text.
 
-   2. No emoji. WhatsApp renders them with the DEVICE's own font, and some
+   2. The CARD link comes FIRST. WhatsApp builds the link preview from the first
+      URL it finds, so leading with the login link made every share preview the
+      generic site instead of the customer's own branded card.
+
+   3. No emoji. WhatsApp renders them with the DEVICE's own font, and some
       Windows / WhatsApp Web setups draw a replacement box for every one of
       them — even 2010-era emoji. WhatsApp's own *bold* and _italic_ plus line
       spacing carry the structure with nothing that can fail to render. */
@@ -32,13 +36,13 @@ export function accountDetailsWhatsApp(o: {
     "Welcome to *DigitalCarda* — your digital business card is ready.",
     ...(o.company ? [`We're glad to have *${o.company}* on board.`] : []),
     "",
+    ...(cardUrl ? ["*YOUR CARD LINK*", cardUrl, ""] : []),
     "*YOUR LOGIN*",
     `Email: ${o.loginEmail}`,
     ...(o.password ? [`Password: ${o.password}`] : []),
     "",
     "Sign in here:",
     `${SITE}/login`,
-    ...(cardUrl ? ["", "*YOUR CARD LINK*", cardUrl] : []),
     "",
     ...(o.password ? ["_Please change your password after your first sign-in (Dashboard → Settings)._", ""] : []),
     "Share your card on WhatsApp, by email, or with your QR code — one link shows everything about your business.",
@@ -46,7 +50,6 @@ export function accountDetailsWhatsApp(o: {
     "Need help setting it up? Just reply to this message.",
     "",
     "— Team DigitalCarda",
-    SITE,
   ];
   return lines.join("\n");
 }
@@ -73,9 +76,9 @@ export function featureUpdateWhatsApp(o: { name?: string | null; slug?: string |
     "",
     ...FEATURES.map((t) => `• ${t}`),
     "",
+    ...(cardUrl ? ["Your card (same link and QR):", cardUrl, ""] : []),
     "Open your dashboard:",
     `${SITE}/dashboard/build`,
-    ...(cardUrl ? ["", "Your card (same link and QR):", cardUrl] : []),
     "",
     "It's all included in your current plan — nothing extra to pay.",
     "Reply here if you'd like a quick walkthrough.",
