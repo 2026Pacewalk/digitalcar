@@ -7,12 +7,17 @@
 const SITE = "https://digitalcarda.in";
 const BRAND = {
   gold: "#F7B31C",
-  goldDark: "#D97706",
+  goldDark: "#B45309",
+  goldTint: "#FFF8EA",   // warm band behind the hero
+  goldLine: "#F6DFA8",
   navy: "#14243E",
+  navyDeep: "#0B1729",
   ink: "#0F172A",
-  sub: "#64748B",
+  body: "#3F4C5F",
+  sub: "#7A8798",
   line: "#E8EDF3",
-  soft: "#F6F8FB",
+  soft: "#F4F7FB",
+  page: "#EDF1F7",       // outside the card
 };
 
 export interface Email {
@@ -26,65 +31,142 @@ const esc = (s: unknown) =>
 
 export const inr = (n: unknown) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
-/* ── Shared building blocks ──────────────────────────────────────────── */
+/* ── Shared building blocks ──────────────────────────────────────────────
+   Email HTML is 1998 technology: tables, inline styles, no flex/grid, no web
+   fonts we can rely on. So the design carries itself on colour blocking,
+   spacing, and type hierarchy rather than effects that half the clients drop. */
 
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,Helvetica,sans-serif";
+
+/** Primary call to action. Solid gold with a darker keyline so it still reads
+    as a button in clients that ignore border-radius. */
 function button(label: string, href: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 6px"><tr><td align="center" bgcolor="${BRAND.gold}" style="border-radius:12px">
-    <a href="${esc(href)}" target="_blank" style="display:inline-block;padding:13px 30px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;color:${BRAND.ink};text-decoration:none;border-radius:12px">${esc(label)}</a>
-  </td></tr></table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 8px"><tr>
+    <td align="center" bgcolor="${BRAND.gold}" style="border-radius:12px;border-bottom:3px solid ${BRAND.goldDark}">
+      <a href="${esc(href)}" target="_blank" style="display:inline-block;padding:14px 34px;font-family:${FONT};font-size:15px;font-weight:700;color:#1A1206;text-decoration:none;letter-spacing:.2px">${esc(label)}</a>
+    </td></tr></table>`;
 }
 
+/** Key/value card with a gold rail — labels above values so long values
+    (URLs, emails, passwords) get the full width instead of being squeezed. */
 function detailTable(rows: [string, string][], opts: { accentLast?: boolean } = {}): string {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border:1px solid ${BRAND.line};border-radius:12px;overflow:hidden">
-    ${rows.map(([k, v], i) => {
-      const last = opts.accentLast && i === rows.length - 1;
-      return `<tr>
-        <td style="padding:11px 16px;background:${BRAND.soft};font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:${BRAND.sub};width:42%;border-bottom:1px solid ${BRAND.line}">${esc(k)}</td>
-        <td style="padding:11px 16px;font-family:Arial,Helvetica,sans-serif;font-size:${last ? "16px" : "14px"};font-weight:${last ? "bold" : "normal"};color:${last ? BRAND.goldDark : BRAND.ink};border-bottom:1px solid ${BRAND.line}">${v}</td>
-      </tr>`;
-    }).join("")}
+  void opts;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;border:1px solid ${BRAND.line};border-left:4px solid ${BRAND.gold};border-radius:12px;background:#FFFFFF">
+    <tr><td style="padding:6px 20px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      ${rows.map(([k, v], i) => `<tr>
+        <td style="padding:${i === 0 ? "16px" : "14px"} 0 14px;${i < rows.length - 1 ? `border-bottom:1px solid ${BRAND.line};` : ""}">
+          <div style="font-family:${FONT};font-size:10.5px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:.9px;margin-bottom:5px">${esc(k)}</div>
+          <div style="font-family:${FONT};font-size:15px;font-weight:600;color:${BRAND.ink};word-break:break-word">${v}</div>
+        </td></tr>`).join("")}
+      </table>
+    </td></tr>
+  </table>`;
+}
+
+/** A single credential value styled for reading aloud / copying. */
+function codeValue(v: string): string {
+  return `<span style="display:inline-block;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:15px;font-weight:700;color:${BRAND.ink};background:${BRAND.goldTint};border:1px solid ${BRAND.goldLine};border-radius:7px;padding:5px 11px;letter-spacing:.4px">${esc(v)}</span>`;
+}
+
+/** Numbered feature row — a gold chip, a title, and one line of plain English. */
+function featureRow(n: number, title: string, body: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 4px">
+    <tr>
+      <td width="42" valign="top" style="padding:12px 0">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td width="30" height="30" align="center" valign="middle" bgcolor="${BRAND.goldTint}" style="width:30px;height:30px;border-radius:8px;border:1px solid ${BRAND.goldLine};font-family:${FONT};font-size:13px;font-weight:800;color:${BRAND.goldDark}">${n}</td>
+        </tr></table>
+      </td>
+      <td valign="top" style="padding:12px 0 12px 4px;border-bottom:1px solid ${BRAND.line}">
+        <div style="font-family:${FONT};font-size:15px;font-weight:700;color:${BRAND.ink};margin-bottom:3px">${title}</div>
+        <div style="font-family:${FONT};font-size:13.5px;line-height:1.6;color:${BRAND.body}">${body}</div>
+      </td>
+    </tr>
+  </table>`;
+}
+
+/** Highlight panel — used for the card link, so it feels like the hero object. */
+function linkPanel(label: string, url: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0">
+    <tr><td align="center" bgcolor="${BRAND.navy}" style="border-radius:14px;padding:22px 24px">
+      <div style="font-family:${FONT};font-size:10.5px;font-weight:700;color:${BRAND.gold};text-transform:uppercase;letter-spacing:1.1px;margin-bottom:8px">${esc(label)}</div>
+      <a href="${esc(url)}" target="_blank" style="font-family:${FONT};font-size:17px;font-weight:700;color:#FFFFFF;text-decoration:none;word-break:break-all">${esc(url.replace(/^https:\/\//, ""))}</a>
+    </td></tr>
+  </table>`;
+}
+
+/** Soft note / caveat line. */
+function note(html: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0">
+    <tr><td style="background:${BRAND.soft};border-radius:10px;padding:13px 16px;font-family:${FONT};font-size:13px;line-height:1.6;color:${BRAND.body}">${html}</td></tr>
   </table>`;
 }
 
 /** Wrap content in the branded shell. `accent` sets the header strip mood.
-    `footer` overrides the default account-email footer line (e.g. for cold outreach). */
+    `footer` overrides the default account-email footer line. */
 function layout(opts: { preheader: string; badge?: string; heading: string; bodyHtml: string; accent?: string; footer?: string }): string {
   const accent = opts.accent || BRAND.gold;
   const footerLine = opts.footer ?? "You're receiving this because you have a DigitalCarda account.";
   return `<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting"></head>
-<body style="margin:0;padding:0;background:${BRAND.soft}">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(opts.preheader)}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.soft};padding:24px 12px">
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>DigitalCarda</title>
+</head>
+<body style="margin:0;padding:0;background:${BRAND.page};-webkit-font-smoothing:antialiased">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:${BRAND.page}">${esc(opts.preheader)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.page};padding:32px 12px">
     <tr><td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,.06)">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:20px;overflow:hidden;border:1px solid ${BRAND.line}">
+
         <!-- header -->
-        <tr><td style="background:${BRAND.navy};padding:22px 32px">
+        <tr><td bgcolor="${BRAND.navy}" style="background:${BRAND.navy};padding:26px 32px 24px">
           <table role="presentation" width="100%"><tr>
-            <td>
-              <img src="${SITE}/logo.png" width="150" height="48" alt="DigitalCarda"
-                   style="display:block;border:0;outline:none;text-decoration:none;height:48px;width:150px;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#ffffff;letter-spacing:.2px">
+            <td valign="middle">
+              <img src="${SITE}/logo.png" width="146" height="46" alt="DigitalCarda"
+                   style="display:block;border:0;outline:none;text-decoration:none;height:46px;width:146px;font-family:${FONT};font-size:19px;font-weight:700;color:#FFFFFF">
             </td>
-            <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#93a4bd">Digital Business Cards</td>
+            <td align="right" valign="middle" style="font-family:${FONT};font-size:10.5px;font-weight:600;color:#8FA2BC;text-transform:uppercase;letter-spacing:1.2px">Digital Business Cards</td>
           </tr></table>
         </td></tr>
-        <!-- accent strip -->
-        <tr><td style="height:4px;background:${accent};line-height:4px;font-size:0">&nbsp;</td></tr>
-        <!-- body -->
-        <tr><td style="padding:34px 32px 12px">
-          ${opts.badge ? `<div style="display:inline-block;padding:5px 12px;border-radius:999px;background:${BRAND.soft};font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:${BRAND.goldDark};text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">${esc(opts.badge)}</div>` : ""}
-          <h1 style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:23px;line-height:1.25;color:${BRAND.ink}">${opts.heading}</h1>
-          <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.65;color:#334155">${opts.bodyHtml}</div>
+        <tr><td style="height:3px;background:${accent};line-height:3px;font-size:0">&nbsp;</td></tr>
+
+        <!-- hero -->
+        <tr><td bgcolor="${BRAND.goldTint}" style="background:${BRAND.goldTint};padding:30px 32px 26px;border-bottom:1px solid ${BRAND.goldLine}">
+          ${opts.badge ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 13px"><tr>
+            <td bgcolor="${BRAND.navy}" style="border-radius:999px;padding:6px 14px;font-family:${FONT};font-size:10px;font-weight:700;color:${BRAND.gold};text-transform:uppercase;letter-spacing:1.2px">${esc(opts.badge)}</td>
+          </tr></table>` : ""}
+          <h1 style="margin:0;font-family:${FONT};font-size:27px;line-height:1.25;font-weight:800;color:${BRAND.ink};letter-spacing:-.3px">${opts.heading}</h1>
         </td></tr>
+
+        <!-- body -->
+        <tr><td style="padding:30px 32px 8px">
+          <div style="font-family:${FONT};font-size:15px;line-height:1.7;color:${BRAND.body}">${opts.bodyHtml}</div>
+        </td></tr>
+
         <!-- footer -->
-        <tr><td style="padding:24px 32px 30px">
-          <div style="border-top:1px solid ${BRAND.line};padding-top:18px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#94a3b8">
-            <a href="${SITE}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:bold">digitalcarda.in</a> &nbsp;·&nbsp; Your all-in-one digital business card.<br>
+        <tr><td bgcolor="${BRAND.soft}" style="background:${BRAND.soft};padding:24px 32px 26px;border-top:1px solid ${BRAND.line}">
+          <table role="presentation" width="100%"><tr>
+            <td style="font-family:${FONT};font-size:13px;font-weight:700;color:${BRAND.ink}">
+              <a href="${SITE}" style="color:${BRAND.ink};text-decoration:none">digitalcarda.in</a>
+            </td>
+            <td align="right" style="font-family:${FONT};font-size:12px">
+              <a href="${SITE}/dashboard" style="color:${BRAND.goldDark};text-decoration:none;font-weight:600">Dashboard</a>
+              <span style="color:#C7D0DC">&nbsp;·&nbsp;</span>
+              <a href="${SITE}/contact" style="color:${BRAND.goldDark};text-decoration:none;font-weight:600">Support</a>
+            </td>
+          </tr></table>
+          <div style="height:1px;background:${BRAND.line};margin:16px 0 14px;font-size:0;line-height:0">&nbsp;</div>
+          <div style="font-family:${FONT};font-size:11.5px;line-height:1.65;color:${BRAND.sub}">
+            Your all-in-one digital business card — share it with a link or a QR code.<br>
             ${footerLine}
           </div>
         </td></tr>
       </table>
-      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#b6c0cf;padding:16px 0 0">© DigitalCarda · Made by Pacewalk</div>
+      <div style="font-family:${FONT};font-size:11px;color:#9FAEC1;padding:18px 0 0">© DigitalCarda · Made by Pacewalk</div>
     </td></tr>
   </table>
 </body></html>`;
@@ -124,100 +206,90 @@ export function accountDetailsEmail(o: {
 }): Email {
   const cardUrl = o.slug ? `${SITE}/${o.slug}` : "";
   const who = o.company || o.name || "your business";
-  const heading = "Your digital card is ready 🎉";
 
   const rows: [string, string][] = [
-    ["Login email", `<a href="mailto:${esc(o.loginEmail)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.loginEmail)}</a>`],
+    ["Login email", `<a href="mailto:${esc(o.loginEmail)}" style="color:${BRAND.ink};text-decoration:none">${esc(o.loginEmail)}</a>`],
   ];
-  if (o.password) rows.push(["Password", `<span style="font-family:'Courier New',monospace;font-size:15px;font-weight:bold;letter-spacing:.5px">${esc(o.password)}</span>`]);
-  rows.push(["Dashboard", `<a href="${SITE}/login" style="color:${BRAND.goldDark};text-decoration:none">${SITE.replace(/^https:\/\//, "")}/login</a>`]);
-  if (cardUrl) rows.push(["Your card link", `<a href="${esc(cardUrl)}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:bold">${esc(cardUrl.replace(/^https:\/\//, ""))}</a>`]);
+  if (o.password) rows.push(["Password", codeValue(o.password)]);
+  rows.push(["Sign in at", `<a href="${SITE}/login" style="color:${BRAND.goldDark};text-decoration:none">digitalcarda.in/login</a>`]);
 
   const bodyHtml =
     hi(o.name) +
-    p(`Welcome to <strong>DigitalCarda</strong> — we're delighted to have ${esc(who)} on board. Your digital business card is live and ready to share.`) +
+    p(`Welcome to <strong style="color:${BRAND.ink}">DigitalCarda</strong>. We're delighted to have <strong style="color:${BRAND.ink}">${esc(who)}</strong> on board — your digital business card is live and ready to share.`) +
+    (cardUrl ? linkPanel("Your card is live at", cardUrl) : "") +
+    `<div style="font-family:${FONT};font-size:11px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:1px;margin:26px 0 -6px">Your login</div>` +
     detailTable(rows) +
-    (o.password
-      ? p(`<span style="color:${BRAND.sub};font-size:13px">For your security, please sign in and change this password from <strong>Dashboard → Settings</strong>.</span>`)
-      : "") +
+    (o.password ? note(`<strong style="color:${BRAND.ink}">Please change this password</strong> after your first sign-in — you'll find it under <strong>Dashboard → Settings</strong>.`) : "") +
     button("Sign in to your dashboard", `${SITE}/login`) +
-    (cardUrl ? p(`<span style="font-size:13px;color:${BRAND.sub}">Share your card anywhere — WhatsApp, email, or your QR code. Every scan opens <a href="${esc(cardUrl)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(cardUrl.replace(/^https:\/\//, ""))}</a>.</span>`) : "") +
-    p(`<span style="font-size:13px;color:${BRAND.sub}">Need a hand getting set up? Just reply to this email — we're happy to help.</span>`);
+    p(`<span style="font-size:13.5px;color:${BRAND.sub}">Share your card on WhatsApp, by email, or with your QR code — one link shows your contact details, services, gallery and payment options.</span>`) +
+    p(`<span style="font-size:13.5px;color:${BRAND.sub}">Need a hand setting it up? Just reply to this email — a real person will help.</span>`);
 
   const textLines = [
     `Hi ${o.name || "there"},`, "",
-    `Welcome to DigitalCarda! Your digital business card is live and ready to share.`, "",
-    `Login email: ${o.loginEmail}`,
+    "Welcome to DigitalCarda! Your digital business card is live and ready to share.", "",
+    ...(cardUrl ? [`Your card: ${cardUrl}`, ""] : []),
+    "YOUR LOGIN",
+    `Email: ${o.loginEmail}`,
     ...(o.password ? [`Password: ${o.password}`, "(Please change it after your first sign-in.)"] : []),
-    `Dashboard: ${SITE}/login`,
-    ...(cardUrl ? [`Your card: ${cardUrl}`] : []),
+    `Sign in: ${SITE}/login`,
     "", "Need help getting set up? Just reply to this email.", "", "— Team DigitalCarda",
   ];
 
   return {
-    subject: `Your DigitalCarda account & card link`,
-    html: layout({ preheader: "Your login details and your live card link — everything to get started.", badge: "Welcome aboard", heading, bodyHtml }),
+    subject: "Your DigitalCarda account & card link",
+    html: layout({ preheader: "Your login details and your live card link — everything to get started.", badge: "Welcome aboard", heading: "Your digital card is ready 🎉", bodyHtml }),
     text: textLines.join("\n"),
   };
 }
 
-/* "What's new" announcement for existing customers. Keep FEATURE_HIGHLIGHTS as
-   the single source of truth — the WhatsApp version (src/lib/shareTemplates.ts)
+/* "What's new" announcement for existing customers. FEATURE_HIGHLIGHTS is the
+   single source of truth — the WhatsApp version (src/lib/shareTemplates.ts)
    mirrors the same list, so the two never drift apart. */
-export const FEATURE_HIGHLIGHTS: { icon: string; title: string; body: string }[] = [
-  { icon: "🎨", title: "A brand-new card editor",
-    body: "Everything in one screen — your details, look &amp; feel, and what's on your card — with a live preview that updates as you type. Nothing to save; it saves itself." },
-  { icon: "✨", title: "New premium designs",
-    body: "Fresh single-screen card designs, plus a Compact layout that collapses long cards into neat tap-to-open sections." },
-  { icon: "🖼️", title: "Gallery &amp; video layouts",
-    body: "Show your photo gallery full-width or as a tidy 3-across grid, and your videos stacked or as a swipe carousel." },
-  { icon: "🛍️", title: "Better products &amp; services",
-    body: "Redesigned service cards with price, savings badge and a clear button — or switch to a compact icon list with one tap." },
-  { icon: "🌈", title: "Your brand colours, automatically",
-    body: "Upload your logo and we pick your brand colours from it, then preview every template in them. Custom card backgrounds too." },
-  { icon: "🤖", title: "AI card generator",
-    body: "Paste your website link and we build your card for you — content, services, contact details and branding." },
-  { icon: "📍", title: "Tap-to-navigate address",
-    body: "Add your Google Maps link and visitors can tap your address to get directions straight away." },
-  { icon: "🎛️", title: "You control what shows",
+export const FEATURE_HIGHLIGHTS: { title: string; body: string }[] = [
+  { title: "A brand-new card editor",
+    body: "Everything on one screen — your details, look &amp; feel, and what's on your card — with a live preview that updates as you type. Nothing to save; it saves itself." },
+  { title: "New premium designs",
+    body: "Fresh single-screen card designs, plus a Compact layout that folds a long card into neat tap-to-open sections." },
+  { title: "Gallery &amp; video layouts",
+    body: "Show your photos full-width or as a tidy 3-across grid, and your videos stacked or as a swipe carousel." },
+  { title: "Better products &amp; services",
+    body: "Redesigned cards with price, a savings badge and a clear button — or switch to a compact icon list in one tap." },
+  { title: "Your brand colours, automatically",
+    body: "Upload your logo and we pick your brand colours from it, then preview every template in them. Custom backgrounds too." },
+  { title: "AI card generator",
+    body: "Paste your website link and we build the card for you — content, services, contact details and branding." },
+  { title: "Tap-to-navigate address",
+    body: "Add your Google Maps link so visitors can tap your address and get directions straight away." },
+  { title: "You choose what shows",
     body: "Show or hide your QR code, share button, view count and plan badge — and drag your card sections into any order." },
 ];
 
 export function featureUpdateEmail(o: { name?: string | null; slug?: string | null }): Email {
   const cardUrl = o.slug ? `${SITE}/${o.slug}` : "";
-  const heading = "What's new on DigitalCarda ✨";
-
-  const list = FEATURE_HIGHLIGHTS.map((f) => `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px">
-      <tr>
-        <td width="34" valign="top" style="font-size:20px;line-height:1.2;padding-top:2px">${f.icon}</td>
-        <td style="font-family:Arial,Helvetica,sans-serif">
-          <div style="font-size:15px;font-weight:bold;color:${BRAND.ink};margin-bottom:3px">${f.title}</div>
-          <div style="font-size:13.5px;line-height:1.6;color:${BRAND.sub}">${f.body}</div>
-        </td>
-      </tr>
-    </table>`).join("");
 
   const bodyHtml =
     hi(o.name) +
-    p("We've been busy. Your digital card just got a lot more powerful — and a lot easier to edit. Here's what's new:") +
-    list +
-    button("Open your dashboard", `${SITE}/dashboard/build`) +
-    (cardUrl ? p(`<span style="font-size:13px;color:${BRAND.sub}">Your card is still at <a href="${esc(cardUrl)}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:bold">${esc(cardUrl.replace(/^https:\/\//, ""))}</a> — same link, same QR code. Nothing you've shared stops working.</span>`) : "") +
-    p(`<span style="font-size:13px;color:${BRAND.sub}">All of this is already included in your plan. Reply to this email if you'd like a quick walkthrough.</span>`);
+    p("We've been busy. Your digital card just became a lot more powerful — and a lot easier to edit. Here's what's new:") +
+    `<div style="margin:22px 0 4px">${FEATURE_HIGHLIGHTS.map((f, i) => featureRow(i + 1, f.title, f.body)).join("")}</div>` +
+    button("See it in your dashboard", `${SITE}/dashboard/build`) +
+    (cardUrl
+      ? note(`Your card is still at <a href="${esc(cardUrl)}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:700">${esc(cardUrl.replace(/^https:\/\//, ""))}</a> — <strong style="color:${BRAND.ink}">same link, same QR code</strong>. Everything you've already shared keeps working.`)
+      : "") +
+    p(`<span style="font-size:13.5px;color:${BRAND.sub}">It's all included in your current plan — nothing extra to pay. Reply to this email if you'd like a quick walkthrough.</span>`);
 
+  const strip = (t: string) => t.replace(/&amp;/g, "&");
   const textLines = [
     `Hi ${o.name || "there"},`, "",
     "Your DigitalCarda card just got a big update. What's new:", "",
-    ...FEATURE_HIGHLIGHTS.map((f) => `• ${f.title.replace(/&amp;/g, "&")} — ${f.body.replace(/&amp;/g, "&")}`),
-    "", `Open your dashboard: ${SITE}/dashboard/build`,
-    ...(cardUrl ? [`Your card (unchanged): ${cardUrl}`] : []),
+    ...FEATURE_HIGHLIGHTS.map((f, i) => `${i + 1}. ${strip(f.title)} — ${strip(f.body)}`),
+    "", `See it: ${SITE}/dashboard/build`,
+    ...(cardUrl ? [`Your card (same link & QR): ${cardUrl}`] : []),
     "", "All included in your plan. Reply if you'd like a walkthrough.", "", "— Team DigitalCarda",
   ];
 
   return {
     subject: "New on your DigitalCarda card ✨ (all included in your plan)",
-    html: layout({ preheader: "A brand-new editor, live preview, new designs and more — already in your account.", badge: "Product update", heading, bodyHtml }),
+    html: layout({ preheader: "A brand-new editor, live preview, new designs and more — already in your account.", badge: "Product update", heading: "What's new on DigitalCarda ✨", bodyHtml }),
     text: textLines.join("\n"),
   };
 }
