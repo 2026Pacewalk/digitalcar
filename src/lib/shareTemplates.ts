@@ -7,10 +7,14 @@
 
 const SITE = "https://digitalcarda.in";
 
-/* Emoji here must stay within Unicode 6.0 (2010) and carry no variation
-   selectors. WhatsApp renders with the device's own emoji font, and Windows
-   Segoe UI Emoji / older Android have no glyph for newer code points — they
-   draw a replacement box instead. Anything from 2014 onwards is a gamble. */
+/* Two rules for these messages:
+   1. A URL always sits alone on its own line. WhatsApp only linkifies a URL it
+      can find the start of — a label or emoji in front of it can stop the link
+      being tappable.
+   2. Emoji stay within Unicode 6.0 (2010) and carry no variation
+      selectors. WhatsApp renders with the device's own emoji font, and Windows
+      Segoe UI Emoji / older Android have no glyph for newer code points — they
+      draw a replacement box. Anything from 2014 onwards is a gamble. */
 
 /** Everything a new customer needs: greeting, login, card link. */
 export function accountDetailsWhatsApp(o: {
@@ -30,8 +34,10 @@ export function accountDetailsWhatsApp(o: {
     "*Your login details*",
     `📧 Email: ${o.loginEmail}`,
     ...(o.password ? [`🔑 Password: ${o.password}`] : []),
-    `🔗 Login: ${SITE}/login`,
-    ...(cardUrl ? ["", "*Your card link*", `📇 ${cardUrl}`] : []),
+    "",
+    "🔗 Sign in here:",
+    `${SITE}/login`,
+    ...(cardUrl ? ["", "📇 *Your card link*", cardUrl] : []),
     "",
     ...(o.password ? ["_Please change your password after your first sign-in (Dashboard → Settings)._", ""] : []),
     "Share your card on WhatsApp, email or with your QR code — one link shows everything about your business.",
@@ -66,8 +72,9 @@ export function featureUpdateWhatsApp(o: { name?: string | null; slug?: string |
     "",
     ...FEATURES.map(([icon, text]) => `${icon} ${text}`),
     "",
-    `👉 Open your dashboard: ${SITE}/dashboard/build`,
-    ...(cardUrl ? [`📇 Your card (same link & QR): ${cardUrl}`] : []),
+    "👉 Open your dashboard:",
+    `${SITE}/dashboard/build`,
+    ...(cardUrl ? ["", "📇 Your card (same link & QR):", cardUrl] : []),
     "",
     "It's all included in your current plan — nothing extra to pay.",
     "Reply here if you'd like a quick walkthrough",
