@@ -71,6 +71,67 @@ function rateLimit(
   }
 }
 
+/* Per-card Open Graph image: /og/<slug>.png
+   Pasting a card link into WhatsApp/Facebook/LinkedIn used to preview a generic
+   stock photo for every customer. This renders that person's own card — name,
+   role, company, logo — with a QR of their card URL, so the preview itself is
+   scannable. Cached in memory and at the CDN because scrapers hit it in bursts. */
+const ogCache = new Map<string, { png: Buffer; at: number }>();
+const OG_TTL = 10 * 60_000;
+
+const ogHandler = async (c: { req: { param: (k: string) => string } }): Promise<Response> => {
+  const file = c.req.param("file");
+  const slug = file.replace(/\.png$/i, "").toLowerCase();
+  if (!slug || !/^[a-z0-9_-]{2,80}$/.test(slug)) return new Response("Not found", { status: 404 });
+
+  const hit = ogCache.get(slug);
+  if (hit && Date.now() - hit.at < OG_TTL) {
+    return new Response(new Uint8Array(hit.png), {
+      headers: { "content-type": "image/png", "cache-control": "public, max-age=600, s-maxage=86400" },
+    });
+  }
+
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { publishedCards } = await import("@db/schema");
+    const { eq } = await import("drizzle-orm");
+    const rows = await getDb().select({ data: publishedCards.data })
+      .from(publishedCards).where(eq(publishedCards.slug, slug)).limit(1);
+
+    let cust = ((rows[0]?.data as { customer?: Record<string, unknown> })?.customer) || null;
+    if (!cust) {
+      // Legacy customers.json card (readPublicJson is declared below in this
+      // module; this only runs at request time, so it is initialised by then).
+      const list = (await readPublicJson("customers")) as Record<string, unknown>[] | null;
+      cust = (Array.isArray(list) ? list : []).find((r) => String(r.slug || "").toLowerCase() === slug) || null;
+    }
+    if (!cust) return new Response("Not found", { status: 404 });
+
+    const { renderCardOg } = await import("./lib/og-image");
+    const png = await renderCardOg({
+      slug,
+      name: (cust.name as string) || null,
+      designation: (cust.designation as string) || null,
+      company: (cust.company_name as string) || null,
+      logo: (cust.logo as string) || null,
+      photo: (cust.photo as string) || null,
+      accent: (cust.color as string) || null,
+    });
+    ogCache.set(slug, { png, at: Date.now() });
+    if (ogCache.size > 500) ogCache.clear();   // crude bound; it refills lazily
+    return new Response(new Uint8Array(png), {
+      headers: { "content-type": "image/png", "cache-control": "public, max-age=600, s-maxage=86400" },
+    });
+  } catch (e) {
+    console.error("[og] render failed:", (e as Error).message);
+    return Response.redirect("https://digitalcarda.in/og-default.jpg", 302); // never show a broken preview
+  }
+};
+// Pretty path for production; /api/ alias so it also works behind the dev
+// server, which only routes /api/* to this app.
+app.get("/og/:file", ogHandler);
+app.get("/api/og/:file", ogHandler);
+
 // Public enquiry capture for the legacy (customers.json) cards — stores the lead
 // when the slug maps to a known card, and always emails the owner.
 app.post("/api/enquiry", async (c) => {
