@@ -211,6 +211,7 @@ export default function AdminCustomers() {
 
   const impersonate = trpc.auth.impersonate.useMutation();
   const extendMut = trpc.user.extendValidity.useMutation();
+  const pkgMut = trpc.user.setPackage.useMutation();
   const deactivateMut = trpc.user.deactivateCustomer.useMutation();
   const setLimitMut = trpc.user.setCardLimit.useMutation();
   const deleteAppUserMut = trpc.admin.deleteAppUser.useMutation();
@@ -259,16 +260,30 @@ export default function AdminCustomers() {
     toast.success(`Password updated for ${pwdModal.name}`);
     setPwdModal(null);
   };
-  const savePackage = () => {
+  const savePackage = async () => {
     if (!pkgModal) return;
+    const c = pkgModal;
     const id = pkgs.find((p) => p.name === pkgValue)?.id ?? 7;
     // Validity from the chosen term (Trial is always 30 days).
     const days = pkgValue === "Trial" ? 30 : pkgCycle === "triennial" ? 1095 : pkgCycle === "monthly" ? 30 : 365;
     const newExp = new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
-    setRows((r) => r.map((c) => (c.id === pkgModal.id ? { ...c, package_id: id, expired_on: newExp, status: 1 } : c)));
     const term = pkgValue === "Trial" ? "" : pkgCycle === "triennial" ? " · 3 Years" : pkgCycle === "monthly" ? " · Monthly" : " · Yearly";
-    toast.success(`${pkgModal.name} set to ${pkgValue}${term} — valid till ${fmtDate(newExp)}`);
+    // Optimistic row update, then SAVE IT — this used to change the view only,
+    // so the plan silently reverted on refresh.
+    setRows((r) => r.map((x) => (x.id === c.id ? { ...x, package_id: id, expired_on: newExp, status: 1 } : x)));
     setPkgModal(null);
+    try {
+      const res = await pkgMut.mutateAsync({ email: c.email, packageId: id, cycle: pkgCycle });
+      if (res.ok) {
+        toast.success(`${c.name} set to ${pkgValue}${term} — valid till ${fmtDate(res.expiredOn ?? newExp)}`);
+      } else {
+        setRows((r) => r.map((x) => (x.id === c.id ? { ...x, package_id: c.package_id, expired_on: c.expired_on, status: c.status } : x)));
+        toast.error(`No live account matched ${c.email} — the package was not changed.`);
+      }
+    } catch {
+      setRows((r) => r.map((x) => (x.id === c.id ? { ...x, package_id: c.package_id, expired_on: c.expired_on, status: c.status } : x)));
+      toast.error("Could not change the package — the server save failed.");
+    }
   };
   const saveExtend = async () => {
     if (!expModal) return;

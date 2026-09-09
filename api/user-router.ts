@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, authedQuery, resellerQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, resellerProfiles, cards, subscriptions } from "@db/schema";
+import { users, resellerProfiles, cards, subscriptions, publishedCards, cardTrials } from "@db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 
 export const userRouter = createRouter({
@@ -140,6 +140,72 @@ export const userRouter = createRouter({
   // ─── Give a customer extra days of card validity (matched by email) ───
   // Extends the active subscription's period end — which is what actually keeps
   // the public card live — so the extra days take real effect.
+  /* ─── Super-admin: change a customer's package (Trial / Gold / Platinum) ───
+     The admin UI used to change this ONLY in React state and show a success
+     toast, so it silently reverted on refresh. The Customers list derives
+     package_id from the SUBSCRIPTIONS table, so that is what has to be written.
+     We also mirror the plan onto the published card snapshot (the public card's
+     pause gate and the customer's own dashboard read package_id/expired_on from
+     there) and convert any running trial, so every place that answers "what
+     plan is this?" agrees. */
+  setPackage: adminQuery
+    .input(z.object({
+      email: z.string().email(),
+      packageId: z.number().int().min(1).max(99),
+      cycle: z.enum(["monthly", "yearly", "triennial"]).default("yearly"),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase().trim();
+      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } });
+      if (!user) return { ok: false as const, reason: "no_account" as const };
+
+      const isTrial = input.packageId === 7;
+      const days = isTrial ? 30 : input.cycle === "triennial" ? 1095 : input.cycle === "monthly" ? 30 : 365;
+      const now = new Date();
+      const end = new Date(now.getTime() + days * 86_400_000);
+
+      const sub = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.userId, user.id),
+        orderBy: [desc(subscriptions.createdAt)],
+      });
+      if (sub) {
+        await db.update(subscriptions).set({
+          packageId: input.packageId, status: "active", billingCycle: input.cycle,
+          currentPeriodStart: now, currentPeriodEnd: end,
+        }).where(eq(subscriptions.id, sub.id));
+      } else {
+        await db.insert(subscriptions).values({
+          userId: user.id, packageId: input.packageId, status: "active", billingCycle: input.cycle,
+          amount: "0.00", currency: "INR", currentPeriodStart: now, currentPeriodEnd: end,
+          paymentGateway: "manual",
+        });
+      }
+
+      const expiredOn = end.toISOString().slice(0, 10);
+
+      // Keep the published snapshot in step so the customer's dashboard and the
+      // public card don't keep showing the old plan.
+      try {
+        const rows = await db.select().from(publishedCards).where(eq(publishedCards.userId, user.id));
+        for (const row of rows) {
+          const data = (row.data && typeof row.data === "object" ? row.data : {}) as Record<string, unknown>;
+          const customer = { ...((data.customer as Record<string, unknown>) || {}) };
+          customer.package_id = input.packageId;
+          customer.expired_on = expiredOn;
+          await db.update(publishedCards).set({ data: { ...data, customer } }).where(eq(publishedCards.id, row.id));
+        }
+      } catch { /* snapshot mirror is best-effort — never fail the plan change */ }
+
+      // A paid plan ends the trial clock (otherwise lifecycle emails/pausing
+      // still treat them as a trial user).
+      try {
+        if (!isTrial) await db.update(cardTrials).set({ status: "converted" }).where(eq(cardTrials.userId, user.id));
+      } catch { /* ignore */ }
+
+      return { ok: true as const, packageId: input.packageId, expiredOn };
+    }),
+
   extendValidity: adminQuery
     .input(z.object({ email: z.string().email(), days: z.number().int().min(1).max(3650) }))
     .mutation(async ({ input }) => {
