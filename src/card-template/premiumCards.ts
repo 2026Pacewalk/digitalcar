@@ -734,7 +734,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
     </header>
     <main class="pw-body">
       ${socials ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">Connect With Me</h2><div class="pw-socials">${socials}</div></section>` : ""}
-      ${svcIconsOnly && services ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">${esc(s(c.product) || "Our Solutions")}</h2><div class="pw-svcs">${services}</div></section>` : ""}
+      ${svcIconsOnly && services && Number(c.product_on ?? 1) === 1 ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">${esc(s(c.product) || "Our Solutions")}</h2><div class="pw-svcs">${services}</div></section>` : ""}
       ${cx.html}
       <div class="pw-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
       ${chrome}
@@ -749,6 +749,10 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
 // ── Professional Profile (image #4): cover banner, overlapping circular photo,
 // 3 contact buttons, social row, 4 action tiles, QR modal, website + address cards ──
 function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolean; extras?: PremiumExtras }): string {
+  // Respect the owner's section toggles (Settings → Modules), same as the
+  // other premium templates do.
+  const ppShowQr = Number(c.cardqr_on ?? 1) !== 0;
+  const ppShowShare = Number(c.share_on ?? 1) !== 0;
   const brand = s(c.color) || "#2563eb";
   const dark = s(c.color2) || "#0f2747";
   const nameCol = lum(brand) < 0.62 ? brand : dark; // keep the name readable on white
@@ -781,7 +785,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
     { ic: "fa fa-user-plus", lb: "Save", attr: `href="data:text/vcard;charset=utf-8,${encodeURIComponent(["BEGIN:VCARD", "VERSION:3.0", `FN:${s(c.name)}`, `ORG:${s(c.company_name)}`, `TITLE:${s(c.designation)}`, `TEL;TYPE=CELL:${s(c.mobile1)}`, `EMAIL:${s(c.email)}`, `URL:${s(c.url)}`, `ADR:;;${s(c.address)};;;;`, "END:VCARD"].join("\n"))}" download="${slug || "contact"}.vcf"`, tag: "a" },
     youtube ? { ic: "fa fa-play", lb: "Watch", attr: `href="${esc(youtube)}" target="_blank" rel="noopener"`, tag: "a" } : null,
     about ? { ic: "fa fa-user", lb: "About", attr: `href="javascript:void(0)" onclick="document.getElementById('pp-about').scrollIntoView({behavior:'smooth'})"`, tag: "a" } : null,
-    { ic: "fa fa-qrcode", lb: "Scan", attr: `type="button" onclick="ppQR(true)"`, tag: "button" },
+    ppShowQr ? { ic: "fa fa-qrcode", lb: "Scan", attr: `type="button" onclick="ppQR(true)"`, tag: "button" } : null,
   ].filter(Boolean).map((t) => { const x = t as { ic: string; lb: string; attr: string; tag: string }; return `<${x.tag} class="pp-tile" ${x.attr} aria-label="${x.lb}"><span class="pp-tile-ic"><i class="${x.ic}"></i></span><span>${x.lb}</span></${x.tag}>`; }).join("");
 
   const ref = s(c.referral_code) || slug;
@@ -869,7 +873,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
       <a href="/signup${ref ? `?ref=${encodeURIComponent(ref)}` : ""}" target="_top">Create Free Card</a>
     </div>`;
 
-  const modal = opts.thumb ? "" : `
+  const modal = (opts.thumb || !ppShowQr) ? "" : `
   <div id="ppqr" class="pp-modal" onclick="if(event.target===this)ppQR(false)">
     <div class="pp-modal-in">
       <button class="pp-modal-x" type="button" onclick="ppQR(false)" aria-label="Close">&times;</button>
@@ -901,7 +905,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   <div class="pp">
     <div class="pp-cover">
       <div class="pp-cover-logo">${brandTxt}</div>
-      <button class="pp-share" type="button" onclick="pwShare()" aria-label="Share profile"><i class="fa fa-share-alt"></i></button>
+      ${ppShowShare ? `<button class="pp-share" type="button" onclick="pwShare()" aria-label="Share profile"><i class="fa fa-share-alt"></i></button>` : ""}
     </div>
     <div class="pp-in">
       <div class="pp-card pp-rise">

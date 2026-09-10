@@ -292,8 +292,10 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
   const phone = s(c.mobile1).replace(/[^\d+]/g, "");
   const waMsg = encodeURIComponent(`Hi ${s(c.name) || "there"}, I found your card and would love to connect.`);
 
-  const btn = (icon: string, href: string, label: string, target = "_blank") =>
-    label && href ? `<a class="lb-link" href="${esc(href)}" target="${target}" rel="noopener"><span class="lb-ic"><i class="${icon}"></i></span><span class="lb-label">${esc(label)}</span></a>` : "";
+  const btn = (icon: string, href: string, label: string, target = "_blank", download = "") =>
+    label && href
+      ? `<a class="lb-link" href="${esc(href)}" ${download ? `download="${esc(download)}"` : `target="${target}" rel="noopener"`}><span class="lb-ic"><i class="${icon}"></i></span><span class="lb-label">${esc(label)}</span></a>`
+      : "";
 
   // vCard as a data URI so "Save Contact" works with no JavaScript.
   const vcard = ["BEGIN:VCARD", "VERSION:3.0", `FN:${s(c.name)}`, `ORG:${s(c.company_name)}`, `TITLE:${s(c.designation)}`,
@@ -345,7 +347,7 @@ ${showShare ? shareSheetCss("#111827") : ""}
     ${bio ? `<p class="lb-bio">${bio}</p>` : ""}
     <div class="lb-links">
       ${links}
-      ${btn("fa fa-user-plus", vcardHref, "Save Contact")}
+      ${btn("fa fa-user-plus", vcardHref, "Save Contact", "_self", `${slug || "contact"}.vcf`)}
     </div>
     ${qrSrc ? `<div class="lb-qr"><img src="${qrSrc}" alt="Scan to open this card" ${IMG}><div class="lb-qr-tx"><b>Scan my card</b><span>Point your camera to open &amp; save my card</span></div></div>` : ""}
     ${social ? `<ul class="lb-social">${social}</ul>` : ""}
