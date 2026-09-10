@@ -40,11 +40,16 @@ function askSecret(q) {
   });
 }
 
-/** Replace a key in .env, or append it if it isn't there. Comments survive. */
+/** Replace a key in .env, or append it if it isn't there. Comments survive.
+ *  The replacement is passed as a FUNCTION on purpose: with a string, JS treats
+ *  $&, $` and $' inside it as replacement patterns, so a password containing a
+ *  dollar sign was silently corrupted — $` even spliced the preceding .env
+ *  lines (including DATABASE_URL) into the value. A function replacer is taken
+ *  literally. */
 function setKey(text, key, value) {
   const line = `${key}=${value}`;
   const re = new RegExp(`^${key}=.*$`, "m");
-  return re.test(text) ? text.replace(re, line) : text.replace(/\n*$/, `\n${line}\n`);
+  return re.test(text) ? text.replace(re, () => line) : text.replace(/\n*$/, () => `\n${line}\n`);
 }
 
 const main = async () => {
