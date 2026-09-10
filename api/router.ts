@@ -18,6 +18,7 @@ import { paymentRouter } from "./payment-router";
 import { resellerRouter } from "./reseller-router";
 import { aiRouter } from "./ai-router";
 import { bulkOrderRouter } from "./bulk-order-router";
+import { contactRouter } from "./contact-router";
 import { adminRouter } from "./admin-router";
 import { domainRouter } from "./domain-router";
 import { addonRouter } from "./addon-router";
@@ -45,6 +46,7 @@ export const appRouter = createRouter({
   reseller: resellerRouter,
   ai: aiRouter,
   bulkOrder: bulkOrderRouter,
+  contact: contactRouter,
   admin: adminRouter,
   domain: domainRouter,
   addon: addonRouter,
