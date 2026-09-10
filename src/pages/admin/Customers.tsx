@@ -740,7 +740,27 @@ export default function AdminCustomers() {
       </Modal>}
 
       {/* Share with Customer — login details or the what's-new announcement */}
-      {shareModal && <Modal onClose={() => setShareModal(null)} icon={<Send size={20} className="text-[#0EA5E9]" />} iconBg="bg-[#E0F2FE]" title="Share with Customer" subtitle={`${shareModal.name} · ${shareModal.email}`}>
+      {shareModal && <Modal wide onClose={() => setShareModal(null)} icon={<Send size={20} className="text-[#0EA5E9]" />} iconBg="bg-[#E0F2FE]" title="Share with Customer" subtitle={`${shareModal.name} · ${shareModal.email}`}>
+        {/* The thing being shared, shown as the thing itself — this is the very
+            image WhatsApp and LinkedIn put on the link preview, so what the admin
+            sees here is what the customer will see. */}
+        {shareModal.slug && (
+          <div className="rounded-2xl border border-[#E2E8F0] overflow-hidden mb-4">
+            <a href={`https://digitalcarda.in/${shareModal.slug}`} target="_blank" rel="noopener noreferrer" className="block">
+              <img src={`https://digitalcarda.in/og/${shareModal.slug}.png`} alt={`${shareModal.name} — digital card`}
+                loading="lazy" className="block w-full aspect-[1200/630] object-cover bg-[#EDF1F7]" />
+            </a>
+            <div className="flex items-center gap-2 px-3 py-2.5 border-t border-[#E2E8F0] bg-white">
+              <Globe size={14} className="text-[#94A3B8] shrink-0" />
+              <span className="flex-1 min-w-0 truncate text-[12.5px] font-semibold text-[#0F172A]">digitalcarda.in/{shareModal.slug}</span>
+              <button type="button" title="Copy card link"
+                onClick={() => { navigator.clipboard.writeText(`https://digitalcarda.in/${shareModal.slug}`).then(() => toast.success("Card link copied")).catch(() => toast.error("Copy failed")); }}
+                className="w-8 h-8 rounded-lg border border-[#E2E8F0] text-[#334155] hover:bg-[#F8FAFC] flex items-center justify-center shrink-0"><Copy size={14} /></button>
+              <a href={`https://digitalcarda.in/${shareModal.slug}`} target="_blank" rel="noopener noreferrer" title="Open card"
+                className="w-8 h-8 rounded-lg border border-[#E2E8F0] text-[#334155] hover:bg-[#F8FAFC] flex items-center justify-center shrink-0"><ExternalLink size={14} /></a>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2 mb-4">
           {([["welcome", "Login & card link"], ["update", "What's new"]] as const).map(([k, label]) => (
             <button key={k} type="button" onClick={() => setShareKind(k)}
@@ -786,7 +806,7 @@ export default function AdminCustomers() {
         )}
 
         <label className="block text-xs font-semibold text-[#334155] mb-1.5">Message preview</label>
-        <textarea readOnly value={shareMessage(shareModal)} rows={9}
+        <textarea readOnly value={shareMessage(shareModal)} rows={11}
           className="w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3 text-[12px] leading-relaxed text-[#334155] outline-none font-mono" />
 
         <div className="grid grid-cols-3 gap-2 mt-4">
@@ -916,7 +936,7 @@ function Modal({ children, onClose, icon, iconBg, title, subtitle, wide }: {
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-[#0F172A]/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${wide ? "max-w-md" : "max-w-sm"} p-6 animate-scale-in`}>
+      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${wide ? "max-w-md" : "max-w-sm"} max-h-[calc(100vh-2rem)] overflow-y-auto p-6 animate-scale-in`}>
         <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-lg text-[#94A3B8] hover:bg-[#F1F5F9] flex items-center justify-center transition-colors"><X size={16} /></button>
         <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center mb-4`}>{icon}</div>
         <h3 className="text-lg font-bold text-[#0F172A]">{title}</h3>

@@ -103,6 +103,40 @@ function note(html: string): string {
   </table>`;
 }
 
+
+/** Their actual card, as a tappable picture. Remote images are blocked by
+    default in some clients, so the link panel below it always repeats the URL. */
+function cardPreview(slug: string, alt: string): string {
+  const url = `${SITE}/${encodeURIComponent(slug)}`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 4px">
+    <tr><td align="center">
+      <a href="${esc(url)}" target="_blank" style="text-decoration:none;display:block">
+        <img src="${SITE}/og/${encodeURIComponent(slug)}.png" width="536" alt="${esc(alt)}"
+             style="display:block;width:100%;max-width:536px;height:auto;border:1px solid ${BRAND.line};border-radius:14px;background:${BRAND.soft}">
+      </a>
+      <div style="font-family:${FONT};font-size:12px;line-height:1.6;color:${BRAND.sub};padding:10px 0 0">
+        Tap the card to open it &nbsp;&middot;&nbsp; the QR code works from a printed copy too
+      </div>
+    </td></tr>
+  </table>`;
+}
+
+/** Short list of plain-English pointers, ticked. Not numbered — these are
+    alternatives, not steps, and fake ordering reads as filler. */
+function tickList(label: string, items: string[]): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px">
+    <tr><td bgcolor="${BRAND.soft}" style="background:${BRAND.soft};border-radius:14px;padding:18px 20px 6px">
+      <div style="font-family:${FONT};font-size:10.5px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:1px;padding-bottom:6px">${esc(label)}</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        ${items.map((t) => `<tr>
+          <td width="24" valign="top" style="padding:8px 0 8px;font-family:${FONT};font-size:14px;font-weight:800;color:${BRAND.goldDark};line-height:1.6">&check;</td>
+          <td valign="top" style="padding:8px 0 8px;font-family:${FONT};font-size:14px;line-height:1.6;color:${BRAND.body}">${t}</td>
+        </tr>`).join("")}
+      </table>
+    </td></tr>
+  </table>`;
+}
+
 /** Wrap content in the branded shell. `accent` sets the header strip mood.
     `footer` overrides the default account-email footer line. */
 function layout(opts: { preheader: string; badge?: string; heading: string; bodyHtml: string; accent?: string; footer?: string }): string {
@@ -215,13 +249,18 @@ export function accountDetailsEmail(o: {
 
   const bodyHtml =
     hi(o.name) +
-    p(`Welcome to <strong style="color:${BRAND.ink}">DigitalCarda</strong>. We're delighted to have <strong style="color:${BRAND.ink}">${esc(who)}</strong> on board — your digital business card is live and ready to share.`) +
-    (cardUrl ? linkPanel("Your card is live at", cardUrl) : "") +
-    `<div style="font-family:${FONT};font-size:11px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:1px;margin:26px 0 -6px">Your login</div>` +
+    p(`Welcome to <strong style="color:${BRAND.ink}">DigitalCarda</strong> — we're delighted to have <strong style="color:${BRAND.ink}">${esc(who)}</strong> on board. Here is your card:`) +
+    (o.slug ? cardPreview(o.slug, `${who} — digital business card`) : "") +
+    (cardUrl ? linkPanel("Share this link anywhere", cardUrl) : "") +
+    tickList("Where to put your link", [
+      "In your <strong style=\"color:" + BRAND.ink + "\">WhatsApp Business</strong> profile and status — where most enquiries start.",
+      "One line under your name in your <strong style=\"color:" + BRAND.ink + "\">email signature</strong>.",
+      "<strong style=\"color:" + BRAND.ink + "\">Print the QR</strong> on your visiting card, packaging or shop counter.",
+    ]) +
+    `<div style="font-family:${FONT};font-size:11px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:1px;margin:30px 0 -6px">Your login</div>` +
     detailTable(rows) +
-    (o.password ? note(`<strong style="color:${BRAND.ink}">Please change this password</strong> after your first sign-in — you'll find it under <strong>Dashboard → Settings</strong>.`) : "") +
-    button("Sign in to your dashboard", `${SITE}/login`) +
-    p(`<span style="font-size:13.5px;color:${BRAND.sub}">Share your card on WhatsApp, by email, or with your QR code — one link shows your contact details, services, gallery and payment options.</span>`) +
+    (o.password ? note(`<strong style="color:${BRAND.ink}">Please change this password</strong> after your first sign-in — under <strong>Dashboard &rarr; Settings</strong>.`) : "") +
+    button("Sign in and edit your card", `${SITE}/login`) +
     p(`<span style="font-size:13.5px;color:${BRAND.sub}">Need a hand setting it up? Just reply to this email — a real person will help.</span>`);
 
   const textLines = [
@@ -236,8 +275,8 @@ export function accountDetailsEmail(o: {
   ];
 
   return {
-    subject: "Your DigitalCarda account & card link",
-    html: layout({ preheader: "Your login details and your live card link — everything to get started.", badge: "Welcome aboard", heading: "Your digital card is ready 🎉", bodyHtml }),
+    subject: o.company ? `${o.company} — your digital card is live` : "Your digital card is live",
+    html: layout({ preheader: "Your card link, your QR code and your login — everything to get started.", badge: "Welcome aboard", heading: "Your digital card is ready", bodyHtml }),
     text: textLines.join("\n"),
   };
 }
@@ -269,12 +308,12 @@ export function featureUpdateEmail(o: { name?: string | null; slug?: string | nu
 
   const bodyHtml =
     hi(o.name) +
-    p("We've been busy. Your digital card just became a lot more powerful — and a lot easier to edit. Here's what's new:") +
-    `<div style="margin:22px 0 4px">${FEATURE_HIGHLIGHTS.map((f, i) => featureRow(i + 1, f.title, f.body)).join("")}</div>` +
+    p("We've been busy. Your digital card just became a lot more powerful — and a lot easier to edit.") +
+    (o.slug ? cardPreview(o.slug, "Your digital business card") : "") +
+    (cardUrl ? linkPanel("Same link, same QR code", cardUrl) : "") +
+    p("Here's what's new:") +
+    `<div style="margin:20px 0 4px">${FEATURE_HIGHLIGHTS.map((f, i) => featureRow(i + 1, f.title, f.body)).join("")}</div>` +
     button("See it in your dashboard", `${SITE}/dashboard/build`) +
-    (cardUrl
-      ? note(`Your card is still at <a href="${esc(cardUrl)}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:700">${esc(cardUrl.replace(/^https:\/\//, ""))}</a> — <strong style="color:${BRAND.ink}">same link, same QR code</strong>. Everything you've already shared keeps working.`)
-      : "") +
     p(`<span style="font-size:13.5px;color:${BRAND.sub}">It's all included in your current plan — nothing extra to pay. Reply to this email if you'd like a quick walkthrough.</span>`);
 
   const strip = (t: string) => t.replace(/&amp;/g, "&");

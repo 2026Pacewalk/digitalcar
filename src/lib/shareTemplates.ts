@@ -21,7 +21,8 @@
 
 const SITE = "https://digitalcarda.in";
 
-/** Everything a new customer needs: greeting, login, card link. */
+/** Short by design: a phone message people actually read, with the card link
+    first so it is both the preview and the point. */
 export function accountDetailsWhatsApp(o: {
   name?: string | null;
   loginEmail: string;
@@ -30,40 +31,30 @@ export function accountDetailsWhatsApp(o: {
   company?: string | null;
 }): string {
   const cardUrl = o.slug ? `${SITE}/${o.slug}` : "";
-  const lines = [
+  return [
     `Hi ${o.name || "there"},`,
     "",
-    "Welcome to *DigitalCarda* — your digital business card is ready.",
-    ...(o.company ? [`We're glad to have *${o.company}* on board.`] : []),
+    `Your digital business card${o.company ? ` for *${o.company}*` : ""} is ready.`,
+    ...(cardUrl ? ["", "*YOUR CARD*", cardUrl] : []),
     "",
-    ...(cardUrl ? ["*YOUR CARD LINK*", cardUrl, ""] : []),
-    "*YOUR LOGIN*",
-    `Email: ${o.loginEmail}`,
+    "*LOGIN*",
+    o.loginEmail,
     ...(o.password ? [`Password: ${o.password}`] : []),
-    "",
-    "Sign in here:",
     `${SITE}/login`,
     "",
-    ...(o.password ? ["_Please change your password after your first sign-in (Dashboard → Settings)._", ""] : []),
-    "Share your card on WhatsApp, by email, or with your QR code — one link shows everything about your business.",
-    "",
-    "Need help setting it up? Just reply to this message.",
+    "Share the link or your QR code — everything about your business in one tap.",
     "",
     "— Team DigitalCarda",
-  ];
-  return lines.join("\n");
+  ].join("\n");
 }
 
 /* Keep in step with FEATURE_HIGHLIGHTS in api/lib/email-templates.ts. */
 const FEATURES: string[] = [
-  "*Brand-new card editor* — everything on one screen with a live preview, and it saves itself",
-  "*New premium designs* plus a Compact layout for long cards",
-  "*Gallery & video layouts* — full-width or grid, stacked or swipe",
-  "*Better services* — price, savings badge and buttons, or a compact icon list",
-  "*Your brand colours* picked automatically from your logo, plus custom backgrounds",
-  "*AI card generator* — paste your website link and we build the card",
-  "*Tap-to-navigate address* with your Google Maps link",
-  "*You control what shows* — QR, share, views, plan badge and section order",
+  "*New card editor* — one screen, live preview, saves itself",
+  "*New premium designs* and a Compact layout",
+  "*Your brand colours* picked from your logo",
+  "*AI card generator* — paste your website, we build the card",
+  "*Better gallery, videos and services* layouts",
 ];
 
 /** "What's new" announcement for existing customers. */
@@ -72,16 +63,15 @@ export function featureUpdateWhatsApp(o: { name?: string | null; slug?: string |
   const lines = [
     `Hi ${o.name || "there"},`,
     "",
-    "Good news — your *DigitalCarda* card just got a big update:",
+    "Your *DigitalCarda* card just got a big update:",
     "",
     ...FEATURES.map((t) => `• ${t}`),
+    ...(cardUrl ? ["", "Your card — same link, same QR:", cardUrl] : []),
     "",
-    ...(cardUrl ? ["Your card (same link and QR):", cardUrl, ""] : []),
-    "Open your dashboard:",
+    "See it here:",
     `${SITE}/dashboard/build`,
     "",
-    "It's all included in your current plan — nothing extra to pay.",
-    "Reply here if you'd like a quick walkthrough.",
+    "All included in your plan. Reply if you'd like a quick walkthrough.",
     "",
     "— Team DigitalCarda",
   ];
