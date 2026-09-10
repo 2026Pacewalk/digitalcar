@@ -8,7 +8,13 @@ on:
 
 concurrency:
   group: deploy-production
-  cancel-in-progress: true
+  # QUEUE, don't cancel. Cancelling the GitHub job does NOT kill the deploy.sh
+  # already running on the VPS over SSH, so a rapid second push used to start a
+  # second deploy on top of the first — they collided on .git/index.lock and the
+  # newer run died at `git checkout` in ~10s ("Another git process seems to be
+  # running"). Queueing makes each push deploy in order; deploy.sh also takes a
+  # server-side lock as a second line of defence.
+  cancel-in-progress: false
 
 jobs:
   deploy:

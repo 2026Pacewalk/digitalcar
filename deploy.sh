@@ -29,6 +29,20 @@ echo "▶ Toolchain: node $(node -v), npm $(npm -v), pm2 $(pm2 -v)"
 
 cd "$APP_DIR"
 
+# ── Serialise deploys on THIS server ────────────────────────────────────────
+# A cancelled GitHub job does not kill the deploy already running here, so two
+# deploy.sh runs could overlap and fight over git's index.lock (the newer one
+# died at `git checkout`). Wait for the other one to finish instead of failing.
+# Degrades gracefully: if flock is unavailable we just carry on as before.
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"/tmp/digitalcarda-deploy.lock" || true
+  if ! flock -w 900 9; then
+    echo "✗ Another deploy is still running after 15 min — giving up." >&2
+    exit 1
+  fi
+  echo "▶ Deploy lock acquired"
+fi
+
 echo "▶ Fetching latest code…"
 git fetch --all --prune
 git checkout "$BRANCH"
