@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { PenLine, Copy, Check, Code2, AlertTriangle, ChevronDown, Info } from "lucide-react";
+import { PenLine, Copy, Check, Code2, AlertTriangle, ChevronDown, Info, Mail, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router";
 import ModuleShell, { Panel, Field, fieldCls, Tip } from "@/components/customer/ModuleShell";
@@ -116,6 +116,15 @@ export default function CustomerSignature() {
   const opts: SignatureOptions = { accent, showLogo, showQr, showSocials, showAddress, tagline: tagline.trim() };
   const html = useMemo(() => buildSignature(templateId, sig, opts), [templateId, sig, accent, showLogo, showQr, showSocials, showAddress, tagline]);
   const plain = useMemo(() => buildSignatureText(sig, opts), [sig, showAddress, showSocials, tagline]);
+  const active = SIGNATURE_TEMPLATES.find((t) => t.id === templateId);
+
+  /* Every design rendered at once for the picker thumbnails. Cheap — these are
+     string builds, not network calls — and it means the grid shows the customer
+     THEIR signature in each layout, with their own colour and toggles applied,
+     instead of a stock screenshot that never matches what they get. */
+  const thumbs = useMemo(() => Object.fromEntries(
+    SIGNATURE_TEMPLATES.map((t) => [t.id, buildSignature(t.id, sig, opts)]),
+  ) as Record<string, string>, [sig, accent, showLogo, showQr, showSocials, showAddress, tagline]);
 
   // A signature with no name/contact is worse than none — point them at the editor.
   const missing = [!sig.name && "your name", !sig.phone && "a phone number", !sig.email && "an email"].filter(Boolean) as string[];
@@ -148,7 +157,6 @@ export default function CustomerSignature() {
       /* No phone preview: this page shows the signature itself, and a card
          mock-up beside it competes with the thing being previewed. */
       preview={false} wide>
-      <Tip>Every email you send is a chance to share your card. Pick a design, copy it, and paste it once into your email settings — it then rides along on every message.</Tip>
 
       {missing.length > 0 && (
         <div className="flex items-start gap-3 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] px-4 py-3">
@@ -160,108 +168,151 @@ export default function CustomerSignature() {
         </div>
       )}
 
-      {/* ── Designs ── */}
-      <Panel title="Choose a design" subtitle="Six layouts, all built from the details already on your card">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-          {SIGNATURE_TEMPLATES.map((t) => (
-            <button key={t.id} onClick={() => setTemplateId(t.id)} type="button"
-              className={`text-left rounded-xl p-3 transition-all ${templateId === t.id ? "bg-[#FFFBEB] ring-2 ring-[#F7B31C]" : "bg-[#F8FAFC] ring-1 ring-[#E2E8F0] hover:ring-[#F7B31C]/50"}`}>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[13px] font-bold text-[#0F172A]">{t.name}</span>
-                {templateId === t.id && <Check size={13} className="text-[#F7B31C]" />}
+      {/* Two columns on desktop: choose on the left, the live result stays put
+          on the right. Picking a design is a compare-and-contrast job, so the
+          preview must never scroll out of view while you browse. */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_430px] gap-4 sm:gap-5 items-start">
+
+        {/* ── Left: designs and options ── */}
+        <div className="min-w-0 space-y-4 sm:space-y-5">
+          <Panel title="Choose a design" subtitle={`${SIGNATURE_TEMPLATES.length} layouts, every one built from the details already on your card`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {SIGNATURE_TEMPLATES.map((t) => (
+                <button key={t.id} type="button" onClick={() => setTemplateId(t.id)}
+                  aria-pressed={templateId === t.id}
+                  className={`group text-left rounded-2xl overflow-hidden transition-all ${
+                    templateId === t.id
+                      ? "ring-2 ring-[#F7B31C] bg-[#FFFBEB] shadow-premium"
+                      : "ring-1 ring-[#E2E8F0] bg-white hover:ring-[#F7B31C]/60 hover:shadow-premium"}`}>
+                  {/* A real, scaled-down render — you pick by looking, not by
+                      reading a description of what it might look like. */}
+                  <div className="h-[132px] bg-white border-b border-[#F1F5F9] overflow-hidden relative">
+                    <div className="absolute inset-0 origin-top-left pointer-events-none"
+                      style={{ transform: "scale(0.46)", width: "217%", padding: "14px 16px" }}
+                      dangerouslySetInnerHTML={{ __html: thumbs[t.id] }} />
+                  </div>
+                  <div className="px-3 py-2.5 flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold text-[#0F172A] leading-tight">{t.name}</p>
+                      <p className="text-[11px] text-[#64748B] leading-snug mt-0.5">{t.blurb}</p>
+                    </div>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                      templateId === t.id ? "bg-[#F7B31C]" : "bg-[#F1F5F9] group-hover:bg-[#E2E8F0]"}`}>
+                      {templateId === t.id && <Check size={12} className="text-[#0F172A]" />}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel title="What to include">
+            <div className="flex flex-wrap gap-2">
+              <Toggle on={showLogo} set={setShowLogo} label="Logo" />
+              <Toggle on={showQr} set={setShowQr} label="QR code" />
+              <Toggle on={showSocials} set={setShowSocials} label="Social links" />
+              <Toggle on={showAddress} set={setShowAddress} label="Address" />
+            </div>
+
+            {showLogo && logoIsEmbedded && (
+              <div className="flex items-start gap-2.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] px-3 py-2.5 mt-3">
+                <Info size={14} className="text-[#B45309] mt-0.5 shrink-0" />
+                <p className="text-[11px] text-[#92400E] leading-snug">
+                  Your logo is stored inside the card rather than as a web address. Gmail and Apple Mail usually
+                  re-upload it when you paste, but Outlook may drop it — if it disappears, turn the logo off or
+                  use the Plain text design.
+                </p>
               </div>
-              <p className="text-[11px] text-[#64748B] leading-snug mt-1">{t.blurb}</p>
-            </button>
-          ))}
-        </div>
-      </Panel>
+            )}
 
-      {/* ── Options ── */}
-      <Panel title="What to include">
-        <div className="flex flex-wrap gap-2">
-          <Toggle on={showLogo} set={setShowLogo} label="Logo" />
-          <Toggle on={showQr} set={setShowQr} label="QR code" />
-          <Toggle on={showSocials} set={setShowSocials} label="Social links" />
-          <Toggle on={showAddress} set={setShowAddress} label="Address" />
+            <div className="mt-4">
+              <p className="text-[11px] font-semibold text-[#334155] mb-2">Accent colour</p>
+              <div className="flex flex-wrap gap-2">
+                {ACCENTS.map((c) => (
+                  <button key={c} type="button" onClick={() => setAccent(c)} aria-label={`Accent ${c}`}
+                    className={`w-8 h-8 rounded-lg transition-transform ${accent === c ? "ring-2 ring-offset-2 ring-[#0F172A] scale-105" : "ring-1 ring-[#E2E8F0] hover:scale-105"}`}
+                    style={{ background: c }} />
+                ))}
+              </div>
+              <p className="text-[11px] text-[#94A3B8] mt-2">Monochrome ignores this — that design is black and white by definition.</p>
+            </div>
+
+            <div className="mt-4 max-w-lg">
+              <Field label="Tagline under the link" hint="Leave empty to hide it">
+                <input value={tagline} onChange={(e) => setTagline(e.target.value)} className={fieldCls} maxLength={90} />
+              </Field>
+            </div>
+          </Panel>
+
+          <Panel title="Where to paste it" subtitle="One-time setup per email account">
+            <div className="divide-y divide-[#F1F5F9]">
+              {HOW_TO.map((h, i) => (
+                <div key={h.client}>
+                  <button type="button" onClick={() => setOpenHelp(openHelp === i ? null : i)}
+                    className="w-full flex items-center justify-between py-3 text-left">
+                    <span className="text-[13px] font-semibold text-[#0F172A]">{h.client}</span>
+                    <ChevronDown size={16} className={`text-[#94A3B8] transition-transform ${openHelp === i ? "rotate-180" : ""}`} />
+                  </button>
+                  {openHelp === i && (
+                    <ol className="pb-3 pl-1 space-y-1.5">
+                      {h.steps.map((s, k) => (
+                        <li key={k} className="flex gap-2.5 text-[12px] text-[#475569] leading-snug">
+                          <span className="w-4 h-4 rounded-full bg-[#F1F5F9] text-[#64748B] text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{k + 1}</span>
+                          {s}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Panel>
         </div>
 
-        {showLogo && logoIsEmbedded && (
-          <div className="flex items-start gap-2.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] px-3 py-2.5 mt-3">
-            <Info size={14} className="text-[#B45309] mt-0.5 shrink-0" />
-            <p className="text-[11px] text-[#92400E] leading-snug">
-              Your logo is stored inside the card rather than as a web address. Gmail and Apple Mail usually
-              re-upload it when you paste, but Outlook may drop it — if it disappears, turn the logo off or
-              use the Plain text design.
-            </p>
+        {/* ── Right: the result, pinned ── */}
+        <aside className="xl:sticky xl:top-6 space-y-3">
+          <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[#F1F5F9]">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-7 h-7 rounded-lg bg-[#FEF3C7] flex items-center justify-center shrink-0">
+                  <Mail size={14} className="text-[#B45309]" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-bold text-[#0F172A] truncate">{active?.name}</p>
+                  <p className="text-[10px] text-[#94A3B8]">Exactly what lands in the inbox</p>
+                </div>
+              </div>
+            </div>
+
+            {/* A faux message footer, so it is judged in context. */}
+            <div className="p-4 overflow-x-auto">
+              <p className="text-[13px] text-[#94A3B8] mb-2">Thanks and regards,</p>
+              <div ref={previewRef} dangerouslySetInnerHTML={{ __html: html }} />
+            </div>
           </div>
-        )}
 
-        <div className="mt-4">
-          <p className="text-[11px] font-semibold text-[#334155] mb-2">Accent colour</p>
-          <div className="flex flex-wrap gap-2">
-            {ACCENTS.map((c) => (
-              <button key={c} type="button" onClick={() => setAccent(c)} aria-label={`Accent ${c}`}
-                className={`w-8 h-8 rounded-lg transition-transform ${accent === c ? "ring-2 ring-offset-2 ring-[#0F172A] scale-105" : "ring-1 ring-[#E2E8F0]"}`}
-                style={{ background: c }} />
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-4 max-w-lg">
-          <Field label="Tagline under the link" hint="Leave empty to hide it">
-            <input value={tagline} onChange={(e) => setTagline(e.target.value)} className={fieldCls} maxLength={90} />
-          </Field>
-        </div>
-      </Panel>
-
-      {/* ── Preview + copy ── */}
-      <Panel title="Preview" subtitle="This is exactly what lands in the reader's inbox">
-        <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 overflow-x-auto">
-          {/* A faux message footer so the signature is seen in context. */}
-          <p className="text-[13px] text-[#94A3B8] mb-1">Thanks and regards,</p>
-          <div ref={previewRef} dangerouslySetInnerHTML={{ __html: html }} />
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2.5 mt-4">
           <button onClick={doCopy} type="button"
-            className="flex-1 h-12 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.98]">
+            className="w-full h-12 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.98]">
             {copied === "rich" ? <><Check size={17} /> Copied — now paste it</> : <><Copy size={17} /> Copy signature</>}
           </button>
-          <button onClick={doCopyHtml} type="button"
-            className="h-12 px-5 rounded-xl bg-[#F1F5F9] text-[#334155] text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#E2E8F0] transition-colors">
-            {copied === "html" ? <Check size={16} className="text-emerald-500" /> : <Code2 size={16} />} Copy HTML
-          </button>
-        </div>
-        <p className="text-[11px] text-[#94A3B8] mt-2">
-          “Copy signature” keeps the formatting — paste it straight into your email signature box. “Copy HTML”
-          is the raw code, for signature editors that ask for HTML.
-        </p>
-      </Panel>
 
-      {/* ── Where to paste it ── */}
-      <Panel title="Where to paste it" subtitle="One-time setup per email account">
-        <div className="divide-y divide-[#F1F5F9]">
-          {HOW_TO.map((h, i) => (
-            <div key={h.client}>
-              <button type="button" onClick={() => setOpenHelp(openHelp === i ? null : i)}
-                className="w-full flex items-center justify-between py-3 text-left">
-                <span className="text-[13px] font-semibold text-[#0F172A]">{h.client}</span>
-                <ChevronDown size={16} className={`text-[#94A3B8] transition-transform ${openHelp === i ? "rotate-180" : ""}`} />
-              </button>
-              {openHelp === i && (
-                <ol className="pb-3 pl-1 space-y-1.5">
-                  {h.steps.map((s, k) => (
-                    <li key={k} className="flex gap-2.5 text-[12px] text-[#475569] leading-snug">
-                      <span className="w-4 h-4 rounded-full bg-[#F1F5F9] text-[#64748B] text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{k + 1}</span>
-                      {s}
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </div>
-          ))}
-        </div>
-      </Panel>
+          <div className="flex gap-2">
+            <button onClick={doCopyHtml} type="button"
+              className="flex-1 h-10 rounded-xl bg-[#F1F5F9] text-[#334155] text-[12px] font-semibold flex items-center justify-center gap-2 hover:bg-[#E2E8F0] transition-colors">
+              {copied === "html" ? <Check size={14} className="text-emerald-500" /> : <Code2 size={14} />} Copy HTML
+            </button>
+            <a href={cardUrl} target="_blank" rel="noreferrer"
+              className="flex-1 h-10 rounded-xl bg-[#F1F5F9] text-[#334155] text-[12px] font-semibold flex items-center justify-center gap-2 hover:bg-[#E2E8F0] transition-colors">
+              <ExternalLink size={14} /> Open my card
+            </a>
+          </div>
+
+          <p className="text-[11px] text-[#94A3B8] leading-snug">
+            “Copy signature” keeps the formatting — paste it straight into your email signature box.
+            “Copy HTML” is the raw code, for signature editors that ask for HTML.
+          </p>
+        </aside>
+      </div>
     </ModuleShell>
   );
 }
