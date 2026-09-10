@@ -1,9 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useNavigate } from "react-router";
-import { Sparkles, Wand2, RefreshCw, ArrowRight, ArrowLeft, Loader2, Check, Palette, Zap, Globe, PenLine } from "lucide-react";
+import { useNavigate, Link } from "react-router";
+import {
+  Sparkles, Wand2, RefreshCw, ArrowRight, ArrowLeft, Loader2, Check, Palette,
+  Zap, Globe, PenLine, ChevronRight, FileText, ShoppingBag, Search, Layers,
+  Clock, Rocket, Eye,
+} from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { buildCardHtml, buildCardThumb } from "@/card-template/buildCard";
 import { toast } from "sonner";
+import { Reveal, SectionHeading } from "@/components/public/Reveal";
 
 type AiCard = {
   tagline: string; about: string; services: { name: string; description: string }[];
@@ -44,6 +49,31 @@ const PROFESSIONS = ["Real Estate Agent", "Doctor", "Chartered Accountant", "Int
 const GEN_MSGS = ["Understanding your business…", "Writing your bio & services…", "Matching a design & colours…", "Polishing your card…"];
 const WEB_MSGS = ["Reading your website…", "Finding your logo & brand colours…", "Pulling your services & contact details…", "Designing your card…"];
 
+/* Marketing content — rendered only on the form step, so it never competes
+   with the tool once someone is actually generating or reviewing a card. */
+const WRITES = [
+  { icon: PenLine, accent: "#F7B31C", title: "Your tagline", desc: "One line that says what you do, in words a customer would actually use." },
+  { icon: FileText, accent: "#8B5CF6", title: "Your about section", desc: "A short, credible introduction written from your own business details." },
+  { icon: ShoppingBag, accent: "#EC4899", title: "Your services", desc: "Each one named and described, ready to show with pricing later." },
+  { icon: Search, accent: "#3B82F6", title: "Your SEO text", desc: "Meta title and description so the card can be found on Google." },
+  { icon: Palette, accent: "#14B8A6", title: "A matching design", desc: "A template and colour pair picked to suit your line of work." },
+  { icon: Zap, accent: "#F97316", title: "Your call to action", desc: "The button text most likely to turn a visitor into an enquiry." },
+];
+
+const HOW = [
+  { icon: PenLine, num: 1, title: "Describe it, or paste a link", desc: "Three details is enough. If you already have a website, the link alone will do." },
+  { icon: Sparkles, num: 2, title: "AI writes and designs", desc: "Copy, services, SEO, template and colours — generated in about ten seconds." },
+  { icon: Rocket, num: 3, title: "Preview, tweak, publish", desc: "Swap the design, change colours, regenerate any section, then save it free." },
+];
+
+const AI_FAQS = [
+  { q: "Is the AI card generator free to use?", a: "Yes. You can generate a card and preview it live without signing up or entering any card details. You only create an account when you want to save it and publish it on your own link." },
+  { q: "What does the AI actually write for me?", a: "It writes your tagline, about section, service names and descriptions, SEO title and description, and your call-to-action button text. It also picks a template and a colour pair that suit your profession." },
+  { q: "Can I build a card from my existing website?", a: "Yes. Paste your website address and the AI reads the page — pulling your logo, brand colours, services, contact details and location — then writes the card content to match what is already on your site." },
+  { q: "Can I change what the AI produced?", a: "Yes. Every section has a regenerate button, you can pick any of the 31 designs, and you can override the primary and secondary colours with your own brand shades before saving." },
+  { q: "How long does it take?", a: "About five seconds when you describe your business, and around ten when the AI has to read your website first. The preview updates instantly after that." },
+];
+
 export default function AIGenerator() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"form" | "generating" | "result">("form");
@@ -56,6 +86,7 @@ export default function AIGenerator() {
   const [customColor, setCustomColor] = useState<string | null>(null);  // user's colour override (null = follow design)
   const [customColor2, setCustomColor2] = useState<string | null>(null);
   const [msgIdx, setMsgIdx] = useState(0);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
   const genMut = trpc.ai.generate.useMutation();
   const regenMut = trpc.ai.regenerate.useMutation();
   const webMut = trpc.ai.fromWebsite.useMutation();
@@ -63,9 +94,34 @@ export default function AIGenerator() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
-    if (step === "generating") { timerRef.current = setInterval(() => setMsgIdx((i) => (i + 1) % GEN_MSGS.length), 1100); }
+    // Advance and hold on the last step. It used to wrap with `% length`, which
+    // is fine for a rotating caption but wrong for a checklist — steps would
+    // un-tick and start over while the request was still in flight.
+    if (step === "generating") { timerRef.current = setInterval(() => setMsgIdx((i) => Math.min(i + 1, GEN_MSGS.length - 1)), 1100); }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [step]);
+
+  // FAQPage schema, matching the copy rendered below the tool.
+  useEffect(() => {
+    const ld = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: AI_FAQS.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    };
+    let s = document.getElementById("dc-ai-ld");
+    if (!s) {
+      s = document.createElement("script");
+      s.id = "dc-ai-ld";
+      (s as HTMLScriptElement).type = "application/ld+json";
+      document.head.appendChild(s);
+    }
+    s.textContent = JSON.stringify(ld);
+    return () => { document.getElementById("dc-ai-ld")?.remove(); };
+  }, []);
 
   const generate = async () => {
     if (!form.businessName.trim() || !form.profession.trim()) { toast.error("Add your business name and profession"); return; }
@@ -152,13 +208,32 @@ export default function AIGenerator() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FFFBEB] via-white to-white pt-24 pb-20">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="text-center max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-b from-[#FFFBEB] via-white to-white pt-24 pb-20 relative">
+      {/* Ambient backdrop — decorative only, and already covered by the
+          reduced-motion kill list via animate-aurora-drift. */}
+      <div aria-hidden="true" className="absolute inset-0 bg-grid mask-fade-b opacity-60 pointer-events-none" />
+      <div aria-hidden="true" className="absolute top-0 right-0 w-[520px] h-[520px] bg-[#F7B31C]/15 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4 animate-aurora-drift pointer-events-none" />
+      <div aria-hidden="true" className="absolute top-40 left-0 w-[380px] h-[380px] bg-[#8B5CF6]/10 rounded-full blur-3xl -translate-x-1/3 animate-aurora-drift pointer-events-none" style={{ animationDelay: "3s" }} />
+
+      <div className="max-w-6xl mx-auto px-4 relative">
+        <Reveal stagger className="text-center max-w-2xl mx-auto">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0F172A] text-[#F7B31C] text-[11px] font-bold uppercase tracking-wider"><Sparkles size={13} /> AI Powered</span>
-          <h1 className="mt-4 text-4xl sm:text-5xl font-extrabold text-[#0F172A] tracking-tight">Your digital card, written by AI</h1>
-          <p className="mt-4 text-base text-[#64748B]">Tell us three things — our AI writes your bio, services and SEO, and picks a design. Preview it live, then save &amp; publish free.</p>
-        </div>
+          <h1 className="mt-5 text-4xl sm:text-5xl font-extrabold text-[#0F172A] tracking-tight leading-[1.08]">
+            Your digital card,{" "}
+            <span className="relative inline-block text-gradient-gold">
+              written by AI
+              <svg className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 300 10" fill="none" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M2 7c60-5 120-5 180-2s90 3 116-1" stroke="#F7B31C" strokeWidth="3" strokeLinecap="round" opacity="0.5" />
+              </svg>
+            </span>
+          </h1>
+          <p className="mt-6 text-base text-[#64748B] leading-relaxed">Tell us three things — our AI writes your bio, services and SEO, and picks a design. Preview it live, then save &amp; publish free.</p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12px] text-[#64748B]">
+            <span className="inline-flex items-center gap-1.5"><Check size={13} className="text-emerald-500" /> Free to try</span>
+            <span className="inline-flex items-center gap-1.5"><Check size={13} className="text-emerald-500" /> No signup to preview</span>
+            <span className="inline-flex items-center gap-1.5"><Clock size={13} className="text-emerald-500" /> About 10 seconds</span>
+          </div>
+        </Reveal>
 
         {step === "form" && (
           <div className="mt-10 max-w-xl mx-auto bg-white rounded-3xl shadow-premium-lg border border-[#F1F5F9] p-7">
@@ -219,16 +294,46 @@ export default function AIGenerator() {
           </div>
         )}
 
-        {step === "generating" && (
-          <div className="mt-16 flex flex-col items-center text-center">
-            <div className="relative w-24 h-24">
-              <div className="absolute inset-0 rounded-full bg-[#F7B31C]/20 animate-ping" />
-              <div className="relative w-24 h-24 rounded-full gradient-gold flex items-center justify-center"><Sparkles size={38} className="text-[#0F172A] animate-pulse" /></div>
+        {step === "generating" && (() => {
+          const msgs = mode === "website" ? WEB_MSGS : GEN_MSGS;
+          const pct = Math.round(((msgIdx + 1) / msgs.length) * 100);
+          return (
+            <div className="mt-14 max-w-md mx-auto">
+              <div className="flex flex-col items-center text-center">
+                <div className="relative w-24 h-24">
+                  <div className="absolute inset-0 rounded-full bg-[#F7B31C]/20 animate-ping" />
+                  <div className="relative w-24 h-24 rounded-full gradient-gold flex items-center justify-center shadow-gold"><Sparkles size={38} className="text-[#0F172A] animate-pulse" /></div>
+                </div>
+                <h2 className="mt-7 text-xl font-bold text-[#0F172A]">Creating your card…</h2>
+                <p className="mt-1.5 text-[13px] text-[#94A3B8]">This usually takes a few seconds.</p>
+              </div>
+
+              {/* Checklist: done steps tick, the current one spins. Far easier to
+                  wait through than a single caption that keeps changing. */}
+              <div className="mt-8 rounded-2xl bg-white ring-1 ring-[#E7EBF2] shadow-premium-lg p-5">
+                <div className="h-1.5 rounded-full bg-[#F1F5F9] overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-[#F7B31C] to-[#D97706] transition-all duration-700 ease-out" style={{ width: `${pct}%` }} />
+                </div>
+                <ul className="mt-5 space-y-3.5" aria-live="polite">
+                  {msgs.map((m, i) => {
+                    const done = i < msgIdx;
+                    const now = i === msgIdx;
+                    return (
+                      <li key={m} className={`flex items-center gap-3 transition-all duration-500 ${done || now ? "opacity-100" : "opacity-40"}`}>
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors duration-500 ${
+                          done ? "bg-emerald-50 text-emerald-600" : now ? "bg-[#FEF3C7] text-[#B45309]" : "bg-[#F1F5F9] text-[#CBD5E1]"
+                        }`}>
+                          {done ? <Check size={14} strokeWidth={3} /> : now ? <Loader2 size={14} className="animate-spin" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+                        </span>
+                        <span className={`text-[13.5px] leading-snug ${now ? "font-bold text-[#0F172A]" : done ? "font-medium text-[#475569]" : "text-[#94A3B8]"}`}>{m}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             </div>
-            <h2 className="mt-8 text-xl font-bold text-[#0F172A]">Creating your card…</h2>
-            <p className="mt-2 text-sm text-[#64748B] h-5 transition-all">{(mode === "website" ? WEB_MSGS : GEN_MSGS)[msgIdx]}</p>
-          </div>
-        )}
+          );
+        })()}
 
         {step === "result" && gen && (
           <div className="mt-10 space-y-6">
@@ -318,6 +423,111 @@ export default function AIGenerator() {
               <button onClick={() => setStep("form")} className="w-full text-sm text-[#94A3B8] hover:text-[#0F172A] flex items-center justify-center gap-1.5 transition-colors"><ArrowLeft size={14} /> Start over</button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── Below the tool. Only on the form step: once someone is generating
+            or reviewing a card, this would just be noise under their result. ── */}
+        {step === "form" && (
+          <div className="mt-24 space-y-24">
+            {/* What the AI writes */}
+            <section>
+              <SectionHeading
+                eyebrow="What you get"
+                title={<>Six Things Written <span className="text-gradient-gold">For You</span></>}
+                subtitle="Not a blank template — a finished card with the words already in it."
+              />
+              <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {WRITES.map((w) => (
+                  <div key={w.title} className="group relative rounded-2xl bg-gradient-to-b from-white to-[#FAFBFD] ring-1 ring-[#E8ECF3] p-5 overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-premium-lg hover:ring-[#F7B31C]/40">
+                    <span aria-hidden="true" className="absolute -right-8 -top-8 w-28 h-28 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: `${w.accent}2E` }} />
+                    <span className="relative w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-105" style={{ background: `${w.accent}18`, color: w.accent }}>
+                      <w.icon size={19} />
+                    </span>
+                    <h3 className="relative text-[14.5px] font-bold text-[#0F172A] mb-1.5">{w.title}</h3>
+                    <p className="relative text-[12.5px] text-[#64748B] leading-relaxed">{w.desc}</p>
+                  </div>
+                ))}
+              </Reveal>
+            </section>
+
+            {/* How it works */}
+            <section className="relative rounded-3xl bg-gradient-to-br from-[#0F172A] to-[#1E293B] ring-1 ring-white/10 px-6 py-14 sm:px-10 overflow-hidden">
+              <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-25" />
+              <div aria-hidden="true" className="absolute -top-16 -right-16 w-64 h-64 bg-[#F7B31C]/20 rounded-full blur-3xl" />
+              <div className="relative">
+                <SectionHeading
+                  eyebrow="How it works"
+                  title={<>Three Steps, <span className="text-gradient-gold">Ten Seconds</span></>}
+                  subtitle="No brief to write, no designer to book, nothing to install."
+                  light
+                />
+                <Reveal stagger className="grid sm:grid-cols-3 gap-8 relative">
+                  <div aria-hidden="true" className="hidden sm:block absolute top-10 left-[16%] right-[16%] h-0.5 border-t-2 border-dashed border-white/20" />
+                  {HOW.map((s) => (
+                    <div key={s.num} className="text-center relative z-10 group">
+                      <div className="relative w-20 h-20 mx-auto mb-5">
+                        <div className="w-20 h-20 rounded-2xl bg-white shadow-lg flex items-center justify-center transition-transform duration-300 group-hover:-translate-y-1">
+                          <s.icon size={28} className="text-[#D97706]" />
+                        </div>
+                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-[#0F172A] border-2 border-[#F7B31C] flex items-center justify-center">
+                          <span className="text-xs font-bold text-[#F7B31C]">{s.num}</span>
+                        </div>
+                      </div>
+                      <h3 className="text-[16px] font-bold text-white mb-2">{s.title}</h3>
+                      <p className="text-[12.5px] text-[#94A3B8] leading-relaxed max-w-xs mx-auto">{s.desc}</p>
+                    </div>
+                  ))}
+                </Reveal>
+              </div>
+            </section>
+
+            {/* FAQ */}
+            <section className="max-w-3xl mx-auto">
+              <SectionHeading
+                eyebrow="Questions"
+                title={<>Before You <span className="text-gradient-gold">Generate</span></>}
+                subtitle="What people ask about the AI generator."
+              />
+              <Reveal stagger className="space-y-3">
+                {AI_FAQS.map((f, i) => {
+                  const on = openFaq === i;
+                  return (
+                    <div key={f.q} className={`rounded-2xl bg-white ring-1 transition-all duration-300 ${on ? "ring-[#F7B31C]/45 shadow-premium-lg" : "ring-[#E2E8F0] shadow-premium hover:ring-[#CBD5E1]"}`}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaq(on ? null : i)}
+                        aria-expanded={on}
+                        className="w-full flex items-center gap-4 text-left px-5 sm:px-6 py-4 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
+                      >
+                        <h3 className="flex-1 text-[14.5px] font-bold text-[#0F172A] leading-snug">{f.q}</h3>
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${on ? "bg-[#F7B31C] text-[#0F172A] rotate-90" : "bg-[#F1F5F9] text-[#64748B]"}`}>
+                          <ChevronRight size={15} />
+                        </span>
+                      </button>
+                      <div className="grid transition-all duration-300 ease-out" style={{ gridTemplateRows: on ? "1fr" : "0fr" }}>
+                        <div className="overflow-hidden">
+                          <p className="px-5 sm:px-6 pb-5 text-[13.5px] text-[#64748B] leading-relaxed">{f.a}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </Reveal>
+
+              <Reveal className="mt-9 text-center">
+                <p className="text-[13.5px] text-[#64748B]">
+                  Prefer to build it yourself?{" "}
+                  <Link to="/digital-business-cards-templates" className="font-semibold text-[#B45309] hover:underline inline-flex items-center gap-1">
+                    <Eye size={13} /> Browse the templates
+                  </Link>
+                  {" "}or{" "}
+                  <Link to="/features" className="font-semibold text-[#B45309] hover:underline inline-flex items-center gap-1">
+                    <Layers size={13} /> see every feature
+                  </Link>.
+                </p>
+              </Reveal>
+            </section>
           </div>
         )}
       </div>
