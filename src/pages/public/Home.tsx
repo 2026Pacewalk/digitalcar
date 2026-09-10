@@ -370,23 +370,36 @@ function StatsBand() {
    Trusted marquee
    ───────────────────────────────────────────────────────────── */
 function TrustedSection() {
-  const brands = ["Digital Agencies", "Doctors & Clinics", "Consultants", "Restaurants", "Real Estate", "Freelancers", "Retail Stores", "Coaches", "Salons", "Photographers"];
-  const row = [...brands, ...brands];
+  // Two rows drifting opposite ways, with the rating anchored in the middle
+  // so the strip reads as proof rather than decoration.
+  const rowA = ["Digital Agencies", "Doctors & Clinics", "Consultants", "Restaurants", "Real Estate", "Freelancers"];
+  const rowB = ["Retail Stores", "Coaches", "Salons", "Photographers", "Event Planners", "Startups"];
+  const pill = (b: string, i: number) => (
+    <span key={`${b}-${i}`} className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-[#E2E8F0] shadow-premium text-sm font-medium text-[#475569]">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C]" /> {b}
+    </span>
+  );
+
   return (
-    <section className="py-14">
+    <section className="py-14 bg-gradient-to-b from-white to-[#F8FAFC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <p className="text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-widest mb-8">
-          Trusted by businesses, professionals & local brands across India
-        </p>
-      </div>
-      <div className="relative overflow-hidden mask-fade-x">
-        <div className="marquee-track gap-3">
-          {row.map((b, i) => (
-            <span key={i} className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-[#E2E8F0] shadow-premium text-sm font-medium text-[#475569]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C]" /> {b}
+        <div className="flex flex-col items-center gap-3 mb-8">
+          <p className="text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-widest">
+            Trusted by businesses, professionals &amp; local brands across India
+          </p>
+          <div className="inline-flex items-center gap-2.5 h-9 pl-3 pr-4 rounded-full bg-white ring-1 ring-[#E2E8F0] shadow-premium">
+            <span className="flex items-center gap-0.5">
+              {[...Array(5)].map((_, i) => <Star key={i} size={12} className="fill-[#F7B31C] text-[#F7B31C]" />)}
             </span>
-          ))}
+            <span className="text-[12px] font-bold text-[#0F172A]">4.9</span>
+            <span className="text-[12px] text-[#64748B]">from 1,456+ businesses</span>
+          </div>
         </div>
+      </div>
+
+      <div className="relative overflow-hidden mask-fade-x space-y-3">
+        <div className="marquee-track gap-3">{[...rowA, ...rowA].map(pill)}</div>
+        <div className="marquee-track marquee-track--rev gap-3">{[...rowB, ...rowB].map(pill)}</div>
       </div>
     </section>
   );
@@ -587,35 +600,78 @@ function WhyDigitalCardaSection() {
   );
 }
 
-/* ─── AI Section ─── */
+/* ─── AI Section ─────────────────────────────────────────────
+   Asymmetric on purpose: one hero tile that demonstrates the AI card
+   generator, with the supporting tools as compact rows beside it —
+   rather than eight identical cards in a row. */
 function AISection() {
-  const aiFeatures = [
-    { icon: FileDown, title: "AI About Us Writer", desc: "Generate compelling business descriptions instantly." },
-    { icon: ShoppingBag, title: "AI Product Descriptions", desc: "Create product copy that converts visitors to buyers." },
-    { icon: Globe, title: "AI SEO Generator", desc: "Auto-generate meta titles, descriptions, and keywords." },
-    { icon: CreditCard, title: "AI Bio Writer", desc: "Craft a professional bio for your digital card." },
-    { icon: MessageCircle, title: "AI FAQ Generator", desc: "Generate relevant FAQs for your business automatically." },
-    { icon: Globe, title: "AI Translation", desc: "Translate your card content into multiple languages." },
-    { icon: Mail, title: "AI Lead Reply", desc: "Draft professional responses to captured leads." },
-    { icon: Sparkles, title: "AI Template Suggestion", desc: "Get AI-recommended templates for your industry." },
+  const aiTools = [
+    { icon: FileText, title: "AI About Us Writer", desc: "Compelling business descriptions, instantly." },
+    { icon: ShoppingBag, title: "AI Product Copy", desc: "Product text that turns visitors into buyers." },
+    { icon: Globe, title: "AI SEO Generator", desc: "Meta titles, descriptions and keywords." },
+    { icon: MessageCircle, title: "AI FAQ Generator", desc: "Answer the questions customers actually ask." },
+    { icon: Mail, title: "AI Lead Reply", desc: "Draft professional replies to captured leads." },
+    { icon: Layers, title: "AI Translation", desc: "Publish your card in multiple languages." },
   ];
+  const extracted = ["Logo", "Brand colours", "Services", "Contact details"];
+
   return (
     <section className="py-20 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#F7B31C]/8 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-[250px] h-[250px] bg-[#14B8A6]/8 rounded-full blur-3xl" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <SectionHeading eyebrow="AI Tools" title="Build Smarter Cards with AI" subtitle="AI tools that write business descriptions, product content, SEO titles, FAQs, bios, CTAs, and multilingual content in seconds." light />
-        <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {aiFeatures.map((f, i) => (
-            <div key={i} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 card-hover hover:border-[#F7B31C]/30">
-              <div className="w-10 h-10 rounded-xl bg-[#F7B31C]/20 flex items-center justify-center mb-3"><f.icon size={18} className="text-[#F7B31C]" /></div>
-              <h3 className="text-sm font-semibold text-white mb-1">{f.title}</h3>
-              <p className="text-xs text-[#94A3B8] leading-relaxed">{f.desc}</p>
+      <div className="absolute inset-0 bg-grid-dark opacity-30" />
+      <div className="absolute top-0 right-0 w-[340px] h-[340px] bg-[#F7B31C]/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 left-0 w-[280px] h-[280px] bg-[#14B8A6]/10 rounded-full blur-3xl" />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <SectionHeading eyebrow="AI Tools" title={<>Build Smarter Cards with <span className="text-gradient-gold">AI</span></>} subtitle="Paste a website and AI builds the card. Or let it write your bio, products, SEO and FAQs one section at a time." light />
+
+        <div className="grid lg:grid-cols-5 gap-5">
+          {/* Hero tile — the generator, shown as a flow rather than described */}
+          <Reveal className="lg:col-span-2">
+            <div className="relative h-full rounded-3xl p-[1.5px] bg-gradient-to-br from-[#F7B31C] via-[#F7B31C]/25 to-[#14B8A6]/40">
+              <div className="h-full rounded-[calc(1.5rem-1px)] bg-[#0B1222] p-6 flex flex-col">
+                <span className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#F7B31C]/15 text-[#F7B31C] ring-1 ring-[#F7B31C]/25">
+                  <Sparkles size={11} /> Most loved
+                </span>
+                <h3 className="mt-4 text-xl font-extrabold text-white leading-snug">AI Card Generator</h3>
+                <p className="mt-2 text-[13px] text-[#94A3B8] leading-relaxed">Already have a website? Paste the link — AI reads it and builds a finished card for you.</p>
+
+                {/* the flow */}
+                <div className="mt-6 space-y-3">
+                  <div className="flex items-center gap-2.5 h-11 px-3.5 rounded-xl bg-white/[0.06] ring-1 ring-white/10">
+                    <Globe size={15} className="text-[#14B8A6] shrink-0" />
+                    <span className="text-[13px] text-white font-medium">pacewalk.com</span>
+                    <span className="w-[2px] h-4 bg-[#F7B31C] animate-pulse rounded-full" />
+                  </div>
+                  <div className="flex justify-center"><ChevronRight size={16} className="text-[#475569] rotate-90" /></div>
+                  <div className="flex flex-wrap gap-2">
+                    {extracted.map((e) => (
+                      <span key={e} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#14B8A6]/10 ring-1 ring-[#14B8A6]/25 text-[11px] font-semibold text-[#5EEAD4]">
+                        <Check size={10} /> {e}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <Link to="/ai-card-generator" className="btn-gold mt-auto pt-0 h-12 flex items-center justify-center gap-2 !mt-7">
+                  <Sparkles size={17} /> Try It Free
+                </Link>
+              </div>
             </div>
-          ))}
-        </Reveal>
-        <div className="text-center mt-10">
-          <Link to="/ai-card-generator" className="btn-gold inline-flex items-center gap-2 h-12 px-7"><Sparkles size={18} /> Try AI Card Generator</Link>
+          </Reveal>
+
+          {/* Supporting tools — compact rows, two up */}
+          <Reveal stagger className="lg:col-span-3 grid sm:grid-cols-2 gap-3.5 content-start">
+            {aiTools.map((f) => (
+              <div key={f.title} className="group flex items-start gap-3.5 rounded-2xl bg-white/[0.045] ring-1 ring-white/10 p-4 transition-all hover:bg-white/[0.08] hover:ring-[#F7B31C]/35 hover:-translate-y-0.5">
+                <span className="w-10 h-10 rounded-xl bg-[#F7B31C]/15 ring-1 ring-[#F7B31C]/20 flex items-center justify-center shrink-0 transition-colors group-hover:bg-[#F7B31C]">
+                  <f.icon size={17} className="text-[#F7B31C] transition-colors group-hover:text-[#0F172A]" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-[13.5px] font-bold text-white leading-tight">{f.title}</h3>
+                  <p className="mt-1 text-[12px] text-[#94A3B8] leading-relaxed">{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </Reveal>
         </div>
       </div>
     </section>
@@ -672,32 +728,53 @@ function TemplatesSection() {
   );
 }
 
-/* ─── Industries ─── */
+/* ─── Industries ─────────────────────────────────────────────
+   Spotlight + field: the four verticals that actually drive signups get
+   real cards; the long tail becomes a pill field. Fifteen identical
+   tiles read as a list — this reads as a hierarchy. */
 function IndustriesSection() {
-  const industries = [
-    { icon: Monitor, name: "Digital Marketing Agencies" }, { icon: CreditCard, name: "Doctors & Clinics" },
-    { icon: MapPin, name: "Real Estate Agents" }, { icon: Shield, name: "Lawyers" },
-    { icon: Users, name: "Consultants" }, { icon: Sparkles, name: "Freelancers" },
-    { icon: ShoppingBag, name: "Restaurants" }, { icon: Image, name: "Salons" },
-    { icon: ShoppingBag, name: "Retail Shops" }, { icon: Zap, name: "Coaches" },
-    { icon: Image, name: "Photographers" }, { icon: Clock, name: "Event Planners" },
-    { icon: FileDown, name: "Education Institutes" }, { icon: Zap, name: "Startups" },
-    { icon: Shield, name: "Local Service Providers" },
+  const featured = [
+    { icon: Monitor, name: "Digital Agencies", desc: "Pitch decks, portfolios and client links in one place.", accent: "#8B5CF6" },
+    { icon: CreditCard, name: "Doctors & Clinics", desc: "Timings, location and appointment booking in a tap.", accent: "#14B8A6" },
+    { icon: MapPin, name: "Real Estate", desc: "Listings, site visits and instant WhatsApp enquiries.", accent: "#F7B31C" },
+    { icon: ShoppingBag, name: "Restaurants & Retail", desc: "Menu, offers, payments and Google reviews together.", accent: "#EC4899" },
   ];
+  const more = [
+    "Lawyers", "Consultants", "Freelancers", "Salons & Spas", "Coaches & Trainers",
+    "Photographers", "Event Planners", "Education Institutes", "Startups",
+    "Interior Designers", "Local Services",
+  ];
+
   return (
-    <section className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeading eyebrow="Industries" title="Made for Every Business Type" subtitle="Whatever your industry, DigitalCarda has the features and templates to help you grow." />
-        <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {industries.map((ind, i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9] card-hover flex items-center gap-3 hover:border-[#F7B31C]/40 group">
-              <div className="w-10 h-10 rounded-xl bg-[#F1F5F9] group-hover:bg-[#FEF3C7] flex items-center justify-center shrink-0 transition-colors">
-                <ind.icon size={18} className="text-[#F7B31C]" />
-              </div>
-              <span className="text-sm font-medium text-[#0F172A]">{ind.name}</span>
+    <section className="py-20 bg-white relative overflow-hidden">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHeading eyebrow="Industries" title={<>Made for Every <span className="text-gradient-gold">Business Type</span></>} subtitle="Whatever you do, there is a template and a feature set already shaped for it." />
+
+        <Reveal stagger className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {featured.map((f) => (
+            <div key={f.name} className="group relative rounded-2xl bg-gradient-to-b from-white to-[#FAFBFD] ring-1 ring-[#E8ECF3] p-5 overflow-hidden transition-all hover:-translate-y-1 hover:shadow-premium-lg hover:ring-[#F7B31C]/40">
+              <span aria-hidden="true" className="absolute -right-6 -top-6 w-24 h-24 rounded-full blur-2xl transition-opacity opacity-0 group-hover:opacity-100" style={{ background: `${f.accent}26` }} />
+              <span className="relative w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: `${f.accent}1A`, color: f.accent }}>
+                <f.icon size={19} />
+              </span>
+              <h3 className="relative text-[15px] font-bold text-[#0F172A] mb-1.5">{f.name}</h3>
+              <p className="relative text-[12.5px] text-[#64748B] leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </Reveal>
+
+        <Reveal className="mt-8">
+          <p className="text-center text-[11px] font-bold uppercase tracking-widest text-[#94A3B8] mb-5">And plenty more</p>
+          <div className="flex flex-wrap justify-center gap-2.5">
+            {more.map((m) => (
+              <span key={m} className="inline-flex items-center gap-2 h-9 px-4 rounded-full bg-[#F8FAFC] ring-1 ring-[#E2E8F0] text-[13px] font-medium text-[#475569] transition-all hover:bg-white hover:ring-[#F7B31C]/50 hover:-translate-y-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C]" /> {m}
+              </span>
+            ))}
+          </div>
+        </Reveal>
+
         <div className="text-center mt-10">
           <Link to="/industries" className="btn-navy inline-flex items-center gap-2">View All Industries <ChevronRight size={16} /></Link>
         </div>
@@ -750,31 +827,151 @@ function HowItWorksSection() {
   );
 }
 
-/* ─── Analytics ─── */
+/* ─── Analytics ──────────────────────────────────────────────
+   The section that most needed a real visual: a page selling analytics
+   should SHOW analytics. One series (views over 12 months) with a hover
+   crosshair, KPI tiles with sparklines, then the trackable metrics as
+   chips — deliberately NOT another uniform card grid. */
+const VIEW_SERIES = [2100, 2580, 3120, 2870, 3760, 4380, 5210, 4880, 6090, 7020, 7810, 9140];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/* Smooth cubic through points (midpoint control points — stable for any series). */
+function smoothPath(pts: { x: number; y: number }[]) {
+  if (!pts.length) return "";
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length; i++) {
+    const cx = (pts[i - 1].x + pts[i].x) / 2;
+    d += ` C ${cx} ${pts[i - 1].y}, ${cx} ${pts[i].y}, ${pts[i].x} ${pts[i].y}`;
+  }
+  return d;
+}
+
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  const W = 70, H = 24;
+  const max = Math.max(...data), min = Math.min(...data), span = max - min || 1;
+  const pts = data.map((v, i) => ({ x: (i / (data.length - 1)) * W, y: H - 3 - ((v - min) / span) * (H - 6) }));
+  const last = pts[pts.length - 1];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true" className="shrink-0">
+      <path d={smoothPath(pts)} fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={last.x} cy={last.y} r="2.5" fill={color} />
+    </svg>
+  );
+}
+
+const KPIS = [
+  { label: "Total Views", value: "91,240", delta: "+18.2%", spark: [12, 18, 15, 22, 26, 24, 33], color: "#D97706" },
+  { label: "WhatsApp Clicks", value: "12,806", delta: "+24.5%", spark: [8, 11, 10, 15, 14, 19, 23], color: "#16A34A" },
+  { label: "QR Scans", value: "7,412", delta: "+11.8%", spark: [6, 8, 12, 10, 14, 16, 18], color: "#8B5CF6" },
+  { label: "Leads Captured", value: "2,318", delta: "+31.4%", spark: [3, 5, 4, 8, 9, 12, 16], color: "#3B82F6" },
+];
+
+function AnalyticsPanel() {
+  const [hover, setHover] = useState<number | null>(null);
+  const W = 760, H = 208, padL = 10, padR = 10, padT = 16, padB = 28;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const max = Math.max(...VIEW_SERIES) * 1.08;            // headroom so the peak is not clipped
+  const pts = VIEW_SERIES.map((v, i) => ({
+    x: padL + (i / (VIEW_SERIES.length - 1)) * innerW,
+    y: padT + (1 - v / max) * innerH,
+  }));
+  const line = smoothPath(pts);
+  const base = padT + innerH;                             // area charts sit on a zero baseline
+  const area = `${line} L ${pts[pts.length - 1].x} ${base} L ${pts[0].x} ${base} Z`;
+  const act = hover != null ? pts[hover] : null;
+
+  return (
+    <div className="rounded-3xl bg-white ring-1 ring-[#E7EBF2] shadow-premium-lg overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-[#F1F5F9]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-9 h-9 rounded-xl bg-[#FEF3C7] flex items-center justify-center shrink-0"><BarChart3 size={17} className="text-[#B45309]" /></span>
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold text-[#0F172A] leading-tight">Card Analytics</p>
+            <p className="text-[11px] text-[#94A3B8]">Views over the last 12 months</p>
+          </div>
+        </div>
+        <span className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[#F8FAFC] ring-1 ring-[#E2E8F0] text-[11px] font-semibold text-[#475569] shrink-0">
+          <Clock size={12} /> Last 12 months
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-[#F1F5F9]">
+        {KPIS.map((k) => (
+          <div key={k.label} className="bg-white px-4 sm:px-5 py-4">
+            <p className="text-[11px] font-medium text-[#94A3B8] truncate">{k.label}</p>
+            <div className="mt-1.5 flex items-end justify-between gap-2">
+              <p className="text-xl font-extrabold text-[#0F172A] tabular-nums leading-none">{k.value}</p>
+              <Sparkline data={k.spark} color={k.color} />
+            </div>
+            <span className="mt-2.5 inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-700 bg-emerald-50 ring-1 ring-emerald-100 rounded-full px-2 py-0.5">
+              <TrendingUp size={10} /> {k.delta}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="relative px-2 sm:px-4 pt-5 pb-2">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block" role="img"
+          aria-label="Card views rising from about 2,100 in January to about 9,140 in December">
+          <defs>
+            <linearGradient id="dcAreaFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#F7B31C" stopOpacity="0.32" />
+              <stop offset="100%" stopColor="#F7B31C" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+            <line key={t} x1={padL} x2={W - padR} y1={padT + t * innerH} y2={padT + t * innerH}
+              stroke="#EEF2F7" strokeWidth="1" strokeDasharray={t === 1 ? "0" : "4 5"} />
+          ))}
+          <path d={area} fill="url(#dcAreaFill)" />
+          <path d={line} fill="none" stroke="#D97706" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+          {pts.map((p, i) => (
+            <text key={i} x={p.x} y={H - 8} textAnchor="middle" fill="#94A3B8" style={{ fontSize: 11, fontWeight: 600 }}>{MONTHS[i]}</text>
+          ))}
+          {act && (
+            <g pointerEvents="none">
+              <line x1={act.x} x2={act.x} y1={padT} y2={base} stroke="#CBD5E1" strokeWidth="1" strokeDasharray="3 4" />
+              <circle cx={act.x} cy={act.y} r="6" fill="#ffffff" stroke="#D97706" strokeWidth="2.5" />
+            </g>
+          )}
+          {pts.map((p, i) => (
+            <rect key={`hit-${i}`} x={p.x - innerW / 24} y={padT} width={innerW / 12} height={innerH} fill="transparent"
+              onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
+          ))}
+        </svg>
+        {act && hover != null && (
+          <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full z-10"
+            style={{ left: `${(act.x / W) * 100}%`, top: `${(act.y / H) * 100}%` }}>
+            <div className="rounded-xl bg-[#0F172A] text-white px-3 py-2 shadow-lg whitespace-nowrap mb-2">
+              <p className="text-[10px] font-medium text-[#94A3B8] leading-none">{MONTHS[hover]}</p>
+              <p className="text-[13px] font-bold tabular-nums leading-tight mt-1">{VIEW_SERIES[hover].toLocaleString("en-US")} views</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AnalyticsSection() {
-  const stats = [
-    { icon: Eye, label: "Total Views", desc: "How many people view your card" },
-    { icon: Users, label: "Unique Visitors", desc: "Track individual visitor counts" },
-    { icon: Phone, label: "Call Clicks", desc: "Monitor phone call initiations" },
-    { icon: MessageCircle, label: "WhatsApp Clicks", desc: "Track WhatsApp conversations" },
-    { icon: Mail, label: "Email Clicks", desc: "See email engagement rates" },
-    { icon: QrCode, label: "QR Scans", desc: "Count QR code scans" },
-    { icon: Globe, label: "Lead Forms", desc: "Track enquiry submissions" },
-    { icon: Share2, label: "Source Tracking", desc: "Know where visitors come from" },
-    { icon: Smartphone, label: "Device Reports", desc: "Mobile vs desktop breakdown" },
-    { icon: TrendingUp, label: "Monthly Growth", desc: "Compare month-over-month" },
+  const tracked = [
+    { icon: Eye, label: "Total Views" }, { icon: Users, label: "Unique Visitors" },
+    { icon: Phone, label: "Call Clicks" }, { icon: MessageCircle, label: "WhatsApp Clicks" },
+    { icon: Mail, label: "Email Clicks" }, { icon: QrCode, label: "QR Scans" },
+    { icon: Globe, label: "Lead Forms" }, { icon: Share2, label: "Source Tracking" },
+    { icon: Smartphone, label: "Device Reports" }, { icon: TrendingUp, label: "Monthly Growth" },
   ];
   return (
-    <section className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeading eyebrow="Analytics" title="Track Every Click and Lead" subtitle="Know how customers interact with your card — views, WhatsApp & call clicks, QR scans, product views, offers, and enquiries." />
-        <Reveal stagger className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {stats.map((s, i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 shadow-premium border border-[#F1F5F9] card-hover text-center hover:border-[#F7B31C]/40">
-              <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center mx-auto mb-3"><s.icon size={18} className="text-[#F7B31C]" /></div>
-              <h3 className="text-xs font-semibold text-[#0F172A] mb-1">{s.label}</h3>
-              <p className="text-[10px] text-[#64748B]">{s.desc}</p>
-            </div>
+    <section className="py-20 bg-gradient-to-b from-white to-[#F8FAFC] relative overflow-hidden">
+      <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[720px] h-[360px] bg-[#F7B31C]/[0.07] rounded-full blur-3xl pointer-events-none" />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <SectionHeading eyebrow="Analytics" title={<>Track Every <span className="text-gradient-gold">Click and Lead</span></>} subtitle="Know exactly how customers interact with your card — views, WhatsApp and call clicks, QR scans, product views and enquiries." />
+        <Reveal><AnalyticsPanel /></Reveal>
+        <Reveal stagger className="mt-8 flex flex-wrap justify-center gap-2.5">
+          {tracked.map((s) => (
+            <span key={s.label} className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-white ring-1 ring-[#E2E8F0] shadow-premium text-[13px] font-medium text-[#334155] hover:ring-[#F7B31C]/50 hover:-translate-y-0.5 transition-all">
+              <s.icon size={14} className="text-[#B45309]" /> {s.label}
+            </span>
           ))}
         </Reveal>
       </div>
@@ -825,26 +1022,29 @@ function QRNFCSection() {
 }
 
 /* ─── Where to use the card link ───────────────────────────────
-   Answer-engine content: a short, quotable answer block followed by
-   concrete placements. Written so Google AI Overviews / ChatGPT /
-   Perplexity can lift a clean answer and cite us, and mirrored into
-   FAQPage JSON-LD (schema text stays identical to the visible copy). */
+   Answer-engine content: a short, quotable answer block plus concrete
+   placements. Written so Google AI Overviews / ChatGPT / Perplexity can
+   lift a clean answer and cite us, and mirrored into FAQPage JSON-LD
+   (schema text stays identical to the visible copy).
+
+   Laid out as an editorial two-column list rather than another card
+   grid — the page already has several of those. */
 const LINK_ANSWER =
   "You can use a digital business card link anywhere you would normally hand over contact details — in email signatures, WhatsApp and SMS, social media bios, video-call backgrounds, printed material and packaging, mobile wallets, your website, your Google Business Profile, listing and job portals, event badges and standees, invoices, and paid ad campaigns.";
 
 const LINK_PLACEMENTS = [
-  { icon: Mail, title: "Email Signature", desc: "Add the link under every outgoing email so each message quietly captures leads.", accent: "#F7B31C" },
-  { icon: MessageCircle, title: "WhatsApp & SMS", desc: "Drop it into chats, broadcasts and your WhatsApp Business profile — nothing to install.", accent: "#22C55E" },
-  { icon: Link2, title: "Social Media Bios", desc: "Pin it as your single link-in-bio on Instagram, LinkedIn, Facebook and X.", accent: "#8B5CF6" },
-  { icon: Monitor, title: "Video Call Backgrounds", desc: "Show the QR in your Zoom, Meet or Teams background so people scan mid-meeting.", accent: "#3B82F6" },
-  { icon: FileDown, title: "Print & Packaging", desc: "Put the QR on visiting cards, brochures, flyers, packaging and shop signage.", accent: "#EC4899" },
-  { icon: Wallet, title: "Mobile Wallet", desc: "Save the card as a pass in Apple Wallet or Google Wallet for lock-screen access.", accent: "#14B8A6" },
-  { icon: Globe, title: "Website & Blog", desc: "Link it from your header, footer, author bio or Contact Us page.", accent: "#0EA5E9" },
-  { icon: MapPin, title: "Google Business Profile", desc: "Use it as your website or appointment link so local searchers get the full profile.", accent: "#EF4444" },
-  { icon: Building2, title: "Listing & Job Portals", desc: "Ideal for IndiaMART, JustDial, Naukri and freelance profiles that allow only one link.", accent: "#F97316" },
-  { icon: ScanLine, title: "Events & Exhibitions", desc: "Print it on badges, standees and stall banners — visitors scan instead of taking paper.", accent: "#6366F1" },
-  { icon: FileText, title: "Invoices & Quotations", desc: "Attach it to invoices, quotations and proposals so clients can reach you instantly.", accent: "#0F766E" },
-  { icon: TrendingUp, title: "Ads & Campaigns", desc: "Use it as the landing link for Google, Meta and WhatsApp ad campaigns.", accent: "#D97706" },
+  { icon: Mail, title: "Email Signature", desc: "Under every outgoing email, quietly capturing leads.", accent: "#F7B31C" },
+  { icon: MessageCircle, title: "WhatsApp & SMS", desc: "Chats, broadcasts and your WhatsApp Business profile.", accent: "#22C55E" },
+  { icon: Link2, title: "Social Media Bios", desc: "Your single link-in-bio on Instagram, LinkedIn and X.", accent: "#8B5CF6" },
+  { icon: Monitor, title: "Video Call Backgrounds", desc: "A QR in your Zoom, Meet or Teams background.", accent: "#3B82F6" },
+  { icon: FileDown, title: "Print & Packaging", desc: "Visiting cards, brochures, flyers, packaging, signage.", accent: "#EC4899" },
+  { icon: Wallet, title: "Mobile Wallet", desc: "Saved as a pass in Apple Wallet or Google Wallet.", accent: "#14B8A6" },
+  { icon: Globe, title: "Website & Blog", desc: "Header, footer, author bio or Contact Us page.", accent: "#0EA5E9" },
+  { icon: MapPin, title: "Google Business Profile", desc: "As your website or appointment link for local search.", accent: "#EF4444" },
+  { icon: Building2, title: "Listing & Job Portals", desc: "IndiaMART, JustDial, Naukri — where one link is allowed.", accent: "#F97316" },
+  { icon: ScanLine, title: "Events & Exhibitions", desc: "Badges, standees and stall banners people scan.", accent: "#6366F1" },
+  { icon: FileText, title: "Invoices & Quotations", desc: "So clients can reach you straight from the document.", accent: "#0F766E" },
+  { icon: TrendingUp, title: "Ads & Campaigns", desc: "The landing link for Google, Meta and WhatsApp ads.", accent: "#D97706" },
 ];
 
 function WhereToUseSection() {
@@ -869,38 +1069,58 @@ function WhereToUseSection() {
     return () => { document.getElementById("where-to-use-ld")?.remove(); };
   }, []);
 
+  const half = Math.ceil(LINK_PLACEMENTS.length / 2);
+  const columns = [LINK_PLACEMENTS.slice(0, half), LINK_PLACEMENTS.slice(half)];
+
   return (
-    <section className="py-20 bg-white" id="where-to-use">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          eyebrow="Share Anywhere"
-          title={<>Where to Use Your <span className="text-gradient-gold">Digital Card Link</span></>}
-          subtitle="One link replaces every paper card. These are the places it earns you the most contacts."
-        />
+    <section className="py-20 bg-white relative overflow-hidden" id="where-to-use">
+      <div className="absolute -left-24 top-1/3 w-[420px] h-[420px] bg-[#14B8A6]/[0.06] rounded-full blur-3xl pointer-events-none" />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div className="grid lg:grid-cols-12 gap-10 lg:gap-12">
 
-        {/* The quotable answer — kept short and self-contained on purpose. */}
-        <Reveal className="max-w-3xl mx-auto mb-12">
-          <div className="relative rounded-2xl bg-[#F8FAFC] ring-1 ring-[#E2E8F0] p-5 sm:p-6 pl-6 sm:pl-7 overflow-hidden">
-            <span aria-hidden="true" className="absolute left-0 top-4 bottom-4 w-1 rounded-full bg-gradient-to-b from-[#F7B31C] to-[#D97706]" />
-            <p className="text-[15px] leading-relaxed text-[#334155]">{LINK_ANSWER}</p>
-          </div>
-        </Reveal>
-
-        <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {LINK_PLACEMENTS.map(({ icon: Icon, title, desc, accent }) => (
-            <div key={title} className="rounded-2xl bg-white ring-1 ring-[#E2E8F0] p-5 transition-all hover:-translate-y-1 hover:shadow-premium-lg hover:ring-[#F7B31C]/40">
-              <span className="w-11 h-11 rounded-xl flex items-center justify-center mb-3.5" style={{ background: `${accent}1A`, color: accent }}>
-                <Icon size={19} />
+          {/* Intro + the quotable answer, held at the top on desktop */}
+          <Reveal className="lg:col-span-5">
+            <div className="lg:sticky lg:top-24">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-4 bg-[#FEF3C7] text-[#92400E]">
+                <Sparkles size={12} /> Share Anywhere
               </span>
-              <h3 className="text-[15px] font-bold text-[#0F172A] mb-1.5">{title}</h3>
-              <p className="text-[13px] text-[#64748B] leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </Reveal>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] tracking-tight leading-[1.15]">
+                Where to Use Your <span className="text-gradient-gold">Digital Card Link</span>
+              </h2>
+              <p className="mt-4 text-base text-[#64748B] leading-relaxed">
+                One link replaces every paper card. These are the places it earns you the most contacts.
+              </p>
 
-        <Reveal className="mt-10 text-center">
-          <Link to="/signup" className="btn-gold inline-flex items-center gap-2">Create Your Card Link Free <ArrowRight size={16} /></Link>
-        </Reveal>
+              <div className="relative mt-7 rounded-2xl bg-[#F8FAFC] ring-1 ring-[#E2E8F0] p-5 pl-6 overflow-hidden">
+                <span aria-hidden="true" className="absolute left-0 top-4 bottom-4 w-1 rounded-full bg-gradient-to-b from-[#F7B31C] to-[#D97706]" />
+                <p className="text-[14.5px] leading-relaxed text-[#334155]">{LINK_ANSWER}</p>
+              </div>
+
+              <Link to="/signup" className="btn-gold mt-7 h-12 px-7 inline-flex items-center gap-2 text-base">
+                Create Your Card Link Free <ArrowRight size={17} />
+              </Link>
+            </div>
+          </Reveal>
+
+          {/* The placements — hairline list, two up */}
+          <Reveal stagger className="lg:col-span-7 grid sm:grid-cols-2 gap-x-8 gap-y-0 content-start">
+            {columns.map((col, ci) => (
+              <div key={ci} className="divide-y divide-[#EEF2F7]">
+                {col.map(({ icon: Icon, title, desc, accent }) => (
+                  <div key={title} className="group flex items-start gap-3.5 py-4 first:pt-0">
+                    <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105" style={{ background: `${accent}16`, color: accent }}>
+                      <Icon size={17} />
+                    </span>
+                    <div className="min-w-0 pt-0.5">
+                      <h3 className="text-[14px] font-bold text-[#0F172A] leading-tight">{title}</h3>
+                      <p className="mt-1 text-[12.5px] text-[#64748B] leading-relaxed">{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </Reveal>
+        </div>
       </div>
     </section>
   );
