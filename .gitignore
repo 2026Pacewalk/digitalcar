@@ -79,3 +79,5 @@ media/
 .live-dump.sql
 .live-db-pass
 .last-live-sync
+.claude/launch.json
+._*

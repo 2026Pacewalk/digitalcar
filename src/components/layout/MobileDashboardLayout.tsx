@@ -5,7 +5,7 @@ import {
   Plus, Eye, Share2, CreditCard, Menu, MessageSquare,
   Settings, LogOut, HelpCircle, ChevronLeft,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Star, Upload, Mail, Layers,
-  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode, Link2, Globe, ArrowLeft, MailCheck,
+  Gift, Wand2, QrCode, Link2, Globe, ArrowLeft, MailCheck, PenLine,
 } from "lucide-react";
 import { getToken, clearSession } from "@/lib/session";
 import { useAuth } from "@/hooks/useAuth";
@@ -139,6 +139,7 @@ const NAV: Record<string, NavConfig> = {
         { icon: Mail, label: "Leads", path: "/dashboard/leads" },
         { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
         { icon: QrCode, label: "QR & Share", path: "/dashboard/qr" },
+        { icon: PenLine, label: "Email Signature", path: "/dashboard/signature" },
         { icon: Gift, label: "Refer & Earn", path: "/dashboard/refer" },
       ] },
       { title: "Account", items: [
@@ -161,6 +162,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/dashboard/products": "Products / Services",
   "/dashboard/offers": "Offers & Deals",
   "/dashboard/payments": "Payments",
+  "/dashboard/signature": "Email Signature",
   "/dashboard/qrcode": "QR Code",
   "/dashboard/qr": "QR Codes",
   "/dashboard/media": "Gallery",
