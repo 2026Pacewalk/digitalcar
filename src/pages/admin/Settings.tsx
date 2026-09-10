@@ -135,6 +135,13 @@ export default function AdminSettings() {
                       <div className="text-sm">
                         <p className="font-semibold text-[#166534]">SMTP is configured — emails will send.</p>
                         <p className="text-[#15803D] mt-0.5 text-xs">Host: <b>{smtp.host}</b> · From: <b>{smtp.from}</b> · Lead alerts → <b>{smtp.notifyTo}</b></p>
+                        {smtp.misaligned && (
+                          <p className="text-[#B45309] mt-2 text-xs leading-relaxed">
+                            <b>Heads up:</b> you're sending as <b>{smtp.misaligned.from}</b> but through <b>{smtp.misaligned.via}</b>.
+                            The provider will usually rewrite the From address — and if it doesn't, the mail fails SPF for that
+                            domain and goes to spam. Send through whoever hosts that domain's mailbox instead.
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : smtp?.mode === "preview" ? (

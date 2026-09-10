@@ -44,6 +44,14 @@ function transport(): Transporter | null {
     auth: { user: SMTP_USER, pass: SMTP_PASS.replace(/\s+/g, "") },
   });
   mode = "live";
+  const a = fromAlignment();
+  if (!a.aligned) {
+    console.warn(
+      `[mail] From is ${a.from} but mail is sent through ${a.via}. ` +
+      `${SMTP_HOST} will usually rewrite the From header, and if it does not, the mail fails SPF for that domain and lands in spam. ` +
+      `Send through the provider that hosts ${domainOf(a.from)}.`,
+    );
+  }
   return cached;
 }
 
@@ -90,6 +98,25 @@ export const PLATFORM_EMAIL = "hello@digitalcarda.in";
 
 export const ownerAddress = () => process.env.LEAD_NOTIFY_TO || PLATFORM_EMAIL;
 
+const addressOf = (v: string) => (v.match(/<([^>]+)>/)?.[1] || v).trim().toLowerCase();
+const domainOf = (v: string) => addressOf(v).split("@")[1] || "";
+
+/** The From header. MAIL_FROM wins; a bare address gets the brand name put in
+    front of it, so recipients see "DigitalCarda", not a raw mailbox. */
+export function mailFrom(): string {
+  const raw = (process.env.MAIL_FROM || process.env.SMTP_USER || PLATFORM_EMAIL).trim();
+  return raw.includes("<") ? raw : `DigitalCarda <${raw}>`;
+}
+
+/** A From address on one domain sent through another provider's SMTP is the
+    classic silent misconfiguration: the provider either rewrites the header or
+    the mail fails SPF and lands in spam. Report it rather than let it rot. */
+export function fromAlignment(): { aligned: boolean; from: string; via: string | null } {
+  const from = addressOf(mailFrom());
+  const user = process.env.SMTP_USER || "";
+  return { aligned: !user || domainOf(from) === domainOf(user), from, via: user || null };
+}
+
 /** Send a rendered Email template to a recipient. Never throws — returns a
     status so callers (e.g. the admin test tool) can report success/failure.
     Existing callers that ignore the return value are unaffected. */
@@ -100,7 +127,7 @@ export async function sendEmail(to: string | undefined | null, email: Email, rep
     // rather than silently dropping the mail.
     const t = transport() ?? (process.env.NODE_ENV === "production" ? null : await previewTransport());
     if (!t) { void logEmail(to, email, replyTo, "skipped", "SMTP not configured"); return { ok: false, error: "SMTP not configured" }; }
-    const from = process.env.MAIL_FROM || process.env.SMTP_USER || `DigitalCarda <${PLATFORM_EMAIL}>`;
+    const from = mailFrom();
     const info = await t.sendMail({ from, to, replyTo: replyTo || undefined, subject: email.subject, text: email.text, html: email.html });
     const captured = mode === "preview";
     const preview = captured ? nodemailer.getTestMessageUrl(info) || null : null;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
-import { sendEmail, smtpConfigured, ownerAddress, mailMode } from "./lib/mail";
+import { sendEmail, smtpConfigured, ownerAddress, mailMode, mailFrom, fromAlignment } from "./lib/mail";
 import { smtpTestEmail, marketingIntroEmail } from "./lib/email-templates";
 
 const settingsStore: Record<string, Record<string, unknown>> = {
@@ -63,7 +63,9 @@ export const settingsRouter = createRouter({
     // "live" real SMTP · "preview" dev capture mailbox · "none" nothing goes out
     mode: smtpConfigured() ? "live" as const : mailMode(),
     host: process.env.SMTP_HOST || null,
-    from: process.env.MAIL_FROM || process.env.SMTP_USER || null,
+    from: smtpConfigured() ? mailFrom() : null,
+    // Sending as one domain through another provider's SMTP silently lands in spam
+    misaligned: smtpConfigured() && !fromAlignment().aligned ? fromAlignment() : null,
     notifyTo: ownerAddress(),
   })),
 
