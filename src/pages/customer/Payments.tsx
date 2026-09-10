@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Wallet, Save, Landmark, Smartphone, QrCode, Plus, Trash2, Pencil, X, ImageOff, Link2, AtSign } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel, Field, fieldCls, ImagePick, LimitBar, Tip, AutoSaveBadge, SectionToggle } from "@/components/customer/ModuleShell";
-import { useLocalList, packageLimit } from "@/hooks/useCustomer";
+import { useLocalList, packageLimit, accountPackageId } from "@/hooks/useCustomer";
 import { useCardAutosave } from "@/hooks/useCardAutosave";
 import { contentSeeder } from "@/lib/cardContent";
 
@@ -12,7 +12,7 @@ type Qr = { id: number; name: string; filename: string };
 const blankQr: Omit<Qr, "id"> = { name: "Pay Online", filename: "" };
 
 export function PaymentsEditor() {
-  const { data, val, set, status } = useCardAutosave();
+  const { val, set, status } = useCardAutosave();
 
   // ── Multiple UPI IDs ──
   const { items: upis, add: addUpi, update: updateUpi, remove: removeUpi } = useLocalList<Upi>("dc_upi", []);
@@ -20,7 +20,7 @@ export function PaymentsEditor() {
   const { items: banks, add: addBank, update: updateBank, remove: removeBank } = useLocalList<Bank>("dc_banks", []);
 
   // ── Payment QR codes ──
-  const qrLimit = packageLimit(Number(data.package_id), "qrcode");
+  const qrLimit = packageLimit(accountPackageId(), "qrcode");
   const { items: qrs, add: addQr, update: updateQr, remove: removeQr } = useLocalList<Qr>("dc_qrcode", [], contentSeeder("qrcodes"));
   const [qrOpen, setQrOpen] = useState(false);
   const [qrEditId, setQrEditId] = useState<number | null>(null);

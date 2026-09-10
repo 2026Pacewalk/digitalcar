@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Image as ImageIcon, Video, Trash2, Plus, Play, ImagePlus, Instagram, Check } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { fieldCls, LimitBar, Tip, AutoSaveBadge, SectionToggle } from "@/components/customer/ModuleShell";
-import { useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
+import { useLocalList, fileToDataUrl, packageLimit, accountPackageId } from "@/hooks/useCustomer";
 import { useCardAutosave } from "@/hooks/useCardAutosave";
 import { contentSeeder } from "@/lib/cardContent";
 import { parseVideo, isVideoUrl } from "@/lib/video";
@@ -11,11 +11,11 @@ type Gallery = { id: number; name: string; filename: string };
 type Vid = { id: number; title: string; url: string };
 
 export function MediaEditor() {
-  const { data, val, set, status } = useCardAutosave();
+  const { val, set, status } = useCardAutosave();
   const videoLayout = (val("video_layout") || "stack").toLowerCase() === "swipe" ? "swipe" : "stack";
   const galleryLayout = val("gallery_layout").toLowerCase() === "compact" ? "compact" : "";
-  const gLimit = packageLimit(Number(data.package_id), "gallery");
-  const vLimit = packageLimit(Number(data.package_id), "video");
+  const gLimit = packageLimit(accountPackageId(), "gallery");
+  const vLimit = packageLimit(accountPackageId(), "video");
   const [tab, setTab] = useState<"gallery" | "video">("gallery");
   const gallery = useLocalList<Gallery>("dc_gallery", [], contentSeeder("gallery"));
   const videos = useLocalList<Vid>("dc_videos", [], contentSeeder("videos"));

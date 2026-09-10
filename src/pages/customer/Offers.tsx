@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Tag, Plus, Trash2, Pencil, X, Save, Search, ImageOff, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Field, fieldCls, areaCls, ImagePick, LimitBar, Tip } from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList, packageLimit } from "@/hooks/useCustomer";
+import { useLocalList, packageLimit, accountPackageId } from "@/hooks/useCustomer";
 import { contentSeeder, cleanPlain } from "@/lib/cardContent";
 
 type Offer = { id: number; title: string; description: string; valid: string; filename: string };
@@ -10,8 +10,7 @@ const blank: Omit<Offer, "id"> = { title: "", description: "", valid: "", filena
 const fmt = (s: string) => { if (!s) return "—"; const d = new Date(s); return isNaN(d.getTime()) ? s : d.toLocaleDateString("en-GB").replace(/\//g, "-"); };
 
 export default function CustomerOffers() {
-  const { data } = useCustomer();
-  const limit = packageLimit(Number(data.package_id), "offer");
+  const limit = packageLimit(accountPackageId(), "offer");
   const { items, add, update, remove, persist, ready } = useLocalList<Offer>("dc_offers", [], contentSeeder("offers"));
 
   // One-time cleanup of any already-stored offers that still hold raw HTML / mangled encoding.

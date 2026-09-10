@@ -1,14 +1,13 @@
 import { Upload, Trash2, FileText, Download, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { LimitBar, Tip, SectionToggle } from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList, fileToDataUrl, packageLimit } from "@/hooks/useCustomer";
+import { useLocalList, fileToDataUrl, packageLimit, accountPackageId } from "@/hooks/useCustomer";
 import { contentSeeder } from "@/lib/cardContent";
 
 type Up = { id: number; name: string; filename: string; kind: string };
 
 export function UploadsEditor() {
-  const { data } = useCustomer();
-  const limit = packageLimit(Number(data.package_id), "uploads");
+  const limit = packageLimit(accountPackageId(), "uploads");
   const { items, add, remove } = useLocalList<Up>("dc_uploads", [], contentSeeder("uploads"));
 
   const onPick = async (files: FileList | null) => {

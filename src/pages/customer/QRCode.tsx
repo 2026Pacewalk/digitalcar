@@ -2,15 +2,14 @@ import { useState } from "react";
 import { QrCode, Plus, Trash2, Pencil, X, Save, ImageOff } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Field, fieldCls, ImagePick, LimitBar } from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList, packageLimit } from "@/hooks/useCustomer";
+import { useLocalList, packageLimit, accountPackageId } from "@/hooks/useCustomer";
 import { contentSeeder } from "@/lib/cardContent";
 
 type Qr = { id: number; name: string; filename: string };
 const blank: Omit<Qr, "id"> = { name: "Pay Online", filename: "" };
 
 export default function CustomerQRCode() {
-  const { data } = useCustomer();
-  const limit = packageLimit(Number(data.package_id), "qrcode");
+  const limit = packageLimit(accountPackageId(), "qrcode");
   const { items, add, update, remove } = useLocalList<Qr>("dc_qrcode", [], contentSeeder("qrcodes"));
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);

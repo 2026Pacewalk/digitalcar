@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router";
 import { ShoppingBag, Plus, Pencil, Trash2, X, Save, ImageOff, Tag, MousePointerClick, ChevronDown, Check, AlertTriangle, Type, Link2, Zap, Calendar, Repeat, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Field, fieldCls, areaCls, ImagePick, LimitBar, Tip, SectionToggle } from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList, packageLimit } from "@/hooks/useCustomer";
+import { useCustomer, useLocalList, packageLimit, accountPackageId } from "@/hooks/useCustomer";
 import { contentSeeder, cleanPlain } from "@/lib/cardContent";
 
 type Product = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string; isOffer?: boolean; valid?: string };
@@ -41,7 +41,7 @@ export function ProductsEditor() {
   const items = allItems.filter((p) => !!p.isOffer === isOfferTab);
   const productCount = allItems.filter((p) => !p.isOffer).length;
   const offerCount = allItems.filter((p) => p.isOffer).length;
-  const limit = packageLimit(Number(data.package_id), isOfferTab ? "offer" : "product");
+  const limit = packageLimit(accountPackageId(), isOfferTab ? "offer" : "product");
 
   // One-time merge of any legacy stand-alone offers (dc_offers) into this list as offers.
   useEffect(() => {
