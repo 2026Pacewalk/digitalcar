@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
-import { sendEmail, smtpConfigured, ownerAddress } from "./lib/mail";
+import { sendEmail, smtpConfigured, ownerAddress, mailMode } from "./lib/mail";
 import { smtpTestEmail, marketingIntroEmail } from "./lib/email-templates";
 
 const settingsStore: Record<string, Record<string, unknown>> = {
@@ -60,6 +60,8 @@ export const settingsRouter = createRouter({
   // server .env, never the DB). No secrets are returned.
   smtpStatus: adminQuery.query(() => ({
     configured: smtpConfigured(),
+    // "live" real SMTP · "preview" dev capture mailbox · "none" nothing goes out
+    mode: smtpConfigured() ? "live" as const : mailMode(),
     host: process.env.SMTP_HOST || null,
     from: process.env.MAIL_FROM || process.env.SMTP_USER || null,
     notifyTo: ownerAddress(),

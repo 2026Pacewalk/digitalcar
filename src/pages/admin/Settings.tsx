@@ -2,7 +2,7 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import TopBar from "@/components/layout/TopBar";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
-import { Save, Globe, Mail, Palette, Shield, Bell, CreditCard, CheckCircle2, XCircle, Send, Loader2 } from "lucide-react";
+import { Save, Globe, Mail, Palette, Shield, Bell, CreditCard, CheckCircle2, XCircle, Send, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
 import PaymentSettingsPanel from "@/components/admin/PaymentSettingsPanel";
@@ -135,6 +135,18 @@ export default function AdminSettings() {
                       <div className="text-sm">
                         <p className="font-semibold text-[#166534]">SMTP is configured — emails will send.</p>
                         <p className="text-[#15803D] mt-0.5 text-xs">Host: <b>{smtp.host}</b> · From: <b>{smtp.from}</b> · Lead alerts → <b>{smtp.notifyTo}</b></p>
+                      </div>
+                    </div>
+                  ) : smtp?.mode === "preview" ? (
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle size={20} className="text-[#B45309] shrink-0 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-semibold text-[#92400E]">Development mode — emails are captured, not delivered.</p>
+                        <p className="text-[#B45309] mt-1 text-xs">
+                          You're running without SMTP credentials, so every email goes to a throwaway preview mailbox and
+                          nobody's real inbox. The preview link is printed in the terminal. To send for real from here, add
+                          <code> SMTP_HOST</code>, <code>SMTP_USER</code> and <code>SMTP_PASS</code> to your local <code>.env</code>.
+                        </p>
                       </div>
                     </div>
                   ) : (

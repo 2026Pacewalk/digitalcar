@@ -14,12 +14,25 @@ import type { Transporter } from "nodemailer";
  */
 let cached: Transporter | null | undefined; // undefined = not yet built, null = unconfigured
 
+/** How mail is being delivered right now — reported on the admin Settings page.
+    "preview" is the local-development capture described below. */
+export type MailMode = "live" | "preview" | "none";
+let mode: MailMode = "none";
+export const mailMode = () => mode;
+
 function transport(): Transporter | null {
   if (cached !== undefined) return cached;
   const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-    console.warn("[mail] SMTP not configured (set SMTP_HOST/SMTP_USER/SMTP_PASS) — emails skipped.");
+    // Only alarming in production. Locally it is the expected default, and the
+    // preview mailbox below takes over.
+    if (process.env.NODE_ENV === "production") {
+      console.warn("[mail] SMTP not configured (set SMTP_HOST/SMTP_USER/SMTP_PASS) — emails skipped.");
+    } else {
+      console.log("[mail] no SMTP credentials — using a dev preview mailbox (nothing reaches real inboxes).");
+    }
     cached = null;
+    mode = "none";
     return null;
   }
   const port = Number(process.env.SMTP_PORT || 465);
@@ -30,7 +43,41 @@ function transport(): Transporter | null {
     // Gmail displays App Passwords with spaces — strip them so either form works.
     auth: { user: SMTP_USER, pass: SMTP_PASS.replace(/\s+/g, "") },
   });
+  mode = "live";
   return cached;
+}
+
+/* ── Local development: capture instead of send ───────────────────────────
+   A dev box with no SMTP credentials used to just drop every email, so the
+   whole flow was untestable locally. It now falls back to a throwaway
+   Ethereal mailbox: the message is fully delivered there and we print a
+   preview URL, but it reaches nobody's real inbox.
+
+   That last part is the point. Putting the production Gmail App Password on a
+   laptop would mean one stray click in the Share modal really emails a real
+   customer. Never active in production — there, missing SMTP stays an error
+   worth shouting about. */
+let devTransport: Promise<Transporter | null> | null = null;
+
+function previewTransport(): Promise<Transporter | null> {
+  if (devTransport) return devTransport;
+  devTransport = (async () => {
+    try {
+      const acct = await nodemailer.createTestAccount();
+      const t = nodemailer.createTransport({
+        host: acct.smtp.host, port: acct.smtp.port, secure: acct.smtp.secure,
+        auth: { user: acct.user, pass: acct.pass },
+      });
+      mode = "preview";
+      console.log(`[mail] dev preview mailbox ready (${acct.user}) — emails are captured, not delivered.`);
+      return t;
+    } catch (e) {
+      // Offline, or Ethereal is down. Behave exactly as before.
+      console.warn("[mail] could not open a dev preview mailbox:", (e as Error).message);
+      return null;
+    }
+  })();
+  return devTransport;
 }
 
 import type { Email } from "./email-templates";
@@ -49,12 +96,19 @@ export const ownerAddress = () => process.env.LEAD_NOTIFY_TO || PLATFORM_EMAIL;
 export async function sendEmail(to: string | undefined | null, email: Email, replyTo?: string | null): Promise<{ ok: boolean; error?: string }> {
   try {
     if (!to) return { ok: false, error: "No recipient" };
-    const t = transport();
+    // Real SMTP when it is configured; outside production, a capture mailbox
+    // rather than silently dropping the mail.
+    const t = transport() ?? (process.env.NODE_ENV === "production" ? null : await previewTransport());
     if (!t) { void logEmail(to, email, replyTo, "skipped", "SMTP not configured"); return { ok: false, error: "SMTP not configured" }; }
     const from = process.env.MAIL_FROM || process.env.SMTP_USER || `DigitalCarda <${PLATFORM_EMAIL}>`;
-    await t.sendMail({ from, to, replyTo: replyTo || undefined, subject: email.subject, text: email.text, html: email.html });
-    console.log(`[mail] "${email.subject}" sent to ${to}`);
-    void logEmail(to, email, replyTo, "sent", null);
+    const info = await t.sendMail({ from, to, replyTo: replyTo || undefined, subject: email.subject, text: email.text, html: email.html });
+    const captured = mode === "preview";
+    const preview = captured ? nodemailer.getTestMessageUrl(info) || null : null;
+    console.log(`[mail] "${email.subject}" ${captured ? "captured for" : "sent to"} ${to}${preview ? ` — open it: ${preview}` : ""}`);
+    // Logged as "skipped", because the log answers one question — did the
+    // customer get it? In dev capture mode the honest answer is no.
+    void logEmail(to, email, replyTo, captured ? "skipped" : "sent",
+      captured ? "Captured in the dev preview mailbox — not delivered" : null);
     return { ok: true };
   } catch (e) {
     const why = (e as Error).message;
