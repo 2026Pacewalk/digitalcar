@@ -47,6 +47,10 @@ export function useAuth() {
   }, []);
 
   const login = useCallback((email: string, password: string): boolean => {
+    // Local-dev only, exactly like Login.tsx's demoLogin. Without this guard the
+    // built-in demo credentials were a hardcoded sign-in path in the production
+    // bundle too. (Nothing currently calls this — the guard keeps it that way.)
+    if (!import.meta.env.DEV) return false;
     const entry = DEMO_USERS[email.toLowerCase().trim()];
     if (entry && entry.password === password) {
       setSession("demo_token_" + entry.user.id, entry.user, "main");

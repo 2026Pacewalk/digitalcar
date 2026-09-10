@@ -5,7 +5,12 @@
  */
 import { getToken } from "@/lib/session";
 
+/* Super-admin endpoints always read the ADMIN portal slot. */
 const authHeaders = () => ({ "x-auth-token": getToken("admin") });
+/* Endpoints that act as the CURRENT user read the slot for the page they're on
+   (/dashboard/* → "main"). Using the admin slot here sent an empty token for
+   every customer, so /api/my/leads 401'd and the Enquiries page looked empty. */
+const sessionHeaders = () => ({ "x-auth-token": getToken() });
 
 /** Super-admin-only files (customers / enquiries). */
 export function fetchAdminData<T = unknown>(file: "customers" | "enquiries"): Promise<T> {
@@ -27,7 +32,7 @@ export function hideAdminRecords(file: "customers" | "enquiries", ids: (string |
 
 /** The signed-in customer's OWN leads only (scoped server-side by their slug). */
 export function fetchMyLeads<T = unknown>(): Promise<T> {
-  return fetch("/api/my/leads", { headers: authHeaders() }).then((r) => {
+  return fetch("/api/my/leads", { headers: sessionHeaders() }).then((r) => {
     if (!r.ok) throw new Error("Could not load leads");
     return r.json() as Promise<T>;
   });

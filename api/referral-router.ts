@@ -10,7 +10,7 @@ import { eq, desc, and, gt, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { payoutRequestAdminEmail, payoutCompletedEmail } from "./lib/email-templates";
-import { enforceRateLimit, clientIp } from "./lib/rate-limit";
+import { enforceRateLimit } from "./lib/rate-limit";
 
 const COMMISSION_KEY = "referral_commission_percent";
 const DISCOUNT_KEY = "referral_discount_percent";
@@ -200,19 +200,29 @@ export const referralRouter = createRouter({
     }),
 
   // ─── Public: record a referral (fallback path) ───
-  record: publicQuery
-    .input(z.object({ code: z.string().min(2), refereeEmail: z.string().email().optional(), refereeId: z.number().optional() }))
+  // Authed on purpose: this used to be public AND took an arbitrary refereeId,
+  // so anyone could POST a code with someone else's user id and forge a "joined"
+  // referral — attributing other people's signups to their own code and earning
+  // commission when those users paid. The referee is now always the caller.
+  record: authedQuery
+    .input(z.object({ code: z.string().min(2) }))
     .mutation(async ({ ctx, input }) => {
-      enforceRateLimit(`refrecord:${clientIp(ctx.req)}`, 10, 300_000);
+      enforceRateLimit(`refrecord:${ctx.user.id}`, 10, 300_000);
       const db = getDb();
       const referrer = await db.query.users.findFirst({ where: eq(users.referralCode, input.code.toUpperCase()) });
       if (!referrer) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid referral code" });
+      if (referrer.id === ctx.user.id) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "You can't refer yourself." });
+      }
+      // One referral row per referee — never stack duplicates for the same person.
+      const already = await db.query.referrals.findFirst({ where: eq(referrals.refereeId, ctx.user.id) });
+      if (already) return { ok: true, referrerId: already.referrerId };
       await db.insert(referrals).values({
         referrerId: referrer.id,
-        refereeId: input.refereeId ?? null,
-        refereeEmail: input.refereeEmail ?? null,
+        refereeId: ctx.user.id,
+        refereeEmail: ctx.user.email,
         code: input.code.toUpperCase(),
-        status: input.refereeId ? "joined" : "pending",
+        status: "joined",
       });
       return { ok: true, referrerId: referrer.id };
     }),

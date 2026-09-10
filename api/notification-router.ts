@@ -52,7 +52,18 @@ export const notificationRouter = createRouter({
 
   clearAll: authedQuery.mutation(async ({ ctx }) => {
     const db = getDb();
-    await db.delete(notifications).where(eq(notifications.userId, ctx.user.id));
+    // The cron jobs (cron/lifecycle.ts, cron/trial-emails.ts) use rows in THIS
+    // table as their send-once ledger: claim() only sends when no row exists for
+    // (userId, type). Hard-deleting everything therefore made the next cron run
+    // re-send trial emails the customer had already received. Those markers
+    // (ls_* / trial_email_*) are kept and just marked read; everything else is
+    // cleared as before.
+    //   NOTE: a kept marker stays listed (as read) — clearing it from the bell
+    //   too would need a `cleared_at` column, which is a schema migration.
+    const isLedger = sql`(${notifications.type} LIKE 'ls\\_%' OR ${notifications.type} LIKE 'trial\\_email\\_%')`;
+    await db.delete(notifications).where(and(eq(notifications.userId, ctx.user.id), sql`NOT ${isLedger}`));
+    await db.update(notifications).set({ isRead: true })
+      .where(and(eq(notifications.userId, ctx.user.id), isLedger));
     return { ok: true };
   }),
 });
