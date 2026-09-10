@@ -144,7 +144,10 @@ export default function CustomerSignature() {
   );
 
   return (
-    <ModuleShell title="Email Signature" subtitle="Put your card link at the bottom of every email you send" icon={PenLine}>
+    <ModuleShell title="Email Signature" subtitle="Put your card link at the bottom of every email you send" icon={PenLine}
+      /* No phone preview: this page shows the signature itself, and a card
+         mock-up beside it competes with the thing being previewed. */
+      preview={false} wide>
       <Tip>Every email you send is a chance to share your card. Pick a design, copy it, and paste it once into your email settings — it then rides along on every message.</Tip>
 
       {missing.length > 0 && (
