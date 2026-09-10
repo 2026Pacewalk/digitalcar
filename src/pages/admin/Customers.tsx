@@ -214,6 +214,7 @@ export default function AdminCustomers() {
   const extendMut = trpc.user.extendValidity.useMutation();
   const pkgMut = trpc.user.setPackage.useMutation();
   const setPwdMut = trpc.user.setPassword.useMutation();
+  const createMut = trpc.user.createCustomer.useMutation();
   const sendDetailsMut = trpc.user.sendAccountDetails.useMutation();
   const sendUpdateMut = trpc.user.sendFeatureUpdate.useMutation();
   // "Share with customer": one place to send their login + card link, or the
@@ -387,21 +388,42 @@ export default function AdminCustomers() {
       toast.error("Removed here, but couldn't save on the server — may return on refresh.");
     }
   };
-  const addCustomer = () => {
+  /* Creates the account for real — user, plan and a live card. This used to
+     only add a row to the table on screen, so the "customer" had no login and
+     their card URL 404'd. */
+  const addCustomer = async () => {
     if (!addForm.name || !addForm.email) { toast.error("Name and email are required"); return; }
-    const id = Math.max(0, ...rows.map((r) => r.id)) + 1;
     const pid = pkgs.find((p) => p.name === addForm.pkg)?.id ?? 7;
-    const now = new Date();
-    const exp = new Date(now); exp.setDate(exp.getDate() + 7);
-    setRows((r) => [{
-      id, name: addForm.name, username: addForm.username || addForm.email.split("@")[0], email: addForm.email,
-      mobile1: addForm.mobile1, slug: addForm.slug || addForm.name.toLowerCase().replace(/\s+/g, "-"),
-      package_id: pid, admin_id: Number(addForm.admin_id), activated_on: now.toISOString().slice(0, 10),
-      expired_on: exp.toISOString().slice(0, 10), status: 1, password: "123456",
-    }, ...r]);
-    toast.success("Customer added");
-    setAddOpen(false);
-    setAddForm({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", admin_id: 0 });
+    const slug = (addForm.slug || addForm.name).trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9_-]/g, "");
+    if (slug.length < 2) { toast.error("Enter a valid card URL (letters, numbers and dashes)"); return; }
+    setSending(true);
+    try {
+      const res = await createMut.mutateAsync({
+        name: addForm.name.trim(), email: addForm.email.trim(), phone: addForm.mobile1 || undefined,
+        slug, packageId: pid,
+      });
+      if (!res.ok) {
+        const why = res.reason === "email_taken" ? "That email already has an account."
+          : res.reason === "slug_taken" ? `The card URL "${slug}" is already taken.`
+          : res.reason === "bad_slug" ? "That card URL isn't valid."
+          : "Could not create the customer.";
+        toast.error(why);
+        return;
+      }
+      const now = new Date();
+      setRows((r) => [{
+        id: Math.max(0, ...r.map((x) => x.id)) + 1,
+        name: addForm.name, username: addForm.username || slug, email: addForm.email,
+        mobile1: addForm.mobile1, slug: res.slug, package_id: pid, admin_id: Number(addForm.admin_id),
+        activated_on: now.toISOString().slice(0, 10), expired_on: res.expiredOn,
+        status: 1, password: res.password,
+      }, ...r]);
+      toast.success(`${addForm.name} created — card live at digitalcarda.in/${res.slug}`);
+      setAddOpen(false);
+      setAddForm({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", admin_id: 0 });
+    } catch {
+      toast.error("Could not create the customer.");
+    } finally { setSending(false); }
   };
 
   // Export the current filtered + sorted list (all of it, not just this page) to CSV.

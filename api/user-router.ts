@@ -289,6 +289,82 @@ export const userRouter = createRouter({
       return { ok: true as const, password: input.password };
     }),
 
+  /* ─── Super-admin: create a customer, with a LIVE card ───
+     "Add New Customer" used to only push a row into the admin table in the
+     browser: no account, no card, and a hard-coded password. The admin was told
+     "Customer added", then the card URL 404'd and the customer could not log in.
+
+     This creates the account for real: the user, their plan, and a published
+     snapshot so the card answers at its URL immediately. The generated password
+     is returned ONCE so it can be handed over; only its hash is stored. */
+  createCustomer: adminQuery
+    .input(z.object({
+      name: z.string().min(1).max(120),
+      email: z.string().email(),
+      phone: z.string().max(30).optional(),
+      slug: z.string().min(2).max(80),
+      packageId: z.number().int().min(1).max(99).default(7),
+      company: z.string().max(160).optional(),
+      password: z.string().min(6).max(200).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.toLowerCase().trim();
+      // Slug is stored lower-case: every public lookup lower-cases the path.
+      const slug = input.slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+      if (slug.length < 2) return { ok: false as const, reason: "bad_slug" as const };
+
+      if (await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } }))
+        return { ok: false as const, reason: "email_taken" as const };
+
+      const taken = await db.select({ id: publishedCards.id }).from(publishedCards).where(eq(publishedCards.slug, slug)).limit(1);
+      if (taken.length) return { ok: false as const, reason: "slug_taken" as const };
+
+      // Readable but strong, so it can be read out on a call.
+      const pwd = input.password
+        || `${["Bright", "Swift", "Solid", "Prime", "Clear", "Sharp"][Math.floor(Math.random() * 6)]}@${Math.floor(1000 + Math.random() * 8999)}`;
+
+      const inserted = await db.insert(users).values({
+        email, password: await bcrypt.hash(pwd, 12),
+        fullName: input.name.trim(), phone: input.phone?.trim() || null,
+        role: "customer", status: "active",
+      });
+      const userId = Number((inserted as unknown as { insertId?: number }).insertId)
+        || Number((await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } }))?.id);
+      if (!userId) return { ok: false as const, reason: "create_failed" as const };
+
+      const isTrial = input.packageId === 7;
+      const now = new Date();
+      const end = new Date(now.getTime() + (isTrial ? 30 : 365) * 86_400_000);
+      const expiredOn = end.toISOString().slice(0, 10);
+      await db.insert(subscriptions).values({
+        userId, packageId: input.packageId, status: "active",
+        billingCycle: isTrial ? "monthly" : "yearly", amount: "0.00", currency: "INR",
+        currentPeriodStart: now, currentPeriodEnd: end, paymentGateway: "manual",
+      });
+
+      // Publish a starter card so the URL works the moment it is shared. The
+      // customer fills in the rest from their dashboard.
+      const publicId = Math.random().toString(36).slice(2, 12);
+      await db.insert(publishedCards).values({
+        userId, cardId: 1, slug, publicId,
+        data: {
+          customer: {
+            id: userId, name: input.name.trim(), username: slug, slug,
+            email, mobile1: input.phone?.trim() || "", mobile2: input.phone?.trim() || "",
+            company_name: input.company?.trim() || "",
+            package_id: input.packageId, expired_on: expiredOn,
+            theme: "1", published: 1, status: 1,
+            about_on: 1, product_on: 1, payment_on: 1, gallery_on: 1,
+            video_on: 1, enquiry_on: 1, cardqr_on: 1,
+          },
+          products: [], gallery: [], videos: [], offers: [], qrcodes: [],
+        },
+      });
+
+      return { ok: true as const, userId, slug, password: pwd, expiredOn };
+    }),
+
   extendValidity: adminQuery
     .input(z.object({ email: z.string().email(), days: z.number().int().min(1).max(3650) }))
     .mutation(async ({ input }) => {
