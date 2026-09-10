@@ -237,7 +237,7 @@
     transition: none !important;
   }
   .animate-marquee, .animate-aurora-drift, .animate-float, .animate-spin-slow,
-  .dc-rise { animation: none !important; }
+  .dc-rise, .dc-swap-in { animation: none !important; }
   .dc-rise { opacity: 1 !important; transform: none !important; }
   .dc-live-dot::after { display: none !important; }
   .dc-collapse { transition: none !important; }
@@ -526,3 +526,12 @@ button.fab:active {
 .marquee-track--rev {
   animation-direction: reverse;
 }
+
+/* Content-swap entrance — used when a keyed panel re-mounts (persona switcher),
+   so the new content cross-fades in rather than snapping. */
+@keyframes dcSwapIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+.dc-swap-in { animation: dcSwapIn 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.dc-swap-d1 { animation-delay: 0.08s; }

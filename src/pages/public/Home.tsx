@@ -7,7 +7,7 @@ import {
   ChevronRight, ChevronLeft, Monitor, Smartphone, Globe, BarChart3,
   Link2, Leaf, Quote, ScanLine, Gift, Building2, Plus,
 } from "lucide-react";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { trpc } from "@/providers/trpc";
 import TemplateThumb, { THUMB_W, THUMB_H } from "@/components/TemplateThumb";
@@ -728,55 +728,237 @@ function TemplatesSection() {
   );
 }
 
-/* ─── Industries ─────────────────────────────────────────────
-   Spotlight + field: the four verticals that actually drive signups get
-   real cards; the long tail becomes a pill field. Fifteen identical
-   tiles read as a list — this reads as a hierarchy. */
-function IndustriesSection() {
-  const featured = [
-    { icon: Monitor, name: "Digital Agencies", desc: "Pitch decks, portfolios and client links in one place.", accent: "#8B5CF6" },
-    { icon: CreditCard, name: "Doctors & Clinics", desc: "Timings, location and appointment booking in a tap.", accent: "#14B8A6" },
-    { icon: MapPin, name: "Real Estate", desc: "Listings, site visits and instant WhatsApp enquiries.", accent: "#F7B31C" },
-    { icon: ShoppingBag, name: "Restaurants & Retail", desc: "Menu, offers, payments and Google reviews together.", accent: "#EC4899" },
-  ];
-  const more = [
-    "Lawyers", "Consultants", "Freelancers", "Salons & Spas", "Coaches & Trainers",
-    "Photographers", "Event Planners", "Education Institutes", "Startups",
-    "Interior Designers", "Local Services",
-  ];
+/* ─── Built for your profession ───────────────────────────────
+   The conversion centrepiece: visitors pick their own trade and the
+   pitch rewrites itself in place — a tailored headline, the objection
+   that actually stops THEM, the four features that matter to them, and
+   a card mock in their world. A generic "for everyone" pitch converts
+   far worse than one the reader recognises as their own.
+
+   Mechanics: a sliding active pill (measured, so it animates between
+   tabs of different widths) and a keyed panel that re-mounts, so the
+   content cross-fades on every switch. */
+type Persona = {
+  id: string; tab: string; icon: React.ComponentType<{ size?: number; className?: string }>;
+  accent: string; headline: string; pain: string; points: string[]; stat: string;
+  card: { name: string; role: string; chips: string[] };
+};
+
+const PERSONAS: Persona[] = [
+  {
+    id: "clinics", tab: "Doctors & Clinics", icon: Plus, accent: "#14B8A6",
+    headline: "Digital Visiting Card for Doctors & Clinics",
+    pain: "Patients lose the paper slip with your OPD timings. Your card lives in their phone instead — timings, directions and a booking button always one tap away.",
+    points: [
+      "OPD timings and clinic address with one-tap directions",
+      "Appointment requests straight to your WhatsApp",
+      "Google review link that builds local trust",
+      "Share reports, prescriptions and forms as PDFs",
+    ],
+    stat: "Clinics see 3× more appointment enquiries",
+    card: { name: "Dr. Anita Sharma", role: "MD Physician · Sharma Clinic", chips: ["Call", "WhatsApp", "Directions"] },
+  },
+  {
+    id: "realestate", tab: "Real Estate", icon: MapPin, accent: "#F7B31C",
+    headline: "Digital Business Card for Real Estate Agents",
+    pain: "You meet twenty people at a site visit and hand out twenty cards. Send one link instead — with your live listings already inside it.",
+    points: [
+      "Property listings with photos, pricing and highlights",
+      "One-tap site-visit booking over WhatsApp",
+      "Google Maps directions to every project",
+      "Every enquiry captured as a lead you can follow up",
+    ],
+    stat: "Agents capture 4× more leads per site visit",
+    card: { name: "Rohit Malhotra", role: "Realtor · Malhotra Properties", chips: ["Listings", "Site Visit", "Directions"] },
+  },
+  {
+    id: "agencies", tab: "Agencies & Freelancers", icon: Monitor, accent: "#8B5CF6",
+    headline: "Digital Business Card for Agencies & Freelancers",
+    pain: "Your portfolio, your packages and your payment link should not need three different URLs and a follow-up email.",
+    points: [
+      "Portfolio gallery and showreel videos in one place",
+      "Service packages with clear pricing",
+      "UPI and payment links so you get paid faster",
+      "Your own custom domain for a serious brand",
+    ],
+    stat: "Freelancers close new work 2× faster",
+    card: { name: "Aarav Mehta", role: "Founder · Mehta Studio", chips: ["Portfolio", "Packages", "Pay Now"] },
+  },
+  {
+    id: "retail", tab: "Restaurants & Retail", icon: ShoppingBag, accent: "#EC4899",
+    headline: "Digital Card & QR Menu for Restaurants and Shops",
+    pain: "One QR on the table can do the job of a menu, an offer board and a review request — without reprinting anything.",
+    points: [
+      "Menu and products with photos and live prices",
+      "Today's offers, with an expiry date that self-removes",
+      "UPI payment QR right at the counter",
+      "Google review link that lifts your rating",
+    ],
+    stat: "Outlets collect 5× more Google reviews",
+    card: { name: "Spice Route", role: "Multi-cuisine · Zirakpur", chips: ["Menu", "Offers", "Pay via UPI"] },
+  },
+  {
+    id: "salons", tab: "Salons & Wellness", icon: Sparkles, accent: "#F97316",
+    headline: "Digital Visiting Card for Salons & Spas",
+    pain: "Clients rebook when booking takes one tap instead of one phone call they keep postponing.",
+    points: [
+      "Service menu with prices and duration",
+      "WhatsApp booking in a single tap",
+      "Before-and-after gallery of your work",
+      "Packages and offers that bring clients back",
+    ],
+    stat: "Salons see 40% more repeat bookings",
+    card: { name: "Glow Studio", role: "Hair & Skin · Chandigarh", chips: ["Services", "Book Now", "Gallery"] },
+  },
+  {
+    id: "coaches", tab: "Coaches & Consultants", icon: Users, accent: "#3B82F6",
+    headline: "Digital Business Card for Coaches & Consultants",
+    pain: "Your credibility is the product. Let people see it before the first call, not during it.",
+    points: [
+      "Programmes and packages with transparent pricing",
+      "Testimonials and Google reviews front and centre",
+      "Discovery calls booked over WhatsApp or a link",
+      "Videos and free resources that build trust early",
+    ],
+    stat: "Coaches book 3× more discovery calls",
+    card: { name: "Neha Kapoor", role: "Business Coach · Delhi", chips: ["Programmes", "Book Call", "Reviews"] },
+  },
+];
+
+function PersonaSection() {
+  const [active, setActive] = useState(0);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pill, setPill] = useState({ left: 0, width: 0 });
+
+  // Measure the active tab so the pill can slide between tabs of different
+  // widths (re-measured on resize and whenever the selection changes).
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = btnRefs.current[active];
+      if (el) setPill({ left: el.offsetLeft, width: el.offsetWidth });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [active]);
+
+  // Keep the chosen tab in view on narrow screens.
+  useEffect(() => {
+    btnRefs.current[active]?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [active]);
+
+  const p = PERSONAS[active];
 
   return (
-    <section className="py-20 bg-white relative overflow-hidden">
+    <section className="py-20 bg-white relative overflow-hidden" id="built-for-you">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeading eyebrow="Industries" title={<>Made for Every <span className="text-gradient-gold">Business Type</span></>} subtitle="Whatever you do, there is a template and a feature set already shaped for it." />
+      <div
+        className="absolute left-1/2 top-40 -translate-x-1/2 w-[760px] h-[400px] rounded-full blur-3xl pointer-events-none transition-colors duration-700"
+        style={{ background: `${p.accent}14` }}
+      />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <SectionHeading
+          eyebrow="Built for you"
+          title={<>Made for the Way <span className="text-gradient-gold">You Work</span></>}
+          subtitle="Pick your line of work — the card, the features and the pitch change to match it."
+        />
 
-        <Reveal stagger className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {featured.map((f) => (
-            <div key={f.name} className="group relative rounded-2xl bg-gradient-to-b from-white to-[#FAFBFD] ring-1 ring-[#E8ECF3] p-5 overflow-hidden transition-all hover:-translate-y-1 hover:shadow-premium-lg hover:ring-[#F7B31C]/40">
-              <span aria-hidden="true" className="absolute -right-6 -top-6 w-24 h-24 rounded-full blur-2xl transition-opacity opacity-0 group-hover:opacity-100" style={{ background: `${f.accent}26` }} />
-              <span className="relative w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: `${f.accent}1A`, color: f.accent }}>
-                <f.icon size={19} />
-              </span>
-              <h3 className="relative text-[15px] font-bold text-[#0F172A] mb-1.5">{f.name}</h3>
-              <p className="relative text-[12.5px] text-[#64748B] leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
-        </Reveal>
-
-        <Reveal className="mt-8">
-          <p className="text-center text-[11px] font-bold uppercase tracking-widest text-[#94A3B8] mb-5">And plenty more</p>
-          <div className="flex flex-wrap justify-center gap-2.5">
-            {more.map((m) => (
-              <span key={m} className="inline-flex items-center gap-2 h-9 px-4 rounded-full bg-[#F8FAFC] ring-1 ring-[#E2E8F0] text-[13px] font-medium text-[#475569] transition-all hover:bg-white hover:ring-[#F7B31C]/50 hover:-translate-y-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C]" /> {m}
-              </span>
-            ))}
+        {/* Persona tabs with a sliding indicator */}
+        <Reveal>
+          <div ref={tabsRef} className="relative flex gap-1.5 overflow-x-auto no-scrollbar p-1.5 rounded-2xl bg-[#F1F5F9] ring-1 ring-[#E2E8F0] mb-10">
+            <span
+              aria-hidden="true"
+              className="absolute top-1.5 bottom-1.5 rounded-xl bg-[#0F172A] shadow-premium transition-all duration-500 ease-[cubic-bezier(.2,.8,.2,1)]"
+              style={{ left: pill.left, width: pill.width }}
+            />
+            {PERSONAS.map((x, i) => {
+              const on = i === active;
+              return (
+                <button
+                  key={x.id}
+                  ref={(el) => { btnRefs.current[i] = el; }}
+                  type="button"
+                  onClick={() => setActive(i)}
+                  aria-pressed={on}
+                  className={`relative z-10 shrink-0 inline-flex items-center gap-2 h-11 px-4 rounded-xl text-[13px] font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] ${on ? "text-white" : "text-[#475569] hover:text-[#0F172A]"}`}
+                >
+                  <x.icon size={15} className={on ? "" : "text-[#94A3B8]"} />
+                  <span className="whitespace-nowrap">{x.tab}</span>
+                </button>
+              );
+            })}
           </div>
         </Reveal>
 
-        <div className="text-center mt-10">
-          <Link to="/industries" className="btn-navy inline-flex items-center gap-2">View All Industries <ChevronRight size={16} /></Link>
+        {/* One shell, content swapped — keyed so it re-mounts and cross-fades */}
+        <div key={p.id} className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+          <div className="dc-swap-in">
+            <h3 className="text-2xl sm:text-[2rem] font-extrabold text-[#0F172A] tracking-tight leading-[1.2]">{p.headline}</h3>
+            <p className="mt-4 text-[15px] text-[#64748B] leading-relaxed">{p.pain}</p>
+
+            <div className="mt-7 space-y-3.5">
+              {p.points.map((pt) => (
+                <div key={pt} className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: `${p.accent}1F`, color: p.accent }}>
+                    <Check size={12} strokeWidth={3} />
+                  </span>
+                  <span className="text-[14px] text-[#334155] leading-relaxed">{pt}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-7 inline-flex items-center gap-2.5 rounded-full px-4 py-2.5 ring-1" style={{ background: `${p.accent}12`, borderColor: "transparent", boxShadow: `inset 0 0 0 1px ${p.accent}33` }}>
+              <TrendingUp size={15} style={{ color: p.accent }} />
+              <span className="text-[13px] font-bold text-[#0F172A]">{p.stat}</span>
+            </div>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link to="/signup" className="btn-gold h-12 px-7 inline-flex items-center gap-2 text-base">
+                Start Free <ArrowRight size={17} />
+              </Link>
+              <Link to="/industries" className="h-12 px-6 inline-flex items-center gap-2 text-sm font-semibold text-[#475569] border border-[#E2E8F0] rounded-xl hover:bg-[#F8FAFC] transition-all">
+                See more industries <ChevronRight size={15} />
+              </Link>
+            </div>
+          </div>
+
+          {/* Card mock in that persona's world */}
+          <div className="dc-swap-in dc-swap-d1 flex justify-center">
+            <div className="relative w-full max-w-[330px]">
+              <div className="absolute -inset-4 rounded-[2rem] blur-2xl opacity-60 transition-colors duration-700" style={{ background: `${p.accent}1F` }} />
+              <div className="relative rounded-[1.75rem] bg-white ring-1 ring-[#E7EBF2] shadow-premium-lg overflow-hidden">
+                <div className="h-24 relative" style={{ background: `linear-gradient(135deg, ${p.accent}, ${p.accent}B3)` }}>
+                  <div className="absolute inset-0 bg-grid-dark opacity-20" />
+                </div>
+                <div className="px-5 pb-6 -mt-10 relative">
+                  <div className="w-20 h-20 rounded-2xl bg-white ring-4 ring-white shadow-premium flex items-center justify-center mx-auto" style={{ color: p.accent }}>
+                    <p.icon size={30} />
+                  </div>
+                  <p className="mt-3.5 text-center text-[17px] font-extrabold text-[#0F172A] leading-tight">{p.card.name}</p>
+                  <p className="mt-1 text-center text-[12px] text-[#64748B]">{p.card.role}</p>
+
+                  <div className="mt-5 grid grid-cols-3 gap-2">
+                    {p.card.chips.map((c) => (
+                      <span key={c} className="h-9 rounded-xl text-[11px] font-bold flex items-center justify-center text-center px-1 leading-tight" style={{ background: `${p.accent}14`, color: p.accent }}>
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    <div className="h-2 rounded-full bg-[#F1F5F9]" />
+                    <div className="h-2 rounded-full bg-[#F1F5F9] w-4/5" />
+                    <div className="h-2 rounded-full bg-[#F1F5F9] w-3/5" />
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-center gap-2 text-[10.5px] font-semibold text-[#94A3B8]">
+                    <QrCode size={13} /> digitalcarda.in/{p.id}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1367,6 +1549,116 @@ function PricingSection() {
 }
 
 /* ─── Final CTA ─── */
+/* ─── FAQ ─────────────────────────────────────────────────────
+   Doing two jobs at once: it answers the objections that actually stop
+   a signup (cost, app install, technical skill, permanence), and it
+   targets the question queries people type before they buy. Answers are
+   written answer-first so AI Overviews can lift a clean sentence, and
+   mirrored into FAQPage JSON-LD with identical text. */
+const FAQS = [
+  {
+    q: "What is a digital business card?",
+    a: "A digital business card is a shareable web page that holds your contact details, services, payment options and links in one place. You share it as a link or QR code, and the person opens it instantly — nothing is printed and nothing is installed.",
+  },
+  {
+    q: "Does the other person need an app to open my card?",
+    a: "No. Your card opens in any web browser on any phone, tablet or laptop. Neither you nor the person receiving it needs to download an app or create an account, which is why cards get opened far more often than a PDF or a contact file.",
+  },
+  {
+    q: "How much does a digital business card cost in India?",
+    a: "DigitalCarda plans start at Rs. 99 per month, and you can start a 30-day free trial without entering card details upfront. Compared with reprinting paper visiting cards every time a number, address or designation changes, a digital card usually pays for itself in the first year.",
+  },
+  {
+    q: "Do I need any technical or design skills?",
+    a: "No. You pick a ready template, add your details, and publish — most people finish in under ten minutes. AI can also write your about section, service descriptions and SEO text for you, and you can paste your website link to have a full card generated automatically.",
+  },
+  {
+    q: "If I redesign my card later, does my QR code stop working?",
+    a: "No. Your QR code and link point to a permanent address, so you can change the design, template, phone number or content as often as you like and everything you already printed keeps working. That is the main advantage over paper cards.",
+  },
+  {
+    q: "Can I use my own domain and branding?",
+    a: "Yes. You can connect your own domain or subdomain, apply your brand colours and logo, and remove template styling so the card looks like part of your own website. Agencies and resellers can also white-label the whole platform for their clients.",
+  },
+  {
+    q: "Can I see who viewed my digital card?",
+    a: "Yes. You get analytics for card views, unique visitors, call and WhatsApp clicks, QR scans, enquiry form submissions, device type and traffic source — so you can tell which sharing channel actually brings you business.",
+  },
+];
+
+function FaqSection() {
+  const [open, setOpen] = useState<number | null>(0);
+
+  useEffect(() => {
+    const ld = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: FAQS.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    };
+    let s = document.getElementById("dc-faq-ld");
+    if (!s) {
+      s = document.createElement("script");
+      s.id = "dc-faq-ld";
+      (s as HTMLScriptElement).type = "application/ld+json";
+      document.head.appendChild(s);
+    }
+    s.textContent = JSON.stringify(ld);
+    return () => { document.getElementById("dc-faq-ld")?.remove(); };
+  }, []);
+
+  return (
+    <section className="py-20 bg-[#F8FAFC] relative overflow-hidden" id="faq">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <SectionHeading
+          eyebrow="Questions"
+          title={<>Everything You Might Be <span className="text-gradient-gold">Wondering</span></>}
+          subtitle="The things people ask us most before they start."
+        />
+
+        <Reveal stagger className="space-y-3">
+          {FAQS.map((f, i) => {
+            const on = open === i;
+            return (
+              <div key={f.q} className={`rounded-2xl bg-white ring-1 transition-all duration-300 ${on ? "ring-[#F7B31C]/45 shadow-premium-lg" : "ring-[#E2E8F0] shadow-premium hover:ring-[#CBD5E1]"}`}>
+                <button
+                  type="button"
+                  onClick={() => setOpen(on ? null : i)}
+                  aria-expanded={on}
+                  className="w-full flex items-center gap-4 text-left px-5 sm:px-6 py-4.5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] rounded-2xl"
+                >
+                  <h3 className="flex-1 text-[14.5px] sm:text-[15px] font-bold text-[#0F172A] leading-snug">{f.q}</h3>
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${on ? "bg-[#F7B31C] text-[#0F172A] rotate-90" : "bg-[#F1F5F9] text-[#64748B]"}`}>
+                    <ChevronRight size={15} />
+                  </span>
+                </button>
+                <div className="grid transition-all duration-300 ease-out" style={{ gridTemplateRows: on ? "1fr" : "0fr" }}>
+                  <div className="overflow-hidden">
+                    <p className="px-5 sm:px-6 pb-5 text-[13.5px] text-[#64748B] leading-relaxed">{f.a}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </Reveal>
+
+        <Reveal className="mt-9 text-center">
+          <p className="text-[13.5px] text-[#64748B]">
+            Still deciding?{" "}
+            <Link to="/contact" className="font-semibold text-[#B45309] hover:underline">Talk to us</Link>
+            {" "}or{" "}
+            <Link to="/signup" className="font-semibold text-[#B45309] hover:underline">start the free trial</Link> — no card details needed.
+          </p>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 function FinalCTA() {
   return (
     <section className="py-20">
@@ -1404,11 +1696,11 @@ export default function Home() {
       <HeroSection />
       <StatsBand />
       <TrustedSection />
+      <PersonaSection />
       <FeaturesSection />
       <WhyDigitalCardaSection />
       <AISection />
-      <TemplatesSection />
-      <IndustriesSection />
+      <TemplatesSection />
       <HowItWorksSection />
       <AnalyticsSection />
       <QRNFCSection />
