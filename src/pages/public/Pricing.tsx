@@ -1,8 +1,9 @@
-import { Check, ArrowRight, HelpCircle, Sparkles, Zap, Crown, IdCard, QrCode, Images, Tag, MessageSquare, Globe, Star } from "lucide-react";
+import { Check, ArrowRight, ChevronRight, Sparkles, Zap, Crown, IdCard, QrCode, Images, Tag, MessageSquare, Globe, Star, ShieldCheck } from "lucide-react";
 import { Link } from "react-router";
-import { useState } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { trpc } from "@/providers/trpc";
 import { planFeatures, type PlanPkg } from "@/lib/planFeatures";
+import { Reveal } from "@/components/public/Reveal";
 
 /* ── Billing periods ──────────────────────────────────────────── */
 type Period = "monthly" | "yearly" | "3year";
@@ -137,28 +138,107 @@ export default function Pricing() {
   const { data: pkgs } = trpc.package.list.useQuery();
   const plans = pkgs && pkgs.length ? buildPlans(pkgs as unknown as DbPkg[]) : PLANS;
 
+  // Sliding indicator for the billing toggle, measured from the active button so
+  // it tracks labels of different widths (and the badges that come and go).
+  const periodRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pill, setPill] = useState({ left: 0, width: 0 });
+  const periodIdx = PERIODS.findIndex((p) => p.id === period);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = periodRefs.current[periodIdx];
+      if (el) setPill({ left: el.offsetLeft, width: el.offsetWidth });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [periodIdx]);
+
+  /* Structured data: the FAQ, plus the paid plans as real Offers built from the
+     LIVE prices so the markup can never drift from what is on screen. */
+  useEffect(() => {
+    const paid = plans.filter((p) => p.price.monthly > 0);
+    const ld = {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "FAQPage",
+          mainEntity: faqs.map((f) => ({
+            "@type": "Question",
+            name: f.q,
+            acceptedAnswer: { "@type": "Answer", text: f.a },
+          })),
+        },
+        ...(paid.length ? [{
+          "@type": "Product",
+          name: "DigitalCarda digital business card",
+          description: "A digital business card with QR code, WhatsApp chat, payment links, products, gallery, lead capture and analytics.",
+          brand: { "@type": "Brand", name: "DigitalCarda" },
+          offers: paid.map((p) => ({
+            "@type": "Offer",
+            name: p.name,
+            price: String(p.price.monthly),
+            priceCurrency: "INR",
+            availability: "https://schema.org/InStock",
+            url: "https://digitalcarda.in/pricing",
+          })),
+        }] : []),
+      ],
+    };
+    let s = document.getElementById("dc-pricing-ld");
+    if (!s) {
+      s = document.createElement("script");
+      s.id = "dc-pricing-ld";
+      (s as HTMLScriptElement).type = "application/ld+json";
+      document.head.appendChild(s);
+    }
+    s.textContent = JSON.stringify(ld);
+    return () => { document.getElementById("dc-pricing-ld")?.remove(); };
+  }, [plans]);
+
   return (
-    <div className="pt-24 pb-20 bg-[#F8FAFC]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="pt-24 pb-20 bg-[#F8FAFC] relative">
+      <div aria-hidden="true" className="absolute inset-0 bg-grid mask-fade-b opacity-50 pointer-events-none" />
+      <div aria-hidden="true" className="absolute top-0 right-0 w-[520px] h-[520px] bg-[#F7B31C]/12 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4 animate-aurora-drift pointer-events-none" />
+      <div aria-hidden="true" className="absolute top-56 left-0 w-[380px] h-[380px] bg-[#8B5CF6]/10 rounded-full blur-3xl -translate-x-1/3 animate-aurora-drift pointer-events-none" style={{ animationDelay: "3s" }} />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-8">
+        <Reveal stagger className="text-center max-w-3xl mx-auto mb-8">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E] mb-4"><Sparkles size={13} className="text-[#F7B31C]" /> Pricing</span>
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-[#0F172A] tracking-tight">One card. Every way to be found.</h1>
-          <p className="mt-4 text-base text-[#64748B]">Start free for 30 days — full features, no credit card. Then keep your digital card live from just <span className="font-semibold text-[#0F172A]">₹99/month</span>.</p>
-        </div>
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-[#0F172A] tracking-tight leading-[1.08]">
+            One card.{" "}
+            <span className="relative inline-block text-gradient-gold">
+              Every way to be found.
+              <svg className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 300 10" fill="none" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M2 7c60-5 120-5 180-2s90 3 116-1" stroke="#F7B31C" strokeWidth="3" strokeLinecap="round" opacity="0.5" />
+              </svg>
+            </span>
+          </h1>
+          <p className="mt-6 text-base text-[#64748B] leading-relaxed">Start free for 30 days — full features, no credit card. Then keep your digital card live from just <span className="font-semibold text-[#0F172A]">₹99/month</span>.</p>
+        </Reveal>
 
         {/* Billing toggle */}
-        <div className="flex justify-center mb-10">
-          <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-white ring-1 ring-[#E2E8F0] shadow-premium">
-            {PERIODS.map((p) => (
-              <button key={p.id} onClick={() => setPeriod(p.id)}
-                className={`relative px-4 sm:px-5 h-10 rounded-xl text-sm font-semibold transition-all ${period === p.id ? "gradient-gold text-[#0F172A] shadow-gold" : "text-[#64748B] hover:text-[#0F172A]"}`}>
+        <Reveal className="flex justify-center mb-10">
+          <div className="relative inline-flex items-center gap-1 p-1 rounded-2xl bg-white ring-1 ring-[#E2E8F0] shadow-premium">
+            <span
+              aria-hidden="true"
+              className="absolute top-1 bottom-1 rounded-xl gradient-gold shadow-gold transition-all duration-500 ease-[cubic-bezier(.2,.8,.2,1)]"
+              style={{ left: pill.left, width: pill.width }}
+            />
+            {PERIODS.map((p, i) => (
+              <button
+                key={p.id}
+                ref={(el) => { periodRefs.current[i] = el; }}
+                onClick={() => setPeriod(p.id)}
+                aria-pressed={period === p.id}
+                className={`relative z-10 px-4 sm:px-5 h-10 rounded-xl text-sm font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A] ${period === p.id ? "text-[#0F172A]" : "text-[#64748B] hover:text-[#0F172A]"}`}
+              >
                 {p.label}
-                {p.badge && <span className={`ml-1.5 hidden sm:inline text-[10px] font-bold px-1.5 py-0.5 rounded-full align-middle ${period === p.id ? "bg-[#0F172A]/10 text-[#0F172A]" : "bg-[#DCFCE7] text-[#166534]"}`}>{p.badge}</span>}
+                {p.badge && <span className={`ml-1.5 hidden sm:inline text-[10px] font-bold px-1.5 py-0.5 rounded-full align-middle transition-colors ${period === p.id ? "bg-[#0F172A]/10 text-[#0F172A]" : "bg-[#DCFCE7] text-[#166534]"}`}>{p.badge}</span>}
               </button>
             ))}
           </div>
-        </div>
+        </Reveal>
 
         {/* Plans */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-5xl mx-auto items-start">
@@ -235,7 +315,7 @@ export default function Pricing() {
         </div>
 
         {/* Bulk teaser */}
-        <div className="mt-8 max-w-5xl mx-auto">
+        <Reveal className="mt-8 max-w-5xl mx-auto">
           <Link to="/bulk-cards" className="group flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-white ring-1 ring-[#F1F5F9] shadow-premium px-6 py-5 hover:ring-[#F7B31C]/50 transition-all">
             <div className="flex items-center gap-3 text-center sm:text-left">
               <span className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center shrink-0"><IdCard size={20} className="text-[#F7B31C]" /></span>
@@ -246,13 +326,17 @@ export default function Pricing() {
             </div>
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0F172A] group-hover:gap-2.5 transition-all whitespace-nowrap">View Bulk Cards <ArrowRight size={15} /></span>
           </Link>
-        </div>
+        </Reveal>
 
         {/* Trust line */}
-        <p className="mt-6 text-center text-[13px] text-[#94A3B8]">7-day money-back guarantee · Cancel anytime · UPI, Cards, Net Banking, Paytm & GPay</p>
+        <Reveal className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-[#94A3B8]">
+          <span className="inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-emerald-500" /> 7-day money-back guarantee</span>
+          <span className="inline-flex items-center gap-1.5"><Check size={14} className="text-emerald-500" /> Cancel anytime</span>
+          <span className="inline-flex items-center gap-1.5"><Check size={14} className="text-emerald-500" /> UPI, Cards, Net Banking, Paytm &amp; GPay</span>
+        </Reveal>
 
         {/* Custom Domain add-on */}
-        <div className="mt-16 max-w-5xl mx-auto">
+        <Reveal className="mt-16 max-w-5xl mx-auto">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0F172A] to-[#1E293B] p-7 sm:p-9 ring-1 ring-white/5">
             <div className="absolute -top-16 -right-10 w-64 h-64 bg-[#8B5CF6]/15 rounded-full blur-3xl" />
             <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6">
@@ -271,7 +355,7 @@ export default function Pricing() {
               </div>
             </div>
           </div>
-        </div>
+        </Reveal>
 
         {/* Everything included — dynamic, admin-managed feature list */}
         {includedFeatures.length > 0 && (
@@ -297,29 +381,46 @@ export default function Pricing() {
 
         {/* FAQs */}
         <div className="mt-20 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-[#0F172A] text-center mb-8">Frequently Asked Questions</h2>
-          <div className="space-y-3">
-            {faqs.map((faq, i) => (
-              <div key={i} className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
-                <button onClick={() => setOpenFaq(openFaq === i ? null : i)} className="w-full flex items-center justify-between p-5 text-left">
-                  <span className="text-sm font-medium text-[#0F172A]">{faq.q}</span>
-                  <HelpCircle size={16} className={`text-[#94A3B8] transition-transform shrink-0 ml-3 ${openFaq === i ? "rotate-180" : ""}`} />
-                </button>
-                {openFaq === i && <div className="px-5 pb-5"><p className="text-sm text-[#64748B] leading-relaxed">{faq.a}</p></div>}
-              </div>
-            ))}
-          </div>
+          <Reveal className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight">Frequently Asked <span className="text-gradient-gold">Questions</span></h2>
+            <p className="mt-2.5 text-sm text-[#64748B]">The things people check before they pick a plan.</p>
+          </Reveal>
+          <Reveal stagger className="space-y-3">
+            {faqs.map((faq, i) => {
+              const on = openFaq === i;
+              return (
+                <div key={faq.q} className={`rounded-2xl bg-white ring-1 transition-all duration-300 ${on ? "ring-[#F7B31C]/45 shadow-premium-lg" : "ring-[#E2E8F0] shadow-premium hover:ring-[#CBD5E1]"}`}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(on ? null : i)}
+                    aria-expanded={on}
+                    className="w-full flex items-center gap-4 text-left px-5 sm:px-6 py-4 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
+                  >
+                    <h3 className="flex-1 text-[14.5px] font-bold text-[#0F172A] leading-snug">{faq.q}</h3>
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${on ? "bg-[#F7B31C] text-[#0F172A] rotate-90" : "bg-[#F1F5F9] text-[#64748B]"}`}>
+                      <ChevronRight size={15} />
+                    </span>
+                  </button>
+                  <div className="grid transition-all duration-300 ease-out" style={{ gridTemplateRows: on ? "1fr" : "0fr" }}>
+                    <div className="overflow-hidden">
+                      <p className="px-5 sm:px-6 pb-5 text-[13.5px] text-[#64748B] leading-relaxed">{faq.a}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </Reveal>
         </div>
 
         {/* Closing CTA */}
-        <div className="mt-16 text-center bg-gradient-to-br from-[#0F172A] to-[#1E293B] rounded-3xl p-10 sm:p-14 relative overflow-hidden">
+        <Reveal className="mt-16 text-center bg-gradient-to-br from-[#0F172A] to-[#1E293B] rounded-3xl p-10 sm:p-14 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-72 h-72 bg-[#F7B31C]/10 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
           <div className="relative">
             <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Your card is ready in minutes</h2>
             <p className="text-sm text-[#94A3B8] mb-6 max-w-lg mx-auto">Start free for 30 days with every feature unlocked. No credit card, no risk.</p>
             <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">Start Free Trial <ArrowRight size={16} /></Link>
           </div>
-        </div>
+        </Reveal>
       </div>
     </div>
   );
