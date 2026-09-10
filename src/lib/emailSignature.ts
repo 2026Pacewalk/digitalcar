@@ -12,6 +12,10 @@
      • explicit width/height + border:0 + display:block on images
      • an explicit colour on every <a> (clients otherwise force blue/underline)
 
+   Icons are hosted PNGs (public/sig/, built by scripts/build-signature-icons.mjs).
+   Gmail strips inline <svg>, Outlook ignores icon webfonts, and every client
+   blocks data: URIs in <img> — a hosted PNG is the only format that survives.
+
    Everything is escaped: the card fields are user input and end up in someone
    else's inbox. */
 
@@ -27,7 +31,8 @@ export type SignatureData = {
   logo: string;      // absolute https URL (or a data: URI)
   cardUrl: string;   // https://digitalcarda.in/<slug>
   qrSrc: string;     // absolute QR image URL
-  socials: { label: string; url: string }[];
+  /** `platform` selects the brand icon; `label` is the accessible name. */
+  socials: { platform: string; label: string; url: string }[];
 };
 
 export type SignatureOptions = {
@@ -63,170 +68,258 @@ const waDigits = (s: string) => String(s || "").replace(/\D/g, "");
 /* Strip the scheme for display, keep it for the href. */
 const prettyUrl = (u: string) => String(u || "").replace(/^https?:\/\//i, "").replace(/\/$/, "");
 
+/* Which platforms have a generated s-<key>.png. Keep in step with
+   scripts/build-signature-icons.mjs. */
+const ICON_PLATFORMS = new Set([
+  "facebook", "instagram", "x", "youtube", "linkedin", "whatsapp", "telegram",
+  "tiktok", "pinterest", "snapchat", "github", "behance", "dribbble", "spotify",
+  "twitch", "discord",
+]);
+
+/* Icons live beside the card, so a signature previewed on localhost uses local
+   icons and one built in production points at production. */
+function iconBase(d: SignatureData): string {
+  try { return `${new URL(d.cardUrl).origin}/sig`; } catch { return "https://digitalcarda.in/sig"; }
+}
+
+const icon = (d: SignatureData, name: string, size: number, inline = false) =>
+  `<img src="${esc(iconBase(d))}/${esc(name)}.png" width="${size}" height="${size}" alt="" ` +
+  `style="display:${inline ? "inline-block" : "block"};border:0;outline:none;` +
+  `width:${size}px;height:${size}px;${inline ? "vertical-align:-2px;" : ""}" />`;
+
 const a = (href: string, text: string, color: string, bold = false) =>
   `<a href="${esc(href)}" style="color:${color};text-decoration:none;font-family:${FONT};${bold ? "font-weight:bold;" : ""}">${esc(text)}</a>`;
 
-/* One "Label: value" contact row. Uses a nested table so the label column
-   cannot collapse in Outlook. */
-function row(label: string, valueHtml: string): string {
-  return `<tr>
-    <td style="padding:2px 8px 2px 0;font-family:${FONT};font-size:12px;color:${MUTED};white-space:nowrap;">${esc(label)}</td>
-    <td style="padding:2px 0;font-family:${FONT};font-size:12px;color:${INK};">${valueHtml}</td>
-  </tr>`;
-}
+/** Vertical space between blocks. A sized empty div survives everywhere;
+    padding on a <div> is dropped by Outlook's Word renderer. */
+const gap = (px: number) => `<div style="height:${px}px;line-height:${px}px;font-size:0;">&nbsp;</div>`;
 
-function contactRows(d: SignatureData, o: SignatureOptions): string {
-  const out: string[] = [];
-  if (d.phone) out.push(row("Phone", a(`tel:${digits(d.phone)}`, d.phone, INK)));
+/* ── Contact lines ─────────────────────────────────────────────────────────
+   An icon cell then the value — the layout every professional signature uses.
+   The icon column is fixed width so values line up even when a row wraps. */
+type Line = { icon: string; html: string };
+
+function contactLines(d: SignatureData, o: SignatureOptions, color = INK, withAddress = true): Line[] {
+  const out: Line[] = [];
+  if (d.phone) out.push({ icon: "phone", html: a(`tel:${digits(d.phone)}`, d.phone, color) });
   if (d.whatsapp && waDigits(d.whatsapp) !== waDigits(d.phone)) {
-    out.push(row("WhatsApp", a(`https://wa.me/${waDigits(d.whatsapp)}`, d.whatsapp, INK)));
+    out.push({ icon: "s-whatsapp", html: a(`https://wa.me/${waDigits(d.whatsapp)}`, d.whatsapp, color) });
   }
-  if (d.email) out.push(row("Email", a(`mailto:${d.email}`, d.email, INK)));
-  if (d.website) out.push(row("Web", a(d.website, prettyUrl(d.website), INK)));
-  if (o.showAddress && d.address) {
-    out.push(row("Address", `<span style="font-family:${FONT};font-size:12px;color:${INK};">${esc(d.address)}</span>`));
+  if (d.email) out.push({ icon: "mail", html: a(`mailto:${d.email}`, d.email, color) });
+  if (d.website) out.push({ icon: "globe", html: a(d.website, prettyUrl(d.website), color) });
+  if (withAddress && o.showAddress && d.address) {
+    out.push({ icon: "pin", html: `<span style="font-family:${FONT};font-size:12px;color:${color};">${esc(d.address)}</span>` });
   }
-  return out.join("");
+  return out;
 }
 
-function socialsLine(d: SignatureData, o: SignatureOptions): string {
+/** Stacked icon rows — the classic left-aligned contact block. */
+function contactStack(d: SignatureData, o: SignatureOptions, color = INK): string {
+  const lines = contactLines(d, o, color);
+  if (!lines.length) return "";
+  const rows = lines.map((l) => `<tr>
+      <td width="22" valign="top" style="width:22px;padding:3px 8px 3px 0;">${icon(d, l.icon, 14)}</td>
+      <td valign="top" style="padding:2px 0;font-family:${FONT};font-size:12px;line-height:1.5;color:${color};">${l.html}</td>
+    </tr>`).join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody>${rows}</tbody></table>`;
+}
+
+/** One flowing line of icon+value pairs — for the compact template.
+    Built from inline spans rather than a table ON PURPOSE: a table row cannot
+    wrap, so a customer with four long contact fields would push the reader into
+    a horizontal scroll. Each pair keeps nowrap so an icon never separates from
+    its value, but the line as a whole breaks where it must. The address is left
+    out — it is far too long for a single-line layout. */
+function contactInline(d: SignatureData, o: SignatureOptions, color = INK): string {
+  const lines = contactLines(d, o, color, false);
+  if (!lines.length) return "";
+  const sep = `<span style="color:${LINE};font-family:${FONT};font-size:12px;">&nbsp;&nbsp;|&nbsp;&nbsp;</span>`;
+  const cells = lines.map((l) =>
+    `<span style="white-space:nowrap;font-family:${FONT};font-size:12px;color:${color};">` +
+    `${icon(d, l.icon, 13, true)}&nbsp;${l.html}</span>`).join(sep);
+  return `<div style="font-family:${FONT};font-size:12px;line-height:2;color:${color};">${cells}</div>`;
+}
+
+/** Brand-coloured social discs. Falls back to a text link for any platform we
+    have no icon for, so a link is never silently dropped. */
+function socialRow(d: SignatureData, o: SignatureOptions, size = 26): string {
   if (!o.showSocials || !d.socials.length) return "";
-  // Text links, not icons: icon fonts never render in mail, and hot-linked icon
-  // images are blocked by default in Outlook.
-  const links = d.socials.map((s) => a(s.url, s.label, o.accent)).join(
-    `<span style="color:${LINE};"> &nbsp;|&nbsp; </span>`);
-  return `<tr><td style="padding:8px 0 0;font-family:${FONT};font-size:11px;">${links}</td></tr>`;
+  const cells = d.socials.map((s) => {
+    const inner = ICON_PLATFORMS.has(s.platform)
+      ? `<img src="${esc(iconBase(d))}/s-${esc(s.platform)}.png" width="${size}" height="${size}" alt="${esc(s.label)}" style="display:block;border:0;outline:none;width:${size}px;height:${size}px;" />`
+      : `<span style="font-family:${FONT};font-size:11px;color:${o.accent};">${esc(s.label)}</span>`;
+    return `<td style="padding:0 6px 0 0;"><a href="${esc(s.url)}" style="text-decoration:none;">${inner}</a></td>`;
+  }).join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody><tr>${cells}</tr></tbody></table>`;
 }
 
 /* The point of the whole feature: a prominent, tappable card link. */
-function cardButton(d: SignatureData, o: SignatureOptions): string {
-  return `<a href="${esc(d.cardUrl)}" style="display:inline-block;background:${o.accent};color:#ffffff;font-family:${FONT};font-size:12px;font-weight:bold;text-decoration:none;padding:8px 16px;border-radius:6px;">View my digital card</a>`;
-}
+const cardButton = (d: SignatureData, o: SignatureOptions, label = "View my digital card") =>
+  `<a href="${esc(d.cardUrl)}" style="display:inline-block;background:${o.accent};color:#ffffff;font-family:${FONT};font-size:12px;font-weight:bold;text-decoration:none;padding:9px 18px;border-radius:5px;">${esc(label)}</a>`;
 
-function cardLinkLine(d: SignatureData, o: SignatureOptions): string {
-  const tag = o.tagline ? `<div style="font-family:${FONT};font-size:11px;color:${MUTED};padding-top:4px;">${esc(o.tagline)}</div>` : "";
-  return `${a(d.cardUrl, prettyUrl(d.cardUrl), o.accent, true)}${tag}`;
-}
+const taglineLine = (o: SignatureOptions, color = MUTED) =>
+  o.tagline ? `<div style="font-family:${FONT};font-size:11px;color:${color};padding-top:6px;line-height:1.4;">${esc(o.tagline)}</div>` : "";
 
 const logoImg = (d: SignatureData, size: number) =>
-  `<img src="${esc(d.logo)}" width="${size}" alt="${esc(d.company || d.name)}" style="display:block;border:0;outline:none;width:${size}px;max-width:${size}px;height:auto;border-radius:6px;" />`;
+  `<img src="${esc(d.logo)}" width="${size}" alt="${esc(d.company || d.name)}" style="display:block;border:0;outline:none;width:${size}px;max-width:${size}px;height:auto;" />`;
 
 const qrImg = (d: SignatureData, size: number) =>
   `<img src="${esc(d.qrSrc)}" width="${size}" height="${size}" alt="Scan my digital card" style="display:block;border:0;outline:none;width:${size}px;height:${size}px;" />`;
 
-const nameBlock = (d: SignatureData, o: SignatureOptions, nameSize = 16) => `
-  <div style="font-family:${FONT};font-size:${nameSize}px;font-weight:bold;color:${INK};line-height:1.25;">${esc(d.name)}</div>
-  ${d.designation || d.company ? `<div style="font-family:${FONT};font-size:12px;color:${MUTED};padding-top:2px;line-height:1.35;">
-    ${esc(d.designation)}${d.designation && d.company ? " &nbsp;·&nbsp; " : ""}${d.company ? `<span style="color:${o.accent};font-weight:bold;">${esc(d.company)}</span>` : ""}
-  </div>` : ""}`;
+/** Name, role and company — the identity block, shared by every template. */
+function identity(d: SignatureData, o: SignatureOptions, opts: { nameSize?: number; onDark?: boolean } = {}): string {
+  const { nameSize = 17, onDark = false } = opts;
+  const nameColor = onDark ? "#ffffff" : INK;
+  const roleColor = onDark ? "#f1f5f9" : MUTED;
+  const coColor = onDark ? "#ffffff" : o.accent;
+  const role = d.designation
+    ? `<div style="font-family:${FONT};font-size:12.5px;color:${roleColor};padding-top:3px;line-height:1.4;">${esc(d.designation)}</div>` : "";
+  const co = d.company
+    ? `<div style="font-family:${FONT};font-size:12.5px;font-weight:bold;color:${coColor};padding-top:2px;line-height:1.4;">${esc(d.company)}</div>` : "";
+  return `<div style="font-family:${FONT};font-size:${nameSize}px;font-weight:bold;color:${nameColor};line-height:1.25;letter-spacing:.2px;">${esc(d.name)}</div>${role}${co}`;
+}
 
-const wrap = (inner: string) =>
-  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody>${inner}</tbody></table>`;
+const OPEN = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody>`;
+const CLOSE = `</tbody></table>`;
 
-/* ── Templates ─────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   TEMPLATES
+   ══════════════════════════════════════════════════════════════════════════ */
 
-const classic: SignatureTemplate["build"] = (d, o) => wrap(`
-  <tr>
-    ${o.showLogo && d.logo ? `<td style="padding:0 16px 0 0;vertical-align:top;">${logoImg(d, 72)}</td>
-    <td style="padding:0 16px 0 0;border-left:3px solid ${o.accent};"></td>` : ""}
-    <td style="vertical-align:top;">
-      ${nameBlock(d, o)}
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;padding-top:8px;"><tbody>
-        ${contactRows(d, o)}
-        <tr><td colspan="2" style="padding:8px 0 0;">${cardLinkLine(d, o)}</td></tr>
-        ${socialsLine(d, o)}
-      </tbody></table>
+/* 1 ── Corporate: logo, a vertical accent rule, then the details. The layout
+        most company signatures use, and the safest across clients. */
+function corporate(d: SignatureData, o: SignatureOptions): string {
+  const withLogo = o.showLogo && !!d.logo;
+  const socials = socialRow(d, o);
+  return `${OPEN}<tr>
+    ${withLogo ? `<td valign="top" style="padding:0 18px 0 0;">${logoImg(d, 96)}</td>
+    <td width="3" style="width:3px;background:${o.accent};font-size:0;line-height:0;">&nbsp;</td>` : ""}
+    <td valign="top" style="padding:0 0 0 ${withLogo ? "18px" : "0"};">
+      ${identity(d, o)}
+      ${gap(10)}
+      ${contactStack(d, o)}
+      ${gap(12)}
+      ${cardButton(d, o)}
+      ${taglineLine(o)}
+      ${socials ? gap(12) + socials : ""}
     </td>
-    ${o.showQr ? `<td style="padding:0 0 0 16px;vertical-align:top;">${qrImg(d, 76)}</td>` : ""}
-  </tr>`);
+    ${o.showQr ? `<td valign="top" style="padding:0 0 0 20px;">${qrImg(d, 84)}</td>` : ""}
+  </tr>${CLOSE}`;
+}
 
-const modern: SignatureTemplate["build"] = (d, o) => wrap(`
-  <tr>
-    <td style="border-left:4px solid ${o.accent};padding:2px 0 2px 14px;vertical-align:top;">
-      ${o.showLogo && d.logo ? `<div style="padding-bottom:8px;">${logoImg(d, 64)}</div>` : ""}
-      ${nameBlock(d, o, 17)}
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;padding-top:8px;"><tbody>
-        ${contactRows(d, o)}
-        ${socialsLine(d, o)}
-      </tbody></table>
-      <div style="padding-top:12px;">${cardButton(d, o)}</div>
-      ${o.tagline ? `<div style="font-family:${FONT};font-size:11px;color:${MUTED};padding-top:6px;">${esc(o.tagline)}</div>` : ""}
-    </td>
-    ${o.showQr ? `<td style="padding:0 0 0 18px;vertical-align:top;">${qrImg(d, 84)}</td>` : ""}
-  </tr>`);
+/* 2 ── Executive: name across the top over a full-width accent rule, details
+        left, logo and QR right. Reads like a letterhead. */
+function executive(d: SignatureData, o: SignatureOptions): string {
+  const socials = socialRow(d, o, 24);
+  const right = [
+    o.showLogo && d.logo ? logoImg(d, 90) : "",
+    o.showQr ? `<div style="padding-top:10px;">${qrImg(d, 76)}</div>` : "",
+  ].filter(Boolean).join("");
+  return `${OPEN}
+    <tr><td colspan="2" style="padding:0 0 8px;">${identity(d, o, { nameSize: 19 })}</td></tr>
+    <tr><td colspan="2" style="padding:0 0 12px;"><div style="height:2px;line-height:2px;font-size:0;background:${o.accent};">&nbsp;</div></td></tr>
+    <tr>
+      <td valign="top" style="padding:0 24px 0 0;">
+        ${contactStack(d, o)}
+        ${gap(12)}
+        ${cardButton(d, o)}
+        ${taglineLine(o)}
+        ${socials ? gap(12) + socials : ""}
+      </td>
+      ${right ? `<td valign="top" align="right" style="padding:0;">${right}</td>` : ""}
+    </tr>${CLOSE}`;
+}
 
-const compact: SignatureTemplate["build"] = (d, o) => wrap(`
-  <tr>
-    ${o.showLogo && d.logo ? `<td style="padding:0 12px 0 0;vertical-align:middle;">${logoImg(d, 48)}</td>` : ""}
-    <td style="vertical-align:middle;">
-      <div style="font-family:${FONT};font-size:14px;font-weight:bold;color:${INK};">${esc(d.name)}${d.designation ? `<span style="font-weight:normal;color:${MUTED};font-size:12px;"> &nbsp;·&nbsp; ${esc(d.designation)}</span>` : ""}</div>
-      <div style="font-family:${FONT};font-size:12px;color:${INK};padding-top:4px;">
-        ${[d.phone ? a(`tel:${digits(d.phone)}`, d.phone, INK) : "",
-           d.email ? a(`mailto:${d.email}`, d.email, INK) : "",
-           d.website ? a(d.website, prettyUrl(d.website), INK) : ""]
-          .filter(Boolean).join(`<span style="color:${LINE};"> &nbsp;|&nbsp; </span>`)}
-      </div>
-      <div style="padding-top:6px;">${cardLinkLine(d, o)}</div>
-      ${o.showSocials && d.socials.length ? `<div style="padding-top:6px;font-family:${FONT};font-size:11px;">${d.socials.map((s) => a(s.url, s.label, o.accent)).join(`<span style="color:${LINE};"> &nbsp;|&nbsp; </span>`)}</div>` : ""}
-    </td>
-  </tr>`);
+/* 3 ── Slim: a few tight lines. Built for reply chains, where a tall block
+        turns into noise by the third message. */
+function slim(d: SignatureData, o: SignatureOptions): string {
+  const socials = socialRow(d, o, 22);
+  const rest = [d.designation, d.company].filter(Boolean).join(", ");
+  const head = `<span style="font-family:${FONT};font-size:14px;font-weight:bold;color:${INK};">${esc(d.name)}</span>` +
+    (rest ? `<span style="font-family:${FONT};font-size:12px;color:${MUTED};"> — ${esc(rest)}</span>` : "");
+  return `${OPEN}
+    <tr><td style="padding:0 0 3px;">${head}</td></tr>
+    <tr><td style="padding:4px 0 0;">${contactInline(d, o)}</td></tr>
+    <tr><td style="padding:7px 0 0;font-family:${FONT};font-size:12px;color:${MUTED};">
+      ${a(d.cardUrl, prettyUrl(d.cardUrl), o.accent, true)}${o.tagline ? ` &nbsp;·&nbsp; ${esc(o.tagline)}` : ""}
+    </td></tr>
+    ${socials ? `<tr><td style="padding:8px 0 0;">${socials}</td></tr>` : ""}
+    ${CLOSE}`;
+}
 
-const banner: SignatureTemplate["build"] = (d, o) => wrap(`
-  <tr><td style="background:${o.accent};padding:12px 16px;border-radius:8px 8px 0 0;">
-    <div style="font-family:${FONT};font-size:16px;font-weight:bold;color:#ffffff;line-height:1.2;">${esc(d.name)}</div>
-    ${d.designation || d.company ? `<div style="font-family:${FONT};font-size:12px;color:#ffffff;opacity:0.9;padding-top:2px;">${esc([d.designation, d.company].filter(Boolean).join(" · "))}</div>` : ""}
-  </td></tr>
-  <tr><td style="border:1px solid ${LINE};border-top:0;border-radius:0 0 8px 8px;padding:12px 16px;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody>
-      <tr>
-        ${o.showLogo && d.logo ? `<td style="padding:0 14px 0 0;vertical-align:top;">${logoImg(d, 56)}</td>` : ""}
-        <td style="vertical-align:top;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody>
-            ${contactRows(d, o)}
-            ${socialsLine(d, o)}
-          </tbody></table>
-          <div style="padding-top:10px;">${cardButton(d, o)}</div>
+/* 4 ── Header band: name reversed out of a solid accent bar, details beneath.
+        The boldest of the set — suits sales and marketing mail. */
+function headerBand(d: SignatureData, o: SignatureOptions): string {
+  const socials = socialRow(d, o);
+  return `${OPEN}
+    <tr><td style="background:${o.accent};padding:14px 18px;border-radius:5px 5px 0 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;"><tbody><tr>
+        <td valign="middle" style="padding:0;">${identity(d, o, { nameSize: 17, onDark: true })}</td>
+        ${o.showLogo && d.logo ? `<td valign="middle" align="right" style="padding:0 0 0 16px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody><tr><td style="background:#ffffff;padding:7px 9px;border-radius:4px;">${logoImg(d, 76)}</td></tr></tbody></table></td>` : ""}
+      </tr></tbody></table>
+    </td></tr>
+    <tr><td style="border:1px solid ${LINE};border-top:0;border-radius:0 0 5px 5px;padding:14px 18px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody><tr>
+        <td valign="top" style="padding:0;">
+          ${contactStack(d, o)}
+          ${gap(12)}
+          ${cardButton(d, o)}
+          ${taglineLine(o)}
+          ${socials ? gap(12) + socials : ""}
         </td>
-        ${o.showQr ? `<td style="padding:0 0 0 14px;vertical-align:top;">${qrImg(d, 72)}</td>` : ""}
-      </tr>
-    </tbody></table>
-  </td></tr>`);
+        ${o.showQr ? `<td valign="top" align="right" style="padding:0 0 0 20px;">${qrImg(d, 80)}</td>` : ""}
+      </tr></tbody></table>
+    </td></tr>${CLOSE}`;
+}
 
-const cardFirst: SignatureTemplate["build"] = (d, o) => wrap(`
-  <tr>
-    <td style="vertical-align:top;padding:0 16px 0 0;">
-      ${qrImg(d, 96)}
-      <div style="font-family:${FONT};font-size:10px;color:${MUTED};padding-top:4px;text-align:center;width:96px;">Scan my card</div>
+/* 5 ── Card spotlight: the QR leads, so the card is the first thing scanned.
+        The one to pick when the card IS the pitch. */
+function spotlight(d: SignatureData, o: SignatureOptions): string {
+  const socials = socialRow(d, o);
+  return `${OPEN}<tr>
+    <td valign="top" align="center" style="padding:0 18px 0 0;">
+      ${qrImg(d, 104)}
+      <div style="font-family:${FONT};font-size:10px;color:${MUTED};padding-top:6px;text-align:center;">Scan my card</div>
     </td>
-    <td style="vertical-align:top;border-left:1px solid ${LINE};padding-left:16px;">
-      ${o.showLogo && d.logo ? `<div style="padding-bottom:8px;">${logoImg(d, 60)}</div>` : ""}
-      ${nameBlock(d, o)}
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;padding-top:8px;"><tbody>
-        ${contactRows(d, o)}
-        ${socialsLine(d, o)}
-      </tbody></table>
-      <div style="padding-top:10px;">${cardButton(d, o)}</div>
-      ${o.tagline ? `<div style="font-family:${FONT};font-size:11px;color:${MUTED};padding-top:6px;">${esc(o.tagline)}</div>` : ""}
+    <td width="1" style="width:1px;background:${LINE};font-size:0;line-height:0;">&nbsp;</td>
+    <td valign="top" style="padding:0 0 0 18px;">
+      ${o.showLogo && d.logo ? `<div style="padding:0 0 8px;">${logoImg(d, 84)}</div>` : ""}
+      ${identity(d, o)}
+      ${gap(10)}
+      ${contactStack(d, o)}
+      ${gap(12)}
+      ${cardButton(d, o, "Open my card")}
+      ${taglineLine(o)}
+      ${socials ? gap(12) + socials : ""}
     </td>
-  </tr>`);
+  </tr>${CLOSE}`;
+}
 
-/* Text-only. Nothing to strip, nothing to block — renders identically in every
-   client, including plain-text-only setups and mobile signature fields. */
-const minimal: SignatureTemplate["build"] = (d, o) => wrap(`
-  <tr><td style="font-family:${FONT};font-size:13px;color:${INK};line-height:1.5;">
-    <strong style="color:${INK};">${esc(d.name)}</strong>${d.designation ? ` — ${esc(d.designation)}` : ""}${d.company ? `, ${esc(d.company)}` : ""}<br />
-    ${[d.phone ? a(`tel:${digits(d.phone)}`, d.phone, INK) : "",
-       d.email ? a(`mailto:${d.email}`, d.email, INK) : ""].filter(Boolean).join(" &nbsp;|&nbsp; ")}<br />
-    ${cardLinkLine(d, o)}
-  </td></tr>`);
+/* 6 ── Plain text: no images, no colour blocks. Renders identically in every
+        client, survives plain-text-only recipients, and is never blocked. */
+function plain(d: SignatureData, o: SignatureOptions): string {
+  const rows: string[] = [];
+  if (d.phone) rows.push(`Phone: ${a(`tel:${digits(d.phone)}`, d.phone, INK)}`);
+  if (d.email) rows.push(`Email: ${a(`mailto:${d.email}`, d.email, INK)}`);
+  if (d.website) rows.push(`Web: ${a(d.website, prettyUrl(d.website), INK)}`);
+  if (o.showAddress && d.address) rows.push(esc(d.address));
+  const head = [d.designation, d.company].filter(Boolean).map(esc).join(", ");
+  return `${OPEN}
+    <tr><td style="font-family:${FONT};font-size:13px;color:${INK};line-height:1.6;">
+      <strong style="color:${INK};">${esc(d.name)}</strong>${head ? `<br />${head}` : ""}
+      ${rows.length ? `<br />${rows.join("<br />")}` : ""}
+      <br />${a(d.cardUrl, prettyUrl(d.cardUrl), o.accent)}
+      ${o.tagline ? `<br /><span style="color:${MUTED};font-size:12px;">${esc(o.tagline)}</span>` : ""}
+    </td></tr>${CLOSE}`;
+}
 
 export const SIGNATURE_TEMPLATES: SignatureTemplate[] = [
-  { id: "classic", name: "Classic", blurb: "Logo, a divider rule, then your details. The safest all-rounder.", build: classic },
-  { id: "modern", name: "Modern", blurb: "Accent bar down the side with a call-to-action button.", build: modern },
-  { id: "compact", name: "Compact", blurb: "Two tight lines — good for replies and long threads.", build: compact },
-  { id: "banner", name: "Banner", blurb: "Coloured header band with your name, details boxed beneath.", build: banner },
-  { id: "card", name: "Card-first", blurb: "Leads with your QR so people can scan straight from the email.", build: cardFirst },
-  { id: "minimal", name: "Plain text", blurb: "No images or colour blocks — renders anywhere, never blocked.", build: minimal },
+  { id: "corporate", name: "Corporate", blurb: "Logo, accent rule, then your details. The safest all-rounder.", build: corporate },
+  { id: "executive", name: "Executive", blurb: "Letterhead style — name across the top, logo and QR to the right.", build: executive },
+  { id: "slim", name: "Slim", blurb: "A few tight lines. Stays unobtrusive down a long reply chain.", build: slim },
+  { id: "header", name: "Header band", blurb: "Your name reversed out of a solid colour bar. The boldest option.", build: headerBand },
+  { id: "spotlight", name: "Card spotlight", blurb: "Leads with the QR so people scan straight from the email.", build: spotlight },
+  { id: "plain", name: "Plain text", blurb: "No images or colour. Renders anywhere, never blocked.", build: plain },
 ];
 
 export function buildSignature(templateId: string, d: SignatureData, o: SignatureOptions): string {
@@ -240,6 +333,7 @@ export function buildSignatureText(d: SignatureData, o: SignatureOptions): strin
   const lines = [
     [d.name, d.designation, d.company].filter(Boolean).join(" | "),
     d.phone ? `Phone: ${d.phone}` : "",
+    d.whatsapp && waDigits(d.whatsapp) !== waDigits(d.phone) ? `WhatsApp: ${d.whatsapp}` : "",
     d.email ? `Email: ${d.email}` : "",
     d.website ? `Web: ${prettyUrl(d.website)}` : "",
     o.showAddress && d.address ? `Address: ${d.address}` : "",

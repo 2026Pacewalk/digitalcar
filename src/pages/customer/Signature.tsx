@@ -80,7 +80,7 @@ export default function CustomerSignature() {
   const { data } = useCustomer();
   const { data: mine } = trpc.publish.mine.useQuery({ cardId: getActiveCardId() }, { retry: false });
 
-  const [templateId, setTemplateId] = useState("classic");
+  const [templateId, setTemplateId] = useState("corporate");
   const [accent, setAccent] = useState("#F7B31C");
   const [showLogo, setShowLogo] = useState(true);
   const [showQr, setShowQr] = useState(true);
@@ -109,8 +109,8 @@ export default function CustomerSignature() {
     cardUrl,
     qrSrc: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=6&data=${encodeURIComponent(cardUrl)}`,
     socials: readSocialLinks(data as Record<string, unknown>)
-      .map((l) => ({ label: SOCIAL_BY_KEY[l.platform]?.label || l.platform, url: l.url }))
-      .slice(0, 5),
+      .map((l) => ({ platform: l.platform, label: SOCIAL_BY_KEY[l.platform]?.label || l.platform, url: l.url }))
+      .slice(0, 6),
   }), [data, logo, cardUrl]);
 
   const opts: SignatureOptions = { accent, showLogo, showQr, showSocials, showAddress, tagline: tagline.trim() };

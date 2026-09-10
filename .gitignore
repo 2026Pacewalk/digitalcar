@@ -81,3 +81,6 @@ media/
 .last-live-sync
 .claude/launch.json
 ._*
+
+# Dev-only signature preview (scripts/preview-signatures.mjs)
+public/_sig-preview.html
