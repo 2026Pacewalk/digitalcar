@@ -56,21 +56,31 @@ function fit(text: string, max: number): string {
   return t.length > max ? t.slice(0, max - 1).trimEnd() + "…" : t;
 }
 
-/** Data-URI or http(s) image → base64 data URI sharp can inline in the SVG. */
-async function asDataUri(src: string): Promise<string | null> {
+/** Data-URI or http(s) image → base64 data URI sharp can inline in the SVG.
+
+    `square` crops to a centred square here rather than leaving it to the SVG:
+    librsvg ignores preserveAspectRatio="slice" on <image>, so a portrait asked
+    to fill a circle came out blank. Cropping up front means the SVG only ever
+    has to draw a square into a square. */
+async function asDataUri(src: string, square = false): Promise<string | null> {
   try {
     if (!src) return null;
-    if (src.startsWith("data:image/")) return src;
-    if (!/^https?:\/\//i.test(src)) return null;
-    const r = await fetch(src, { signal: AbortSignal.timeout(4000) });
-    if (!r.ok) return null;
-    const type = r.headers.get("content-type") || "image/png";
-    if (!type.startsWith("image/")) return null;
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length > 3_000_000) return null;              // don't inline huge files
+    let buf: Buffer;
+    if (src.startsWith("data:image/")) {
+      const b64 = src.slice(src.indexOf(",") + 1);
+      buf = Buffer.from(b64, "base64");
+    } else if (/^https?:\/\//i.test(src)) {
+      const r = await fetch(src, { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) return null;
+      if (!(r.headers.get("content-type") || "image/png").startsWith("image/")) return null;
+      buf = Buffer.from(await r.arrayBuffer());
+    } else return null;
+    if (!buf.length || buf.length > 3_000_000) return null;   // don't inline huge files
     // Normalise to PNG so the SVG renderer never meets an exotic format.
-    const png = await sharp(buf).resize(320, 320, { fit: "inside", withoutEnlargement: true }).png().toBuffer();
-    return `data:image/png;base64,${png.toString("base64")}`;
+    const img = sharp(buf).resize(320, 320, square
+      ? { fit: "cover", position: sharp.strategy.attention }   // keep the face, not the corners
+      : { fit: "inside", withoutEnlargement: true });
+    return `data:image/png;base64,${(await img.png().toBuffer()).toString("base64")}`;
   } catch { return null; }
 }
 
@@ -110,7 +120,7 @@ export async function renderCardOg(card: OgCard): Promise<Buffer> {
 
   // The card leads with the person's photo; the logo stands in when there is
   // none, and rides as a small badge when there are both.
-  const photo = await asDataUri(String(card.photo || ""));
+  const photo = await asDataUri(String(card.photo || ""), true);
   const logo = await asDataUri(String(card.logo || ""));
   const avatar = photo || logo;
   const badge = photo && logo ? logo : null;
@@ -159,7 +169,7 @@ export async function renderCardOg(card: OgCard): Promise<Buffer> {
   <!-- avatar: the face (or brand) the card opens with -->
   ${avatar
     ? `<circle cx="${AV_CX}" cy="${AV_CY}" r="${AV_R - 6}" fill="#FFFFFF"/>
-       <image href="${avatar}" x="${AV_CX - AV_R + 6}" y="${AV_CY - AV_R + 6}" width="${(AV_R - 6) * 2}" height="${(AV_R - 6) * 2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#avClip)"/>`
+       <image href="${avatar}" x="${AV_CX - AV_R + 6}" y="${AV_CY - AV_R + 6}" width="${(AV_R - 6) * 2}" height="${(AV_R - 6) * 2}" preserveAspectRatio="xMidYMid meet" clip-path="url(#avClip)"/>`
     : `<circle cx="${AV_CX}" cy="${AV_CY}" r="${AV_R - 6}" fill="${accent}"/>
        <text x="${AV_CX}" y="${AV_CY + 26}" font-family="${FONT}" font-size="70" font-weight="bold" fill="${P.onAccent}" text-anchor="middle">${esc(initial)}</text>`}
   <circle cx="${AV_CX}" cy="${AV_CY}" r="${AV_R - 3}" fill="none" stroke="${accent}" stroke-width="5"/>
