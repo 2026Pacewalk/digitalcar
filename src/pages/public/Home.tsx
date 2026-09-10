@@ -8,68 +8,10 @@ import {
   Link2, Leaf, Quote, ScanLine, Gift, Building2, Plus,
 } from "lucide-react";
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
-import type { ReactNode } from "react";
 import { trpc } from "@/providers/trpc";
 import TemplateThumb, { THUMB_W, THUMB_H } from "@/components/TemplateThumb";
 import { STANDEE_STYLES, standeeMarkup } from "@/lib/standee";
-
-/* ─────────────────────────────────────────────────────────────
-   Scroll-reveal primitives
-   ───────────────────────────────────────────────────────────── */
-function useReveal<T extends HTMLElement = HTMLDivElement>() {
-  const ref = useRef<T>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") {
-      setVisible(true);
-      return;
-    }
-    // Safety net: never leave content permanently hidden if the observer
-    // is slow/blocked (background tab, non-painting renderer, etc.).
-    const fallback = window.setTimeout(() => setVisible(true), 900);
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            setVisible(true);
-            window.clearTimeout(fallback);
-            io.disconnect();
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
-    );
-    io.observe(el);
-    return () => {
-      window.clearTimeout(fallback);
-      io.disconnect();
-    };
-  }, []);
-
-  return { ref, visible };
-}
-
-function Reveal({
-  children,
-  stagger,
-  className = "",
-  as: Tag = "div",
-}: {
-  children: ReactNode;
-  stagger?: boolean;
-  className?: string;
-  as?: "div" | "section";
-}) {
-  const { ref, visible } = useReveal<HTMLDivElement>();
-  const base = stagger ? "reveal-stagger" : "reveal";
-  return (
-    <Tag ref={ref as never} className={`${base} ${visible ? "is-visible" : ""} ${className}`}>
-      {children}
-    </Tag>
-  );
-}
+import { useReveal, Reveal, SectionHeading } from "@/components/public/Reveal";
 
 /* ─── Animated number counter (rAF, fires when in view) ─── */
 function Counter({ end, duration = 2000, separator = true }: { end: number; duration?: number; separator?: boolean }) {
@@ -94,21 +36,6 @@ function Counter({ end, duration = 2000, separator = true }: { end: number; dura
   }, [visible, end, duration]);
 
   return <span ref={ref}>{separator ? val.toLocaleString("en-US") : String(val)}</span>;
-}
-
-/* ─── Shared heading ─── */
-function SectionHeading({ eyebrow, title, subtitle, light }: { eyebrow?: string; title: ReactNode; subtitle?: string; light?: boolean }) {
-  return (
-    <Reveal className="text-center max-w-3xl mx-auto mb-12">
-      {eyebrow && (
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-4 ${light ? "bg-white/10 text-[#F7B31C] ring-1 ring-white/10" : "bg-[#FEF3C7] text-[#92400E]"}`}>
-          <Sparkles size={12} /> {eyebrow}
-        </span>
-      )}
-      <h2 className={`text-3xl sm:text-4xl lg:text-[2.7rem] font-extrabold tracking-tight ${light ? "text-white" : "text-[#0F172A]"}`}>{title}</h2>
-      {subtitle && <p className={`mt-4 text-base leading-relaxed ${light ? "text-[#94A3B8]" : "text-[#64748B]"}`}>{subtitle}</p>}
-    </Reveal>
-  );
 }
 
 /* ─────────────────────────────────────────────────────────────
