@@ -5,7 +5,7 @@ import { getDb } from "./queries/connection";
 import { cardAddons } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import { resolveRazorpay } from "./payment-router";
-import { createRazorpayOrder, verifyRazorpaySignature } from "./lib/razorpay";
+import { createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder } from "./lib/razorpay";
 
 /* Card add-ons — ID Card & Membership Card. Paid extras ON TOP of the plan.
    ₹299/year each; on a monthly plan the price is that ÷12. Self-contained so
@@ -79,7 +79,29 @@ export const addonRouter = createRouter({
       const cr = await resolveRazorpay(db);
       const ok = verifyRazorpaySignature({ orderId: input.razorpayOrderId, paymentId: input.razorpayPaymentId, signature: input.razorpaySignature }, cr.keySecret);
       if (!ok) throw new TRPCError({ code: "BAD_REQUEST", message: "Payment verification failed." });
-      await grantAddon(db, ctx.user.id, input.type, input.billingCycle);
+
+      // A valid signature proves the payment is real, not WHICH add-on was paid
+      // for. Take the add-on and cycle from the order's server-written notes, so
+      // a ₹24.92 monthly ID-card payment can't be redeemed as a ₹299 yearly
+      // membership.
+      let order;
+      try {
+        order = await fetchRazorpayOrder(input.razorpayOrderId, cr);
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not confirm this payment with the gateway. If you were charged, contact support." });
+      }
+      const notes = order.notes || {};
+      if (String(notes.userId || "") !== String(ctx.user.id)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This payment belongs to another account." });
+      }
+      const nt = notes.addonType;
+      const nc = notes.billingCycle;
+      const paidType = (nt === "id_card" || nt === "membership") ? nt : null;
+      const paidCycle = (nc === "monthly" || nc === "yearly") ? nc : null;
+      if (!paidType || !paidCycle) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This order is missing its add-on details. Contact support." });
+      }
+      await grantAddon(db, ctx.user.id, paidType, paidCycle);
       return { ok: true };
     }),
 });

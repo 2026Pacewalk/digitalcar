@@ -10,7 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail, referralRewardEmail, resellerCommissionEmail } from "./lib/email-templates";
 import { getUpgradeOfferPercent } from "./lib/pricing";
-import { envRazorpayCreds, credsComplete, inferMode, createRazorpayOrder, verifyRazorpaySignature } from "./lib/razorpay";
+import { envRazorpayCreds, credsComplete, inferMode, createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder } from "./lib/razorpay";
 
 type Order = typeof paymentOrders.$inferSelect;
 
@@ -370,13 +370,36 @@ export const paymentRouter = createRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Payment could not be verified. If you were charged, contact support — the plan was not activated." });
       }
 
-      const { pkg, charged } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false);
+      // The signature only proves this order+payment pair is genuine — it says
+      // NOTHING about which plan was bought. Read the plan back from the order's
+      // own notes (written server-side at creation, same as the webhook does),
+      // so a client cannot pay for the cheapest plan and then ask us to activate
+      // the most expensive one.
+      let order;
+      try {
+        order = await fetchRazorpayOrder(input.razorpayOrderId, cr);
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not confirm this payment with the gateway. If you were charged, contact support — nothing was activated." });
+      }
+      const notes = order.notes || {};
+      if (String(notes.userId || "") !== String(ctx.user.id)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This payment belongs to another account." });
+      }
+      const paidPackageId = Number(notes.packageId);
+      const nc = notes.billingCycle;
+      const paidCycle = (nc === "monthly" || nc === "yearly" || nc === "triennial") ? nc : null;
+      if (!paidPackageId || !paidCycle) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This order is missing its plan details. Contact support — you have not been charged for a plan." });
+      }
+
+      const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, paidPackageId) });
       await recordRazorpayPayment(db, {
         userId: ctx.user.id,
-        packageId: input.packageId,
-        planName: pkg.name,
-        billingCycle: input.billingCycle,
-        amountRupees: charged,
+        packageId: paidPackageId,
+        planName: pkg?.name || String(notes.planName || "Plan"),
+        billingCycle: paidCycle,
+        // The gateway's own figure is the authoritative amount actually paid.
+        amountRupees: Number(order.amount || 0) / 100,
         paymentId: input.razorpayPaymentId, // the gateway payment id = our proof of payment
       });
       return { ok: true };

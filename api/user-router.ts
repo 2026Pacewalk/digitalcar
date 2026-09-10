@@ -21,22 +21,28 @@ export const userRouter = createRouter({
     )
     .query(async ({ input }) => {
       const db = getDb();
-      const { page = 1, limit = 25, search } = input || {};
+      const { page = 1, limit = 25, search, role, status } = input || {};
       const offset = (page - 1) * limit;
 
+      // Build the filter once and apply it to BOTH the page query and the count,
+      // otherwise the admin list ignores search/role/status and the pagination
+      // total describes a different set than the rows shown.
       const conditions = [];
       if (search) {
-        conditions.push(sql`${users.fullName} LIKE ${`%${search}%`} OR ${users.email} LIKE ${`%${search}%`}`);
+        conditions.push(sql`(${users.fullName} LIKE ${`%${search}%`} OR ${users.email} LIKE ${`%${search}%`})`);
       }
-      // Note: role and status filtering simplified
+      if (role) conditions.push(eq(users.role, role));
+      if (status) conditions.push(eq(users.status, status));
+      const where = conditions.length ? and(...conditions) : undefined;
 
       const allUsers = await db.query.users.findMany({
+        where,
         limit,
         offset,
         orderBy: [desc(users.createdAt)],
       });
 
-      const totalResult = await db.select({ count: sql<number>`count(*)` }).from(users);
+      const totalResult = await db.select({ count: sql<number>`count(*)` }).from(users).where(where);
 
       return {
         users: allUsers.map((u) => ({
@@ -135,7 +141,11 @@ export const userRouter = createRouter({
       if (target?.role === "super_admin") {
         throw new TRPCError({ code: "FORBIDDEN", message: "A super_admin account can't be deleted from the panel." });
       }
-      await db.delete(users).where(eq(users.id, input.id));
+      // NEVER hard-delete a customer/reseller row: it orphans their cards,
+      // subscriptions, leads and invoices and is unrecoverable. Deactivate
+      // instead — context.ts refuses API access to a non-active account, so the
+      // effect is the same for the user while the data stays intact.
+      await db.update(users).set({ status: "inactive" }).where(eq(users.id, input.id));
       return { success: true };
     }),
 
@@ -390,6 +400,12 @@ export const userRouter = createRouter({
 
       const customers = await db.query.users.findMany({
         where: and(eq(users.resellerId, resellerId), eq(users.role, "customer")),
+        // Never hand a reseller the full row — it contains the bcrypt password
+        // hash (and every other private column) of their customers.
+        columns: {
+          id: true, email: true, fullName: true, phone: true, avatar: true,
+          role: true, status: true, lastLoginAt: true, createdAt: true,
+        },
         limit,
         offset,
         orderBy: [desc(users.createdAt)],

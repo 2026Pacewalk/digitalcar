@@ -28,7 +28,10 @@ export async function createContext(
         const user = await db.query.users.findFirst({
           where: eq(users.id, payload.userId),
         });
-        if (user) {
+        // A token stays valid until it expires, so re-check the CURRENT account
+        // state on every request: a suspended or deactivated (soft-deleted)
+        // account must lose API access immediately, not at token expiry.
+        if (user && user.status === "active") {
           ctx.user = user;
         }
       }

@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, resellerProfiles, referrals, notifications, cards, publishedCards, cardTrials, appSettings } from "@db/schema";
+import { users, referrals, notifications, cards, publishedCards, cardTrials, appSettings } from "@db/schema";
 import { eq, like } from "drizzle-orm";
 import { slugTakenByOther } from "./publish-router";
 import { createToken, createResetToken, verifyResetToken, createVerifyToken, verifyVerifyToken } from "./lib/jwt";
@@ -184,7 +184,11 @@ export const authRouter = createRouter({
         password: strongPassword,
         fullName: z.string().min(2),
         phone: z.string().optional(),
-        role: z.enum(["reseller", "customer"]).default("customer"),
+        // Public signup can ONLY create a customer. Reseller accounts come from
+        // the application + admin-approval flow (reseller.submitApplication →
+        // reseller.approve) or user.createReseller; accepting "reseller" here let
+        // any anonymous caller self-approve into a commission-earning account.
+        role: z.literal("customer").default("customer"),
         companyName: z.string().optional(),
         referralCode: z.string().optional(),
       })
@@ -239,14 +243,8 @@ export const authRouter = createRouter({
       }
       void sendEmail(ownerAddress(), newSignupAdminEmail({ name: insertedUser.fullName, email: insertedUser.email, role: insertedUser.role, phone: insertedUser.phone }));
 
-      // Create reseller profile if registering as reseller
-      if (input.role === "reseller" && input.companyName) {
-        await db.insert(resellerProfiles).values({
-          userId: insertedUser.id,
-          companyName: input.companyName,
-          commissionRate: "10.00",
-        });
-      }
+      // (No reseller branch here: public signup creates customers only. Reseller
+      // profiles are created by reseller.approve / user.createReseller.)
 
       // Apply referral (Refer & Earn) — both the referrer and this new user get a discount
       if (input.referralCode) {
@@ -355,11 +353,28 @@ export const authRouter = createRouter({
         if (typed.length > 0) {
           const legacy = await legacyPasswordsFor(user.email);
           if (legacy.some((pw) => pw.trim() === typed)) {
-            isValid = true;
-            try {
-              const rehash = await bcrypt.hash(typed, 12);
-              await db.update(users).set({ password: rehash }).where(eq(users.id, user.id));
-            } catch { /* self-heal is best-effort; login still succeeds */ }
+            // The bridge exists ONLY to heal import-time whitespace, so it must
+            // apply while the account is still on the password the import set.
+            // Once the customer has chosen their own password the stored hash no
+            // longer matches any legacy string — and the old export password (a
+            // file that has circulated in builds) must stop working, or it would
+            // be a permanent second credential that silently reverts their new
+            // password on use.
+            let stillOnImportPassword = false;
+            for (const pw of legacy) {
+              if (await bcrypt.compare(pw, user.password)) { stillOnImportPassword = true; break; }
+            }
+            if (!stillOnImportPassword) {
+              // Accounts imported without a legacy password got this default.
+              stillOnImportPassword = await bcrypt.compare("changeme123", user.password);
+            }
+            if (stillOnImportPassword) {
+              isValid = true;
+              try {
+                const rehash = await bcrypt.hash(typed, 12);
+                await db.update(users).set({ password: rehash }).where(eq(users.id, user.id));
+              } catch { /* self-heal is best-effort; login still succeeds */ }
+            }
           }
         }
       }

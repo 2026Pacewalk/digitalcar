@@ -5,6 +5,7 @@ import { getDb } from "./queries/connection";
 import { cards, cardBlocks, analyticsEvents, subscriptions, users } from "@db/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { slugTakenByOther } from "./publish-router";
 
 /** Turn a person's name into a URL-safe slug fragment. */
 function slugify(input: string): string {
@@ -132,10 +133,13 @@ export const cardRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      const existing = await db.query.cards.findFirst({
-        where: eq(cards.slug, input.slug),
-      });
-      if (existing) throw new TRPCError({ code: "CONFLICT", message: "Slug already in use" });
+      // The public /<slug> page resolves from THREE systems (legacy
+      // customers.json, `cards`, and published_cards snapshots). Checking only
+      // `cards` let a new card claim a slug that already serves a live legacy or
+      // snapshot card — silently hijacking that customer's URL.
+      if (await slugTakenByOther(db, input.slug, ctx.user.id, 0, ctx.user.email)) {
+        throw new TRPCError({ code: "CONFLICT", message: "Slug already in use" });
+      }
 
       // Quota: enforce the active plan's maxCards (mirrors bulkCreate — Phase 31).
       const [usedRow] = await db.select({ count: sql<number>`count(*)` }).from(cards).where(eq(cards.userId, ctx.user.id));

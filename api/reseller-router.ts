@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { createRouter, publicQuery, adminQuery, resellerQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { resellerApplications, users, resellerProfiles, notifications } from "@db/schema";
+import { resellerApplications, users, resellerProfiles } from "@db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createResetToken } from "./lib/jwt";
