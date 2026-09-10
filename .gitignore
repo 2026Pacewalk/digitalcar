@@ -84,3 +84,4 @@ media/
 
 # Dev-only signature preview (scripts/preview-signatures.mjs)
 public/_sig-preview.html
+public/_wa-preview.html

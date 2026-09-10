@@ -279,3 +279,22 @@ export function buildWaMessage(id: string, d: WaData): string {
   const t = WA_TEMPLATES.find((x) => x.id === id) || WA_TEMPLATES[0];
   return t.build(d);
 }
+
+/* Render WhatsApp's markup the way WhatsApp renders it, for an on-screen
+   preview bubble. Lives here rather than in the page so the dev preview and
+   the real dashboard cannot drift apart.
+
+   Escape FIRST: the text is the customer's own words, but it ends up in
+   innerHTML. The delimiters need a boundary on each side, or a phone number
+   like 98110_24680 would turn half the message italic. */
+export function waPreviewHtml(text: string): string {
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+  return esc(text)
+    .replace(/```([\s\S]+?)```/g, '<code style="font-family:monospace;background:#00000010;padding:1px 3px;border-radius:3px;">$1</code>')
+    .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s.,!?)]|$)/g, "$1<strong>$2</strong>")
+    .replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,!?)]|$)/g, "$1<em>$2</em>")
+    .replace(/(^|[\s(])~([^~\n]+)~(?=[\s.,!?)]|$)/g, "$1<s>$2</s>")
+    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#027eb5;" target="_blank" rel="noreferrer">$1</a>')
+    .replace(/\n/g, "<br />");
+}

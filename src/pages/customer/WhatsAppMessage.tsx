@@ -5,23 +5,10 @@ import { Link } from "react-router";
 import ModuleShell, { Panel, Tip } from "@/components/customer/ModuleShell";
 import { useCustomer, getActiveCardId } from "@/hooks/useCustomer";
 import { trpc } from "@/providers/trpc";
-import { WA_TEMPLATES, buildWaMessage, WA_SOFT_LIMIT, type WaData } from "@/lib/whatsappMessage";
+import { WA_TEMPLATES, buildWaMessage, waPreviewHtml, WA_SOFT_LIMIT, type WaData } from "@/lib/whatsappMessage";
 
 const ORIGIN = "https://digitalcarda.in";
 
-/* Render WhatsApp's markup the way WhatsApp does, for the preview bubble.
-   Escape FIRST — the text is the customer's own, but it lands in innerHTML. */
-function waPreviewHtml(text: string): string {
-  const esc = (s: string) => s.replace(/[&<>"]/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
-  return esc(text)
-    .replace(/```([\s\S]+?)```/g, '<code style="font-family:monospace;background:#00000010;padding:1px 3px;border-radius:3px;">$1</code>')
-    .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s.,!?)]|$)/g, "$1<strong>$2</strong>")
-    .replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,!?)]|$)/g, "$1<em>$2</em>")
-    .replace(/(^|[\s(])~([^~\n]+)~(?=[\s.,!?)]|$)/g, "$1<s>$2</s>")
-    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#027eb5;" target="_blank" rel="noreferrer">$1</a>')
-    .replace(/\n/g, "<br />");
-}
 
 const HOW_TO: { client: string; steps: string[] }[] = [
   { client: "WhatsApp Business — greeting message", steps: [
