@@ -1629,7 +1629,7 @@ function FaqSection() {
                   type="button"
                   onClick={() => setOpen(on ? null : i)}
                   aria-expanded={on}
-                  className="w-full flex items-center gap-4 text-left px-5 sm:px-6 py-4.5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] rounded-2xl"
+                  className="w-full flex items-center gap-4 text-left px-5 sm:px-6 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] rounded-2xl"
                 >
                   <h3 className="flex-1 text-[14.5px] sm:text-[15px] font-bold text-[#0F172A] leading-snug">{f.q}</h3>
                   <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${on ? "bg-[#F7B31C] text-[#0F172A] rotate-90" : "bg-[#F1F5F9] text-[#64748B]"}`}>
@@ -1710,6 +1710,7 @@ export default function Home() {
       <TestimonialsSection />
       {SHOW_RESELLER_SECTION && <ResellerSection />}
       {SHOW_PRICING_SECTION && <PricingSection />}
+      <FaqSection />
       <FinalCTA />
     </>
   );

@@ -114,8 +114,83 @@ export default function PublicLayout() {
       meta.content = seo.description;
       document.head.appendChild(meta);
     }
+    // Canonical: one indexable URL per route. Without it, the same page reached
+    // with a tracking query string or a trailing slash reads to Google as a
+    // duplicate and splits its ranking signals.
+    const path = location.pathname === "/" ? "/" : location.pathname.replace(/\/+$/, "");
+    let canon = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (!canon) { canon = document.createElement("link"); canon.rel = "canonical"; document.head.appendChild(canon); }
+    canon.href = `https://digitalcarda.in${path}`;
+
     window.scrollTo(0, 0);
   }, [location.pathname, seo]);
+
+  /* Site-wide structured data — who we are, the site itself (so Google can
+     offer a sitelinks search box), and the product with its real pricing.
+
+     Deliberately NO AggregateRating: review markup must reflect genuinely
+     collected, verifiable ratings, and inventing it risks a manual action.
+     Add it only once real reviews are being captured. */
+  useEffect(() => {
+    const ld = {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://digitalcarda.in/#organization",
+          name: "DigitalCarda",
+          url: "https://digitalcarda.in/",
+          logo: "https://digitalcarda.in/apple-touch-icon.png",
+          description: "DigitalCarda builds AI-powered digital business cards and smart microsites for businesses and professionals across India.",
+          contactPoint: {
+            "@type": "ContactPoint",
+            telephone: "+91-95177-22444",
+            email: "hello@digitalcarda.in",
+            contactType: "customer support",
+            areaServed: "IN",
+            availableLanguage: ["en", "hi"],
+          },
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://digitalcarda.in/#website",
+          url: "https://digitalcarda.in/",
+          name: "DigitalCarda",
+          publisher: { "@id": "https://digitalcarda.in/#organization" },
+          potentialAction: {
+            "@type": "SearchAction",
+            target: { "@type": "EntryPoint", urlTemplate: "https://digitalcarda.in/digital-business-cards-templates?q={search_term_string}" },
+            "query-input": "required name=search_term_string",
+          },
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://digitalcarda.in/#app",
+          name: "DigitalCarda",
+          applicationCategory: "BusinessApplication",
+          operatingSystem: "Web, Android, iOS",
+          url: "https://digitalcarda.in/",
+          publisher: { "@id": "https://digitalcarda.in/#organization" },
+          description: "Create a digital business card with QR code, WhatsApp chat, payment links, products, gallery, lead capture and analytics — no app to install.",
+          offers: {
+            "@type": "Offer",
+            price: "99",
+            priceCurrency: "INR",
+            description: "Plans from Rs. 99/month, with a 30-day free trial that needs no card details upfront.",
+            url: "https://digitalcarda.in/pricing",
+          },
+        },
+      ],
+    };
+    let s = document.getElementById("dc-site-ld");
+    if (!s) {
+      s = document.createElement("script");
+      s.id = "dc-site-ld";
+      (s as HTMLScriptElement).type = "application/ld+json";
+      document.head.appendChild(s);
+    }
+    s.textContent = JSON.stringify(ld);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
