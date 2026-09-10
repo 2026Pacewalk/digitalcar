@@ -115,6 +115,9 @@ const ogHandler = async (c: { req: { param: (k: string) => string } }): Promise<
       company: (cust.company_name as string) || null,
       logo: (cust.logo as string) || null,
       photo: (cust.photo as string) || null,
+      phone: (cust.mobile1 as string) || null,
+      email: (cust.email as string) || null,
+      website: (cust.url as string) || null,
       accent: (cust.color as string) || null,
       second: (cust.color2 as string) || null,
     });
