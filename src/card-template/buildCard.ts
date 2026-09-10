@@ -2,6 +2,7 @@ import mainCss from "./main.css?raw";
 import type { CustomerRecord } from "@/hooks/useCustomer";
 import { fixMojibake } from "@/lib/cardContent";
 import { parseVideo } from "@/lib/video";
+import { safeExternalUrl } from "@/lib/url";
 import { buildLinkBioHtml, LINKBIO_START, LINKBIO_COUNT } from "./linkbio";
 import { buildPremiumCardHtml, PREMIUM_COUNT, svcMeta } from "./premiumCards";
 import { SOCIAL_BY_KEY, readSocialLinks } from "@/lib/socialPlatforms";
@@ -297,7 +298,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     `\n\nEverything in one tap — call, WhatsApp, directions, products & save the contact:\n${cardUrl}`;
   const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean);
   const initial = (s(c.name)[0] || "D").toUpperCase();
-  const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='${s(c.logo_shape) === "round" ? 70 : 12}' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
+  const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='${s(c.logo_shape) === "round" ? 70 : 12}' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`).replace(/'/g, "%27")}`;
 
   // Paid-plan trust badge on the logo — Gold (pkg 5) = crown, Platinum (pkg 6) =
   // gem; both gold. Trial/Free show none, and the owner can hide it (badge_on=0).
@@ -314,9 +315,9 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     text ? `<div class="home-single-details"><a href="${esc(href)}" target="_blank"><i class="${icon}"></i><span>${esc(text)}</span></a></div>` : "";
   const homeDetails = [
     detail("fa fa-phone-alt", `tel:${s(c.mobile1)}`, s(c.mobile1)),
-    detail("fa fa-globe", s(c.url), s(c.url)),
+    detail("fa fa-globe", safeExternalUrl(c.url), s(c.url)),
     detail("fa fa-envelope", `mailto:${s(c.email)}`, s(c.email)),
-    detail("fa fa-map-marker-alt", s(c.google_map) || "#", s(c.address)),
+    detail("fa fa-map-marker-alt", safeExternalUrl(c.google_map) || "#", s(c.address)),
   ].join("");
 
   const infoItem = (icon: string, label: string, v: string) =>
@@ -344,12 +345,12 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 
   // Smart product CTA — the action adapts to the button label the user chose.
   const phone = s(c.mobile1).replace(/[^\d+]/g, "");
-  const mapLink = s(c.google_map);
+  const mapLink = safeExternalUrl(c.google_map);
   const email = s(c.email);
   const waMsg = (name: string) => encodeURIComponent(`Hi, I'm interested in "${s(name)}". Please share more details.`);
   const smartBtn = (p: Product): { href: string; target: string; icon: string } => {
     const t = s(p.button_title).toLowerCase();
-    const link = s(p.button);
+    const link = safeExternalUrl(p.button);
     if (/call|phone|dial|ring/.test(t) && phone) return { href: `tel:${phone}`, target: "_self", icon: "fa fa-phone-alt" };
     if (/whatsapp|chat/.test(t) && wa) return { href: `https://wa.me/${wa}/?text=${waMsg(p.name)}`, target: "_blank", icon: "fab fa-whatsapp" };
     if (/visit|map|location|direction|reach|near|store|shop\b/.test(t) && (mapLink || link)) return { href: mapLink || link, target: "_blank", icon: "fa fa-map-marker-alt" };
@@ -1171,7 +1172,7 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number, opts: { chro
   const secondary = s(c.color2);
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
   const initial = (s(c.name)[0] || "D").toUpperCase();
-  const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='${s(c.logo_shape) === "round" ? 70 : 12}' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`)}`;
+  const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='${s(c.logo_shape) === "round" ? 70 : 12}' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`).replace(/'/g, "%27")}`;
   const social = renderSocialIcons(c, false)
     || `<li><a href="javascript:void(0)"><i class="fab fa-facebook-f"></i></a></li><li><a href="javascript:void(0)"><i class="fab fa-instagram"></i></a></li>`;
   const detail = (icon: string, text: string) =>

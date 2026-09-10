@@ -12,6 +12,7 @@
 
 import { resolveCardBg, cardBgOverrideCss } from "./cardBackground";
 import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
+import { safeExternalUrl } from "@/lib/url";
 
 type LBProduct = { name: string; button?: string; button_title?: string };
 type LBRecord = Record<string, unknown>;
@@ -285,7 +286,7 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
   const bio = esc(s(c.designation) || (s(c.about_us).slice(0, 110)));
   const slug = s(c.slug);
   const initial = (s(c.name)[0] || "D").toUpperCase();
-  const avatarPh = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><rect width='160' height='160' fill='${accent}'/><text x='50%' y='50%' font-size='74' fill='#fff' text-anchor='middle' font-family='Arial' dominant-baseline='central'>${initial}</text></svg>`)}`;
+  const avatarPh = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><rect width='160' height='160' fill='${accent}'/><text x='50%' y='50%' font-size='74' fill='#fff' text-anchor='middle' font-family='Arial' dominant-baseline='central'>${initial}</text></svg>`).replace(/'/g, "%27")}`;
 
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
   const phone = s(c.mobile1).replace(/[^\d+]/g, "");
@@ -302,13 +303,13 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
   const links = [
     btn("fa fa-phone-alt", phone ? `tel:${phone}` : "", "Call Now", "_self"),
     btn("fab fa-whatsapp", wa ? `https://wa.me/${wa}?text=${waMsg}` : "", "Chat on WhatsApp"),
-    btn("fa fa-globe", s(c.url), "Visit Website"),
+    btn("fa fa-globe", safeExternalUrl(c.url), "Visit Website"),
     btn("fa fa-envelope", s(c.email) ? `mailto:${s(c.email)}` : "", "Email Us", "_self"),
-    btn("fa fa-map-marker-alt", s(c.google_map), "Get Directions"),
+    btn("fa fa-map-marker-alt", safeExternalUrl(c.google_map), "Get Directions"),
     // Each product/service becomes its own labelled button.
     ...products.map((p) => {
       const label = s(p.button_title) || s(p.name);
-      const href = s(p.button) || (wa ? `https://wa.me/${wa}?text=${encodeURIComponent(`Hi, I'm interested in "${s(p.name)}".`)}` : "");
+      const href = safeExternalUrl(p.button) || (wa ? `https://wa.me/${wa}?text=${encodeURIComponent(`Hi, I'm interested in "${s(p.name)}".`)}` : "");
       return btn("fa fa-arrow-right", href, label);
     }),
   ].filter(Boolean).join("");
@@ -348,7 +349,7 @@ ${showShare ? shareSheetCss("#111827") : ""}
     </div>
     ${qrSrc ? `<div class="lb-qr"><img src="${qrSrc}" alt="Scan to open this card" ${IMG}><div class="lb-qr-tx"><b>Scan my card</b><span>Point your camera to open &amp; save my card</span></div></div>` : ""}
     ${social ? `<ul class="lb-social">${social}</ul>` : ""}
-    ${siteText ? `<a class="lb-site" href="${esc(s(c.url))}" target="_blank" rel="noopener">${esc(siteText)}</a>` : ""}
+    ${siteText ? `<a class="lb-site" href="${esc(safeExternalUrl(c.url))}" target="_blank" rel="noopener">${esc(siteText)}</a>` : ""}
     <div class="lb-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
     ${chrome}
   </div>

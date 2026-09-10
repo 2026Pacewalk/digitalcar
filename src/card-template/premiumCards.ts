@@ -7,6 +7,7 @@
  */
 import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
 import { parseVideo } from "@/lib/video";
+import { safeExternalUrl } from "@/lib/url";
 import { SOCIAL_BY_KEY, readSocialLinks } from "@/lib/socialPlatforms";
 
 type PCProduct = { name: string; tagline?: string; description?: string; button?: string; button_title?: string; filename?: string; price?: string; offer_price?: string };
@@ -57,7 +58,7 @@ const HEAD = `<meta charset="utf-8"><meta name="viewport" content="width=device-
 
 const initialPh = (c: PCRecord, bg: string) => {
   const i = (s(c.name)[0] || "D").toUpperCase();
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='200' height='220'><rect width='200' height='220' fill='${bg}'/><text x='50%' y='50%' font-size='96' fill='#fff' text-anchor='middle' font-family='Arial' dominant-baseline='central'>${i}</text></svg>`)}`;
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='200' height='220'><rect width='200' height='220' fill='${bg}'/><text x='50%' y='50%' font-size='96' fill='#fff' text-anchor='middle' font-family='Arial' dominant-baseline='central'>${i}</text></svg>`).replace(/'/g, "%27")}`;
 };
 
 export function buildPremiumCardHtml(c: PCRecord, products: PCProduct[] = [], index = 0, opts: { thumb?: boolean; extras?: PremiumExtras } = {}): string {
@@ -220,7 +221,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   const prods = (o.products || []).filter((p) => s(p.name));
   const servicesHtml = !skip.includes("services") && on(c.product_on) && prods.length
     ? sec("products-section", s(c.product) || "Services", prods.map((p) => {
-        const href = s(p.button);
+        const href = safeExternalUrl(p.button);
         const img = s(p.filename);
         if (img) {
           const priceRow = (s(p.price) || s(p.offer_price))
@@ -520,7 +521,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const logo = s(c.logo);
   const phone = s(c.mobile1).replace(/[^\d+]/g, "");
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
-  const mapHref = s(c.google_map) || (s(c.address) ? `https://maps.google.com/?q=${encodeURIComponent(s(c.address))}` : "");
+  const mapHref = safeExternalUrl(c.google_map) || (s(c.address) ? `https://maps.google.com/?q=${encodeURIComponent(s(c.address))}` : "");
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(cardUrl)}`;
 
   const crow = (icon: string, label: string, text: string, href = "", ext = false) =>
@@ -528,7 +529,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const contacts = [
     crow("fa-phone-alt", "Call", s(c.mobile1), phone ? `tel:${phone}` : ""),
     crow("fa-envelope", "Email", s(c.email), s(c.email) ? `mailto:${s(c.email)}` : ""),
-    crow("fa-globe", "Website", s(c.url).replace(/^https?:\/\//i, "").replace(/\/$/, ""), s(c.url), true),
+    crow("fa-globe", "Website", s(c.url).replace(/^https?:\/\//i, "").replace(/\/$/, ""), safeExternalUrl(c.url), true),
     crow("fa-map-marker-alt", "Address", s(c.address), mapHref, true),
   ].join("");
 
@@ -539,7 +540,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const services = products.slice(0, 8).map((p) => {
     const m = svcMeta(s(p.name));
     const desc = s(p.tagline) || s(p.description).replace(/<[^>]*>/g, "").trim().slice(0, 70) || m.desc;
-    const href = s(p.button) || cardUrl;
+    const href = safeExternalUrl(p.button) || cardUrl;
     return `<a class="pw-svc" href="${esc(href)}" target="_blank" rel="noopener"><span class="pw-svc-ic"><i class="fa ${m.icon}"></i></span><span class="pw-svc-tx"><b>${esc(p.name)}</b><small>${esc(desc)}</small></span><i class="fa fa-arrow-right pw-svc-ar"></i></a>`;
   }).join("");
 
@@ -764,7 +765,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   const email = s(c.email);
   const url = s(c.url);
   const about = s(c.about_us).replace(/<[^>]*>/g, "").trim();
-  const mapHref = s(c.google_map) || (s(c.address) ? `https://maps.google.com/?q=${encodeURIComponent(s(c.address))}` : "");
+  const mapHref = safeExternalUrl(c.google_map) || (s(c.address) ? `https://maps.google.com/?q=${encodeURIComponent(s(c.address))}` : "");
   const youtube = s(c.youtube);
   const qrSrc = (n: number) => `https://api.qrserver.com/v1/create-qr-code/?size=${n}x${n}&margin=8&data=${encodeURIComponent(cardUrl)}`;
 
