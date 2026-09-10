@@ -5,7 +5,8 @@ import { nanoid } from "nanoid";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEvents } from "@db/schema";
+import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEvents, users } from "@db/schema";
+import { legacyPaidPlan } from "./lib/entitlement";
 import { eq, desc, and } from "drizzle-orm";
 
 const DAY = 86_400_000;
@@ -240,20 +241,18 @@ export const publishRouter = createRouter({
     const sub = subs[0];
     if (sub && sub.status === "active" && (!sub.currentPeriodEnd || new Date(sub.currentPeriodEnd).getTime() > now)) return { paused: false, mode };
 
-    // Manual / legacy paid plans: admin-set packages live on the card record
-    // itself (Gold=5 / Platinum=6 + expired_on) with NO subscriptions row. A
-    // valid paid package must keep the card live even after the old trial clock
-    // runs out — otherwise paying customers get paused (real prod incident).
+    // Manual / legacy paid plans: admin-set packages (Gold=5 / Platinum=6 +
+    // expired_on) with NO subscriptions row. A valid paid package must keep the
+    // card live even after the old trial clock runs out — otherwise paying
+    // customers get paused (real prod incident).
+    //
+    // Read from customers.json (admin-written) and NOT from the card snapshot:
+    // the snapshot is customer-supplied via publish.saveSnapshot, so trusting it
+    // let anyone publish `package_id: 6` and keep their card live for free.
     try {
-      const cust = ((rows[0].data as { customer?: Record<string, unknown> })?.customer) || {};
-      const pkg = Number(cust.package_id);
-      if (pkg === 5 || pkg === 6) {
-        const exp = String(cust.expired_on || "").trim();
-        const expMs = exp ? Date.parse(exp) : NaN;
-        // No expiry recorded → treat as live; else valid through the end of that day.
-        if (!exp || (Number.isFinite(expMs) && expMs + DAY > now)) return { paused: false, mode };
-      }
-    } catch { /* malformed snapshot — fall through to trial gating */ }
+      const owner = await db.select({ email: users.email }).from(users).where(eq(users.id, uid)).limit(1);
+      if (legacyPaidPlan(owner[0]?.email, now)) return { paused: false, mode };
+    } catch { /* lookup failed — fall through to trial gating */ }
 
     const tr = await db.select().from(cardTrials).where(eq(cardTrials.userId, uid));
     const t = tr[0];

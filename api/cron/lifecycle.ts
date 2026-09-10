@@ -14,6 +14,7 @@
 import { getDb } from "../queries/connection";
 import { cardTrials, users, notifications, publishedCards, cardEvents, funnelEvents, appSettings } from "@db/schema";
 import { and, eq, inArray, sql, gt } from "drizzle-orm";
+import { legacyPaidPlan } from "../lib/entitlement";
 import { sendEmail } from "../lib/mail";
 import {
   trialDay1Email, trialDay7Email, trialDay15Email, trialDay21Email, trialDay25Email,
@@ -64,19 +65,21 @@ export async function runLifecycle(): Promise<{ enabled: boolean; scanned: numbe
   const uids = trials.map((t) => t.userId);
   const slugRows = uids.length ? await db.select({ userId: publishedCards.userId, slug: publishedCards.slug, data: publishedCards.data }).from(publishedCards).where(inArray(publishedCards.userId, uids)) : [];
   const slugOf = new Map(slugRows.map((r) => [r.userId, r.slug]));
-  // Users on a manual/legacy paid plan (admin-set Gold=5 / Platinum=6 on the card
-  // snapshot, valid expired_on) — they are PAYING customers with no subscriptions
-  // row, so the trial clock must never email/pause them (real prod incident).
+  // Users on a manual/legacy paid plan (admin-set Gold=5 / Platinum=6, valid
+  // expired_on) — they are PAYING customers with no subscriptions row, so the
+  // trial clock must never email/pause them (real prod incident).
+  //
+  // Sourced from customers.json (admin-written), NOT from the card snapshot.
+  // The snapshot is customer-supplied via publish.saveSnapshot, and this loop
+  // does not merely read it: a match STAMPS the trial "converted" below, which
+  // is permanent. Trusting it let a customer publish `package_id: 6` and write
+  // themselves a free account for good.
   const paidUids = new Set<number>();
-  for (const r of slugRows) {
-    try {
-      const cust = ((r.data as { customer?: Record<string, unknown> })?.customer) || {};
-      const pkg = Number(cust.package_id);
-      if (pkg !== 5 && pkg !== 6) continue;
-      const exp = String(cust.expired_on || "").trim();
-      const expMs = exp ? Date.parse(exp) : NaN;
-      if (!exp || (Number.isFinite(expMs) && expMs + DAY > now)) paidUids.add(r.userId);
-    } catch { /* malformed snapshot — treat as not paid */ }
+  const trialUsers = uids.length
+    ? await db.select({ id: users.id, email: users.email }).from(users).where(inArray(users.id, uids))
+    : [];
+  for (const u of trialUsers) {
+    if (legacyPaidPlan(u.email, now)) paidUids.add(u.id);
   }
 
   let sent = 0;
