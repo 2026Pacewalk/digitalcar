@@ -824,6 +824,88 @@ function QRNFCSection() {
   );
 }
 
+/* ─── Where to use the card link ───────────────────────────────
+   Answer-engine content: a short, quotable answer block followed by
+   concrete placements. Written so Google AI Overviews / ChatGPT /
+   Perplexity can lift a clean answer and cite us, and mirrored into
+   FAQPage JSON-LD (schema text stays identical to the visible copy). */
+const LINK_ANSWER =
+  "You can use a digital business card link anywhere you would normally hand over contact details — in email signatures, WhatsApp and SMS, social media bios, video-call backgrounds, printed material and packaging, mobile wallets, your website, your Google Business Profile, listing and job portals, event badges and standees, invoices, and paid ad campaigns.";
+
+const LINK_PLACEMENTS = [
+  { icon: Mail, title: "Email Signature", desc: "Add the link under every outgoing email so each message quietly captures leads.", accent: "#F7B31C" },
+  { icon: MessageCircle, title: "WhatsApp & SMS", desc: "Drop it into chats, broadcasts and your WhatsApp Business profile — nothing to install.", accent: "#22C55E" },
+  { icon: Link2, title: "Social Media Bios", desc: "Pin it as your single link-in-bio on Instagram, LinkedIn, Facebook and X.", accent: "#8B5CF6" },
+  { icon: Monitor, title: "Video Call Backgrounds", desc: "Show the QR in your Zoom, Meet or Teams background so people scan mid-meeting.", accent: "#3B82F6" },
+  { icon: FileDown, title: "Print & Packaging", desc: "Put the QR on visiting cards, brochures, flyers, packaging and shop signage.", accent: "#EC4899" },
+  { icon: Wallet, title: "Mobile Wallet", desc: "Save the card as a pass in Apple Wallet or Google Wallet for lock-screen access.", accent: "#14B8A6" },
+  { icon: Globe, title: "Website & Blog", desc: "Link it from your header, footer, author bio or Contact Us page.", accent: "#0EA5E9" },
+  { icon: MapPin, title: "Google Business Profile", desc: "Use it as your website or appointment link so local searchers get the full profile.", accent: "#EF4444" },
+  { icon: Building2, title: "Listing & Job Portals", desc: "Ideal for IndiaMART, JustDial, Naukri and freelance profiles that allow only one link.", accent: "#F97316" },
+  { icon: ScanLine, title: "Events & Exhibitions", desc: "Print it on badges, standees and stall banners — visitors scan instead of taking paper.", accent: "#6366F1" },
+  { icon: FileText, title: "Invoices & Quotations", desc: "Attach it to invoices, quotations and proposals so clients can reach you instantly.", accent: "#0F766E" },
+  { icon: TrendingUp, title: "Ads & Campaigns", desc: "Use it as the landing link for Google, Meta and WhatsApp ad campaigns.", accent: "#D97706" },
+];
+
+function WhereToUseSection() {
+  useEffect(() => {
+    const ld = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: [{
+        "@type": "Question",
+        name: "Where can I use a digital business card link?",
+        acceptedAnswer: { "@type": "Answer", text: LINK_ANSWER },
+      }],
+    };
+    let s = document.getElementById("where-to-use-ld");
+    if (!s) {
+      s = document.createElement("script");
+      s.id = "where-to-use-ld";
+      (s as HTMLScriptElement).type = "application/ld+json";
+      document.head.appendChild(s);
+    }
+    s.textContent = JSON.stringify(ld);
+    return () => { document.getElementById("where-to-use-ld")?.remove(); };
+  }, []);
+
+  return (
+    <section className="py-20 bg-white" id="where-to-use">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHeading
+          eyebrow="Share Anywhere"
+          title={<>Where to Use Your <span className="text-gradient-gold">Digital Card Link</span></>}
+          subtitle="One link replaces every paper card. These are the places it earns you the most contacts."
+        />
+
+        {/* The quotable answer — kept short and self-contained on purpose. */}
+        <Reveal className="max-w-3xl mx-auto mb-12">
+          <div className="relative rounded-2xl bg-[#F8FAFC] ring-1 ring-[#E2E8F0] p-5 sm:p-6 pl-6 sm:pl-7 overflow-hidden">
+            <span aria-hidden="true" className="absolute left-0 top-4 bottom-4 w-1 rounded-full bg-gradient-to-b from-[#F7B31C] to-[#D97706]" />
+            <p className="text-[15px] leading-relaxed text-[#334155]">{LINK_ANSWER}</p>
+          </div>
+        </Reveal>
+
+        <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {LINK_PLACEMENTS.map(({ icon: Icon, title, desc, accent }) => (
+            <div key={title} className="rounded-2xl bg-white ring-1 ring-[#E2E8F0] p-5 transition-all hover:-translate-y-1 hover:shadow-premium-lg hover:ring-[#F7B31C]/40">
+              <span className="w-11 h-11 rounded-xl flex items-center justify-center mb-3.5" style={{ background: `${accent}1A`, color: accent }}>
+                <Icon size={19} />
+              </span>
+              <h3 className="text-[15px] font-bold text-[#0F172A] mb-1.5">{title}</h3>
+              <p className="text-[13px] text-[#64748B] leading-relaxed">{desc}</p>
+            </div>
+          ))}
+        </Reveal>
+
+        <Reveal className="mt-10 text-center">
+          <Link to="/signup" className="btn-gold inline-flex items-center gap-2">Create Your Card Link Free <ArrowRight size={16} /></Link>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 /* ─── Custom Domain ─── */
 function CustomDomainSection() {
   return (
@@ -1110,6 +1192,7 @@ export default function Home() {
       <HowItWorksSection />
       <AnalyticsSection />
       <QRNFCSection />
+      <WhereToUseSection />
       <CustomDomainSection />
       <GrowSection />
       <TestimonialsSection />
