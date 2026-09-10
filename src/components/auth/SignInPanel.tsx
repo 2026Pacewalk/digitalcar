@@ -39,7 +39,7 @@ export default function SignInPanel() {
       <div aria-hidden="true" className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-[#F7B31C]/45 to-transparent" />
 
       <div className="relative z-10 w-full max-w-[440px] flex flex-col min-h-[560px]">
-        <Link to="/" aria-label="DigitalCarda home" className="inline-flex items-center gap-3 self-start rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F172A]">
+        <Link to="/" aria-label="DigitalCarda home" className="dc-enter inline-flex items-center gap-3 self-start rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F172A]">
           {logoOk ? (
             /* alt="" — the link itself is already labelled, so a filled alt would
                announce the brand twice. */
@@ -54,14 +54,14 @@ export default function SignInPanel() {
 
         {/* A <p>.font-display renders identically to an <h2> here, while leaving
             the form's <h1> as the document's first heading. */}
-        <p className="font-display text-[2rem] leading-[1.15] font-extrabold text-white tracking-tight mt-8">
+        <p className="dc-enter dc-enter-1 font-display text-[2rem] leading-[1.15] font-extrabold text-white tracking-tight mt-8">
           Your Card Never Went Offline.
         </p>
-        <p className="mt-3 text-[15px] leading-relaxed text-[#94A3B8]">
+        <p className="dc-enter dc-enter-2 mt-3 text-[15px] leading-relaxed text-[#94A3B8]">
           While you were away, your link kept working, your QR kept scanning and your enquiries kept arriving. Sign in and pick up exactly where you left off.
         </p>
 
-        <ul className="mt-7 space-y-3.5">
+        <ul className="dc-enter dc-enter-3 mt-7 space-y-3.5">
           {STATUS.map((s, i) => (
             <li key={s.strong} className="flex items-start gap-3">
               <span

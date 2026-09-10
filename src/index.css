@@ -237,7 +237,7 @@
     transition: none !important;
   }
   .animate-marquee, .animate-aurora-drift, .animate-float, .animate-spin-slow,
-  .dc-rise, .dc-swap-in { animation: none !important; }
+  .dc-rise, .dc-swap-in, .dc-enter { animation: none !important; }
   .dc-rise { opacity: 1 !important; transform: none !important; }
   .dc-live-dot::after { display: none !important; }
   .dc-collapse { transition: none !important; }
@@ -535,3 +535,16 @@ button.fab:active {
 }
 .dc-swap-in { animation: dcSwapIn 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .dc-swap-d1 { animation-delay: 0.08s; }
+
+/* Page-entrance rise for the auth screens. Longer and softer than .dc-rise,
+   which is a 160ms micro-animation for inline warnings and must stay snappy.
+   Only applied to elements that do NOT already own `animation` (the floating
+   card mock, the live dots) — the shorthand would otherwise cancel theirs. */
+@keyframes dcEnter {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: none; }
+}
+.dc-enter { animation: dcEnter 560ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.dc-enter-1 { animation-delay: 70ms; }
+.dc-enter-2 { animation-delay: 140ms; }
+.dc-enter-3 { animation-delay: 210ms; }

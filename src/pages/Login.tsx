@@ -238,7 +238,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
         </Link>
 
         <div className="w-full max-w-[420px] min-w-0 relative">
-          <div className="lg:hidden flex items-center gap-2.5 mb-7 justify-center">
+          <div className="dc-enter lg:hidden flex items-center gap-2.5 mb-7 justify-center">
             <span className="w-9 h-9 rounded-xl gradient-gold flex items-center justify-center"><CreditCard size={18} className="text-[#0F172A]" aria-hidden="true" /></span>
             <span className="text-xl font-bold text-[#0F172A]">Digital<span className="text-gradient-gold">Carda</span></span>
           </div>
@@ -246,7 +246,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
           {/* THE FORM CARD — "the back of the card", where the owner writes. The
               5px edge bar is the one piece of art direction a 320px phone sees,
               and it rhymes with the mockup's gold header on the panel. */}
-          <div className="relative rounded-[24px] bg-white border border-[#E2E8F0] shadow-premium-lg overflow-hidden">
+          <div className="dc-enter relative rounded-[24px] bg-white border border-[#E2E8F0] shadow-premium-lg overflow-hidden">
             <div aria-hidden="true" className={`h-[5px] w-full ${adminMode ? "bg-[#334155]" : "gradient-gold"}`} />
 
             <div className="p-5 sm:p-7">
@@ -388,7 +388,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
           </div>
 
           {/* Help lives OUTSIDE the card — the card holds only the task. */}
-          <div className="mt-5">
+          <div className="dc-enter dc-enter-1 mt-5">
             <button
               type="button" onClick={() => setHelpOpen((v) => !v)} aria-expanded={helpOpen} aria-controls="login-help"
               className="w-full flex items-center justify-between gap-2 text-[13px] font-semibold text-[#475569] hover:text-[#0F172A] transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] px-1 py-1"
@@ -416,7 +416,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
           </div>
 
           {!adminMode && (
-            <p className="mt-6 text-center text-sm text-[#64748B]">
+            <p className="dc-enter dc-enter-2 mt-6 text-center text-sm text-[#64748B]">
               Don&apos;t have an account? <Link to="/signup" className="text-[#B45309] hover:text-[#92400E] font-semibold">Sign Up Free</Link>
             </p>
           )}
@@ -424,7 +424,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
           {/* Mobile-only trust ribbon — the panel's job, done in one line for the
               60–70% who never see the panel. */}
           {!adminMode && (
-            <div className="lg:hidden mt-8 text-center">
+            <div className="dc-enter dc-enter-2 lg:hidden mt-8 text-center">
               <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11.5px] font-medium text-[#64748B]">
                 <span className="inline-flex items-center gap-1"><Check size={12} className="text-[#16A34A]" aria-hidden="true" /> 30-Day Free Trial</span>
                 <span className="inline-flex items-center gap-1"><Check size={12} className="text-[#16A34A]" aria-hidden="true" /> No credit card</span>
