@@ -37,7 +37,10 @@ const SEED_PRESETS: Preset[] = [
   { id: 6, name: "Teal Breeze", style: 6, primary: "#06B6D4", secondary: "#083344", active: true },
   { id: 7, name: "Sunset", style: 7, primary: "#F97316", secondary: "#431407", active: true },
   { id: 8, name: "Rose Pink", style: 8, primary: "#EC4899", secondary: "#500724", active: true },
-  { id: 9, name: "Indigo", style: 9, primary: "#6366F1", secondary: "#1e1b4b", active: true },
+  /* id 9 ("Indigo", style 9) retired — withdrawn from the catalogue.
+     Card style 9 itself still renders, so any existing card already on it is
+     unaffected; it simply is not offered to new users any more. Ids are not
+     renumbered: they are stable keys for the stored preset list. */
   { id: 10, name: "Slate Pro", style: 10, primary: "#334155", secondary: "#0f172a", active: true },
   { id: 11, name: "Amber", style: 11, primary: "#EAB308", secondary: "#422006", active: true },
   { id: 12, name: "Sky", style: 12, primary: "#0EA5E9", secondary: "#082f49", active: true },
