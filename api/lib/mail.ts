@@ -50,15 +50,47 @@ export async function sendEmail(to: string | undefined | null, email: Email, rep
   try {
     if (!to) return { ok: false, error: "No recipient" };
     const t = transport();
-    if (!t) return { ok: false, error: "SMTP not configured" };
+    if (!t) { void logEmail(to, email, replyTo, "skipped", "SMTP not configured"); return { ok: false, error: "SMTP not configured" }; }
     const from = process.env.MAIL_FROM || process.env.SMTP_USER || `DigitalCarda <${PLATFORM_EMAIL}>`;
     await t.sendMail({ from, to, replyTo: replyTo || undefined, subject: email.subject, text: email.text, html: email.html });
     console.log(`[mail] "${email.subject}" sent to ${to}`);
+    void logEmail(to, email, replyTo, "sent", null);
     return { ok: true };
   } catch (e) {
-    console.error(`[mail] failed to send "${email.subject}":`, (e as Error).message);
-    return { ok: false, error: (e as Error).message };
+    const why = (e as Error).message;
+    console.error(`[mail] failed to send "${email.subject}":`, why);
+    if (to) void logEmail(to, email, replyTo, "failed", why);
+    return { ok: false, error: why };
   }
+}
+
+/* Record the send so the super-admin can answer "did they get it?".
+   Fire-and-forget and swallowed: a logging problem must never turn into a
+   failed email. Only the envelope is stored, never the body — welcome mails
+   carry a plaintext password. */
+async function logEmail(
+  to: string, email: Email, replyTo: string | null | undefined,
+  status: "sent" | "failed" | "skipped", error: string | null,
+): Promise<void> {
+  try {
+    const [{ getDb }, { emailLogs, users }, { eq }] = await Promise.all([
+      import("../queries/connection"),
+      import("@db/schema"),
+      import("drizzle-orm"),
+    ]);
+    const db = getDb();
+    const addr = to.toLowerCase().trim().slice(0, 255);
+    const owner = await db.query.users.findFirst({ where: eq(users.email, addr), columns: { id: true } });
+    await db.insert(emailLogs).values({
+      toEmail: addr,
+      subject: String(email.subject || "").slice(0, 300),
+      kind: email.kind ? String(email.kind).slice(0, 64) : null,
+      replyTo: replyTo ? String(replyTo).slice(0, 255) : null,
+      status,
+      error: error ? error.slice(0, 500) : null,
+      userId: owner?.id ?? null,
+    });
+  } catch { /* logging is best-effort by design */ }
 }
 
 /** True when the three required SMTP env vars are present. */

@@ -5,7 +5,7 @@ import {
   Plus, Eye, Share2, CreditCard, Menu, MessageSquare,
   Settings, LogOut, HelpCircle, ChevronLeft,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Star, Upload, Mail, Layers,
-  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode, Link2, Globe, ArrowLeft,
+  ToggleRight, Search, ReceiptText, KeyRound, Gift, Wand2, QrCode, Link2, Globe, ArrowLeft, MailCheck,
 } from "lucide-react";
 import { getToken, clearSession } from "@/lib/session";
 import { useAuth } from "@/hooks/useAuth";
@@ -82,6 +82,7 @@ const NAV: Record<string, NavConfig> = {
       { title: "System", items: [
         { icon: Link2, label: "URL Conflicts", path: "/admin/url-conflicts" },
         { icon: Globe, label: "Custom Domains", path: "/admin/domains" },
+        { icon: MailCheck, label: "Email Log", path: "/admin/email-log" },
         { icon: Settings, label: "Settings", path: "/admin/settings" },
       ] },
     ],

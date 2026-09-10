@@ -21,6 +21,8 @@ const BRAND = {
 };
 
 export interface Email {
+  /** Which template produced this — recorded in the email log. */
+  kind?: string;
   subject: string;
   html: string;
   text: string;
@@ -224,6 +226,7 @@ export function welcomeEmail(o: { name?: string; role?: string }): Email {
     </ul>` +
     button("Go to your dashboard", `${SITE}/dashboard`);
   return {
+    kind: "welcomeEmail",
     subject: "Welcome to DigitalCarda 🎉",
     html: layout({ preheader: "Your DigitalCarda account is ready — let's build your card.", badge: "Welcome", heading, bodyHtml }),
     text: `Hi ${o.name || "there"},\n\nWelcome to DigitalCarda! Your account is ready. Build your digital card, add products & gallery, and start capturing leads.\n\nDashboard: ${SITE}/dashboard`,
@@ -275,6 +278,7 @@ export function accountDetailsEmail(o: {
   ];
 
   return {
+    kind: "accountDetailsEmail",
     subject: o.company ? `${o.company} — your digital card is live` : "Your digital card is live",
     html: layout({ preheader: "Your card link, your QR code and your login — everything to get started.", badge: "Welcome aboard", heading: "Your digital card is ready", bodyHtml }),
     text: textLines.join("\n"),
@@ -327,6 +331,7 @@ export function featureUpdateEmail(o: { name?: string | null; slug?: string | nu
   ];
 
   return {
+    kind: "featureUpdateEmail",
     subject: "New on your DigitalCarda card ✨ (all included in your plan)",
     html: layout({ preheader: "A brand-new editor, live preview, new designs and more — already in your account.", badge: "Product update", heading: "What's new on DigitalCarda ✨", bodyHtml }),
     text: textLines.join("\n"),
@@ -357,6 +362,7 @@ export function enquiryAutoReplyEmail(o: {
     (cardUrl ? button(`View ${o.business}`, cardUrl) : "");
 
   return {
+    kind: "enquiryAutoReplyEmail",
     subject: `We've received your enquiry — ${o.business}`,
     html: layout({
       preheader: `Thanks for contacting ${o.business}. We'll be in touch shortly.`,
@@ -384,6 +390,7 @@ export function planUpgradedEmail(o: { name?: string | null; planName: string; v
     button("Open your dashboard", `${SITE}/dashboard/build`) +
     (o.slug ? note(`Your card stays at <a href="${SITE}/${esc(o.slug)}" style="color:${BRAND.goldDark};text-decoration:none;font-weight:700">digitalcarda.in/${esc(o.slug)}</a> — same link, same QR code.`) : "");
   return {
+    kind: "planUpgradedEmail",
     subject: `Your plan is now ${o.planName} 🎉`,
     html: layout({ preheader: `${o.planName} is active on your DigitalCarda account.`, badge: "Plan updated", heading: `You're on ${esc(o.planName)} now 🎉`, bodyHtml }),
     text: [`Hi ${o.name || "there"},`, "", `Your DigitalCarda account is now on the ${o.planName} plan.`,
@@ -413,6 +420,7 @@ export function cardPublishedEmail(o: { name?: string | null; slug: string; comp
     featureRow(3, "Print the QR where customers stand", "Reception, counter, packaging, visiting cards, vehicle — anywhere a phone camera can reach.") +
     button("Share your card", `${SITE}/dashboard/qr`);
   return {
+    kind: "cardPublishedEmail",
     subject: "🎉 Your digital card is live",
     html: layout({ preheader: `Your card is live at digitalcarda.in/${o.slug} — here's your QR code.`, badge: "You're live", heading: "Your card is live 🎉", bodyHtml }),
     text: [`Hi ${o.name || "there"},`, "", `Your digital business card is live: ${cardUrl}`, "",
@@ -445,6 +453,7 @@ export function monthlyDigestEmail(o: {
     button("Open your dashboard", `${SITE}/dashboard`) +
     (o.slug ? p(`<span style="font-size:13.5px;color:${BRAND.sub}">Your card: <a href="${SITE}/${esc(o.slug)}" style="color:${BRAND.goldDark};text-decoration:none">digitalcarda.in/${esc(o.slug)}</a></span>`) : "");
   return {
+    kind: "monthlyDigestEmail",
     subject: `Your card in ${o.month}: ${o.views.toLocaleString("en-IN")} views, ${o.leads} enquiries`,
     html: layout({ preheader: `${o.views} views and ${o.leads} enquiries in ${o.month}.`, badge: "Monthly report", heading: `Your ${esc(o.month)} report 📊`, bodyHtml }),
     text: [`Hi ${o.name || "there"},`, "", `Your card in ${o.month}:`,
@@ -465,6 +474,7 @@ export function dormantCardEmail(o: { name?: string | null; slug?: string | null
     button("Update your card", `${SITE}/dashboard/build`) +
     (o.slug ? p(`<span style="font-size:13.5px;color:${BRAND.sub}">It takes two minutes, and your link stays exactly the same: digitalcarda.in/${esc(o.slug)}</span>`) : "");
   return {
+    kind: "dormantCardEmail",
     subject: "Your card could use a refresh ✨",
     html: layout({ preheader: "A couple of quick updates keep your card working for you.", badge: "Quick nudge", heading: "Time for a quick refresh ✨", bodyHtml }),
     text: [`Hi ${o.name || "there"},`, "", `Your card hasn't changed in about ${o.days} days.`, "",
@@ -483,6 +493,7 @@ export function reviewRequestEmail(o: { name?: string | null; reviewUrl?: string
     button("Write a review", url) +
     note("Not happy with something? Reply to this email instead and we'll put it right — we'd much rather fix it than read about it later.");
   return {
+    kind: "reviewRequestEmail",
     subject: "Would you review DigitalCarda?",
     html: layout({ preheader: "If your card has been useful, a quick review would mean a lot.", badge: "A small favour", heading: "Would you share your experience? ⭐", bodyHtml }),
     text: [`Hi ${o.name || "there"},`, "", "If DigitalCarda has been useful, would you leave us a quick review?", "", url, "",
@@ -502,6 +513,7 @@ export function leadNotificationEmail(o: { name: string; email?: string | null; 
     ]) +
     (o.slug ? button("View card", `${SITE}/${esc(o.slug)}`) : "");
   return {
+    kind: "leadNotificationEmail",
     subject: `New lead: ${o.name || "Enquiry"} — ${label}`,
     html: layout({ preheader: `New enquiry from ${o.name} on ${label}`, badge: "New Lead", heading: "You've got a new lead 🎯", bodyHtml, accent: "#22C55E" }),
     text: `New lead on ${label}\n\nName: ${o.name}\nEmail: ${o.email || "—"}\nPhone: ${o.contact || "—"}\nMessage: ${o.message || "—"}`,
@@ -520,6 +532,7 @@ export function hotLeadEmail(o: { name: string; email?: string | null; contact?:
     ]) +
     (o.contact ? button("Call now", `tel:${esc(o.contact)}`) : o.slug ? button("View card", `${SITE}/${esc(o.slug)}`) : "");
   return {
+    kind: "hotLeadEmail",
     subject: `🔥 Hot lead: ${o.name || "Enquiry"} — ${label}`,
     html: layout({ preheader: `High-intent enquiry from ${o.name} — respond fast`, badge: "🔥 Hot Lead", heading: "🔥 Hot lead — respond fast", bodyHtml, accent: "#EA580C" }),
     text: `HOT LEAD on ${label}\n\nName: ${o.name}\nEmail: ${o.email || "—"}\nPhone: ${o.contact || "—"}\nMessage: ${o.message || "—"}`,
@@ -538,6 +551,7 @@ export function paymentSubmittedEmail(o: { name?: string; planName: string; amou
     ], { accentLast: true }) +
     p(`We'll email you the moment it's verified.`);
   return {
+    kind: "paymentSubmittedEmail",
     subject: `Payment received — ${o.planName} (under review)`,
     html: layout({ preheader: "We're verifying your payment — plan activates shortly.", badge: "Payment · Pending", heading: "Payment received ⏳", bodyHtml }),
     text: `Hi ${o.name || "there"},\n\nWe received your ${o.planName} payment (ref ${o.reference}, ${inr(o.amount)}). It's under verification and your plan activates once confirmed.`,
@@ -557,6 +571,7 @@ export function paymentToVerifyAdminEmail(o: { name?: string; email?: string; pl
     ], { accentLast: true }) +
     button("Review in admin", `${SITE}/admin/payments`);
   return {
+    kind: "paymentToVerifyAdminEmail",
     subject: `Payment to verify: ${o.planName} — ${inr(o.amount)}`,
     html: layout({ preheader: `${o.name} submitted a ${o.planName} payment to verify.`, badge: "Action needed", heading: "New payment to verify 🔎", bodyHtml, accent: "#3B82F6" }),
     text: `New payment to verify.\n\nCustomer: ${o.name} (${o.email})\nPlan: ${o.planName}\nRef: ${o.reference}\nAmount: ${inr(o.amount)}\n\nReview: ${SITE}/admin/payments`,
@@ -577,6 +592,7 @@ export function paymentVerifiedEmail(o: { name?: string; planName: string; amoun
     ], { accentLast: true }) +
     button("Open dashboard", `${SITE}/dashboard`);
   return {
+    kind: "paymentVerifiedEmail",
     subject: `Payment confirmed — ${o.planName} is active 🎉`,
     html: layout({ preheader: `Your ${o.planName} plan is active. Invoice ${o.invoiceNo}.`, badge: "Payment · Confirmed", heading: "You're all set 🎉", bodyHtml, accent: "#22C55E" }),
     text: `Hi ${o.name || "there"},\n\nYour ${o.planName} plan is active.\nInvoice: ${o.invoiceNo}\nValid till: ${o.validTill}\nAmount: ${inr(o.amount)}\n\nDashboard: ${SITE}/dashboard`,
@@ -590,6 +606,7 @@ export function paymentRejectedEmail(o: { name?: string; planName: string; note?
     p("Please double-check the payment reference and submit again — or reply to this email and we'll help sort it out.") +
     button("Try again", `${SITE}/dashboard/subscription`);
   return {
+    kind: "paymentRejectedEmail",
     subject: `Couldn't verify your ${o.planName} payment`,
     html: layout({ preheader: "We couldn't verify your payment — please try again.", badge: "Payment · Action needed", heading: "Payment not verified", bodyHtml, accent: "#EF4444" }),
     text: `Hi ${o.name || "there"},\n\nWe couldn't verify your ${o.planName} payment.${o.note ? ` Reason: ${o.note}.` : ""} Please check the reference and try again: ${SITE}/dashboard/subscription`,
@@ -607,6 +624,7 @@ export function verifyEmailAddressEmail(o: { name?: string; link: string }): Ema
     </div>` +
     p(`<span style="color:${BRAND.sub};font-size:13px">This link expires in 3 days. If you didn't create a DigitalCarda account, you can safely ignore this email.</span>`);
   return {
+    kind: "verifyEmailAddressEmail",
     subject: "Verify your email — DigitalCarda",
     html: layout({ preheader: "Confirm your email to secure your DigitalCarda account.", badge: "Verify email", heading: "Confirm your email address ✅", bodyHtml, accent: "#3B82F6" }),
     text: `Hi ${o.name || "there"},\n\nWelcome to DigitalCarda! Confirm your email to secure your account:\n${o.link}\n\nThis link expires in 3 days. If you didn't sign up, ignore this email.`,
@@ -620,6 +638,7 @@ export function passwordChangedEmail(o: { name?: string }): Email {
     p(`If this was you, no action is needed. <strong>If you didn't change it</strong>, reset your password immediately and contact us.`) +
     button("Secure your account", `${SITE}/dashboard/settings`);
   return {
+    kind: "passwordChangedEmail",
     subject: "Your password was changed",
     html: layout({ preheader: "Your DigitalCarda password was just changed.", badge: "Security", heading: "Password changed 🔒", bodyHtml, accent: "#3B82F6" }),
     text: `Hi ${o.name || "there"},\n\nYour DigitalCarda password was just changed. If this wasn't you, reset it immediately: ${SITE}/dashboard/settings`,
@@ -633,6 +652,7 @@ export function passwordResetEmail(o: { name?: string; link: string }): Email {
     button("Reset password", o.link) +
     p(`<span style="color:${BRAND.sub};font-size:13px">If you didn't request this, you can safely ignore this email — your password stays the same.</span>`);
   return {
+    kind: "passwordResetEmail",
     subject: "Reset your DigitalCarda password",
     html: layout({ preheader: "Reset your password — link expires in 60 minutes.", badge: "Security", heading: "Reset your password", bodyHtml, accent: "#3B82F6" }),
     text: `Hi ${o.name || "there"},\n\nReset your DigitalCarda password (link expires in 60 min): ${o.link}\n\nDidn't request this? Ignore this email.`,
@@ -646,6 +666,7 @@ export function trialEndingEmail(o: { name?: string; daysLeft: number; cardUrl?:
     p("Upgrade now to keep your card live, keep capturing leads, and unlock every feature — plus a limited-time discount waiting on your dashboard.") +
     button("Upgrade & keep my card live", `${SITE}/dashboard/subscription`);
   return {
+    kind: "trialEndingEmail",
     subject: `⏳ Your card goes offline in ${o.daysLeft} day${o.daysLeft === 1 ? "" : "s"}`,
     html: layout({ preheader: `Only ${o.daysLeft} day(s) left on your trial — upgrade to stay live.`, badge: "Trial ending", heading: `${o.daysLeft} day${o.daysLeft === 1 ? "" : "s"} left on your trial ⏳`, bodyHtml, accent: BRAND.gold }),
     text: `Hi ${o.name || "there"},\n\nYour trial ends in ${o.daysLeft} day(s) — after that your card is paused. Upgrade to stay live: ${SITE}/dashboard/subscription`,
@@ -665,6 +686,7 @@ export function newSignupAdminEmail(o: { name?: string; email?: string; role?: s
     ]) +
     button("View in admin", `${SITE}/admin/customers`);
   return {
+    kind: "newSignupAdminEmail",
     subject: `New signup: ${o.name || o.email || "New user"}`,
     html: layout({ preheader: `${o.name || o.email} started a free trial.`, badge: "New Signup", heading: "New account created 🎉", bodyHtml, accent: "#22C55E" }),
     text: `New signup on DigitalCarda.\n\nName: ${o.name}\nEmail: ${o.email}\nRole: ${o.role}`,
@@ -682,6 +704,7 @@ export function referralSignupAdminEmail(o: { newUserName?: string; newUserEmail
     ]) +
     p(`<span style="color:${BRAND.sub};font-size:13px">The referrer earns a reward once this user upgrades to a paid plan.</span>`);
   return {
+    kind: "referralSignupAdminEmail",
     subject: `Referral signup: ${o.newUserName || "New user"} (via ${o.referrerName || o.code || "referral"})`,
     html: layout({ preheader: `${o.newUserName} joined via ${o.referrerName}'s referral.`, badge: "Referral", heading: "New referral signup 🔗", bodyHtml, accent: "#8B5CF6" }),
     text: `Referral signup.\n\nNew user: ${o.newUserName} (${o.newUserEmail})\nReferred by: ${o.referrerName}\nCode: ${o.code}`,
@@ -695,6 +718,7 @@ export function smtpTestEmail(o: { to?: string }): Email {
     (o.to ? p(`<span style="color:${BRAND.sub};font-size:13px">Sent to: ${esc(o.to)}</span>`) : "") +
     button("Open dashboard", `${SITE}/dashboard`);
   return {
+    kind: "smtpTestEmail",
     subject: "✅ DigitalCarda email test — it works!",
     html: layout({ preheader: "Your SMTP is working — automated emails will send.", badge: "Email test", heading: "Email delivery works 🎉", bodyHtml, accent: "#22C55E" }),
     text: "Your DigitalCarda email delivery is working. This test message confirms SMTP is configured correctly — automated emails will send.",
@@ -711,6 +735,7 @@ export function referralRewardEmail(o: { name?: string; refereeName?: string; am
     p("Keep sharing your link — every friend who goes paid earns you more.") +
     button("View my wallet", `${SITE}/dashboard/refer`);
   return {
+    kind: "referralRewardEmail",
     subject: `You earned ${inr(o.amount)} 🎉`,
     html: layout({ preheader: `${o.refereeName || "A referral"} went paid — you earned ${inr(o.amount)}.`, badge: "Reward earned", heading: "You earned a reward 🎉", bodyHtml, accent: "#22C55E" }),
     text: `Hi ${o.name || "there"},\n\n${o.refereeName || "Someone you referred"} went paid — you earned ${inr(o.amount)}. View your wallet: ${SITE}/dashboard/refer`,
@@ -732,6 +757,7 @@ export function payoutRequestAdminEmail(o: { name?: string; email?: string; amou
     detailTable(rows, { accentLast: true }) +
     button("Review payouts", `${SITE}/admin/referrals`);
   return {
+    kind: "payoutRequestAdminEmail",
     subject: `Payout request: ${inr(o.amount)} — ${o.name || o.email || "user"}`,
     html: layout({ preheader: `${o.name} requested a ${inr(o.amount)} payout.`, badge: "Action needed", heading: "New payout request 💸", bodyHtml, accent: "#3B82F6" }),
     text: `Payout request.\n\nUser: ${o.name} (${o.email})\nMethod: ${o.method}\nDestination: ${o.destination}\nAmount: ${inr(o.amount)}`,
@@ -753,6 +779,7 @@ export function resellerApplicationAdminEmail(o: { name?: string; email?: string
     detailTable(rows) +
     button("Review application", `${SITE}/admin/reseller-applications`);
   return {
+    kind: "resellerApplicationAdminEmail",
     subject: `Reseller application: ${o.name || o.email || "New partner"}`,
     html: layout({ preheader: `${o.name} wants to become a reseller.`, badge: "Action needed", heading: "New reseller application 👋", bodyHtml, accent: "#8B5CF6" }),
     text: `New reseller application.\n\nName: ${o.name}\nEmail: ${o.email}\nPhone: ${o.phone || "—"}\nCompany: ${o.companyName || "—"}\nMessage: ${o.message || "—"}\n\nReview: ${SITE}/admin/reseller-applications`,
@@ -766,6 +793,7 @@ export function resellerApplicationReceivedEmail(o: { name?: string }): Email {
     p("Our team is reviewing your application. We'll email you as soon as it's approved — usually within 1–2 business days.") +
     p(`<span style="color:${BRAND.sub};font-size:13px">Questions? Just reply to this email.</span>`);
   return {
+    kind: "resellerApplicationReceivedEmail",
     subject: "We received your reseller application 👋",
     html: layout({ preheader: "Thanks for applying — we're reviewing your application.", badge: "Application received", heading: "Application received 👋", bodyHtml, accent: "#8B5CF6" }),
     text: `Hi ${o.name || "there"},\n\nThanks for applying to become a DigitalCarda reseller. We're reviewing your application and will email you once it's approved.`,
@@ -780,6 +808,7 @@ export function resellerApprovedEmail(o: { name?: string; link: string }): Email
     button("Set your password", o.link) +
     p(`<span style="color:${BRAND.sub};font-size:13px">This link expires in 60 minutes. If it expires, use “Forgot password” on the login page.</span>`);
   return {
+    kind: "resellerApprovedEmail",
     subject: "You're approved — welcome, partner! 🎉",
     html: layout({ preheader: "Your reseller application is approved — set your password.", badge: "Approved", heading: "You're a reseller now 🎉", bodyHtml, accent: "#22C55E" }),
     text: `Hi ${o.name || "there"},\n\nYour reseller application is approved! Set your password to activate your account: ${o.link}`,
@@ -793,6 +822,7 @@ export function resellerApprovedExistingEmail(o: { name?: string }): Email {
     p("Your existing account has been upgraded to a reseller account. Just sign in with your usual password to access your reseller dashboard.") +
     button("Go to reseller dashboard", `${SITE}/reseller`);
   return {
+    kind: "resellerApprovedExistingEmail",
     subject: "You're approved — welcome, partner! 🎉",
     html: layout({ preheader: "Your reseller application is approved.", badge: "Approved", heading: "You're a reseller now 🎉", bodyHtml, accent: "#22C55E" }),
     text: `Hi ${o.name || "there"},\n\nYour reseller application is approved and your account is upgraded. Sign in to access your reseller dashboard: ${SITE}/reseller`,
@@ -805,6 +835,7 @@ export function resellerRejectedEmail(o: { name?: string; note?: string }): Emai
     p(`Thank you for your interest in becoming a DigitalCarda reseller. After review, we're unable to approve your application at this time.${o.note ? `<br><br><em style="color:${BRAND.sub}">${esc(o.note)}</em>` : ""}`) +
     p("You're welcome to use DigitalCarda as a customer, and you can reach out to us if your circumstances change.");
   return {
+    kind: "resellerRejectedEmail",
     subject: "Update on your reseller application",
     html: layout({ preheader: "An update on your reseller application.", badge: "Application", heading: "Reseller application update", bodyHtml, accent: "#64748B" }),
     text: `Hi ${o.name || "there"},\n\nThank you for applying. We're unable to approve your reseller application at this time.${o.note ? ` ${o.note}` : ""}`,
@@ -837,6 +868,7 @@ export function trialDay1Email(o: { name?: string; cardUrl?: string }): Email {
     p("Share it in your WhatsApp status, email signature, and social bios today.") +
     button("Share my card", o.cardUrl || `${SITE}/dashboard`);
   return {
+    kind: "trialDay1Email",
     subject: "Your DigitalCarda is live — start sharing 🎉",
     html: layout({ preheader: "Your card is live. Share it to start getting engagement.", badge: "Day 1 · Live", heading: "Your card is live 🎉", bodyHtml, accent: "#22C55E" }),
     text: `Hi ${o.name || "there"},\n\nYour DigitalCarda is live! Share it everywhere to start getting views, saves and leads: ${o.cardUrl || SITE + "/dashboard"}`,
@@ -854,6 +886,7 @@ export function trialDay7Email(o: { name?: string; cardUrl?: string }): Email {
     </ul>` +
     button("Improve my card", `${SITE}/dashboard`);
   return {
+    kind: "trialDay7Email",
     subject: "Get more from your DigitalCarda 💡",
     html: layout({ preheader: "3 quick ways to get more views and leads from your card.", badge: "Day 7 · Tips", heading: "Make your card work harder 💡", bodyHtml }),
     text: `Hi ${o.name || "there"},\n\nOne week in! Add services & gallery, enable lead capture, and share your QR code to get more from your card: ${SITE}/dashboard`,
@@ -869,6 +902,7 @@ export function trialDay15Email(o: { name?: string; daysLeft: number; metrics: T
          : p("Your card is live — share it more this week to start seeing views, saves and leads roll in.")) +
     button("Keep my card active", CTA);
   return {
+    kind: "trialDay15Email",
     subject: `Halfway through your trial — ${o.daysLeft} days left`,
     html: layout({ preheader: `${o.daysLeft} days left on your trial. Here's your progress.`, badge: "Day 15 · Halfway", heading: "You're halfway there ⏳", bodyHtml }),
     text: `Hi ${o.name || "there"},\n\nHalfway through your trial — ${o.daysLeft} days left. Views: ${o.metrics.views}, Saves: ${o.metrics.saves}, Leads: ${o.metrics.leads}. Keep it active: ${CTA}`,
@@ -885,6 +919,7 @@ export function trialDay21Email(o: { name?: string; daysLeft: number; metrics: T
       : p(`<strong>${o.daysLeft} days left</strong> on your trial. Share your card a few more times this week to start seeing real engagement before it ends.`)) +
     button("Keep my card active", CTA);
   return {
+    kind: "trialDay21Email",
     subject: "Your DigitalCarda is working 📈",
     html: layout({ preheader: `Your card's results so far — ${o.daysLeft} days left.`, badge: "Day 21 · Results", heading: "Your card is working 📈", bodyHtml, accent: "#22C55E" }),
     text: `Hi ${o.name || "there"},\n\nYour card's results — Views: ${o.metrics.views}, Saves: ${o.metrics.saves}, WhatsApp: ${o.metrics.whatsapp}, Leads: ${o.metrics.leads}. ${o.daysLeft} days left. Keep it active: ${CTA}`,
@@ -898,6 +933,7 @@ export function trialDay25Email(o: { name?: string; daysLeft: number; metrics: T
     (o.metrics.views + o.metrics.leads > 0 ? metricsBlock(o.metrics) : "") +
     button("Keep my card active", CTA);
   return {
+    kind: "trialDay25Email",
     subject: `Keep your card active — ${o.daysLeft} days left`,
     html: layout({ preheader: `${o.daysLeft} days left — activate to keep your card online.`, badge: "Day 25 · Reminder", heading: "Keep your card active 🔔", bodyHtml }),
     text: `Hi ${o.name || "there"},\n\nOnly ${o.daysLeft} days left on your trial. Activate your plan to keep your card online: ${CTA}`,
@@ -911,6 +947,7 @@ export function abandonedPublishEmail(o: { name?: string; productName?: string; 
     p(`You're almost there — ${what} is set up but not published yet. Publishing takes one click, and your <strong>30-day free trial only starts when you publish</strong>, so you lose nothing by finishing now.`) +
     button("Finish &amp; publish my card", o.cardUrl || `${SITE}/dashboard/build`);
   return {
+    kind: "abandonedPublishEmail",
     subject: "Your DigitalCarda is almost ready 🚀",
     html: layout({ preheader: "One click to publish — your free trial starts only when you publish.", badge: "Almost done", heading: "You're one click away 🚀", bodyHtml, accent: BRAND.gold }),
     text: `Hi ${o.name || "there"},\n\nYour digital card is almost ready — publish it to make it live. Your 30-day free trial only starts when you publish: ${o.cardUrl || SITE + "/dashboard/build"}`,
@@ -924,6 +961,7 @@ export function trialEndedEmail(o: { name?: string }): Email {
     p("Everything you built is safe. Upgrade any time to bring your card back online instantly and pick up right where you left off.") +
     button("Reactivate my card", `${SITE}/dashboard/subscription`);
   return {
+    kind: "trialEndedEmail",
     subject: "Your trial ended — reactivate your card anytime",
     html: layout({ preheader: "Your card is paused. Upgrade to bring it back online.", badge: "Trial ended", heading: "Your trial has ended", bodyHtml, accent: "#EF4444" }),
     text: `Hi ${o.name || "there"},\n\nYour trial ended and your card is paused. Your data is safe — upgrade to reactivate: ${SITE}/dashboard/subscription`,
@@ -938,6 +976,7 @@ export function subscriptionRenewalReminderEmail(o: { name?: string; planName: s
     p(`Your <strong>${esc(o.planName)}</strong> plan renews in <strong style="color:${BRAND.goldDark}">${o.daysLeft} day${o.daysLeft === 1 ? "" : "s"}</strong> (valid till ${esc(o.validTill)}). Renew now so your card stays live and every feature keeps working without a break.`) +
     button("Renew my plan", `${SITE}/dashboard/subscription`);
   return {
+    kind: "subscriptionRenewalReminderEmail",
     subject: `Your ${o.planName} plan renews in ${o.daysLeft} day${o.daysLeft === 1 ? "" : "s"}`,
     html: layout({ preheader: `Renew your ${o.planName} plan to stay live.`, badge: "Renewal reminder", heading: "Time to renew ⏳", bodyHtml }),
     text: `Hi ${o.name || "there"},\n\nYour ${o.planName} plan renews in ${o.daysLeft} day(s) (valid till ${o.validTill}). Renew: ${SITE}/dashboard/subscription`,
@@ -951,6 +990,7 @@ export function subscriptionExpiredEmail(o: { name?: string; planName: string })
     p("Everything you built is safe. Renew any time to bring your card back online instantly.") +
     button("Renew &amp; go live again", `${SITE}/dashboard/subscription`);
   return {
+    kind: "subscriptionExpiredEmail",
     subject: `Your ${o.planName} plan expired — renew to go live`,
     html: layout({ preheader: "Your plan expired and your card is paused — renew to reactivate.", badge: "Plan expired", heading: "Your plan has expired", bodyHtml, accent: "#EF4444" }),
     text: `Hi ${o.name || "there"},\n\nYour ${o.planName} plan expired and your card is paused. Renew to reactivate: ${SITE}/dashboard/subscription`,
@@ -964,6 +1004,7 @@ export function paymentFailedEmail(o: { name?: string; planName: string; amount:
     p("You can try again with a different method (card, UPI, netbanking or wallet) — it only takes a minute.") +
     button("Try payment again", `${SITE}/dashboard/subscription`);
   return {
+    kind: "paymentFailedEmail",
     subject: `Payment didn't go through — ${o.planName}`,
     html: layout({ preheader: "Your payment didn't complete — try again to activate your plan.", badge: "Payment · Failed", heading: "Payment didn't complete", bodyHtml, accent: "#EF4444" }),
     text: `Hi ${o.name || "there"},\n\nYour ${inr(o.amount)} payment for ${o.planName} didn't go through — no money was deducted. Try again: ${SITE}/dashboard/subscription`,
@@ -982,6 +1023,7 @@ export function resellerCommissionEmail(o: { name?: string; customerName?: strin
     p("Keep onboarding customers — every paid activation adds to your payout.") +
     button("View my earnings", `${SITE}/reseller`);
   return {
+    kind: "resellerCommissionEmail",
     subject: `You earned ${inr(o.amount)} commission 💰`,
     html: layout({ preheader: `${o.customerName || "A customer"} went paid — you earned ${inr(o.amount)}.`, badge: "Commission earned", heading: "You earned a commission 💰", bodyHtml, accent: "#22C55E" }),
     text: `Hi ${o.name || "there"},\n\n${o.customerName || "A customer"} activated a paid plan — you earned ${inr(o.amount)} commission. View earnings: ${SITE}/reseller`,
@@ -999,6 +1041,7 @@ export function payoutCompletedEmail(o: { name?: string; amount: number | string
     p(`<span style="color:${BRAND.sub};font-size:13px">Bank transfers can take 1–2 business days to reflect.</span>`) +
     button("View my wallet", `${SITE}/reseller`);
   return {
+    kind: "payoutCompletedEmail",
     subject: `Payout sent — ${inr(o.amount)} 🎉`,
     html: layout({ preheader: `Your ${inr(o.amount)} payout has been processed.`, badge: "Payout · Sent", heading: "Your payout is on its way 🎉", bodyHtml, accent: "#22C55E" }),
     text: `Hi ${o.name || "there"},\n\nYour payout of ${inr(o.amount)} has been processed${o.reference ? ` (ref ${o.reference})` : ""}. It may take 1–2 business days to reflect.`,
@@ -1032,6 +1075,7 @@ export function marketingIntroEmail(o: { name?: string; businessName?: string; c
     button("Create your free card", o.ctaUrl || `${SITE}/`) +
     p(`<span style="color:${BRAND.sub};font-size:13px">Prefer to talk? Reply to this email or reach us at <a href="mailto:hello@digitalcarda.in" style="color:${BRAND.goldDark};text-decoration:none">hello@digitalcarda.in</a> · +91 95177 22444.</span>`);
   return {
+    kind: "marketingIntroEmail",
     subject: `${o.businessName ? o.businessName + " — turn" : "Turn"} your visiting card into a smart digital card`,
     html: layout({
       preheader: "A smart digital business card that wins more customers — 30-day free trial.",

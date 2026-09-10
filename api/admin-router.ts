@@ -4,8 +4,8 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { publishedCards, users, cardTrials, subscriptions, appSettings } from "@db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLogs } from "@db/schema";
+import { eq, and, desc, like, or, sql, gte } from "drizzle-orm";
 import { legacySlugSet, slugTakenByOther } from "./publish-router";
 
 /* Emails that belong to a LEGACY customers.json card — used to flag which DB
@@ -244,5 +244,72 @@ export const adminRouter = createRouter({
       if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "No published card for that account." });
       await db.update(publishedCards).set({ slug }).where(owner);
       return { ok: true, slug };
+    }),
+
+  /* ─── Email log ───
+     Every outbound email, newest first. Answers the support question the admin
+     actually asks — "did their login/invoice/reset actually go out?" — without
+     logging into the SMTP provider. The envelope only: recipient, subject,
+     which template, and whether it left the building. Bodies are never stored
+     (a welcome mail carries a plaintext password). */
+  emailLogs: adminQuery
+    .input(z.object({
+      q: z.string().max(200).optional(),
+      status: z.enum(["all", "sent", "failed", "skipped"]).default("all"),
+      kind: z.string().max(64).optional(),
+      days: z.number().int().min(1).max(365).default(30),
+      page: z.number().int().min(1).default(1),
+      perPage: z.number().int().min(10).max(200).default(50),
+    }).default({ status: "all", days: 30, page: 1, perPage: 50 }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const since = new Date(Date.now() - input.days * 86_400_000);
+      const where = [gte(emailLogs.createdAt, since)];
+      if (input.status !== "all") where.push(eq(emailLogs.status, input.status));
+      if (input.kind) where.push(eq(emailLogs.kind, input.kind));
+      const term = (input.q || "").trim();
+      if (term) {
+        const pat = `%${term.replace(/[%_]/g, "")}%`;
+        where.push(or(like(emailLogs.toEmail, pat), like(emailLogs.subject, pat))!);
+      }
+      const filter = and(...where);
+
+      const [rows, counted, kinds, totals] = await Promise.all([
+        db.select().from(emailLogs).where(filter)
+          .orderBy(desc(emailLogs.createdAt))
+          .limit(input.perPage).offset((input.page - 1) * input.perPage),
+        db.select({ n: sql<number>`count(*)` }).from(emailLogs).where(filter),
+        db.select({ kind: emailLogs.kind, n: sql<number>`count(*)` })
+          .from(emailLogs).where(gte(emailLogs.createdAt, since)).groupBy(emailLogs.kind),
+        db.select({ status: emailLogs.status, n: sql<number>`count(*)` })
+          .from(emailLogs).where(gte(emailLogs.createdAt, since)).groupBy(emailLogs.status),
+      ]);
+
+      const byStatus = { sent: 0, failed: 0, skipped: 0 };
+      for (const t of totals) byStatus[t.status as keyof typeof byStatus] = Number(t.n) || 0;
+
+      return {
+        rows,
+        total: Number(counted[0]?.n) || 0,
+        page: input.page,
+        perPage: input.perPage,
+        byStatus,
+        kinds: kinds
+          .filter((k) => k.kind)
+          .map((k) => ({ kind: k.kind as string, n: Number(k.n) || 0 }))
+          .sort((a, b) => b.n - a.n),
+      };
+    }),
+
+  /* Housekeeping: the log grows with every lead alert, so let the admin drop
+     the old end of it. Never touches anything newer than the cutoff. */
+  pruneEmailLogs: adminQuery
+    .input(z.object({ olderThanDays: z.number().int().min(7).max(3650) }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const cutoff = new Date(Date.now() - input.olderThanDays * 86_400_000);
+      await db.delete(emailLogs).where(sql`created_at < ${cutoff}`);
+      const left = await db.select({ n: sql<number>`count(*)` }).from(emailLogs);
+      return { ok: true as const, remaining: Number(left[0]?.n) || 0 };
     }),
 });

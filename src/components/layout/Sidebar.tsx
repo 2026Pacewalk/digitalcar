@@ -7,7 +7,7 @@ import {
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
   ChevronRight, Store, X, ReceiptText,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
-  Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe,
+  Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe, MailCheck,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -80,6 +80,7 @@ const superAdminGroups: NavGroup[] = [
   { title: "System", items: [
     { label: "URL Conflicts", icon: Link2, path: "/admin/url-conflicts" },
     { label: "Custom Domains", icon: Globe, path: "/admin/domains" },
+    { label: "Email Log", icon: MailCheck, path: "/admin/email-log" },
     { label: "Settings", icon: Settings, path: "/admin/settings" },
   ] },
 ];

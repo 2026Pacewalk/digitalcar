@@ -27,6 +27,18 @@ const conn = await mysql.createConnection(url);
 const log = (s) => console.log("  " + s);
 
 const TABLES = {
+  /* Every email the platform sends, so support can answer "did they get it?".
+     Deliberately NO body/html column: welcome mails carry a plaintext password,
+     and a log is read by far more people than a mailbox is. */
+  email_logs: `CREATE TABLE IF NOT EXISTS email_logs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    to_email VARCHAR(255) NOT NULL, subject VARCHAR(300) NOT NULL,
+    kind VARCHAR(64) NULL, reply_to VARCHAR(255) NULL,
+    status ENUM('sent','failed','skipped') NOT NULL DEFAULT 'sent', error VARCHAR(500) NULL,
+    user_id BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX emlog_created_idx (created_at), INDEX emlog_to_idx (to_email),
+    INDEX emlog_status_idx (status), INDEX emlog_kind_idx (kind))`,
   products: `CREATE TABLE IF NOT EXISTS products (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     slug VARCHAR(191) NOT NULL UNIQUE, name VARCHAR(255) NOT NULL, tagline VARCHAR(255) NULL,
