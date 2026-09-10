@@ -386,10 +386,16 @@ export const authRouter = createRouter({
         });
       }
 
-      if (user.status === "suspended") {
+      // Only an ACTIVE account may sign in. context.ts refuses API access to any
+      // non-active account, so letting an "inactive" (deactivated / soft-deleted)
+      // account log in would hand it a token and then 401 every request — a dead
+      // session that looks like the app is broken. Fail here with a clear reason.
+      if (user.status !== "active") {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "Account suspended. Contact support.",
+          message: user.status === "suspended"
+            ? "Account suspended. Contact support."
+            : "This account has been deactivated. Contact support to restore it.",
         });
       }
 
