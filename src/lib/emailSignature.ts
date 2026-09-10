@@ -82,8 +82,17 @@ function iconBase(d: SignatureData): string {
   try { return `${new URL(d.cardUrl).origin}/sig`; } catch { return "https://digitalcarda.in/sig"; }
 }
 
+/* Cache-buster on every icon URL. A CDN caches by full URL, and a 404 fetched
+   before these files were deployed can sit in one edge location for hours while
+   other locations serve the file perfectly — so a probe from elsewhere proves
+   nothing. Bumping this mints new cache keys everywhere at once, which beats
+   waiting for a TTL or asking someone to purge. Bump it whenever an icon is
+   regenerated with different artwork. */
+const ICON_V = "2";
+const iconUrl = (d: SignatureData, file: string) => `${iconBase(d)}/${file}.png?v=${ICON_V}`;
+
 const icon = (d: SignatureData, name: string, size: number, inline = false) =>
-  `<img src="${esc(iconBase(d))}/${esc(name)}.png" width="${size}" height="${size}" alt="" ` +
+  `<img src="${esc(iconUrl(d, name))}" width="${size}" height="${size}" alt="" ` +
   `style="display:${inline ? "inline-block" : "block"};border:0;outline:none;` +
   `width:${size}px;height:${size}px;${inline ? "vertical-align:-2px;" : ""}" />`;
 
@@ -146,7 +155,7 @@ function socialRow(d: SignatureData, o: SignatureOptions, size = 26): string {
   if (!o.showSocials || !d.socials.length) return "";
   const cells = d.socials.map((s) => {
     const inner = ICON_PLATFORMS.has(s.platform)
-      ? `<img src="${esc(iconBase(d))}/s-${esc(s.platform)}.png" width="${size}" height="${size}" alt="${esc(s.label)}" style="display:block;border:0;outline:none;width:${size}px;height:${size}px;" />`
+      ? `<img src="${esc(iconUrl(d, `s-${s.platform}`))}" width="${size}" height="${size}" alt="${esc(s.label)}" style="display:block;border:0;outline:none;width:${size}px;height:${size}px;" />`
       : `<span style="font-family:${FONT};font-size:11px;color:${o.accent};">${esc(s.label)}</span>`;
     return `<td style="padding:0 6px 0 0;"><a href="${esc(s.url)}" style="text-decoration:none;">${inner}</a></td>`;
   }).join("");
