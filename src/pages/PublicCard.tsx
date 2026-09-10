@@ -51,10 +51,14 @@ function getVisitorId(): string {
 // The sandboxed (opaque-origin) card iframe can't reliably read a cross-origin
 // fetch, so the parent fetches the real view count and postMessages it in. The
 // card renders it into its eye-counter. Posts on load and whenever it changes.
-function CardFrame({ html, views }: { html: string; views: number | null }) {
+function CardFrame({ html, views, winRef }: { html: string; views: number | null; winRef?: React.MutableRefObject<Window | null> }) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const post = () => { if (views != null) { try { ref.current?.contentWindow?.postMessage({ __dcViews: views }, "*"); } catch { /* ignore */ } } };
+  // Publish the frame's window so the parent's message handlers can verify that
+  // a relayed enquiry/analytics event really came from THIS card (see below).
+  const track = () => { if (winRef) winRef.current = ref.current?.contentWindow ?? null; };
+  const post = () => { track(); if (views != null) { try { ref.current?.contentWindow?.postMessage({ __dcViews: views }, "*"); } catch { /* ignore */ } } };
   useEffect(post, [views]);
+  useEffect(track);
   return <iframe ref={ref} srcDoc={html} title="card" onLoad={post} sandbox={CARD_SANDBOX} className="w-full min-h-screen border-0 bg-white" />;
 }
 
@@ -76,6 +80,12 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
   // Real, live view count (base + tracked views) fetched same-origin from the
   // parent, then postMessaged into the sandboxed card iframe (see CardFrame).
   const [realViews, setRealViews] = useState<number | null>(null);
+  // The card iframe's window. Every message handler below checks e.source
+  // against it, so only OUR card can relay enquiries/analytics — otherwise any
+  // site that embeds this page in an iframe could postMessage in and forge
+  // leads into the owner's inbox or inflate their analytics.
+  const cardWinRef = useRef<Window | null>(null);
+  const fromCard = (e: MessageEvent) => !!cardWinRef.current && e.source === cardWinRef.current;
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
@@ -111,6 +121,7 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
   // frame), so a malicious card can only ever open a YouTube/Instagram embed.
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
+      if (!fromCard(e)) return;
       const d = (e.data && (e.data as { __dcVideo?: { id?: string; provider?: string; vertical?: boolean } }).__dcVideo);
       if (!d) return;
       const id = String(d.id ?? "");
@@ -131,6 +142,7 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
   // ever file a lead against itself.
   useEffect(() => {
     const onEnquiry = (e: MessageEvent) => {
+      if (!fromCard(e)) return;
       const data = e.data as {
         __dcEnquiry?: { name?: string; contact?: string; email?: string; description?: string };
         __dcTrack?: string | Record<string, unknown>;
@@ -271,12 +283,12 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
         (s.qrcodes ?? []) as Parameters<typeof buildCardHtml>[5],
       );
     }
-    return <>{videoLightbox}<CardFrame html={html} views={realViews} /></>;
+    return <>{videoLightbox}<CardFrame html={html} views={realViews} winRef={cardWinRef} /></>;
   }
 
   // Real customer card rendered from customers.json (the common case today).
   if (!dbHasContent && legacyHtml) {
-    return <>{videoLightbox}<CardFrame html={legacyHtml} views={realViews} /></>;
+    return <>{videoLightbox}<CardFrame html={legacyHtml} views={realViews} winRef={cardWinRef} /></>;
   }
 
   // No usable DB card and not in the legacy data → genuinely not found.
@@ -350,7 +362,7 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
       color2: preset?.secondary || "",
     } as unknown as Parameters<typeof buildCardHtml>[0];
     const html = buildCardHtml(cust, [], [], [], [], []);
-    return <>{videoLightbox}<CardFrame html={html} views={realViews} /></>;
+    return <>{videoLightbox}<CardFrame html={html} views={realViews} winRef={cardWinRef} /></>;
   }
 
   const about = aboutBlock?.content as Record<string, string> || {};
