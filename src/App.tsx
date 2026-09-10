@@ -74,6 +74,7 @@ const CustomerSettings = lazy(() => import("./pages/customer/Settings"));
 const CustomerProfile = lazy(() => import("./pages/customer/Profile"));
 const CustomerQR = lazy(() => import("./pages/customer/QR"));
 const CustomerSignature = lazy(() => import("./pages/customer/Signature"));
+const CustomerWhatsAppMessage = lazy(() => import("./pages/customer/WhatsAppMessage"));
 const CustomerCustomDomain = lazy(() => import("./pages/customer/CustomDomain"));
 const AITools = lazy(() => import("./pages/customer/AITools"));
 const CustomerHome = lazy(() => import("./pages/customer/Home"));
@@ -261,6 +262,7 @@ export default function App() {
         <Route path="/dashboard/profile" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerProfile /></RoleRoute>} />
         <Route path="/dashboard/qr" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerQR /></RoleRoute>} />
         <Route path="/dashboard/signature" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSignature /></RoleRoute>} />
+        <Route path="/dashboard/whatsapp" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerWhatsAppMessage /></RoleRoute>} />
         <Route path="/dashboard/domain" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerCustomDomain /></RoleRoute>} />
         <Route path="/dashboard/ai" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><AITools /></RoleRoute>} />
         <Route path="/dashboard/build" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardStudio /></RoleRoute>} />

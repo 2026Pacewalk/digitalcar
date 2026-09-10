@@ -8,6 +8,7 @@ import {
   ChevronRight, Store, X, ReceiptText,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
   Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe, MailCheck, PenLine,
+  MessageCircle,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -45,6 +46,7 @@ const customerGroups: NavGroup[] = [
     { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
     { label: "QR & Share", icon: QrCode, path: "/dashboard/qr" },
     { label: "Email Signature", icon: PenLine, path: "/dashboard/signature" },
+    { label: "WhatsApp Messages", icon: MessageCircle, path: "/dashboard/whatsapp" },
     { label: "Refer & Earn", icon: Gift, path: "/dashboard/refer" },
   ] },
   { title: "Account", items: [
