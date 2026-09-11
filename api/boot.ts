@@ -656,6 +656,9 @@ app.get("/sitemap.xml", async (c) => {
   const base = "https://digitalcarda.in";
   const pages = ["", "/digital-business-cards-templates", "/features", "/pricing", "/industries", "/bulk-cards",
     "/ai-card-generator", "/resellers", "/refer-earn", "/custom-domain", "/contact",
+    // Free tools — canonical URLs only; each has an alias route that deliberately
+    // stays out of the sitemap so the two never compete for the same terms.
+    "/email-signature-generator", "/whatsapp-message-templates",
     "/privacy", "/refund-policy", "/terms-of-service"];
   const customers = (await readPublicJson("customers")) as { slug?: string }[];
   const slugs = [...new Set(customers.map((x) => String(x.slug || "").trim()).filter(Boolean))];

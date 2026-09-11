@@ -4,7 +4,9 @@ import {
   Menu, X, CreditCard, ChevronRight, Phone, Mail,
   Twitter, Linkedin, Instagram, Facebook,
   Sparkles, LayoutGrid, Tag, Wand2, Users, MessageCircle, LogIn, ArrowRight, Headphones, Layers, Gift,
+  PenLine,
 } from "lucide-react";
+import { SEO_EMAIL_SIGNATURE, SEO_WHATSAPP_TEMPLATES } from "@/lib/publicSeo";
 
 const defaultSEO = {
   title: "DigitalCarda - AI-Powered Digital Business Cards & Smart Microsites",
@@ -69,6 +71,10 @@ const seoMap: Record<string, { title: string; description: string }> = {
     title: "Refund Policy - DigitalCarda",
     description: "Review our refund policy for subscription plans and digital card services.",
   },
+  "/email-signature-generator": SEO_EMAIL_SIGNATURE,
+  "/email-signature-templates": SEO_EMAIL_SIGNATURE,
+  "/whatsapp-message-templates": SEO_WHATSAPP_TEMPLATES,
+  "/whatsapp-business-messages": SEO_WHATSAPP_TEMPLATES,
   "/terms-of-service": {
     title: "Terms & Conditions - DigitalCarda",
     description: "Read our terms of service to understand the rules and guidelines for using DigitalCarda.",
@@ -222,6 +228,7 @@ export default function PublicLayout() {
     { label: "Pricing", href: "/pricing", icon: Tag },
     { label: "Bulk Cards", href: "/bulk-cards", icon: Layers },
     { label: "AI Generator", href: "/ai-card-generator", icon: Wand2 },
+    { label: "Free Tools", href: "/email-signature-generator", icon: PenLine },
     { label: "Resellers", href: "/resellers", icon: Users },
     { label: "Refer & Earn", href: "/refer-earn", icon: Gift },
     { label: "Contact", href: "/contact", icon: MessageCircle },
@@ -429,6 +436,8 @@ export default function PublicLayout() {
               <div className="space-y-2.5">
                 <Link to="/features" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Digital Business Card</Link>
                 <Link to="/ai-card-generator" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">AI Card Builder</Link>
+                <Link to="/email-signature-generator" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Email Signature Generator</Link>
+                <Link to="/whatsapp-message-templates" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">WhatsApp Templates</Link>
                 <Link to="/features" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">QR Code Card</Link>
                 <Link to="/custom-domain" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Custom Domain</Link>
                 <Link to="/features" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Analytics</Link>

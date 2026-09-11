@@ -75,6 +75,8 @@ const CustomerProfile = lazy(() => import("./pages/customer/Profile"));
 const CustomerQR = lazy(() => import("./pages/customer/QR"));
 const CustomerSignature = lazy(() => import("./pages/customer/Signature"));
 const CustomerWhatsAppMessage = lazy(() => import("./pages/customer/WhatsAppMessage"));
+const EmailSignatureGenerator = lazy(() => import("./pages/public/EmailSignatureGenerator"));
+const WhatsAppTemplates = lazy(() => import("./pages/public/WhatsAppTemplates"));
 const CustomerCustomDomain = lazy(() => import("./pages/customer/CustomDomain"));
 const AITools = lazy(() => import("./pages/customer/AITools"));
 const CustomerHome = lazy(() => import("./pages/customer/Home"));
@@ -193,6 +195,12 @@ export default function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/bulk-cards" element={<BulkCards />} />
           <Route path="/ai-card-generator" element={<AIGenerator />} />
+          {/* Free public tools — usable without an account, and the way most
+              people meet the product before they sign up. */}
+          <Route path="/email-signature-generator" element={<EmailSignatureGenerator />} />
+          <Route path="/email-signature-templates" element={<EmailSignatureGenerator />} />
+          <Route path="/whatsapp-message-templates" element={<WhatsAppTemplates />} />
+          <Route path="/whatsapp-business-messages" element={<WhatsAppTemplates />} />
           <Route path="/resellers" element={<Resellers />} />
           <Route path="/refer-earn" element={<ReferEarnPublic />} />
           <Route path="/custom-domain" element={<CustomDomain />} />

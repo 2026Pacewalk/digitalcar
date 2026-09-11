@@ -164,18 +164,27 @@ function socialRow(d: SignatureData, o: SignatureOptions, size = 26, textOnly = 
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody><tr>${cells}</tr></tbody></table>`;
 }
 
-/* The point of the whole feature: a prominent, tappable card link. */
+/* The point of the whole feature: a prominent, tappable card link.
+   Renders nothing without a link — the public generator is used by people who
+   have no card yet, and a button pointing nowhere is worse than no button. */
 const cardButton = (d: SignatureData, o: SignatureOptions, label = "View my digital card") =>
-  `<a href="${esc(d.cardUrl)}" style="display:inline-block;background:${o.accent};color:#ffffff;font-family:${FONT};font-size:12px;font-weight:bold;text-decoration:none;padding:9px 18px;border-radius:5px;">${esc(label)}</a>`;
+  (!d.cardUrl ? "" :
+  `<a href="${esc(d.cardUrl)}" style="display:inline-block;background:${o.accent};color:#ffffff;font-family:${FONT};font-size:12px;font-weight:bold;text-decoration:none;padding:9px 18px;border-radius:5px;">${esc(label)}</a>`);
 
 const taglineLine = (o: SignatureOptions, color = MUTED) =>
   o.tagline ? `<div style="font-family:${FONT};font-size:11px;color:${color};padding-top:6px;line-height:1.4;">${esc(o.tagline)}</div>` : "";
 
+/* Both return NOTHING without a source. An <img src=""> resolves to the page
+   itself, so it renders as a broken-image icon in the builder and drags the
+   whole page in as an attachment in some mail clients. The public generator
+   has no logo at all, and no QR until a card link is entered. */
 const logoImg = (d: SignatureData, size: number) =>
-  `<img src="${esc(d.logo)}" width="${size}" alt="${esc(d.company || d.name)}" style="display:block;border:0;outline:none;width:${size}px;max-width:${size}px;height:auto;" />`;
+  (!d.logo ? "" :
+  `<img src="${esc(d.logo)}" width="${size}" alt="${esc(d.company || d.name)}" style="display:block;border:0;outline:none;width:${size}px;max-width:${size}px;height:auto;" />`);
 
 const qrImg = (d: SignatureData, size: number) =>
-  `<img src="${esc(d.qrSrc)}" width="${size}" height="${size}" alt="Scan my digital card" style="display:block;border:0;outline:none;width:${size}px;height:${size}px;" />`;
+  (!d.qrSrc ? "" :
+  `<img src="${esc(d.qrSrc)}" width="${size}" height="${size}" alt="Scan my digital card" style="display:block;border:0;outline:none;width:${size}px;height:${size}px;" />`);
 
 /** Name, role and company — the identity block, shared by every template. */
 function identity(d: SignatureData, o: SignatureOptions, opts: { nameSize?: number; onDark?: boolean } = {}): string {
@@ -263,7 +272,10 @@ function slim(d: SignatureData, o: SignatureOptions): string {
     <tr><td style="padding:0 0 3px;">${head}</td></tr>
     <tr><td style="padding:4px 0 0;">${contactInline(d, o)}</td></tr>
     <tr><td style="padding:7px 0 0;font-family:${FONT};font-size:12px;color:${MUTED};">
-      ${a(d.cardUrl, prettyUrl(d.cardUrl), o.accent, true)}${o.tagline ? ` &nbsp;·&nbsp; ${esc(o.tagline)}` : ""}
+      ${[
+        d.cardUrl ? a(d.cardUrl, prettyUrl(d.cardUrl), o.accent, true) : "",
+        o.tagline ? esc(o.tagline) : "",
+      ].filter(Boolean).join(" &nbsp;·&nbsp; ")}
     </td></tr>
     ${socials ? `<tr><td style="padding:8px 0 0;">${socials}</td></tr>` : ""}
     ${CLOSE}`;
@@ -298,13 +310,14 @@ function headerBand(d: SignatureData, o: SignatureOptions): string {
         The one to pick when the card IS the pitch. */
 function spotlight(d: SignatureData, o: SignatureOptions): string {
   const socials = socialRow(d, o);
+  const qr = qrImg(d, 104);
   return `${OPEN}<tr>
-    <td valign="top" align="center" style="padding:0 18px 0 0;">
-      ${qrImg(d, 104)}
+    ${qr ? `<td valign="top" align="center" style="padding:0 18px 0 0;">
+      ${qr}
       <div style="font-family:${FONT};font-size:10px;color:${MUTED};padding-top:6px;text-align:center;">Scan my card</div>
     </td>
-    <td width="1" style="width:1px;background:${LINE};font-size:0;line-height:0;">&nbsp;</td>
-    <td valign="top" style="padding:0 0 0 18px;">
+    <td width="1" style="width:1px;background:${LINE};font-size:0;line-height:0;">&nbsp;</td>` : ""}
+    <td valign="top" style="padding:0 0 0 ${qr ? "18px" : "0"};">
       ${o.showLogo && d.logo ? `<div style="padding:0 0 8px;">${logoImg(d, 84)}</div>` : ""}
       ${identity(d, o)}
       ${gap(10)}
@@ -330,7 +343,7 @@ function plain(d: SignatureData, o: SignatureOptions): string {
     <tr><td style="font-family:${FONT};font-size:13px;color:${INK};line-height:1.6;">
       <strong style="color:${INK};">${esc(d.name)}</strong>${head ? `<br />${head}` : ""}
       ${rows.length ? `<br />${rows.join("<br />")}` : ""}
-      <br />${a(d.cardUrl, prettyUrl(d.cardUrl), o.accent)}
+      ${d.cardUrl ? `<br />${a(d.cardUrl, prettyUrl(d.cardUrl), o.accent)}` : ""}
       ${o.tagline ? `<br /><span style="color:${MUTED};font-size:12px;">${esc(o.tagline)}</span>` : ""}
     </td></tr>${CLOSE}`;
 }
@@ -404,7 +417,7 @@ function marketingBanner(d: SignatureData, o: SignatureOptions): string {
           ${esc(o.tagline || "See everything about me in one link")}
         </td>
         <td valign="middle" align="right" style="padding:0 0 0 14px;white-space:nowrap;">
-          <a href="${esc(d.cardUrl)}" style="display:inline-block;background:#ffffff;color:${o.accent};font-family:${FONT};font-size:12px;font-weight:bold;text-decoration:none;padding:8px 16px;border-radius:4px;">Open my card</a>
+          ${d.cardUrl ? `<a href="${esc(d.cardUrl)}" style="display:inline-block;background:#ffffff;color:${o.accent};font-family:${FONT};font-size:12px;font-weight:bold;text-decoration:none;padding:8px 16px;border-radius:4px;">Open my card</a>` : ""}
         </td>
       </tr></tbody></table>
     </td></tr>${CLOSE}`;
@@ -476,7 +489,7 @@ function monochrome(d: SignatureData, o: SignatureOptions): string {
     <tr><td style="padding:0 0 10px;"><div style="height:1px;line-height:1px;font-size:0;background:#111111;">&nbsp;</div></td></tr>
     <tr><td style="padding:0;">${contactStack(d, mono, "#333333", false, true)}</td></tr>
     <tr><td style="padding:10px 0 0;font-family:${FONT};font-size:12px;">
-      <a href="${esc(d.cardUrl)}" style="color:#111111;font-family:${FONT};font-weight:bold;text-decoration:underline;">${esc(prettyUrl(d.cardUrl))}</a>
+      ${d.cardUrl ? `<a href="${esc(d.cardUrl)}" style="color:#111111;font-family:${FONT};font-weight:bold;text-decoration:underline;">${esc(prettyUrl(d.cardUrl))}</a>` : ""}
       ${o.tagline ? `<span style="color:#777777;"> &nbsp;·&nbsp; ${esc(o.tagline)}</span>` : ""}
     </td></tr>
     ${socials ? `<tr><td style="padding:10px 0 0;">${socials}</td></tr>` : ""}
@@ -555,7 +568,7 @@ export function buildSignatureText(d: SignatureData, o: SignatureOptions): strin
     d.email ? `Email: ${d.email}` : "",
     d.website ? `Web: ${prettyUrl(d.website)}` : "",
     o.showAddress && d.address ? `Address: ${d.address}` : "",
-    `My digital card: ${d.cardUrl}`,
+    d.cardUrl ? `My digital card: ${d.cardUrl}` : "",
     o.tagline || "",
     o.showSocials && d.socials.length ? d.socials.map((s) => `${s.label}: ${s.url}`).join("\n") : "",
   ];
