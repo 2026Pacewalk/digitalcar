@@ -129,6 +129,9 @@ export async function renderCardOg(card: OgCard): Promise<Buffer> {
   const role = fit(card.designation || "", 32);
   const company = fit(card.company || "", 34);
   const initial = (String(card.name || card.slug).trim()[0] || "D").toUpperCase();
+  // Long names used to run under the QR panel at a fixed 56px. Size the name to
+  // the room left of it (x 262 to ~808); DejaVu Sans Bold averages ~0.6em a glyph.
+  const nameSize = Math.max(38, Math.min(56, Math.floor(540 / (Math.max(name.length, 1) * 0.6))));
 
   /* Contact rows, exactly as the card shows them — only the ones this card
      actually has, so a sparse card closes up rather than leaving gaps. */
@@ -179,7 +182,7 @@ export async function renderCardOg(card: OgCard): Promise<Buffer> {
     : ""}
 
   <!-- identity -->
-  <text x="${TX}" y="${role ? 148 : 168}" font-family="${FONT}" font-size="56" font-weight="bold" fill="${P.onDark}">${esc(name)}</text>
+  <text x="${TX}" y="${role ? 148 : 168}" font-family="${FONT}" font-size="${nameSize}" font-weight="bold" fill="${P.onDark}">${esc(name)}</text>
   ${role ? `<text x="${TX}" y="192" font-family="${FONT}" font-size="28" font-weight="bold" fill="${accent}">${esc(role)}</text>` : ""}
   ${company ? `<text x="${TX}" y="${role ? 232 : 210}" font-family="${FONT}" font-size="26" fill="${P.muted}">${esc(company)}</text>` : ""}
 
