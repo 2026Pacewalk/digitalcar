@@ -6,7 +6,7 @@ import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLogs } from "@db/schema";
 import { eq, and, desc, like, or, sql, gte } from "drizzle-orm";
-import { legacySlugSet, slugTakenByOther } from "./publish-router";
+import { legacySlugSet, legacySlugOwners, slugTakenByOther } from "./publish-router";
 
 /* Emails that belong to a LEGACY customers.json card — used to flag which DB
    accounts are genuinely "new-flow" (i.e. NOT already in the legacy list, which
@@ -219,8 +219,13 @@ export const adminRouter = createRouter({
       })
       .from(publishedCards)
       .leftJoin(users, eq(users.id, publishedCards.userId));
+    const owners = legacySlugOwners();
     return snaps
       .filter((s) => legacy.has(String(s.slug).toLowerCase().trim()))
+      // The legacy card's own owner (same email) republishing their URL is the
+      // sanctioned reclaim path — see slugTakenByOther — not a hijack. Listing it
+      // here invited an admin to "fix" a customer off their own link.
+      .filter((s) => owners.get(String(s.slug).toLowerCase().trim()) !== String(s.email || "").toLowerCase().trim())
       .map((s) => ({ ...s, suggested: `${String(s.slug).toLowerCase()}-2` }));
   }),
 
