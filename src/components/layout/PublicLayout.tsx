@@ -48,8 +48,8 @@ const seoMap: Record<string, { title: string; description: string }> = {
     description: "Refer friends to DigitalCarda. They get 15% off their first paid plan, and you earn a flat 15% cash commission — paid to your wallet and withdrawable to bank or UPI.",
   },
   "/custom-domain": {
-    title: "Custom Domain - DigitalCarda | Use Your Own Domain",
-    description: "Connect your own domain or subdomain with your digital business card for stronger branding and customer trust.",
+    title: "Custom Domain for Your Digital Business Card | DigitalCarda",
+    description: "Put your digital business card on your own domain, like card.yourbrand.com. HTTPS included, you keep ownership, live in 24–48 hours. Rs. 499 one-time.",
   },
   "/contact": {
     title: "Contact - DigitalCarda | Get in Touch With Our Team",
