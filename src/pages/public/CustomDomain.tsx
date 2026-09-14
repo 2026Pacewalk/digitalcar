@@ -151,23 +151,35 @@ export default function CustomDomain() {
                   </div>
                 </div>
 
-                <div className="p-6 sm:p-7">
-                  <div className="h-20 -mx-6 -mt-6 sm:-mx-7 sm:-mt-7 mb-0 bg-gradient-to-r from-[#14B8A6] to-[#0F766E] relative">
-                    <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-20" />
+                <div className="p-4 sm:p-5">
+                  {/* Inset banner rather than an edge-to-edge slab: navy in the site's
+                      palette, lifted by a soft glow so it reads as a profile cover. */}
+                  <div className="relative h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#16324A] to-[#0F4C4A]">
+                    <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-25" />
+                    <div aria-hidden="true" className="absolute -top-10 -right-6 w-40 h-40 rounded-full bg-[#14B8A6]/35 blur-2xl" />
+                    <div aria-hidden="true" className="absolute -bottom-12 left-10 w-32 h-32 rounded-full bg-[#F7B31C]/20 blur-2xl" />
+                    <span className="absolute top-3 right-3 inline-flex items-center gap-1 h-6 px-2 rounded-full bg-white/10 ring-1 ring-white/15 text-[10px] font-semibold text-white/80">
+                      <Lock size={10} /> Secure
+                    </span>
                   </div>
-                  {/* relative + z-10: the banner above is positioned, so without its own
-                      stacking context this row paints underneath it */}
-                  <div className="relative z-10 -mt-9 flex items-end gap-4">
-                    <div className="w-[72px] h-[72px] rounded-2xl bg-white ring-4 ring-white shadow-premium flex items-center justify-center text-[#0F766E] text-2xl font-extrabold">A</div>
+
+                  {/* Own stacking context so the avatar sits over the positioned banner.
+                      -mt-6 overlaps 24px of the 72px avatar; the ~42px name block needs
+                      the remaining 48px, so the name sits fully below the banner edge. */}
+                  <div className="relative z-10 -mt-6 px-3 flex items-end gap-3.5">
+                    <div className="w-[72px] h-[72px] rounded-2xl p-[3px] bg-gradient-to-br from-[#F7B31C] to-[#D97706] shadow-premium-lg shrink-0">
+                      <div className="w-full h-full rounded-[13px] bg-white flex items-center justify-center text-[#0F172A] text-2xl font-extrabold">A</div>
+                    </div>
                     <div className="pb-1 min-w-0">
                       <p className="text-[16px] font-extrabold text-[#0F172A] leading-tight truncate">Aarav Mehta</p>
-                      <p className="text-[12px] text-[#64748B]">Founder · Acme Digital</p>
+                      <p className="text-[12px] text-[#64748B] truncate">Founder · Acme Digital</p>
                     </div>
                   </div>
-                  <div className="mt-5 grid grid-cols-3 gap-2">
-                    {["Call", "WhatsApp", "Save"].map((c) => (
-                      <span key={c} className="h-9 rounded-xl bg-[#14B8A6]/10 text-[#0F766E] text-[11.5px] font-bold flex items-center justify-center">{c}</span>
-                    ))}
+
+                  <div className="mt-5 px-1 grid grid-cols-3 gap-2">
+                    <span className="h-9 rounded-xl bg-[#0F172A] text-white text-[11.5px] font-bold flex items-center justify-center">Call</span>
+                    <span className="h-9 rounded-xl bg-[#25D366] text-white text-[11.5px] font-bold flex items-center justify-center">WhatsApp</span>
+                    <span className="h-9 rounded-xl ring-1 ring-[#E2E8F0] text-[#334155] text-[11.5px] font-bold flex items-center justify-center">Save</span>
                   </div>
                   <div className="mt-5 space-y-2">
                     <div className="h-2 rounded-full bg-[#F1F5F9]" />
