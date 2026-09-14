@@ -17,6 +17,12 @@ export const SEO_EMAIL_SIGNATURE = {
     "Create a professional email signature free. Fill in your details, pick from 14 designs, and copy it straight into Gmail, Outlook or Apple Mail. No sign-up needed.",
 };
 
+export const SEO_FREE_TOOLS = {
+  title: "Free Business Tools — Email Signature & WhatsApp Templates | DigitalCarda",
+  description:
+    "Free tools for small businesses: an email signature generator, WhatsApp Business message templates and an AI business card builder. No sign-up, nothing to install.",
+};
+
 export const SEO_WHATSAPP_TEMPLATES = {
   title: "Free WhatsApp Business Message Templates — 12 Ready Replies | DigitalCarda",
   description:

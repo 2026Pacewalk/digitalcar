@@ -75,6 +75,7 @@ const CustomerProfile = lazy(() => import("./pages/customer/Profile"));
 const CustomerQR = lazy(() => import("./pages/customer/QR"));
 const CustomerSignature = lazy(() => import("./pages/customer/Signature"));
 const CustomerWhatsAppMessage = lazy(() => import("./pages/customer/WhatsAppMessage"));
+const FreeTools = lazy(() => import("./pages/public/FreeTools"));
 const EmailSignatureGenerator = lazy(() => import("./pages/public/EmailSignatureGenerator"));
 const WhatsAppTemplates = lazy(() => import("./pages/public/WhatsAppTemplates"));
 const CustomerCustomDomain = lazy(() => import("./pages/customer/CustomDomain"));
@@ -197,6 +198,7 @@ export default function App() {
           <Route path="/ai-card-generator" element={<AIGenerator />} />
           {/* Free public tools — usable without an account, and the way most
               people meet the product before they sign up. */}
+          <Route path="/free-tools" element={<FreeTools />} />
           <Route path="/email-signature-generator" element={<EmailSignatureGenerator />} />
           <Route path="/email-signature-templates" element={<EmailSignatureGenerator />} />
           <Route path="/whatsapp-message-templates" element={<WhatsAppTemplates />} />
