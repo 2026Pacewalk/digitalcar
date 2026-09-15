@@ -9,7 +9,8 @@ import {
   LayoutGrid, List, Download, ArrowUpDown, Activity, Layers, Send, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
-import { imgUrl, decodeSpecialities, loadCustomerContent } from "@/lib/cardContent";
+import { imgUrl, decodeSpecialities, loadCustomerContent, loadMySnapshot } from "@/lib/cardContent";
+import { applySnapshotToLocal } from "@/hooks/useCardHydration";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { fetchAdminData, hideAdminRecords } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
@@ -141,23 +142,48 @@ export default function AdminCustomers() {
       // Add every DB account whose email isn't already in the legacy list (dedupe),
       // so no app user is hidden and legacy cards keep their content.
       const legacyEmails = new Set(legacy.map((c) => (c.email || "").toLowerCase().trim()).filter(Boolean));
-      const extra = (appUsers as unknown as Customer[]).filter((u) => !legacyEmails.has((u.email || "").toLowerCase().trim()));
+      const db = appUsers as unknown as (Customer & { subActive?: boolean })[];
+      const extra = db.filter((u) => !legacyEmails.has((u.email || "").toLowerCase().trim()));
+      // customers.json is frozen. When a legacy customer's plan has since been set
+      // in the DB (Change Package, or a refreshed card), take plan + validity from
+      // that ACTIVE subscription — otherwise the row keeps showing the
+      // pre-migration plan, e.g. "Gold, expired 2024" for a live Platinum card.
+      // Legacy customers with no active subscription are left exactly as they are.
+      const dbByEmail = new Map(db.map((u) => [(u.email || "").toLowerCase().trim(), u]));
+      const legacyCurrent = legacy.map((c) => {
+        const live = dbByEmail.get((c.email || "").toLowerCase().trim());
+        return live?.subActive
+          ? { ...c, package_id: live.package_id, expired_on: live.expired_on ?? c.expired_on }
+          : c;
+      });
       // New-flow ids are offset high, so they naturally sort newest-first with the rest.
-      const merged = [...extra, ...legacy].sort((a, b) => Number(b.id) - Number(a.id));
+      const merged = [...extra, ...legacyCurrent].sort((a, b) => Number(b.id) - Number(a.id));
       setRows(merged);
       setLoading(false);
     })();
   }, []);
 
-  // Build the real card preview from customers.json (the public /c/:slug route
-  // reads the DB, which has no content for these imported cards).
+  // Preview what visitors actually see. A published snapshot IS the live card —
+  // the public page renders it in preference to customers.json — so use it when
+  // one exists. The legacy record is only for cards never republished; previewing
+  // it for a refreshed card showed the customer's old card instead of the live one.
   useEffect(() => {
     if (!cardModal) { setCardHtml(null); return; }
     let cancelled = false;
     setCardHtml(null);
     const c = cardModal;
-    const rec = { ...c, specialities: decodeSpecialities((c as Record<string, unknown>).specialities), logo: imgUrl("home", (c as Record<string, unknown>).logo) } as unknown as Parameters<typeof buildCardHtml>[0];
     (async () => {
+      type Snap = { customer?: unknown; products?: unknown[]; gallery?: unknown[]; videos?: unknown[]; offers?: unknown[]; qrcodes?: unknown[] } | null;
+      let snap: Snap = null;
+      try { snap = c.slug ? ((await utils.publish.bySlug.fetch({ slug: String(c.slug).toLowerCase().trim() })) as Snap) : null; } catch { snap = null; }
+      if (cancelled) return;
+      if (snap?.customer) {
+        type B = Parameters<typeof buildCardHtml>;
+        setCardHtml(buildCardHtml(snap.customer as B[0], (snap.products ?? []) as B[1], (snap.gallery ?? []) as B[2],
+          (snap.videos ?? []) as B[3], (snap.offers ?? []) as B[4], (snap.qrcodes ?? []) as B[5]));
+        return;
+      }
+      const rec = { ...c, specialities: decodeSpecialities((c as Record<string, unknown>).specialities), logo: imgUrl("home", (c as Record<string, unknown>).logo) } as unknown as Parameters<typeof buildCardHtml>[0];
       let content;
       try { content = await loadCustomerContent(String(c.slug)); } catch { content = null; }
       if (cancelled) return;
@@ -273,16 +299,34 @@ export default function AdminCustomers() {
     // Set the impersonated identity in the MAIN portal (keeping the admin's own
     // session intact) so scopedKey() targets the client's namespace.
     setSession(token, authUser, "main");
-    localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(rec));
-    try {
-      const content = await loadCustomerContent(String(c.slug));
-      localStorage.setItem(scopedKey("dc_products"), JSON.stringify(content.products));
-      localStorage.setItem(scopedKey("dc_gallery"), JSON.stringify(content.gallery));
-      localStorage.setItem(scopedKey("dc_videos"), JSON.stringify(content.videos));
-      localStorage.setItem(scopedKey("dc_offers"), JSON.stringify(content.offers));
-      localStorage.setItem(scopedKey("dc_qrcode"), JSON.stringify(content.qrcodes));
-      localStorage.setItem(scopedKey("dc_uploads"), JSON.stringify(content.uploads));
-    } catch { /* content optional */ }
+    // Open the card the customer actually has LIVE. A published snapshot (a
+    // new-flow card, or a legacy card that has since been refreshed) is the
+    // primary copy, so load it the way the dashboard's own hydration does - which
+    // also records dc_snap_ts, arming auto-publish's staleness guard.
+    // Seeding the frozen customers.json record instead made hydration skip (a card
+    // "already exists locally"), and the first auto-publish then force-saved the
+    // OLD card over the live one.
+    let fromSnapshot = false;
+    if (!token.startsWith("impersonate_")) {
+      try {
+        const snap = await loadMySnapshot();
+        if (snap) fromSnapshot = applySnapshotToLocal(authUser, snap);
+      } catch { /* no snapshot reachable - fall back to the legacy record */ }
+    }
+    let content: Awaited<ReturnType<typeof loadCustomerContent>> | null = null;
+    try { content = await loadCustomerContent(String(c.slug)); } catch { content = null; }
+    if (!fromSnapshot) {
+      localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(rec));
+      if (content) {
+        localStorage.setItem(scopedKey("dc_products"), JSON.stringify(content.products));
+        localStorage.setItem(scopedKey("dc_gallery"), JSON.stringify(content.gallery));
+        localStorage.setItem(scopedKey("dc_videos"), JSON.stringify(content.videos));
+        localStorage.setItem(scopedKey("dc_offers"), JSON.stringify(content.offers));
+        localStorage.setItem(scopedKey("dc_qrcode"), JSON.stringify(content.qrcodes));
+      }
+    }
+    // Uploads are not part of a snapshot; they still live in the legacy files.
+    if (content) localStorage.setItem(scopedKey("dc_uploads"), JSON.stringify(content.uploads));
     toast.success(`Logged in as ${c.name}`);
     navigate("/dashboard");
   };

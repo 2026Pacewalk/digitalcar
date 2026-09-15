@@ -141,6 +141,11 @@ export const adminRouter = createRouter({
             status: u.status === "active" ? 1 : 0,
             password: "",
             isNew: !legacyEmails.has(String(u.email).toLowerCase().trim()),
+            // Explicit, because package_id above falls back to Trial (7) when there
+            // is no active plan. The admin list overlays DB plans onto LEGACY rows
+            // only when this is true — otherwise it would "downgrade" every legacy
+            // customer who simply has no subscriptions row.
+            subActive,
           };
         } catch { return null; }
       })
