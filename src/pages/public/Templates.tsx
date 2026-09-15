@@ -43,7 +43,7 @@ const STEPS = [
 
 /* Built from the LIVE preset count so the answer can never contradict the
    grid above it (the catalogue grows, a hard-coded number would go stale). */
-const faqsFor = (count: number) => [
+const faqsFor = (count: number | string) => [
   { q: "Can I change the template after I publish?", a: "Yes, as often as you like. Your link and QR code stay exactly the same, so anything you have already printed or shared keeps working — only the design changes." },
   { q: "Do the colours have to stay as shown?", a: "No. Each template ships with its own colour pair, but you can set your own primary and secondary colours, and the card can even pick them up automatically from your uploaded logo." },
   { q: "Are all the features available on every template?", a: "Yes. Products, payments, gallery, videos, Google reviews, the enquiry form and the QR are available on every design — the template decides how it looks, not what it can do." },
@@ -79,7 +79,8 @@ export default function Templates() {
   const [preview, setPreview] = useState<Preset | null>(null);
   const [cat, setCat] = useState<Cat>("all");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const FAQS = useMemo(() => faqsFor(presets.length || 31), [presets.length]);
+  // Until the list arrives (or if it can't load), say "50+" rather than a stale exact number.
+  const FAQS = useMemo(() => faqsFor(presets.length || "50+"), [presets.length]);
 
   const catCount = (c: Cat) => c === "all" ? presets.length
     : c === "featured" ? presets.filter((p) => p.featured).length
@@ -164,7 +165,7 @@ export default function Templates() {
         <Reveal stagger className="text-center max-w-3xl mx-auto mb-10">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E]"><Palette size={12} /> Templates</span>
           <h1 className="mt-5 text-4xl sm:text-5xl font-extrabold text-[#0F172A] tracking-tight leading-[1.08]">
-            {presets.length || 31}{" "}
+            {presets.length || "50+"}{" "}
             <span className="relative inline-block text-gradient-gold">
               Ready-to-Use
               <svg className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 300 10" fill="none" preserveAspectRatio="none" aria-hidden="true">
