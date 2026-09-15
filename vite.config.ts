@@ -6,7 +6,7 @@ import { defineConfig } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   plugins: [
     devServer({ entry: "api/boot.ts", exclude: [/^\/(?!api\/).*$/] }),
     inspectAttr(), react()],
@@ -24,6 +24,10 @@ export default defineConfig({
     },
   },
   envDir: path.resolve(__dirname),
+  // The server-rendering bundle (src/entry-server.tsx → dist/server) needs only code.
+  // Left on, Vite copies all of public/ into it too: ~100 MB per deploy, and a
+  // second copy of customers.json / enquiries.json that has no reason to exist.
+  publicDir: isSsrBuild ? false : "public",
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
@@ -44,4 +48,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

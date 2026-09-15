@@ -3,7 +3,8 @@ import type { HttpBindings } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import fs from "fs";
 import path from "path";
-import { metaFor, injectCardMeta, type CardMeta } from "./card-og";
+import { pathToFileURL } from "url";
+import { metaFor, injectCardMeta, cardSummaryHtml, type CardMeta } from "./card-og";
 
 type App = Hono<{ Bindings: HttpBindings }>;
 const SITE = "https://digitalcarda.in";
@@ -20,6 +21,12 @@ function ogVersion(parts: unknown[]): string {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
   return h.toString(36).slice(0, 6);
+}
+
+/** A tRPC caller for public procedures, used on the server with no signed-in user. */
+async function publicCaller(url: string) {
+  const { appRouter } = await import("../router");
+  return appRouter.createCaller({ req: new Request(url), resHeaders: new Headers() });
 }
 
 async function productMeta(pathname: string, distPath: string): Promise<CardMeta | null> {
@@ -114,13 +121,122 @@ async function cardSnapshotMeta(pathname: string): Promise<CardMeta | null> {
         ...(company ? { worksFor: { "@type": "Organization", name: company } } : {}),
         ...(hasImg ? { image } : {}),
       });
+
+      // A paused card shows visitors a "temporarily paused" notice, so crawlers
+      // must not be handed its full details either — that would be a page saying
+      // one thing to people and another to search engines. Ask the same
+      // procedure the card page asks. If that check fails, treat the card as
+      // paused: the fallback is today's name-only heading, never extra content.
+      let paused = true;
+      try {
+        const state = await (await publicCaller(url)).publish.publicState({ slug });
+        paused = !!state?.paused;
+      } catch { /* keep paused = true */ }
+
       result = { title, description, image, url, jsonLd, ogType: "profile", h1: name, locale: "en_IN",
+        ...(paused ? {} : { bodyHtml: cardSummaryHtml(cust, name) }),
         imageW: 1200, imageH: 630, imageType: "image/png", imageAlt: `${name}'s digital business card`,
         ...(keywords ? { keywords } : {}) };
     }
   } catch { result = null; }
   metaCache.set(key, { meta: result, at: Date.now() });
   return result;
+}
+
+/* ── Server rendering for public marketing pages ─────────────────────────────
+   The site is a client-rendered React app. Without this, every URL is served
+   an empty <div id="root"></div>, so crawlers that don't run JavaScript — and
+   link previewers, SEO tools, AI answer engines — got a title and nothing else,
+   and even Google only saw the content after its deferred rendering pass.
+
+   These routes are rendered by src/entry-server.tsx (built to dist/server) and
+   the browser attaches to that markup instead of rebuilding it.
+
+   Deliberately conservative:
+     · an allow-list — dashboard, admin and customer cards are never rendered
+       here, only the public pages that are the same for every visitor;
+     · any failure (bundle missing, render error, timeout) serves exactly the
+       shell every page got before this existed;
+     · SSR_PUBLIC=0 in the environment switches it off without a deploy. */
+const SSR_ENABLED = process.env.SSR_PUBLIC !== "0";
+const SSR_PATHS = new Set([
+  "/", "/features", "/pricing", "/industries", "/bulk-cards", "/ai-card-generator",
+  "/resellers", "/refer-earn", "/custom-domain", "/contact",
+  "/free-tools", "/email-signature-generator", "/email-signature-templates",
+  "/whatsapp-message-templates", "/whatsapp-business-messages",
+  "/digital-business-cards-templates", "/templates", "/card-designs",
+  "/privacy", "/refund-policy", "/terms-of-service",
+]);
+const PRODUCT_PATH = /^\/digital-business-cards-templates\/([^/]+)$/;
+const SSR_DATA_TIMEOUT_MS = 2500;
+const SSR_RENDER_TIMEOUT_MS = 4500;
+
+type SsrSeed = { path: string; input?: unknown; data: unknown };
+type SsrModule = { render: (url: string, seeds: SsrSeed[]) => Promise<{ html: string; state: string }> };
+
+let ssrModule: Promise<SsrModule | null> | undefined;
+function loadSsr(): Promise<SsrModule | null> {
+  return (ssrModule ??= (async () => {
+    for (const file of ["../dist/server/entry-server.js", "../dist/server/entry-server.mjs"]) {
+      const p = path.resolve(import.meta.dirname, file);
+      if (!fs.existsSync(p)) continue;
+      try {
+        return (await import(pathToFileURL(p).href)) as SsrModule;
+      } catch (e) {
+        console.error("[ssr] could not load the server bundle — serving client-rendered pages:", (e as Error).message);
+        return null;
+      }
+    }
+    console.warn("[ssr] no server bundle in dist/server — serving client-rendered pages");
+    return null;
+  })());
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let t: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    p.finally(() => clearTimeout(t)),
+    new Promise<T>((_, reject) => { t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms); }),
+  ]);
+}
+
+/** The API data each page reads on its first render. Inputs must match the
+    page's own useQuery call exactly, or it misses the cache and shows its
+    loading state instead of the content. A failed fetch is simply left out. */
+async function ssrSeeds(clean: string): Promise<SsrSeed[]> {
+  const caller = await publicCaller(`${SITE}${clean}`);
+  const jobs: Promise<SsrSeed | null>[] = [];
+  const seed = (procPath: string, input: unknown, run: () => Promise<unknown>) =>
+    jobs.push(run().then((data) => ({ path: procPath, input, data }), () => null));
+
+  const product = clean.match(PRODUCT_PATH);
+  if (clean === "/" || clean === "/digital-business-cards-templates" || product) {
+    seed("product.catalogue", undefined, () => caller.product.catalogue());
+  }
+  if (product) {
+    const slug = decodeURIComponent(product[1]);
+    seed("product.bySlug", { slug }, () => caller.product.bySlug({ slug }));
+  }
+  if (clean === "/pricing") {
+    seed("package.features", undefined, () => caller.package.features());
+    seed("package.list", undefined, () => caller.package.list());
+  }
+  if (clean === "/refer-earn") seed("referral.publicRates", undefined, () => caller.referral.publicRates());
+  if (clean === "/templates" || clean === "/card-designs") seed("template.presets", undefined, () => caller.template.presets());
+
+  return (await Promise.all(jobs)).filter((x): x is SsrSeed => x !== null);
+}
+
+async function renderPublic(clean: string, href: string): Promise<{ html: string; state: string } | null> {
+  const mod = await loadSsr();
+  if (!mod) return null;
+  try {
+    const seeds = await withTimeout(ssrSeeds(clean), SSR_DATA_TIMEOUT_MS, "data").catch(() => [] as SsrSeed[]);
+    return await withTimeout(mod.render(href, seeds), SSR_RENDER_TIMEOUT_MS, "render");
+  } catch (e) {
+    console.error(`[ssr] ${clean} fell back to client rendering: ${(e as Error).message}`);
+    return null;
+  }
 }
 
 export function serveStaticFiles(app: App) {
@@ -131,31 +247,56 @@ export function serveStaticFiles(app: App) {
   const readShell = () => (indexShell ||= fs.readFileSync(indexPath, "utf-8"));
 
   // Cache the fully-injected HTML per URL so repeat crawler/visitor hits skip the
-  // meta build + string work (origin TTFB drops from ~200ms to ~few ms). Bounded
+  // meta build + render work (origin TTFB drops from ~200ms to ~few ms). Bounded
   // and short-lived so content stays fresh.
   const htmlCache = new Map<string, { html: string; at: number }>();
   const HTML_TTL = 5 * 60_000;
+  const EDGE_CACHE = "public, max-age=0, s-maxage=120, stale-while-revalidate=600";
 
   // Serve index.html with per-page OG/meta + JSON-LD injected (marketing pages,
-  // cards, products) so social shares and crawlers get proper previews + schema.
+  // cards, products), and the page itself rendered for the public routes above.
   const serveHtml = async (c: Context<{ Bindings: HttpBindings }>) => {
-    const pathname = new URL(c.req.url).pathname;
-    const hit = htmlCache.get(pathname);
-    if (hit && Date.now() - hit.at < HTML_TTL) return c.html(hit.html);
+    const reqUrl = new URL(c.req.url);
+    const pathname = reqUrl.pathname;
+    const clean = pathname.replace(/\/+$/, "") || "/";
+    const ssrWanted = SSR_ENABLED && (SSR_PATHS.has(clean) || PRODUCT_PATH.test(clean));
+    // Rendered markup can depend on the query string, so it's part of the key
+    // for rendered routes; head-only pages ignore it, as before.
+    const cacheKey = ssrWanted ? pathname + reqUrl.search : pathname;
+
+    const hit = htmlCache.get(cacheKey);
+    if (hit && Date.now() - hit.at < HTML_TTL) {
+      c.header("Cache-Control", EDGE_CACHE);
+      return c.html(hit.html);
+    }
     let content = readShell();
     let cacheable = false;
     try {
       const meta = (await productMeta(pathname, distPath)) || (await cardSnapshotMeta(pathname)) || metaFor(pathname, distPath);
-      if (meta) { content = injectCardMeta(content, meta); cacheable = true; }
+      // Soft-404 guard: render a product page only when that product exists.
+      // Otherwise an unknown slug would come back as a 200 with a full "not
+      // found" page — which search engines index as a real, thin page.
+      const productOk = !PRODUCT_PATH.test(clean) || meta?.ogType === "product";
+      const ssr = ssrWanted && productOk ? await renderPublic(clean, pathname + reqUrl.search) : null;
+
+      // With rendered markup the page has its real <h1>; the hidden placeholder
+      // heading is only for pages that still arrive empty.
+      if (meta) { content = injectCardMeta(content, ssr ? { ...meta, h1: undefined, bodyHtml: undefined } : meta); cacheable = true; }
+      if (ssr) {
+        // The data lives in a JSON <script> OUTSIDE #root, so it isn't part of
+        // what React hydrates. `<` is escaped so no value can close the tag.
+        content = content.replace(/<div id="root">\s*<\/div>/, () =>
+          `<div id="root" data-ssr="1">${ssr.html}</div>\n    <script type="application/json" id="__dc_rq">${ssr.state.replace(/</g, "\\u003c")}</script>`);
+      }
     } catch { /* fall back to plain index.html */ }
     // Only cache real pages (meta matched); never cache arbitrary 404 paths.
     if (cacheable) {
       if (htmlCache.size > 500) htmlCache.clear();
-      htmlCache.set(pathname, { html: content, at: Date.now() });
+      htmlCache.set(cacheKey, { html: content, at: Date.now() });
       // Let a CDN edge-cache the (public, non-personalised) page for 2 min while
       // keeping browsers revalidating. With a Cloudflare "Eligible for cache" rule
       // this makes crawler/social TTFB ~edge speed globally; a no-op without it.
-      c.header("Cache-Control", "public, max-age=0, s-maxage=120, stale-while-revalidate=600");
+      c.header("Cache-Control", EDGE_CACHE);
     }
     return c.html(content);
   };

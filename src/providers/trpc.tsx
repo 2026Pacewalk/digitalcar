@@ -8,7 +8,17 @@ import { getToken } from "@/lib/session";
 
 export const trpc = createTRPCReact<AppRouter>();
 
-const queryClient = new QueryClient();
+/* One QueryClient per browser tab — but a FRESH one per server render. A module-
+   level client on the server (src/entry-server.tsx) would be shared by every
+   request, carrying one visitor's cached data into the next visitor's page. */
+export function createAppQueryClient(): QueryClient {
+  return new QueryClient();
+}
+
+let browserQueryClient: QueryClient | undefined;
+export function getBrowserQueryClient(): QueryClient {
+  return (browserQueryClient ??= createAppQueryClient());
+}
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
@@ -32,7 +42,7 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-export function TRPCProvider({ children }: { children: ReactNode }) {
+export function TRPCProvider({ children, queryClient = getBrowserQueryClient() }: { children: ReactNode; queryClient?: QueryClient }) {
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>

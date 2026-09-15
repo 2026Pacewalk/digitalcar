@@ -1,16 +1,43 @@
 import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, hydrateRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
-import { TRPCProvider } from '@/providers/trpc'
+import { hydrate } from '@tanstack/react-query'
+import superjson from 'superjson'
+import { TRPCProvider, getBrowserQueryClient } from '@/providers/trpc'
 import './index.css'
 import App from './App.tsx'
 
-createRoot(document.getElementById('root')!).render(
+const rootEl = document.getElementById('root')!
+const queryClient = getBrowserQueryClient()
+
+// Public marketing pages arrive already rendered by the server (api/lib/vite.ts),
+// with the API data they were rendered from alongside. Load that data into the
+// cache BEFORE the first render, so the browser's first pass produces the same
+// markup the server sent — which is what lets React attach to it.
+const ssrState = document.getElementById('__dc_rq')?.textContent
+if (ssrState) {
+  try { hydrate(queryClient, superjson.parse(ssrState)) } catch { /* the page will fetch it instead */ }
+}
+
+const app = (
   <StrictMode>
     <BrowserRouter>
-      <TRPCProvider>
+      <TRPCProvider queryClient={queryClient}>
         <App />
       </TRPCProvider>
     </BrowserRouter>
-  </StrictMode>,
+  </StrictMode>
 )
+
+if (rootEl.dataset.ssr === '1') {
+  hydrateRoot(rootEl, app, {
+    // A mismatch is survivable: React re-renders that part in the browser, which
+    // is what every page did before server rendering existed. It's logged so it
+    // gets fixed rather than quietly costing the speed gain.
+    onRecoverableError(error) {
+      console.warn('[ssr] hydration mismatch — re-rendered in the browser:', error)
+    },
+  })
+} else {
+  createRoot(rootEl).render(app)
+}

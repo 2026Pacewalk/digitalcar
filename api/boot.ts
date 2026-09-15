@@ -658,26 +658,51 @@ app.get("/sitemap.xml", async (c) => {
     "/ai-card-generator", "/resellers", "/refer-earn", "/custom-domain", "/contact",
     // Free tools — canonical URLs only; each has an alias route that deliberately
     // stays out of the sitemap so the two never compete for the same terms.
-    "/email-signature-generator", "/whatsapp-message-templates",
+    "/free-tools", "/email-signature-generator", "/whatsapp-message-templates",
     "/privacy", "/refund-policy", "/terms-of-service"];
   const customers = (await readPublicJson("customers")) as { slug?: string }[];
   const slugs = [...new Set(customers.map((x) => String(x.slug || "").trim()).filter(Boolean))];
+
+  // <lastmod> lets crawlers spend their visits on pages that actually changed.
+  // Only real dates go in: product and card edits come from the database;
+  // marketing pages change only on deploy, so the build's own timestamp is their
+  // honest upper bound. A legacy card with no stored edit date gets no lastmod
+  // rather than an invented one.
+  const day = (d: Date | string | null | undefined) => {
+    const t = d ? new Date(d) : null;
+    return t && !Number.isNaN(t.getTime()) ? t.toISOString().slice(0, 10) : "";
+  };
+  let deployDay = "";
+  try {
+    const { statSync } = await import("node:fs");
+    deployDay = day(statSync("./dist/public/index.html").mtime);
+  } catch { /* dev server: no build yet */ }
+
   // Published product landing pages (indexable ecommerce pages, §50).
-  let productSlugs: string[] = [];
+  let productRows: { slug: string; updatedAt: Date | null }[] = [];
+  const cardEdited = new Map<string, string>();
   try {
     const { getDb } = await import("./queries/connection");
-    const { products } = await import("@db/schema");
+    const { products, publishedCards } = await import("@db/schema");
     const { eq } = await import("drizzle-orm");
-    const rows = await getDb().select({ slug: products.slug }).from(products).where(eq(products.status, "published"));
-    productSlugs = rows.map((r) => r.slug).filter(Boolean);
-  } catch { /* products table may not exist yet */ }
+    const db = getDb();
+    productRows = (await db.select({ slug: products.slug, updatedAt: products.updatedAt }).from(products).where(eq(products.status, "published")))
+      .filter((r) => r.slug);
+    for (const r of await db.select({ slug: publishedCards.slug, updatedAt: publishedCards.updatedAt }).from(publishedCards)) {
+      const key = String(r.slug || "").toLowerCase();
+      const d = day(r.updatedAt);
+      // A customer can publish more than one card on a slug over time — keep the latest.
+      if (key && d && d > (cardEdited.get(key) || "")) cardEdited.set(key, d);
+    }
+  } catch { /* products / published_cards may not exist yet */ }
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  const url = (loc: string, pri: string) => `  <url><loc>${esc(loc)}</loc><priority>${pri}</priority></url>`;
+  const url = (loc: string, pri: string, lastmod = "") =>
+    `  <url><loc>${esc(loc)}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<priority>${pri}</priority></url>`;
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7")).join("\n") + "\n" +
-    productSlugs.map((s) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(s)}`, "0.8")).join("\n") + "\n" +
-    slugs.map((s) => url(`${base}/${encodeURIComponent(s)}`, "0.5")).join("\n") +
+    pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", deployDay)).join("\n") + "\n" +
+    productRows.map((r) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(r.slug)}`, "0.8", day(r.updatedAt))).join("\n") + "\n" +
+    slugs.map((s) => url(`${base}/${encodeURIComponent(s)}`, "0.5", cardEdited.get(s.toLowerCase()) || "")).join("\n") +
     `\n</urlset>`;
   return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
 });
