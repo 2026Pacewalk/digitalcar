@@ -49,7 +49,7 @@ export function planBullets(p: PlanPkg): string[] {
   b.push(`${p.maxGalleryImages}-photo gallery + ${p.maxVideos} videos`);
   if (p.featureLeadCapture) b.push("Enquiry form — capture every lead");
   b.push("Google reviews + payment links");
-  b.push("All 31 designs + link-in-bio styles");
+  b.push("All 50+ templates + link-in-bio styles");
   b.push(p.featureCustomDomain ? "Advanced analytics + export" : "Visit & tap analytics");
   // Custom domain is a paid add-on (free on Platinum 3-year), surfaced on its own
   // highlighted row — not a plain feature bullet here.

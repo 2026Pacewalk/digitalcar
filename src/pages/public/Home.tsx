@@ -206,12 +206,13 @@ function HeroSection() {
             <h1 className="mt-6 text-[2.6rem] sm:text-5xl lg:text-[3.9rem] font-extrabold text-[#0F172A] leading-[1.05] tracking-tight">
               Create Your Smart{" "}
               <span className="relative inline-block text-gradient-gold">
-                Digital Business Card
+                Digital Business
                 <svg className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 300 10" fill="none" preserveAspectRatio="none">
                   <path d="M2 7c60-5 120-5 180-2s90 3 116-1" stroke="#F7B31C" strokeWidth="3" strokeLinecap="round" opacity="0.5" />
                 </svg>
               </span>{" "}
-              in Minutes
+              {/* Kept together so "Card" never sits alone on its own line. */}
+              <span className="sm:whitespace-nowrap"><span className="text-gradient-gold">Card</span> in Minutes</span>
             </h1>
             <p className="mt-6 text-base sm:text-lg text-[#64748B] leading-relaxed max-w-lg">
               Beautiful, shareable cards with QR codes, lead tracking, payment links, products, videos, and analytics — built for professionals, agencies, and resellers.
@@ -267,11 +268,15 @@ function HeroSection() {
    Stats band (animated counters)
    ───────────────────────────────────────────────────────────── */
 function StatsBand() {
+  // Template count follows the live catalogue (rounded down to a 10, so "50+"
+  // for 51) instead of a number typed in once and forgotten.
+  const { data: catalogue } = trpc.product.catalogue.useQuery();
+  const templates = catalogue?.length ? Math.max(10, Math.floor(catalogue.length / 10) * 10) : 50;
   const stats = [
     { end: 91000, suffix: "+", label: "Card Views", sep: true },
     { end: 5173, suffix: "+", label: "Active Cards", sep: true },
     { end: 1456, suffix: "+", label: "Happy Clients", sep: true },
-    { end: 23, suffix: "+", label: "Templates" },
+    { end: templates, suffix: "+", label: "Templates" },
     { end: 5, suffix: "", label: "Countries" },
   ];
   return (
@@ -335,126 +340,326 @@ function TrustedSection() {
 /* ─────────────────────────────────────────────────────────────
    Features (bento)
    ───────────────────────────────────────────────────────────── */
-/* Icon chip tinted to a category accent */
-function ChipRow({ icon: Icon, label, accent }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; accent: string }) {
+/* Every feature is visible at once — no tabs — so a skimming visitor and a
+   crawler both get the full list. Each tile is one job the card does, with a
+   small drawing of that job; the drawings are decoration only (aria-hidden). */
+type FeatureIcon = React.ComponentType<{ size?: number; className?: string }>;
+type FeatureTile = {
+  id: "build" | "share" | "leads" | "pay" | "grow" | "ai" | "resell";
+  title: string;
+  text: string;
+  accent: string;
+  icon: FeatureIcon;
+  items: { icon: FeatureIcon; label: string }[];
+};
+
+const FEATURE_TILES: FeatureTile[] = [
+  {
+    id: "build", title: "Build a card that sells", accent: "#F7B31C", icon: CreditCard,
+    text: "A visual editor for everything your business wants to show — no design skills needed.",
+    items: [
+      { icon: CreditCard, label: "Drag & drop builder" }, { icon: Image, label: "Image gallery" }, { icon: Play, label: "Video embed" },
+      { icon: ShoppingBag, label: "Products & services" }, { icon: Gift, label: "Offers & deals" }, { icon: Layers, label: "Multilingual" },
+    ],
+  },
+  {
+    id: "share", title: "Share it anywhere", accent: "#14B8A6", icon: Share2,
+    text: "One scan or one tap, and your details are saved on their phone.",
+    items: [{ icon: QrCode, label: "QR code" }, { icon: MessageCircle, label: "WhatsApp chat" }, { icon: Download, label: "Save contact" }, { icon: FileDown, label: "vCard / PDF" }],
+  },
+  {
+    id: "leads", title: "Turn visits into leads", accent: "#8B5CF6", icon: Users,
+    text: "Every enquiry lands in your dashboard, ready to follow up.",
+    items: [{ icon: FileText, label: "Enquiry form" }, { icon: BarChart3, label: "Lead tracking" }, { icon: MapPin, label: "Google Maps" }, { icon: Star, label: "Review link" }],
+  },
+  {
+    id: "pay", title: "Get paid on the card", accent: "#EC4899", icon: Wallet,
+    text: "Customers pay you by UPI, straight from your card.",
+    items: [{ icon: Wallet, label: "UPI / GPay / Paytm" }, { icon: Link2, label: "Payment links" }, { icon: QrCode, label: "Payment QR" }],
+  },
+  {
+    id: "grow", title: "See what works", accent: "#3B82F6", icon: TrendingUp,
+    text: "Views, clicks and search settings, all in one place.",
+    items: [{ icon: Eye, label: "Views & clicks" }, { icon: MousePointer, label: "Click analytics" }, { icon: Shield, label: "SEO settings" }, { icon: Globe, label: "Custom domain" }],
+  },
+  {
+    id: "ai", title: "Let AI write it", accent: "#D97706", icon: Sparkles,
+    text: "Your bio, products, SEO and FAQs drafted in seconds — in more than one language.",
+    items: [
+      { icon: Sparkles, label: "AI bio writer" }, { icon: FileText, label: "AI descriptions" }, { icon: Globe, label: "AI SEO generator" },
+      { icon: MessageCircle, label: "AI FAQ generator" }, { icon: Mail, label: "AI lead reply" }, { icon: Layers, label: "AI translate" },
+    ],
+  },
+  {
+    id: "resell", title: "Sell it under your brand", accent: "#F7B31C", icon: Building2,
+    text: "White-label cards for your own clients, with commission reports built in.",
+    items: [{ icon: Users, label: "White-label" }, { icon: Shield, label: "Custom branding" }, { icon: BarChart3, label: "Commission reports" }, { icon: Eye, label: "Customer analytics" }],
+  },
+];
+
+function FeatureChips({ tile, dark }: { tile: FeatureTile; dark?: boolean }) {
   return (
-    <div className="group/i flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-[#F8FAFC] transition-colors">
-      <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ring-1 ring-black/[0.03]" style={{ backgroundColor: `${accent}1A`, color: accent }}>
-        <Icon size={14} />
+    <ul className="flex flex-wrap gap-1.5">
+      {tile.items.map((it) => (
+        <li
+          key={it.label}
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium ${
+            dark ? "bg-white/[0.07] text-[#E2E8F0] ring-1 ring-white/10" : "bg-[#F8FAFC] text-[#334155] ring-1 ring-[#E2E8F0]"
+          }`}
+        >
+          <span className="flex" style={{ color: dark ? "#F7B31C" : tile.accent }}><it.icon size={12} /></span>
+          {it.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FeatureTileCard({ tile, dark, className = "", children }: { tile: FeatureTile; dark?: boolean; className?: string; children: React.ReactNode }) {
+  return (
+    <article
+      className={`group relative flex flex-col overflow-hidden rounded-[28px] p-6 transition duration-300 hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+        dark
+          ? "bg-[#0B1120] text-white shadow-[0_30px_60px_-30px_rgba(2,6,23,0.75)]"
+          : "bg-white shadow-[0_20px_50px_-32px_rgba(15,23,42,0.35)] ring-1 ring-[#0F172A]/[0.06] hover:shadow-[0_28px_60px_-28px_rgba(15,23,42,0.4)]"
+      } ${className}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full blur-3xl transition-opacity duration-500 ${dark ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+        style={{ background: `${tile.accent}${dark ? "22" : "1F"}` }}
+      />
+      <div aria-hidden="true" className="relative">{children}</div>
+      <div className="relative mt-auto pt-6">
+        <div className="flex items-center gap-2.5">
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+            style={{ background: dark ? "rgba(247,179,28,0.15)" : `${tile.accent}1A`, color: dark ? "#F7B31C" : tile.accent }}
+          >
+            <tile.icon size={17} />
+          </span>
+          <h3 className={`text-lg font-bold tracking-tight ${dark ? "text-white" : "text-[#0F172A]"}`}>{tile.title}</h3>
+        </div>
+        <p className={`mt-2 text-sm leading-relaxed ${dark ? "text-[#94A3B8]" : "text-[#64748B]"}`}>{tile.text}</p>
+        <div className="mt-4"><FeatureChips tile={tile} dark={dark} /></div>
+      </div>
+    </article>
+  );
+}
+
+// 7×7 stand-in QR with three finder squares — decoration only.
+const FEATURE_QR = Array.from({ length: 49 }, (_, i) => {
+  const r = Math.floor(i / 7), c = i % 7;
+  const finder = (r < 3 && c < 3) || (r < 3 && c > 3) || (r > 3 && c < 3);
+  if (finder) return !((r === 1 && c === 1) || (r === 1 && c === 5) || (r === 5 && c === 1));
+  return (r * 3 + c * 5) % 3 === 0;
+});
+
+function FloatChip({ icon: Icon, label, className }: { icon: FeatureIcon; label: string; className: string }) {
+  return (
+    <span className={`absolute hidden items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white shadow-lg ring-1 ring-white/15 backdrop-blur-md sm:inline-flex ${className}`}>
+      <Icon size={13} className="text-[#F7B31C]" /> {label}
+    </span>
+  );
+}
+
+function BuildArt() {
+  const gallery = ["#FDE68A", "#99F6E4", "#C4B5FD", "#FBCFE8", "#BFDBFE", "#FED7AA"];
+  return (
+    <div className="relative flex h-[290px] items-center justify-center sm:h-[330px]">
+      <div className="absolute inset-x-12 bottom-6 top-12 rounded-full bg-[#F7B31C]/10 blur-3xl" />
+      <div className="relative w-[196px] rounded-[32px] bg-[#1E293B] p-2 shadow-2xl ring-1 ring-white/10 motion-safe:animate-[float_6s_ease-in-out_infinite]">
+        <div className="overflow-hidden rounded-[26px] bg-white">
+          <div className="h-16 bg-gradient-to-br from-[#F7B31C] to-[#D97706]" />
+          <div className="-mt-8 flex flex-col items-center px-3 pb-4">
+            <span className="h-14 w-14 rounded-full border-4 border-white bg-gradient-to-br from-[#0F172A] to-[#334155]" />
+            <span className="mt-2 h-2 w-24 rounded bg-[#0F172A]" />
+            <span className="mt-1.5 h-1.5 w-16 rounded bg-[#CBD5E1]" />
+            <span className="mt-3 grid w-full grid-cols-3 gap-1.5">
+              {["Call", "WhatsApp", "Save"].map((t) => (
+                <span key={t} className={`rounded-lg py-1.5 text-center text-[8px] font-bold ${t === "WhatsApp" ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#F1F5F9] text-[#334155]"}`}>{t}</span>
+              ))}
+            </span>
+            <span className="mt-3 grid w-full grid-cols-3 gap-1">
+              {gallery.map((g) => <span key={g} className="aspect-square rounded-md" style={{ background: g }} />)}
+            </span>
+            <span className="mt-3 w-full space-y-1">
+              <span className="block h-1.5 w-full rounded bg-[#E2E8F0]" />
+              <span className="block h-1.5 w-4/5 rounded bg-[#E2E8F0]" />
+            </span>
+          </div>
+        </div>
+      </div>
+      <FloatChip icon={Image} label="Gallery" className="left-[4%] top-[16%] -rotate-6 transition-transform duration-500 group-hover:-translate-y-1" />
+      <FloatChip icon={Play} label="Video" className="right-[4%] top-[28%] rotate-3 transition-transform duration-500 group-hover:-translate-y-1" />
+      <FloatChip icon={ShoppingBag} label="Products" className="bottom-[20%] left-[6%] rotate-2 transition-transform duration-500 group-hover:translate-y-1" />
+      <span className="absolute bottom-[10%] right-[6%] hidden items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#F7B31C] to-[#FBBF24] px-3.5 py-2 text-xs font-bold text-[#0B1120] shadow-[0_10px_24px_-10px_rgba(247,179,28,0.9)] sm:inline-flex">
+        <Zap size={13} /> Publish
       </span>
-      <span className="text-[12px] font-medium text-[#334155]">{label}</span>
-      <ChevronRight size={14} className="ml-auto text-[#CBD5E1] -translate-x-1 opacity-0 group-hover/i:opacity-100 group-hover/i:translate-x-0 transition-all" />
+    </div>
+  );
+}
+
+function ShareArt() {
+  return (
+    <div className="flex h-40 items-center justify-center gap-5">
+      <div className="rounded-2xl bg-white p-3 shadow-lg ring-1 ring-[#E2E8F0] transition-transform duration-500 group-hover:-rotate-3 motion-reduce:transition-none">
+        <div className="grid grid-cols-7 gap-[3px]">
+          {FEATURE_QR.map((on, i) => <span key={i} className={`h-2.5 w-2.5 rounded-[2px] ${on ? "bg-[#0F172A]" : ""}`} />)}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <p className="max-w-[170px] rounded-2xl rounded-bl-md bg-[#DCF8C6] px-3 py-2 text-[12px] leading-snug text-[#14532D] shadow-sm">
+          Here's my digital card — tap to save my number.
+        </p>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#14B8A6]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0F766E]">
+          <Check size={12} /> Contact saved
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function LeadsArt() {
+  const rows = [
+    { who: "New enquiry", msg: "“Need cards for my whole team”", when: "now" },
+    { who: "New enquiry", msg: "“Can you share your price list?”", when: "2m" },
+  ];
+  return (
+    <div className="relative h-40">
+      {rows.map((x, i) => (
+        <div
+          key={x.msg}
+          className={`absolute inset-x-1 flex items-start gap-3 rounded-2xl bg-white p-3 shadow-lg ring-1 ring-[#E2E8F0] transition-transform duration-500 motion-reduce:transition-none ${
+            i === 0 ? "top-3 z-10 group-hover:-translate-y-1" : "top-[4.6rem] scale-[0.94] opacity-70"
+          }`}
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#8B5CF6]/10 text-[#8B5CF6]"><Users size={16} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center justify-between text-[13px] font-semibold text-[#0F172A]">
+              {x.who}<span className="text-[11px] font-medium text-[#94A3B8]">{x.when}</span>
+            </span>
+            <span className="block truncate text-[12px] text-[#64748B]">{x.msg}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PayArt() {
+  return (
+    <div className="flex h-40 items-center justify-center">
+      <div className="w-full max-w-[220px] rounded-2xl bg-gradient-to-br from-[#EC4899] to-[#BE185D] p-4 text-white shadow-[0_18px_36px_-18px_rgba(190,24,93,0.8)] transition-transform duration-500 group-hover:-translate-y-1 motion-reduce:transition-none">
+        <span className="flex items-center justify-between">
+          <span className="text-[11px] font-medium text-white/75">Pay on card</span>
+          <Wallet size={15} className="text-white/80" />
+        </span>
+        <span className="mt-1 block text-2xl font-extrabold tabular-nums">₹2,500</span>
+        <span className="mt-3 flex gap-1.5">
+          {["UPI", "GPay", "Paytm"].map((p) => <span key={p} className="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-semibold">{p}</span>)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function GrowArt() {
+  const bars = [38, 52, 45, 68, 60, 82, 96];
+  return (
+    <div className="flex h-40 flex-col rounded-2xl bg-[#F8FAFC] p-4 ring-1 ring-[#E2E8F0]">
+      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#64748B]"><Eye size={12} className="text-[#3B82F6]" /> Card views · 7 days</span>
+      <span className="mt-3 flex flex-1 items-end gap-2">
+        {bars.map((h, i) => (
+          <span
+            key={i}
+            className={`flex-1 rounded-t-md transition-[filter] duration-300 ${i === bars.length - 1 ? "bg-[#3B82F6]" : "bg-[#3B82F6]/30 group-hover:bg-[#3B82F6]/45"}`}
+            style={{ height: `${h}%` }}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
+
+function AIArt() {
+  return (
+    <div className="h-40 rounded-2xl bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-4 ring-1 ring-[#FDE68A]">
+      <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#B45309]"><Sparkles size={12} /> Writing your About</span>
+      <span className="mt-2 block text-[13px] leading-relaxed text-[#78350F]">
+        We help families find homes they love — with honest advice and site visits on your schedule
+        <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 bg-[#F59E0B] motion-safe:animate-pulse" />
+      </span>
     </div>
   );
 }
 
 function FeaturesSection() {
-  const builderItems = [
-    { icon: CreditCard, label: "Drag & Drop Builder", desc: "Arrange blocks visually" },
-    { icon: Image, label: "Image Gallery", desc: "Showcase photos & work" },
-    { icon: Play, label: "Video Embed", desc: "Add intro & product videos" },
-    { icon: ShoppingBag, label: "Products & Services", desc: "List what you sell" },
-    { icon: Sparkles, label: "Offers & Deals", desc: "Promote your discounts" },
-    { icon: Layers, label: "Multilingual", desc: "Reach every customer" },
-  ];
-
-  const groups = [
-    {
-      title: "Sharing", icon: Share2, accent: "#14B8A6", color: "from-[#14B8A6] to-[#0D9488]", span: "md:col-span-1",
-      items: [{ icon: QrCode, label: "QR Code" }, { icon: MessageCircle, label: "WhatsApp Chat" }, { icon: Download, label: "Save Contact" }, { icon: FileDown, label: "vCard / PDF" }],
-    },
-    {
-      title: "Leads & Forms", icon: Globe, accent: "#8B5CF6", color: "from-[#8B5CF6] to-[#6D28D9]", span: "md:col-span-1",
-      items: [{ icon: Globe, label: "Enquiry Form" }, { icon: BarChart3, label: "Lead Tracking" }, { icon: MapPin, label: "Google Maps" }, { icon: Star, label: "Review Link" }],
-    },
-    {
-      title: "Payments", icon: Wallet, accent: "#EC4899", color: "from-[#EC4899] to-[#BE185D]", span: "md:col-span-1",
-      items: [{ icon: Wallet, label: "UPI / GPay / Paytm" }, { icon: Link2, label: "Payment Links" }, { icon: QrCode, label: "Payment QR" }],
-    },
-    {
-      title: "Analytics & SEO", icon: BarChart3, accent: "#3B82F6", color: "from-[#3B82F6] to-[#1D4ED8]", span: "md:col-span-1",
-      items: [{ icon: Eye, label: "Views & Clicks" }, { icon: MousePointer, label: "Click Analytics" }, { icon: Shield, label: "SEO Settings" }, { icon: Globe, label: "Custom Domain" }],
-    },
-    {
-      title: "AI Powered", icon: Sparkles, accent: "#F59E0B", color: "from-[#F7B31C] via-[#F59E0B] to-[#14B8A6]", span: "md:col-span-2", wide: true,
-      items: [{ icon: Sparkles, label: "AI Bio Writer" }, { icon: FileText, label: "AI Descriptions" }, { icon: Globe, label: "AI SEO Generator" }, { icon: MessageCircle, label: "AI FAQ Generator" }, { icon: Mail, label: "AI Lead Reply" }, { icon: Layers, label: "AI Translate" }],
-    },
-    {
-      title: "Reseller", icon: Users, accent: "#334155", color: "from-[#0F172A] to-[#334155]", span: "md:col-span-2", wide: true,
-      items: [{ icon: Users, label: "White-Label" }, { icon: Shield, label: "Custom Branding" }, { icon: BarChart3, label: "Commission Reports" }, { icon: Eye, label: "Customer Analytics" }],
-    },
-  ];
+  const [build, share, leads, pay, grow, ai, resell] = FEATURE_TILES;
+  const total = FEATURE_TILES.reduce((n, t) => n + t.items.length, 0);
 
   return (
-    <section className="py-16 relative overflow-hidden" id="features">
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-[#F7B31C]/[0.06] rounded-full blur-3xl pointer-events-none" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <SectionHeading eyebrow="Features" title="Everything You Need in One Digital Card" subtitle="22+ powerful features organized by what matters most — create, share, convert, and grow." />
-        <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:auto-rows-fr">
+    <section className="relative overflow-hidden py-20" id="features">
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-40 h-[480px] w-[900px] -translate-x-1/2 rounded-full bg-[#F7B31C]/[0.07] blur-3xl" />
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <SectionHeading
+          eyebrow="Features"
+          title={<>Everything You Need in <span className="text-gradient-gold sm:whitespace-nowrap">One Digital Card</span></>}
+          subtitle={`${total} features, grouped by what you want to do — build, share, convert and grow.`}
+        />
 
-          {/* Hero tile — Card Builder */}
-          <div className="sm:col-span-2 md:col-span-2 md:row-span-2 relative flex flex-col rounded-3xl bg-white ring-1 ring-black/5 shadow-premium overflow-hidden card-hover">
-            <div className="pointer-events-none absolute -right-10 -top-10 w-40 h-40 rounded-full bg-[#F7B31C]/10 blur-3xl" />
-            <div className="relative bg-gradient-to-r from-[#F7B31C] to-[#D97706] px-5 py-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 ring-1 ring-white/25 backdrop-blur-sm flex items-center justify-center"><CreditCard size={19} className="text-white" /></div>
+        <Reveal stagger className="grid gap-4 md:grid-cols-6 lg:grid-cols-12">
+          <FeatureTileCard tile={build} dark className="md:col-span-6 lg:col-span-7 lg:row-span-2"><BuildArt /></FeatureTileCard>
+          <FeatureTileCard tile={share} className="md:col-span-3 lg:col-span-5"><ShareArt /></FeatureTileCard>
+          <FeatureTileCard tile={leads} className="md:col-span-3 lg:col-span-5"><LeadsArt /></FeatureTileCard>
+          <FeatureTileCard tile={pay} className="md:col-span-2 lg:col-span-4"><PayArt /></FeatureTileCard>
+          <FeatureTileCard tile={grow} className="md:col-span-2 lg:col-span-4"><GrowArt /></FeatureTileCard>
+          <FeatureTileCard tile={ai} className="md:col-span-2 lg:col-span-4"><AIArt /></FeatureTileCard>
+
+          {/* Reseller — a wide strip, text beside the drawing */}
+          <article className="group relative overflow-hidden rounded-[28px] bg-[#0B1120] p-6 text-white shadow-[0_30px_60px_-30px_rgba(2,6,23,0.75)] sm:p-8 md:col-span-6 lg:col-span-12">
+            <span aria-hidden="true" className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#F7B31C]/15 blur-3xl" />
+            <span aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-10 h-72 w-72 rounded-full bg-[#14B8A6]/10 blur-3xl" />
+            <div className="relative grid items-center gap-8 lg:grid-cols-[1.1fr_1fr]">
               <div>
-                <h3 className="text-base font-bold text-white leading-none">Card Builder</h3>
-                <p className="text-[11px] text-white/80 mt-1">The visual editor at the core</p>
-              </div>
-              <span className="ml-auto text-[10px] font-bold text-[#7C4A03] bg-white/90 rounded-full px-2.5 py-1">CORE</span>
-            </div>
-
-            <div className="relative p-4 grid grid-cols-2 gap-2.5 content-start flex-1">
-              {builderItems.map((it, i) => (
-                <div key={i} className="group/f rounded-2xl bg-[#F8FAFC] hover:bg-white p-3.5 ring-1 ring-black/[0.04] hover:shadow-md hover:-translate-y-0.5 transition-all">
-                  <div className="w-9 h-9 rounded-xl bg-[#FEF3C7] flex items-center justify-center mb-2.5 group-hover/f:scale-105 transition-transform"><it.icon size={17} className="text-[#D97706]" /></div>
-                  <p className="text-[13px] font-semibold text-[#0F172A] leading-tight">{it.label}</p>
-                  <p className="text-[11px] text-[#64748B] leading-snug mt-0.5">{it.desc}</p>
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F7B31C]/15 text-[#F7B31C]"><resell.icon size={17} /></span>
+                  <h3 className="text-lg font-bold tracking-tight">{resell.title}</h3>
                 </div>
-              ))}
-            </div>
-
-            {/* Mini builder window */}
-            <div className="relative mx-4 mb-4 rounded-2xl bg-[#0F172A] p-4 overflow-hidden">
-              <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-[#F7B31C]/20 blur-2xl" />
-              <div className="relative flex items-center gap-1.5 mb-3">
-                <span className="w-2 h-2 rounded-full bg-[#EF4444]" /><span className="w-2 h-2 rounded-full bg-[#F7B31C]" /><span className="w-2 h-2 rounded-full bg-[#22C55E]" />
-                <span className="text-[10px] text-white/40 ml-1.5 font-medium">card-builder · live preview</span>
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-[#94A3B8]">{resell.text}</p>
+                <div className="mt-4"><FeatureChips tile={resell} dark /></div>
+                <Link to="/resellers" className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-[#F7B31C] hover:underline">
+                  See the reseller program <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
+                </Link>
               </div>
-              <div className="relative space-y-1.5">
-                <div className="h-2.5 w-2/5 rounded-full bg-[#F7B31C]" />
-                <div className="h-2 w-full rounded-full bg-white/10" />
-                <div className="h-2 w-4/5 rounded-full bg-white/10" />
-              </div>
-              <div className="relative mt-3 flex items-center gap-2">
-                <div className="h-8 flex-1 rounded-lg bg-gradient-to-r from-[#F7B31C] to-[#D97706] flex items-center justify-center gap-1.5">
-                  <Zap size={12} className="text-[#0F172A]" /><span className="text-[11px] font-bold text-[#0F172A]">Publish in 2 min</span>
-                </div>
-                <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center"><Share2 size={13} className="text-white/60" /></div>
-              </div>
-            </div>
-          </div>
-
-          {/* Standard + wide tiles */}
-          {groups.map((group, gi) => (
-            <div key={gi} className={`${group.span} relative flex flex-col rounded-3xl bg-white ring-1 ring-black/5 shadow-premium overflow-hidden card-hover`}>
-              <div className="pointer-events-none absolute -right-8 -top-8 w-24 h-24 rounded-full blur-2xl opacity-[0.12]" style={{ background: group.accent }} />
-              <div className={`relative bg-gradient-to-r ${group.color} px-4 py-3 flex items-center gap-2.5`}>
-                <div className="w-9 h-9 rounded-xl bg-white/20 ring-1 ring-white/20 backdrop-blur-sm flex items-center justify-center"><group.icon size={16} className="text-white" /></div>
-                <h3 className="text-sm font-bold text-white">{group.title}</h3>
-                <span className="ml-auto text-[10px] font-semibold text-white/90 bg-white/15 rounded-full px-2 py-0.5">{group.items.length} tools</span>
-              </div>
-              <div className={`relative p-2.5 flex-1 ${group.wide ? "grid grid-cols-2 gap-x-2 gap-y-1 content-start" : "flex flex-col gap-0.5"}`}>
-                {group.items.map((item, ii) => (
-                  <ChipRow key={ii} icon={item.icon} label={item.label} accent={group.accent} />
+              <div aria-hidden="true" className="relative mx-auto flex h-40 w-full max-w-sm items-center justify-center">
+                {[
+                  { tone: "#0F766E", cls: "-translate-x-24 -rotate-12" },
+                  { tone: "#7C3AED", cls: "translate-x-24 rotate-12" },
+                  { tone: "#F7B31C", cls: "z-10 -translate-y-2" },
+                ].map((c) => (
+                  <span key={c.tone} className={`absolute w-40 rounded-2xl bg-white p-3 shadow-2xl transition-transform duration-500 motion-reduce:transition-none ${c.cls}`}>
+                    <span className="flex items-center gap-2">
+                      <span className="h-8 w-8 rounded-full" style={{ background: c.tone }} />
+                      <span className="flex-1 space-y-1">
+                        <span className="block h-1.5 w-16 rounded bg-[#0F172A]" />
+                        <span className="block h-1 w-10 rounded bg-[#CBD5E1]" />
+                      </span>
+                    </span>
+                    <span className="mt-2.5 block h-1.5 w-full rounded bg-[#E2E8F0]" />
+                    <span className="mt-1 block h-1.5 w-3/4 rounded bg-[#E2E8F0]" />
+                  </span>
                 ))}
+                <span className="absolute -bottom-1 z-20 inline-flex items-center gap-1.5 rounded-full bg-[#F7B31C] px-3 py-1 text-xs font-bold text-[#0B1120] shadow-lg">
+                  <Building2 size={12} /> Your brand
+                </span>
               </div>
             </div>
-          ))}
+          </article>
         </Reveal>
 
-        <div className="text-center mt-8">
-          <Link to="/features" className="btn-navy inline-flex items-center gap-2 h-10 px-5 text-sm">Explore All 22+ Features <ChevronRight size={14} /></Link>
+        <div className="mt-10 text-center">
+          <Link to="/features" className="btn-navy inline-flex h-11 items-center gap-2 px-6 text-sm">Explore all features <ChevronRight size={15} /></Link>
         </div>
       </div>
     </section>
@@ -1422,7 +1627,7 @@ function ResellerSection() {
 /* ─── Pricing ─── */
 function PricingSection() {
   const plans = [
-    { name: "Free Trial", price: "₹0", period: "30 Days", popular: false, cta: "Start Free Trial", features: ["Full Gold features", "1 Digital Card", "All 40+ templates", "No credit card needed", "Live in minutes"] },
+    { name: "Free Trial", price: "₹0", period: "30 Days", popular: false, cta: "Start Free Trial", features: ["Full Gold features", "1 Digital Card", "All 50+ templates", "No credit card needed", "Live in minutes"] },
     { name: "Gold", price: "₹999", period: "/ year", popular: true, cta: "Get Gold", features: ["1 Digital Card", "Products & Services", "Gallery, Videos & Offers", "QR & UPI Payments", "Enquiry Form + Leads", "Full Analytics", "Custom URL & Colours"] },
     { name: "Platinum", price: "₹1,999", period: "/ year", popular: false, cta: "Go Platinum", features: ["Everything in Gold", "Up to 3 Cards", "Unlimited Products & Offers", "Remove Branding", "Custom Domain + SEO", "AI Content Tools", "Priority Support"] },
   ];
@@ -1618,7 +1823,7 @@ export default function Home() {
       <FeaturesSection />
       <WhyDigitalCardaSection />
       <AISection />
-      <TemplatesSection />
+      <TemplatesSection />
       <HowItWorksSection />
       <AnalyticsSection />
       <QRNFCSection />

@@ -1,4 +1,5 @@
-/* The public site's link map — ONE list for the footer and the /sitemap page.
+/* The public site's link map — ONE place for the header menus, the page
+ * search, the footer and the /sitemap page.
  *
  * Both used to be hand-written: the old footer pointed "Agencies",
  * "Freelancers" and "Local Businesses" all at /industries and three
@@ -12,7 +13,7 @@
  * Import-free so the server-rendered layout can use it without pulling pages.
  */
 
-export type NavLink = { label: string; href: string; badge?: string };
+export type NavLink = { label: string; href: string; badge?: string; desc?: string };
 export type NavGroup = { title: string; links: NavLink[] };
 
 export const CONTACT = {
@@ -84,4 +85,112 @@ export const SITEMAP_GROUPS: NavGroup[] = [
   FREE_TOOLS,
   BUSINESS,
   { title: "Legal", links: LEGAL_LINKS },
+];
+
+/* ── Header ──────────────────────────────────────────────────────────────────
+   Every description states a fact the linked page itself makes — keep them in
+   step when a page's offer changes. */
+
+export type HeaderMenu = {
+  id: "product" | "templates" | "tools" | "business";
+  label: string;
+  items: (NavLink & { desc: string })[];
+  feature: { eyebrow: string; title: string; text: string; href: string; cta: string };
+};
+
+export const HEADER_MENUS: HeaderMenu[] = [
+  {
+    id: "product",
+    label: "Product",
+    items: [
+      { label: "Features", href: "/features", desc: "QR and WhatsApp sharing, lead capture, analytics and UPI payments" },
+      { label: "AI card generator", href: "/ai-card-generator", desc: "AI writes your headline, about, services and call-to-action" },
+      { label: "Custom domain", href: "/custom-domain", desc: "Your card on your own domain, like card.yourbrand.com" },
+    ],
+    feature: {
+      eyebrow: "30-day free trial",
+      title: "Your card, live in minutes",
+      text: "No card details needed. Share it by QR code, WhatsApp or a single link.",
+      href: "/signup",
+      cta: "Start free trial",
+    },
+  },
+  {
+    id: "templates",
+    label: "Templates",
+    items: [
+      { label: "Card templates", href: "/digital-business-cards-templates", desc: "Ready-made digital business cards for every profession" },
+      { label: "Card designs", href: "/templates", desc: "Change the look anytime — your QR code keeps working" },
+      { label: "Industries", href: "/industries", desc: "Cards for doctors, real estate, lawyers, salons and more" },
+    ],
+    feature: {
+      eyebrow: "Live demos",
+      title: "Try a template before you pick",
+      text: "Every template opens as a working demo card you can test on your phone.",
+      href: "/digital-business-cards-templates",
+      cta: "Browse templates",
+    },
+  },
+  {
+    id: "tools",
+    label: "Free tools",
+    items: [
+      { label: "Email signature generator", href: "/email-signature-generator", badge: "Free", desc: "14 designs for Gmail, Outlook and Apple Mail" },
+      { label: "WhatsApp message templates", href: "/whatsapp-message-templates", badge: "Free", desc: "12 greeting, away and quick-reply messages to copy" },
+      { label: "All free tools", href: "/free-tools", desc: "Free for every business — no sign-up needed" },
+    ],
+    feature: {
+      eyebrow: "No sign-up",
+      title: "Free tools for your business",
+      text: "Make an email signature or a WhatsApp welcome message and copy it in seconds.",
+      href: "/free-tools",
+      cta: "Open free tools",
+    },
+  },
+  {
+    id: "business",
+    label: "Business",
+    items: [
+      { label: "Bulk cards for teams", href: "/bulk-cards", desc: "One brand for every employee, with volume pricing" },
+      { label: "Reseller program", href: "/resellers", desc: "Sell under your own brand and earn 20–30% recurring" },
+      { label: "Refer & earn", href: "/refer-earn", desc: "Friends get 15% off, you earn 15% cash" },
+    ],
+    feature: {
+      eyebrow: "Partners",
+      title: "Grow with DigitalCarda",
+      text: "White-label digital cards for your clients, with recurring commission every month.",
+      href: "/resellers",
+      cta: "See the reseller program",
+    },
+  },
+];
+
+/** Plain links beside the menus. */
+export const HEADER_LINKS: NavLink[] = [
+  { label: "Pricing", href: "/pricing" },
+  { label: "Contact", href: "/contact" },
+];
+
+/** What the header search looks through, most-visited first (shown before
+ *  anything is typed). Card templates are added live from the catalogue. */
+export const SEARCH_PAGES: NavLink[] = [
+  { label: "Card templates", href: "/digital-business-cards-templates", desc: "Ready-made digital business cards" },
+  { label: "Pricing", href: "/pricing", desc: "Plans from Rs. 99/month, 30-day free trial" },
+  { label: "Features", href: "/features", desc: "QR, WhatsApp, leads, analytics and payments" },
+  { label: "AI card generator", href: "/ai-card-generator", desc: "Let AI write your card" },
+  { label: "Email signature generator", href: "/email-signature-generator", desc: "Free · 14 signature designs" },
+  { label: "WhatsApp message templates", href: "/whatsapp-message-templates", desc: "Free · greeting, away and quick replies" },
+  { label: "Contact us", href: "/contact", desc: "Call, WhatsApp or email the team" },
+  { label: "Start free trial", href: "/signup", desc: "30 days free, no card details" },
+  { label: "Home", href: "/", desc: "DigitalCarda home page" },
+  { label: "Card designs", href: "/templates", desc: "Digital visiting card designs" },
+  { label: "Industries", href: "/industries", desc: "Cards for every industry" },
+  { label: "Custom domain", href: "/custom-domain", desc: "Your card on your own domain" },
+  { label: "All free tools", href: "/free-tools", desc: "Free tools, no sign-up" },
+  { label: "Bulk cards for teams", href: "/bulk-cards", desc: "Cards for your whole team" },
+  { label: "Reseller program", href: "/resellers", desc: "White-label and earn commission" },
+  { label: "Refer & earn", href: "/refer-earn", desc: "Give 15%, get 15% cash" },
+  { label: "Sign in", href: "/login", desc: "Customer, reseller and admin login" },
+  { label: "Sitemap", href: "/sitemap", desc: "Every page on DigitalCarda" },
+  ...LEGAL_LINKS.map((l) => ({ ...l, desc: "Policies" })),
 ];

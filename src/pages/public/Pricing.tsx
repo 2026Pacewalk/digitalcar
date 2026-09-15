@@ -48,7 +48,7 @@ const PLANS: Plan[] = [
       { icon: Tag, text: "Up to 15 offers & deals" },
       { icon: MessageSquare, text: "Enquiry form — capture every lead" },
       { icon: Star, text: "Google reviews on your card" },
-      { icon: Crown, text: "All 31 designs + link-in-bio styles" },
+      { icon: Crown, text: "All 50+ templates + link-in-bio styles" },
       { icon: Check, text: "UPI / payment + bank details" },
       { icon: Check, text: "Visit & tap analytics" },
     ],
@@ -121,7 +121,7 @@ function buildPlans(pkgs: DbPkg[]): Plan[] {
 
 const faqs = [
   { q: "Is the 30-day trial really free?", a: "Yes — completely free, no credit card. You get the full card with every premium feature unlocked for 30 days. When it ends, pick a plan to keep your card live; nothing is ever charged automatically." },
-  { q: "What do I actually get on a paid plan?", a: "Your live digital card on a personal link and QR, with lead capture, Google reviews, payment links, gallery and video, and all 31 designs. Gold covers one card and up to 25 products; Platinum adds up to 3 cards, unlimited products, a bigger 60-photo gallery, AI content, multi-language and priority support." },
+  { q: "What do I actually get on a paid plan?", a: "Your live digital card on a personal link and QR, with lead capture, Google reviews, payment links, gallery and video, and all 50+ templates. Gold covers one card and up to 25 products; Platinum adds up to 3 cards, unlimited products, a bigger 60-photo gallery, AI content, multi-language and priority support." },
   { q: "Monthly, Yearly or 3-Year — which should I pick?", a: "The same card, cheaper the longer you commit. Yearly saves about 16% (roughly two months free) over monthly, and the 3-Year plan is the best value — and it includes the custom-domain setup free." },
   { q: "Can I upgrade later?", a: "Anytime. Your card, link and QR stay exactly the same — you just unlock more features and higher limits instantly. We never make you rebuild anything." },
   { q: "How does the custom domain work?", a: "It's a one-time ₹499 add-on (free on the Platinum 3-Year plan). Buy a domain from any registrar or use one you already own — you keep full ownership — and our team connects it to your card with HTTPS, usually within 24–48 hours. The domain's own registration fee is separate." },

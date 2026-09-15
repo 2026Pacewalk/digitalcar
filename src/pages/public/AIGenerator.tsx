@@ -70,7 +70,7 @@ const AI_FAQS = [
   { q: "Is the AI card generator free to use?", a: "Yes. You can generate a card and preview it live without signing up or entering any card details. You only create an account when you want to save it and publish it on your own link." },
   { q: "What does the AI actually write for me?", a: "It writes your tagline, about section, service names and descriptions, SEO title and description, and your call-to-action button text. It also picks a template and a colour pair that suit your profession." },
   { q: "Can I build a card from my existing website?", a: "Yes. Paste your website address and the AI reads the page — pulling your logo, brand colours, services, contact details and location — then writes the card content to match what is already on your site." },
-  { q: "Can I change what the AI produced?", a: "Yes. Every section has a regenerate button, you can pick any of the 31 designs, and you can override the primary and secondary colours with your own brand shades before saving." },
+  { q: "Can I change what the AI produced?", a: "Yes. Every section has a regenerate button, you can pick any of the 50+ templates, and you can override the primary and secondary colours with your own brand shades before saving." },
   { q: "How long does it take?", a: "About five seconds when you describe your business, and around ten when the AI has to read your website first. The preview updates instantly after that." },
 ];
 
