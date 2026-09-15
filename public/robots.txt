@@ -2,9 +2,13 @@ User-agent: *
 Allow: /
 
 # Private app areas — no need to crawl.
+# robots.txt rules are PREFIX matches: a bare "Disallow: /reseller" also blocked
+# the public /resellers page from Google. The reseller portal is matched exactly
+# ($) and by its sub-paths instead, which leaves /resellers crawlable.
 Disallow: /admin
 Disallow: /dashboard
-Disallow: /reseller
+Disallow: /reseller$
+Disallow: /reseller/
 Disallow: /api/
 
 Sitemap: https://digitalcarda.in/sitemap.xml
