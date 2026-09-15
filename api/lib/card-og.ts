@@ -8,15 +8,15 @@
  * so link previews on WhatsApp / Facebook / X / LinkedIn, and crawlers that do
  * not run JavaScript, get the page's real identity instead of a blank shell.
  *
- * Marketing pages take their title and description from src/lib/publicSeo.ts —
- * the same table the browser uses — so the raw HTML and the page after
- * JavaScript runs can no longer disagree.
+ * Marketing pages take their title, description, canonical and breadcrumbs
+ * from src/lib/publicSeo.ts — the same table the browser uses — so the raw
+ * HTML and the page after JavaScript runs can no longer disagree.
  *
  * Pure functions + a cached file read — no framework deps, so it's unit-testable.
  */
 import fs from "fs";
 import path from "path";
-import { seoForPath } from "../../src/lib/publicSeo";
+import { seoForPath, canonicalPathFor, breadcrumbJsonLd } from "../../src/lib/publicSeo";
 
 const SITE = "https://digitalcarda.in";
 
@@ -39,6 +39,8 @@ function customers(distPath: string): Row[] {
 export interface CardMeta {
   title: string; description: string; image: string; url: string;
   jsonLd?: string; ogType?: string; imageW?: number; imageH?: number; imageType?: string; imageAlt?: string;
+  /** BreadcrumbList JSON-LD, written with the id the browser keeps in step on navigation. */
+  breadcrumbLd?: string;
   /** Visually hidden <h1> placed in the empty shell, when there is nothing better. */
   h1?: string;
   /** Pre-escaped markup placed in the empty shell instead of the lone h1. */
@@ -60,7 +62,17 @@ const SR_ONLY = "position:absolute;width:1px;height:1px;padding:0;margin:-1px;ov
 export function metaFor(pathname: string, distPath: string): CardMeta | null {
   const clean = pathname.replace(/\/+$/, "") || "/";
   const mk = seoForPath(clean);
-  if (mk) return { ...mk, image: OG_IMAGE, imageW: 1200, imageH: 630, imageType: "image/jpeg", imageAlt: mk.title, url: `${SITE}${clean === "/" ? "" : clean}`, h1: mk.title, locale: "en_IN" };
+  if (mk) {
+    // An alias (e.g. /card-designs) canonicalises to the page it duplicates.
+    // The home URL keeps its trailing slash, matching what the browser sets.
+    const canon = canonicalPathFor(clean);
+    return {
+      title: mk.title, description: mk.description,
+      image: OG_IMAGE, imageW: 1200, imageH: 630, imageType: "image/jpeg", imageAlt: mk.title,
+      url: `${SITE}${canon}`, h1: mk.title, locale: "en_IN",
+      breadcrumbLd: breadcrumbJsonLd(clean) ?? undefined,
+    };
+  }
   return cardMetaFor(pathname, distPath);
 }
 
@@ -168,6 +180,7 @@ export function cardMetaFor(pathname: string, distPath: string): CardMeta | null
 /** Inject the meta (+ optional JSON-LD and crawler content) into an index.html string. */
 export function injectCardMeta(html: string, meta: CardMeta): string {
   const alt = meta.imageAlt || meta.title;
+  const ld = (json: string) => json.replace(/</g, "\\u003c");
   const tags = [
     `<meta name="description" content="${esc(meta.description)}">`,
     ...(meta.keywords ? [`<meta name="keywords" content="${esc(meta.keywords)}">`] : []),
@@ -191,7 +204,9 @@ export function injectCardMeta(html: string, meta: CardMeta): string {
     `<meta name="twitter:description" content="${esc(meta.description)}">`,
     `<meta name="twitter:image" content="${esc(meta.image)}">`,
     `<meta name="twitter:image:alt" content="${esc(alt)}">`,
-    ...(meta.jsonLd ? [`<script type="application/ld+json">${meta.jsonLd.replace(/</g, "\\u003c")}</script>`] : []),
+    ...(meta.jsonLd ? [`<script type="application/ld+json">${ld(meta.jsonLd)}</script>`] : []),
+    // Same id PublicLayout updates on in-app navigation, so there's only ever one.
+    ...(meta.breadcrumbLd ? [`<script type="application/ld+json" id="dc-breadcrumb-ld">${ld(meta.breadcrumbLd)}</script>`] : []),
   ].join("\n    ");
 
   // Every replacement below is a FUNCTION, not a string. Titles and

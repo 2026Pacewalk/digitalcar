@@ -654,7 +654,7 @@ app.get("/q/:publicId", async (c) => {
 // all 500+ card profiles.
 app.get("/sitemap.xml", async (c) => {
   const base = "https://digitalcarda.in";
-  const pages = ["", "/digital-business-cards-templates", "/features", "/pricing", "/industries", "/bulk-cards",
+  const pages = ["", "/digital-business-cards-templates", "/templates", "/features", "/pricing", "/industries", "/bulk-cards",
     "/ai-card-generator", "/resellers", "/refer-earn", "/custom-domain", "/contact",
     // Free tools — canonical URLs only; each has an alias route that deliberately
     // stays out of the sitemap so the two never compete for the same terms.

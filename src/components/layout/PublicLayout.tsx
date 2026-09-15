@@ -6,7 +6,7 @@ import {
   Sparkles, LayoutGrid, Tag, Wand2, Users, MessageCircle, LogIn, ArrowRight, Headphones, Layers, Gift,
   PenLine,
 } from "lucide-react";
-import { DEFAULT_SEO, PUBLIC_SEO } from "@/lib/publicSeo";
+import { DEFAULT_SEO, seoForPath, breadcrumbJsonLd } from "@/lib/publicSeo";
 
 export default function PublicLayout() {
   const [scrolled, setScrolled] = useState(false);
@@ -14,7 +14,7 @@ export default function PublicLayout() {
   const [logoOk, setLogoOk] = useState(true);
   const location = useLocation();
 
-  const seo = PUBLIC_SEO[location.pathname] || DEFAULT_SEO;
+  const seo = seoForPath(location.pathname) || DEFAULT_SEO;
 
   // On a product page, carry the product into signup so the trial starts on that
   // exact card (e.g. /signup?product=ocean-blue-card); otherwise plain /signup.
@@ -53,10 +53,28 @@ export default function PublicLayout() {
     const path = location.pathname === "/" ? "/" : location.pathname.replace(/\/+$/, "");
     let canon = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!canon) { canon = document.createElement("link"); canon.rel = "canonical"; document.head.appendChild(canon); }
-    canon.href = `https://digitalcarda.in${path}`;
+    // An alias URL (e.g. /card-designs) points at the page it duplicates.
+    canon.href = `https://digitalcarda.in${seo.canonicalPath ?? path}`;
 
     window.scrollTo(0, 0);
   }, [location.pathname, seo]);
+
+  /* BreadcrumbList for the current page — the same trail the server writes into
+     the raw HTML (api/lib/card-og.ts, same element id), kept in step as people
+     move around the site. Product pages publish their own trail with the
+     product name in it, so the element is removed there. */
+  useEffect(() => {
+    const ld = breadcrumbJsonLd(location.pathname);
+    let s = document.getElementById("dc-breadcrumb-ld");
+    if (!ld) { s?.remove(); return; }
+    if (!s) {
+      s = document.createElement("script");
+      s.id = "dc-breadcrumb-ld";
+      (s as HTMLScriptElement).type = "application/ld+json";
+      document.head.appendChild(s);
+    }
+    s.textContent = ld;
+  }, [location.pathname]);
 
   /* Site-wide structured data — who we are, the site itself (so Google can
      offer a sitelinks search box), and the product with its real pricing.
@@ -74,6 +92,9 @@ export default function PublicLayout() {
           name: "DigitalCarda",
           url: "https://digitalcarda.in/",
           logo: "https://digitalcarda.in/apple-touch-icon.png",
+          // Profiles that are verifiably ours. Ties the brand entity together for
+          // Google and AI answer engines; add each new official profile here.
+          sameAs: ["https://in.pinterest.com/digitalcarda/"],
           description: "DigitalCarda builds AI-powered digital business cards and smart microsites for businesses and professionals across India.",
           contactPoint: {
             "@type": "ContactPoint",

@@ -1157,26 +1157,9 @@ const LINK_PLACEMENTS = [
 ];
 
 function WhereToUseSection() {
-  useEffect(() => {
-    const ld = {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: [{
-        "@type": "Question",
-        name: "Where can I use a digital business card link?",
-        acceptedAnswer: { "@type": "Answer", text: LINK_ANSWER },
-      }],
-    };
-    let s = document.getElementById("where-to-use-ld");
-    if (!s) {
-      s = document.createElement("script");
-      s.id = "where-to-use-ld";
-      (s as HTMLScriptElement).type = "application/ld+json";
-      document.head.appendChild(s);
-    }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("where-to-use-ld")?.remove(); };
-  }, []);
+  // This section's question is published in the page's single FAQPage (see
+  // FaqSection). It used to emit a second FAQPage block; one URL carrying two
+  // is invalid structured data and loses FAQ eligibility for both.
 
   const half = Math.ceil(LINK_PLACEMENTS.length / 2);
   const columns = [LINK_PLACEMENTS.slice(0, half), LINK_PLACEMENTS.slice(half)];
@@ -1520,11 +1503,19 @@ function FaqSection() {
     const ld = {
       "@context": "https://schema.org",
       "@type": "FAQPage",
-      mainEntity: FAQS.map((f) => ({
-        "@type": "Question",
-        name: f.q,
-        acceptedAnswer: { "@type": "Answer", text: f.a },
-      })),
+      mainEntity: [
+        ...FAQS.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+        // The "where to use your card link" answer block, higher up the page.
+        {
+          "@type": "Question",
+          name: "Where can I use a digital business card link?",
+          acceptedAnswer: { "@type": "Answer", text: LINK_ANSWER },
+        },
+      ],
     };
     let s = document.getElementById("dc-faq-ld");
     if (!s) {
