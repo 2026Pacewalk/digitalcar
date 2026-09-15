@@ -13,17 +13,7 @@ import { scopedKey, DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { logFunnel } from "@/lib/funnel";
 import { setSession } from "@/lib/session";
-
-function GoogleIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24">
-      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1Z" />
-      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
-      <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
-      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38Z" />
-    </svg>
-  );
-}
+import GoogleSignInButton, { useGoogleClientId, type GoogleSignInResult } from "@/components/auth/GoogleSignInButton";
 
 const STRENGTH = [
   { label: "", color: "" },
@@ -116,10 +106,45 @@ export default function Signup() {
       });
       setSession(res.token, res.user, "main");
       logFunnel("registration", productSlug || undefined, res.user?.id);
-      // Auto-derive the card username from the business name (fall back to full
-      // name, then email). The user can change it later from their dashboard.
-      const handle = slugifyUsername(form.businessName || form.fullName || form.email.split("@")[0]);
-      if (res.user?.id) {
+      // Card handle from the business name (fall back to full name, then email).
+      seedNewCard(res.user?.id, form.businessName || form.fullName || form.email.split("@")[0]);
+      // Trial does NOT start here — it begins on first publish (§5, Phase 13).
+      // Land the user straight in customisation when they picked a card (§32).
+      if (selectedProduct) {
+        toast.success(`Account created! Let's make your ${selectedProduct.name} yours.`);
+        navigate("/dashboard/build");
+      } else {
+        toast.success("Account created! Welcome to DigitalCarda.");
+        navigate("/dashboard/build");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create account");
+      setLoading(false);
+    }
+  };
+
+  /* Signed in with Google. A brand-new account starts its card exactly as an
+     email signup does; an existing account is simply signed in. */
+  const handleGoogle = (res: GoogleSignInResult) => {
+    setSession(res.token, res.user, "main");
+    if (!res.created) {
+      toast.success("Welcome back! You already had an account, so we signed you in.");
+      navigate(res.user.role === "reseller" ? "/reseller" : "/dashboard");
+      return;
+    }
+    logFunnel("registration", productSlug || undefined, res.user.id);
+    seedNewCard(res.user.id, res.user.fullName || res.user.email.split("@")[0]);
+    toast.success(selectedProduct ? `Account created! Let's make your ${selectedProduct.name} yours.` : "Account created! Welcome to DigitalCarda.");
+    navigate("/dashboard/build");
+  };
+
+  /* Start a new account's card from what the visitor chose before signing up:
+     its username, the product or template design they picked, and any AI Card
+     Generator draft. Shared by email and Google signup. */
+  function seedNewCard(userId: number | undefined, handleSource: string) {
+    // The user can change the username later from their dashboard.
+    const handle = slugifyUsername(handleSource);
+    if (userId) {
         try {
           const key = scopedKey("dc_customer");
           const existing = JSON.parse(localStorage.getItem(key) || "{}");
@@ -164,23 +189,10 @@ export default function Signup() {
           } catch { /* non-critical */ }
           localStorage.setItem(key, JSON.stringify(next));
         } catch { /* non-critical — dashboard will seed a default */ }
-      }
-      // Trial does NOT start here — it begins on first publish (§5, Phase 13).
-      // Land the user straight in customisation when they picked a card (§32).
-      if (selectedProduct) {
-        toast.success(`Account created! Let's make your ${selectedProduct.name} yours.`);
-        navigate("/dashboard/build");
-      } else {
-        toast.success("Account created! Welcome to DigitalCarda.");
-        navigate("/dashboard/build");
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create account");
-      setLoading(false);
     }
-  };
+  }
 
-  const socialSoon = () => toast.info("Social sign-up is coming soon — use email for now.");
+  const googleClientId = useGoogleClientId();
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex">
@@ -247,15 +259,17 @@ export default function Signup() {
             </div>
           )}
 
-          {/* Social */}
-          <button onClick={socialSoon} type="button" className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white flex items-center justify-center gap-2.5 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors">
-            <GoogleIcon /> Continue with Google
-          </button>
-          <div className="flex items-center gap-3 my-5">
-            <span className="h-px flex-1 bg-[#E2E8F0]" />
-            <span className="text-xs text-[#94A3B8]">or sign up with email</span>
-            <span className="h-px flex-1 bg-[#E2E8F0]" />
-          </div>
+          {/* Google sign-up — shown only once GOOGLE_CLIENT_ID is set on the server. */}
+          {googleClientId && (
+            <>
+              <GoogleSignInButton clientId={googleClientId} mode="signup" referralCode={referralCode} onSignedIn={handleGoogle} />
+              <div className="flex items-center gap-3 my-5">
+                <span className="h-px flex-1 bg-[#E2E8F0]" />
+                <span className="text-xs text-[#94A3B8]">or sign up with email</span>
+                <span className="h-px flex-1 bg-[#E2E8F0]" />
+              </div>
+            </>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

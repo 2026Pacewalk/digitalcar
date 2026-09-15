@@ -11,6 +11,8 @@ import { createToken, createResetToken, verifyResetToken, createVerifyToken, ver
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail, verifyEmailAddressEmail } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
+import { verifyGoogleIdToken } from "./lib/google-auth";
+import { randomBytes } from "crypto";
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
 
@@ -60,6 +62,74 @@ async function provisionStarterCard(
     });
     return slug;
   } catch { return null; }
+}
+
+/* Everything a brand-new account gets, whichever way it signed up (email or
+   Google): welcome emails, the owner alert, referral linking, the welcome
+   notification, and its own live card with the trial started. */
+async function welcomeNewAccount(
+  db: ReturnType<typeof getDb>,
+  insertedUser: typeof users.$inferSelect,
+  opts: { referralCode?: string; companyName?: string; verifyEmail: boolean },
+): Promise<void> {
+  // Welcome email (+ an email-verification link when the address isn't already
+  // verified) to the new user, and a new-signup alert to the owner — all
+  // non-blocking.
+  void sendEmail(insertedUser.email, welcomeEmail({ name: insertedUser.fullName, role: insertedUser.role }));
+  if (opts.verifyEmail) {
+    const vtoken = await createVerifyToken(insertedUser.id, insertedUser.email);
+    const vlink = `${PUBLIC_BASE_URL}/verify-email?token=${encodeURIComponent(vtoken)}`;
+    void sendEmail(insertedUser.email, verifyEmailAddressEmail({ name: insertedUser.fullName, link: vlink }));
+  }
+  void sendEmail(ownerAddress(), newSignupAdminEmail({ name: insertedUser.fullName, email: insertedUser.email, role: insertedUser.role, phone: insertedUser.phone }));
+
+  // (No reseller branch here: public signup creates customers only. Reseller
+  // profiles are created by reseller.approve / user.createReseller.)
+
+  // Apply referral (Refer & Earn) — both the referrer and this new user get a discount
+  if (opts.referralCode) {
+    const code = opts.referralCode.toUpperCase();
+    try {
+      const referrer = await db.query.users.findFirst({
+        where: eq(users.referralCode, code),
+      });
+      if (referrer && referrer.id !== insertedUser.id) {
+        await db.update(users).set({ referredById: referrer.id }).where(eq(users.id, insertedUser.id));
+        // Reward is credited later by an admin once this user buys a paid plan.
+        await db.insert(referrals).values({
+          referrerId: referrer.id,
+          refereeId: insertedUser.id,
+          refereeEmail: insertedUser.email,
+          code,
+          status: "joined",
+        });
+        // Tell the referrer someone joined with their link
+        await db.insert(notifications).values({
+          userId: referrer.id,
+          type: "referral_joined",
+          title: "New referral signup 🎉",
+          message: `${insertedUser.fullName} just joined with your referral link. You'll earn cash when they upgrade to a paid plan.`,
+          link: "/dashboard/refer",
+        });
+        // Alert the owner about the referral signup (non-blocking).
+        void sendEmail(ownerAddress(), referralSignupAdminEmail({ newUserName: insertedUser.fullName, newUserEmail: insertedUser.email, referrerName: referrer.fullName, code }));
+      }
+    } catch { /* referral linking is best-effort */ }
+  }
+
+  // Welcome message in the new user's bell
+  try {
+    await db.insert(notifications).values({
+      userId: insertedUser.id,
+      type: "welcome",
+      title: "Welcome to DigitalCarda 👋",
+      message: "Your account is ready. Complete your card profile to start getting enquiries.",
+      link: "/dashboard/home",
+    });
+  } catch { /* non-critical */ }
+
+  // Give the new account its own live card URL + start the trial.
+  await provisionStarterCard(db, insertedUser, opts.companyName);
 }
 
 /* Legacy-auth bridge: the old site stored plaintext passwords (some with stray
@@ -233,62 +303,9 @@ export const authRouter = createRouter({
         });
       }
 
-      // Welcome email + email-verification link to the new user, and a new-signup
-      // alert to the owner (all non-blocking).
-      void sendEmail(insertedUser.email, welcomeEmail({ name: insertedUser.fullName, role: insertedUser.role }));
-      {
-        const vtoken = await createVerifyToken(insertedUser.id, insertedUser.email);
-        const vlink = `${PUBLIC_BASE_URL}/verify-email?token=${encodeURIComponent(vtoken)}`;
-        void sendEmail(insertedUser.email, verifyEmailAddressEmail({ name: insertedUser.fullName, link: vlink }));
-      }
-      void sendEmail(ownerAddress(), newSignupAdminEmail({ name: insertedUser.fullName, email: insertedUser.email, role: insertedUser.role, phone: insertedUser.phone }));
-
-      // (No reseller branch here: public signup creates customers only. Reseller
-      // profiles are created by reseller.approve / user.createReseller.)
-
-      // Apply referral (Refer & Earn) — both the referrer and this new user get a discount
-      if (input.referralCode) {
-        try {
-          const referrer = await db.query.users.findFirst({
-            where: eq(users.referralCode, input.referralCode.toUpperCase()),
-          });
-          if (referrer && referrer.id !== insertedUser.id) {
-            await db.update(users).set({ referredById: referrer.id }).where(eq(users.id, insertedUser.id));
-            // Reward is credited later by an admin once this user buys a paid plan.
-            await db.insert(referrals).values({
-              referrerId: referrer.id,
-              refereeId: insertedUser.id,
-              refereeEmail: insertedUser.email,
-              code: input.referralCode.toUpperCase(),
-              status: "joined",
-            });
-            // Tell the referrer someone joined with their link
-            await db.insert(notifications).values({
-              userId: referrer.id,
-              type: "referral_joined",
-              title: "New referral signup 🎉",
-              message: `${insertedUser.fullName} just joined with your referral link. You'll earn cash when they upgrade to a paid plan.`,
-              link: "/dashboard/refer",
-            });
-            // Alert the owner about the referral signup (non-blocking).
-            void sendEmail(ownerAddress(), referralSignupAdminEmail({ newUserName: insertedUser.fullName, newUserEmail: insertedUser.email, referrerName: referrer.fullName, code: input.referralCode.toUpperCase() }));
-          }
-        } catch { /* referral linking is best-effort */ }
-      }
-
-      // Welcome message in the new user's bell
-      try {
-        await db.insert(notifications).values({
-          userId: insertedUser.id,
-          type: "welcome",
-          title: "Welcome to DigitalCarda 👋",
-          message: "Your account is ready. Complete your card profile to start getting enquiries.",
-          link: "/dashboard/home",
-        });
-      } catch { /* non-critical */ }
-
-      // Give the new account its own live card URL + start the trial.
-      await provisionStarterCard(db, insertedUser, input.companyName);
+      await welcomeNewAccount(db, insertedUser, {
+        referralCode: input.referralCode, companyName: input.companyName, verifyEmail: true,
+      });
 
       const token = await createToken({
         userId: insertedUser.id,
@@ -318,6 +335,108 @@ export const authRouter = createRouter({
       username: z.string().optional(),
     }))
     .query(async ({ input }) => findTaken(input)),
+
+  // Is "Continue with Google" switched on? The Client ID is public by design —
+  // Google's button embeds it in every page that shows it — so the browser
+  // reads it from here and no rebuild is needed when it's set or changed.
+  googleConfig: publicQuery.query(() => ({ clientId: process.env.GOOGLE_CLIENT_ID?.trim() || null })),
+
+  /* Sign in or sign up with Google. The browser gets an ID token from Google
+     Identity Services and posts it here; nothing about the person is trusted
+     until that token verifies (api/lib/google-auth.ts).
+       · An account with that email already exists → signed in. Google has
+         verified the address, so the account's email is marked verified too.
+       · No account → a customer account is created exactly as email signup
+         creates one (starter card, trial, referral, welcome emails), with a
+         random password the person never sees; "Forgot password" sets a real
+         one if they ever want to sign in with email.
+     Administrator accounts are refused: they sign in with a password on the
+     admin portal. */
+  google: publicQuery
+    .input(z.object({
+      credential: z.string().min(20).max(4096),
+      referralCode: z.string().max(50).optional(),
+      companyName: z.string().max(255).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`google:${clientIp(ctx.req)}`, 10, 60_000);
+      const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+      if (!clientId) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Google sign-in isn't available yet. Please use email." });
+      }
+
+      let profile;
+      try {
+        profile = await verifyGoogleIdToken(input.credential, clientId);
+      } catch {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "We couldn't verify your Google sign-in. Please try again." });
+      }
+
+      const db = getDb();
+      let user = await db.query.users.findFirst({ where: eq(users.email, profile.email) });
+      let created = false;
+
+      if (user) {
+        if (user.role === "super_admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Administrator accounts sign in with a password on the admin portal." });
+        }
+        // Same rule as password login: only an active account may sign in.
+        if (user.status !== "active") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: user.status === "suspended"
+              ? "Account suspended. Contact support."
+              : "This account has been deactivated. Contact support to restore it.",
+          });
+        }
+        await db.update(users).set({
+          lastLoginAt: new Date(),
+          ...(user.emailVerified ? {} : { emailVerified: true, emailVerifiedAt: new Date() }),
+          ...(!user.avatar && profile.picture ? { avatar: profile.picture } : {}),
+        }).where(eq(users.id, user.id));
+      } else {
+        // An email that exists only in the pre-migration customer list belongs
+        // to an existing card — never create a second, empty identity for it.
+        const taken = await findTaken({ email: profile.email });
+        if (taken.email) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "This email already belongs to a DigitalCarda card. Sign in with your password, or contact support.",
+          });
+        }
+        const [inserted] = await db.insert(users).values({
+          email: profile.email,
+          password: await bcrypt.hash(randomBytes(32).toString("hex"), 12),
+          fullName: profile.name,
+          avatar: profile.picture,
+          role: "customer",
+          status: "active",
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+          lastLoginAt: new Date(),
+        });
+        user = await db.query.users.findFirst({ where: eq(users.id, inserted.insertId) });
+        if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user" });
+        created = true;
+        await welcomeNewAccount(db, user, {
+          referralCode: input.referralCode, companyName: input.companyName, verifyEmail: false,
+        });
+      }
+
+      const token = await createToken({ userId: user.id, email: user.email, role: user.role });
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          status: user.status,
+          avatar: user.avatar,
+        },
+        token,
+        created,
+      };
+    }),
 
   login: publicQuery
     .input(

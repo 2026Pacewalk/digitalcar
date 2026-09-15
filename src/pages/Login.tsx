@@ -11,11 +11,7 @@ import AdminPanel from "@/components/auth/AdminPanel";
 import { SUPPORT, AUTH_TRUST } from "@/components/auth/authMockData";
 import { DEMO_USERS } from "@/hooks/useAuth";
 import { getToken, getSessionUser, setSession, clearSession } from "@/lib/session";
-
-/* Social sign-in is not wired to anything yet. Rather than show a button that
-   only produces a "coming soon" toast in the most valuable slot on the page,
-   the block is compiled out. Flip this when OAuth actually lands. */
-const SOCIAL_ENABLED = false;
+import GoogleSignInButton, { useGoogleClientId, type GoogleSignInResult } from "@/components/auth/GoogleSignInButton";
 
 /* Remembers the IDENTIFIER only — never the password. Opt-in, cleared the
    moment the box is unchecked. */
@@ -68,6 +64,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") && !nextPath.startsWith("/\\")
       ? nextPath : "";
   const loginMut = trpc.auth.login.useMutation();
+  const googleClientId = useGoogleClientId();
   const slot = adminMode ? "admin" : "main"; // this login page's portal
 
   // Already signed in and sent here to reactivate → go straight to the target.
@@ -217,7 +214,14 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     idRef.current?.focus();
   };
 
-  const socialSoon = () => toast.info("Social sign-in is coming soon — use email for now.");
+  /* Signed in with Google. The server refuses administrator accounts, and a
+     first-time Google user gets a new account and lands in the card builder. */
+  const handleGoogle = (res: GoogleSignInResult) => {
+    setSession(res.token, res.user, slot);
+    if (!gateOk(res.user.role)) return;
+    toast.success(res.created ? "Account created! Welcome to DigitalCarda." : "Welcome back!");
+    navigate(res.created ? "/dashboard/build" : next || routeFor(res.user.role));
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex">
@@ -289,10 +293,16 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
                 </div>
               )}
 
-              {SOCIAL_ENABLED && !adminMode && (
-                <button onClick={socialSoon} type="button" className="w-full h-11 rounded-xl border border-[#E2E8F0] bg-white flex items-center justify-center gap-2.5 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors mb-5">
-                  Continue with Google
-                </button>
+              {/* Google sign-in — shown only once GOOGLE_CLIENT_ID is set on the server. */}
+              {googleClientId && !adminMode && (
+                <div className="mb-5">
+                  <GoogleSignInButton clientId={googleClientId} mode="signin" onSignedIn={handleGoogle} />
+                  <div className="mt-5 flex items-center gap-3">
+                    <span className="h-px flex-1 bg-[#E2E8F0]" />
+                    <span className="text-xs text-[#94A3B8]">or sign in with email</span>
+                    <span className="h-px flex-1 bg-[#E2E8F0]" />
+                  </div>
+                </div>
               )}
 
               <form onSubmit={handleLogin} className="space-y-4" noValidate>
