@@ -602,11 +602,49 @@ function FeaturesSection() {
     <section className="relative overflow-hidden py-20" id="features">
       <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-40 h-[480px] w-[900px] -translate-x-1/2 rounded-full bg-[#F7B31C]/[0.07] blur-3xl" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          eyebrow="Features"
-          title={<>Everything You Need in <span className="text-gradient-gold sm:whitespace-nowrap">One Digital Card</span></>}
-          subtitle={`${total} features, grouped by what you want to do — build, share, convert and grow.`}
-        />
+        {/* The words "One Digital Card" sit on a small card of their own, so the
+            heading shows the product rather than only naming it. */}
+        <Reveal className="mx-auto mb-14 max-w-4xl text-center">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white py-1 pl-1 pr-3.5 text-xs font-semibold text-[#92400E] shadow-premium ring-1 ring-[#FDE68A]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#F7B31C] to-[#FBBF24] px-2.5 py-1 text-[11px] font-bold text-[#0B1120]">
+              <Sparkles size={12} /> {total}
+            </span>
+            features in one card
+          </span>
+
+          <h2 className="mt-6 text-[1.9rem] font-extrabold leading-[1.12] tracking-tight text-[#0F172A] sm:text-5xl lg:text-[3.5rem]">
+            <span className="block">Everything You Need</span>{" "}
+            <span className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:mt-4 sm:gap-x-4">
+              <span>in</span>{" "}
+              <span className="relative inline-flex -rotate-2 items-center gap-3 whitespace-nowrap rounded-2xl bg-[#0B1120] px-4 py-2 shadow-[0_22px_40px_-18px_rgba(2,6,23,0.7)] ring-1 ring-white/10 transition-transform duration-500 hover:rotate-0 motion-reduce:transition-none sm:gap-4 sm:rounded-[22px] sm:py-3 sm:pl-4 sm:pr-7">
+                <span aria-hidden="true" className="hidden h-9 w-12 shrink-0 grid-cols-3 gap-[2px] rounded-md bg-gradient-to-br from-[#FDE68A] to-[#D97706] p-1 sm:grid">
+                  {Array.from({ length: 6 }, (_, i) => <span key={i} className="rounded-[2px] bg-[#0B1120]/20" />)}
+                </span>
+                <span className="text-gradient-gold">One Digital Card</span>
+                <span aria-hidden="true" className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#14B8A6] text-white shadow-lg ring-2 ring-[#F8FAFC] sm:h-7 sm:w-7">
+                  <Check size={14} />
+                </span>
+              </span>
+            </span>
+          </h2>
+
+          <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-[#64748B] sm:text-lg">Grouped by what you want your card to do.</p>
+          <ol className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {[
+              { icon: CreditCard, label: "Build" },
+              { icon: Share2, label: "Share" },
+              { icon: Users, label: "Convert" },
+              { icon: TrendingUp, label: "Grow" },
+            ].map((s, i, all) => (
+              <li key={s.label} className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-sm font-semibold text-[#0F172A] shadow-premium ring-1 ring-[#E2E8F0]">
+                  <s.icon size={14} className="text-[#D97706]" /> {s.label}
+                </span>
+                {i < all.length - 1 && <ArrowRight aria-hidden="true" size={14} className="text-[#CBD5E1]" />}
+              </li>
+            ))}
+          </ol>
+        </Reveal>
 
         <Reveal stagger className="grid gap-4 md:grid-cols-6 lg:grid-cols-12">
           <FeatureTileCard tile={build} dark className="md:col-span-6 lg:col-span-7 lg:row-span-2"><BuildArt /></FeatureTileCard>
@@ -1097,45 +1135,111 @@ function PersonaSection() {
   );
 }
 
-/* ─── How It Works ─── */
+/* ─── How It Works ───
+   Dark on purpose: it follows light sections, and the step illustrations sit
+   on cream discs so their navy line-work still reads. The steps are a real
+   sequence, so the big 01 / 02 / 03 numerals carry information. */
 function HowItWorksSection() {
   const steps = [
-    { num: 1, title: "Create Your Own", desc: "It takes 2 minutes. Choose a template, add your details, and customize your card.", img: "/step-create.png" },
-    { num: 2, title: "Save to Your Device", desc: "Accessible anytime, from anywhere — on phone, tablet, or desktop.", img: "/step-save.png" },
-    { num: 3, title: "Share with Everyone", desc: "Share via WhatsApp, Email, QR Code, and social media with a single tap.", img: "/step-share.png" },
+    {
+      num: 1, img: "/step-create.png", chip: "About 2 minutes", chipIcon: Clock,
+      title: "Pick. Fill. Done.",
+      desc: "Choose one of 50+ templates, add your details and make it yours — no designer needed.",
+    },
+    {
+      num: 2, img: "/step-save.png", chip: "Updates live", chipIcon: Zap,
+      title: "Always in your pocket",
+      desc: "Save it to your phone, tablet or desktop. Change a detail once and every shared link updates.",
+    },
+    {
+      num: 3, img: "/step-share.png", chip: "WhatsApp · QR · Email", chipIcon: Share2,
+      title: "One tap, everywhere",
+      desc: "Send it on WhatsApp, by email, as a QR code or on social media — people save you in a tap.",
+    },
   ];
+
   return (
-    <section className="py-20 bg-gradient-to-br from-[#F7B31C] via-[#D97706] to-[#F7B31C] relative overflow-hidden">
-      <div className="absolute inset-0 bg-grid-dark opacity-20" />
-      <div className="absolute top-0 left-0 w-40 h-40 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute bottom-0 right-0 w-56 h-56 bg-white/10 rounded-full translate-x-1/3 translate-y-1/3" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <div className="text-center mb-12">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#0F172A]/10 text-[#0F172A] mb-3">How it works</span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Live in Three Simple Steps</h2>
-        </div>
-        <Reveal stagger className="grid md:grid-cols-3 gap-8 relative">
-          {/* connecting line */}
-          <div className="hidden md:block absolute top-20 left-[16%] right-[16%] h-0.5 border-t-2 border-dashed border-white/30" />
-          {steps.map((s) => (
-            <div key={s.num} className="text-center group relative z-10">
-              <div className="relative w-40 h-40 mx-auto mb-6">
-                <div className="absolute inset-0 bg-white/20 rounded-full group-hover:bg-white/30 transition-colors" />
-                <img src={s.img} alt={s.title} className="relative z-10 w-full h-full object-contain p-4 drop-shadow-lg group-hover:scale-105 transition-transform duration-300" />
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-[#0F172A] border-2 border-[#F7B31C] flex items-center justify-center z-20">
-                  <span className="text-xs font-bold text-[#F7B31C]">{s.num}</span>
-                </div>
+    <section className="relative overflow-hidden bg-[#0B1120] py-20 sm:py-24">
+      <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-30" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-32 -top-32 h-[420px] w-[420px] rounded-full bg-[#F7B31C]/15 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -right-24 h-[420px] w-[420px] rounded-full bg-[#14B8A6]/10 blur-3xl" />
+
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F7B31C]/10 px-3 py-1 text-xs font-semibold text-[#F7B31C] ring-1 ring-[#F7B31C]/20">
+            <Zap size={12} /> How it works
+          </span>
+          <h2 className="mt-5 text-[2rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-[3.3rem]">
+            Live before your{" "}
+            <span className="relative inline-block whitespace-nowrap text-gradient-gold">
+              chai gets cold
+              <svg aria-hidden="true" className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 300 10" fill="none" preserveAspectRatio="none">
+                <path d="M2 7c60-5 120-5 180-2s90 3 116-1" stroke="#F7B31C" strokeWidth="3" strokeLinecap="round" opacity="0.6" />
+              </svg>
+            </span>
+          </h2>
+          <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-[#94A3B8] sm:text-lg">
+            Three steps. About two minutes. No printing, no app to install.
+          </p>
+        </Reveal>
+
+        <Reveal stagger className="relative mt-14 grid gap-5 md:grid-cols-3 md:gap-6">
+          {steps.map((s, i) => (
+            <article
+              key={s.num}
+              className="group relative flex flex-col rounded-3xl bg-white/[0.04] p-6 ring-1 ring-white/10 transition duration-300 hover:-translate-y-1 hover:bg-white/[0.06] hover:ring-[#F7B31C]/40 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-7"
+            >
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute right-5 top-4 select-none font-display text-7xl font-extrabold leading-none text-transparent [-webkit-text-stroke:1.5px_rgba(247,179,28,0.35)] transition-colors duration-300 group-hover:[-webkit-text-stroke:1.5px_rgba(247,179,28,0.7)]"
+              >
+                0{s.num}
+              </span>
+
+              <div className="relative h-32 w-32 rounded-full bg-gradient-to-br from-[#FFF7E6] to-[#FDE68A] p-3 shadow-[0_20px_40px_-20px_rgba(247,179,28,0.7)] ring-4 ring-white/5 transition-transform duration-500 group-hover:-rotate-3 group-hover:scale-105 motion-reduce:transition-none">
+                <img src={s.img} alt="" width={128} height={128} loading="lazy" className="h-full w-full object-contain" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">{s.title}</h3>
-              <p className="text-xs text-white/80 leading-relaxed max-w-xs mx-auto">{s.desc}</p>
-            </div>
+
+              <span className="mt-6 inline-flex items-center gap-1.5 self-start rounded-full bg-[#F7B31C]/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-[#F7B31C] ring-1 ring-[#F7B31C]/20">
+                <s.chipIcon size={12} /> {s.chip}
+              </span>
+              <h3 className="mt-3 text-xl font-bold tracking-tight text-white">
+                <span className="sr-only">Step {s.num}: </span>{s.title}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-[#94A3B8]">{s.desc}</p>
+
+              {i < steps.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-[18px] top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-[#F7B31C] text-[#0B1120] shadow-[0_0_0_6px_#0B1120] md:flex"
+                >
+                  <ArrowRight size={16} />
+                </span>
+              )}
+            </article>
           ))}
         </Reveal>
-        <div className="text-center mt-12">
-          <Link to="/signup" className="inline-flex items-center justify-center gap-2 h-12 px-10 bg-[#0F172A] text-white rounded-2xl text-sm font-semibold hover:bg-[#1E293B] transition-all hover:shadow-lg active:scale-[0.98]">
-            Create Now <ArrowRight size={16} />
-          </Link>
-        </div>
+
+        <Reveal className="mt-12 flex flex-col items-center gap-5">
+          <div className="flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
+            <Link to="/signup" className="btn-gold inline-flex h-12 w-full items-center justify-center gap-2 px-7 text-base sm:w-auto">
+              Create my card free <ArrowRight size={17} />
+            </Link>
+            <Link
+              to="/digital-business-cards-templates"
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/5 sm:w-auto"
+            >
+              Browse 50+ templates
+            </Link>
+          </div>
+          <ul className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-[13px] text-[#94A3B8]">
+            {["30 days free", "No card details needed", "Update anytime"].map((t) => (
+              <li key={t} className="inline-flex items-center gap-1.5">
+                <Check size={14} className="text-[#4ADE80]" /> {t}
+              </li>
+            ))}
+          </ul>
+        </Reveal>
       </div>
     </section>
   );
@@ -1816,20 +1920,25 @@ const SHOW_PRICING_SECTION = false;
 export default function Home() {
   return (
     <>
+      {/* 1. Hook and proof */}
       <HeroSection />
       <StatsBand />
       <TrustedSection />
-      <PersonaSection />
-      <FeaturesSection />
+      {/* 2. Why switch from paper (dark) */}
       <WhyDigitalCardaSection />
-      <AISection />
-      <TemplatesSection />
+      {/* 3. What you get, how easy it is, and a design to start from */}
+      <FeaturesSection />
       <HowItWorksSection />
+      <TemplatesSection />
+      <PersonaSection />
+      {/* 4. Deeper value */}
+      <AISection />
       <AnalyticsSection />
       <QRNFCSection />
       <WhereToUseSection />
       <CustomDomainSection />
       <GrowSection />
+      {/* 5. Proof, price, objections, close */}
       <TestimonialsSection />
       {SHOW_RESELLER_SECTION && <ResellerSection />}
       {SHOW_PRICING_SECTION && <PricingSection />}

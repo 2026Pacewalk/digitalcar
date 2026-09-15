@@ -200,10 +200,7 @@ export default function SiteHeader({ signupHref }: { signupHref: string }) {
                       open ? "bg-white/10 text-white" : active ? "text-[#F7B31C]" : "text-[#CBD5E1] hover:bg-white/[0.06] hover:text-white"
                     }`}
                   >
-                    {m.label}
-                    {m.id === "tools" && (
-                      <span className="rounded-full bg-[#F7B31C] px-1.5 text-[9px] font-extrabold uppercase leading-4 tracking-wide text-[#0B1120]">Free</span>
-                    )}
+                    <MenuLabel menu={m} />
                     <ChevronDown size={14} className={`opacity-70 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
                     {active && <span aria-hidden="true" className="absolute inset-x-3 -bottom-[3px] h-0.5 rounded-full bg-gradient-to-r from-transparent via-[#F7B31C] to-transparent" />}
                   </button>
@@ -353,6 +350,19 @@ export default function SiteHeader({ signupHref }: { signupHref: string }) {
 
       {searchOpen && <SearchDialog onClose={() => setSearchOpen(false)} modKey={modKey} />}
     </>
+  );
+}
+
+/** A menu's label. "Free tools" shows its first word as a yellow pill, so the
+    word is highlighted once instead of repeated beside the label. */
+function MenuLabel({ menu }: { menu: HeaderMenu }) {
+  const [first, ...rest] = menu.label.split(" ");
+  if (menu.id !== "tools") return <>{menu.label}</>;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="rounded-full bg-[#F7B31C] px-2 text-[0.8em] font-bold leading-5 text-[#0B1120]">{first}</span>
+      {rest.join(" ")}
+    </span>
   );
 }
 
@@ -531,8 +541,7 @@ function MobileMenu({
                     onClick={() => setGroup(expanded ? null : m.id)}
                     className="flex w-full items-center gap-2 rounded-2xl px-3.5 py-3.5 text-left text-[15px] font-semibold"
                   >
-                    <span className={active ? "text-[#F7B31C]" : "text-white"}>{m.label}</span>
-                    {m.id === "tools" && <span className="rounded-full bg-[#F7B31C] px-1.5 text-[9px] font-extrabold uppercase leading-4 text-[#0B1120]">Free</span>}
+                    <span className={active ? "text-[#F7B31C]" : "text-white"}><MenuLabel menu={m} /></span>
                     <ChevronDown size={17} className={`ml-auto text-[#64748B] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
                   </button>
                   <div className={`grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none ${expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
