@@ -152,6 +152,11 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
   "/email-signature-templates": { ...SEO_EMAIL_SIGNATURE, canonicalPath: "/email-signature-generator" },
   "/whatsapp-message-templates": SEO_WHATSAPP_TEMPLATES,
   "/whatsapp-business-messages": { ...SEO_WHATSAPP_TEMPLATES, canonicalPath: "/whatsapp-message-templates" },
+  "/sitemap": {
+    title: "Sitemap — Every DigitalCarda Page",
+    description: "Every public page on DigitalCarda in one place: features, pricing, all digital business card templates, free tools, business programmes and policies.",
+    crumb: "Sitemap",
+  },
   "/terms-of-service": {
     title: "Terms & Conditions - DigitalCarda",
     description: "Read our terms of service to understand the rules and guidelines for using DigitalCarda.",

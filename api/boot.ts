@@ -659,7 +659,7 @@ app.get("/sitemap.xml", async (c) => {
     // Free tools — canonical URLs only; each has an alias route that deliberately
     // stays out of the sitemap so the two never compete for the same terms.
     "/free-tools", "/email-signature-generator", "/whatsapp-message-templates",
-    "/privacy", "/refund-policy", "/terms-of-service"];
+    "/privacy", "/refund-policy", "/terms-of-service", "/sitemap"];
   const customers = (await readPublicJson("customers")) as { slug?: string }[];
   const slugs = [...new Set(customers.map((x) => String(x.slug || "").trim()).filter(Boolean))];
 

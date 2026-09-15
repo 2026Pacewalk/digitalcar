@@ -4,9 +4,10 @@ import {
   Menu, X, CreditCard, ChevronRight, Phone, Mail,
   Twitter, Linkedin, Instagram, Facebook,
   Sparkles, LayoutGrid, Tag, Wand2, Users, MessageCircle, LogIn, ArrowRight, Headphones, Layers, Gift,
-  PenLine,
+  PenLine, FileCode2,
 } from "lucide-react";
 import { DEFAULT_SEO, seoForPath, breadcrumbJsonLd } from "@/lib/publicSeo";
+import { CONTACT, FOOTER_GROUPS, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicNav";
 
 export default function PublicLayout() {
   const [scrolled, setScrolled] = useState(false);
@@ -94,7 +95,7 @@ export default function PublicLayout() {
           logo: "https://digitalcarda.in/apple-touch-icon.png",
           // Profiles that are verifiably ours. Ties the brand entity together for
           // Google and AI answer engines; add each new official profile here.
-          sameAs: ["https://in.pinterest.com/digitalcarda/"],
+          sameAs: SOCIAL_LINKS.map((s) => s.href),
           description: "DigitalCarda builds AI-powered digital business cards and smart microsites for businesses and professionals across India.",
           contactPoint: {
             "@type": "ContactPoint",
@@ -362,89 +363,105 @@ export default function PublicLayout() {
 
       <main><Outlet /></main>
 
-      {/* Footer */}
-      <footer className="bg-[#0F172A] text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-28 lg:pb-16">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {/* Company */}
-            <div>
-              <h4 className="font-semibold text-sm mb-4 text-white">Company</h4>
-              <div className="space-y-2.5">
-                <Link to="/" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">About DigitalCarda</Link>
-                <Link to="/features" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Features</Link>
-                <Link to="/digital-business-cards-templates" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Templates</Link>
-                <Link to="/pricing" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Pricing</Link>
-                <Link to="/contact" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Contact</Link>
-              </div>
-            </div>
+      {/* Footer. Link lists come from src/lib/publicNav.ts — the same source as
+          the /sitemap page — so the two can never list different pages. */}
+      <footer className="relative overflow-hidden bg-[#0B1120] text-white">
+        <div aria-hidden="true" className="pointer-events-none absolute -top-48 left-1/2 h-[420px] w-[760px] -translate-x-1/2 rounded-full bg-[#F7B31C]/10 blur-[120px]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 sm:pt-16 pb-28 lg:pb-10">
 
-            {/* Product */}
-            <div>
-              <h4 className="font-semibold text-sm mb-4 text-white">Product</h4>
-              <div className="space-y-2.5">
-                <Link to="/features" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Digital Business Card</Link>
-                <Link to="/ai-card-generator" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">AI Card Builder</Link>
-                <Link to="/free-tools" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">All Free Tools</Link>
-                <Link to="/email-signature-generator" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Email Signature Generator</Link>
-                <Link to="/whatsapp-message-templates" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">WhatsApp Templates</Link>
-                <Link to="/features" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">QR Code Card</Link>
-                <Link to="/custom-domain" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Custom Domain</Link>
-                <Link to="/features" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Analytics</Link>
-              </div>
+          {/* Closing call to action */}
+          <div className="flex flex-col justify-between gap-6 rounded-3xl border border-white/10 bg-gradient-to-br from-[#1A2438] via-[#131C2E] to-[#0F172A] p-6 sm:p-10 lg:flex-row lg:items-center">
+            <div className="max-w-xl">
+              <p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]">
+                <Sparkles size={13} /> 30-day free trial · no card details
+              </p>
+              <p className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-white text-balance">
+                Your whole business, one link away.
+              </p>
+              <p className="mt-2 text-sm sm:text-[15px] leading-relaxed text-[#94A3B8]">
+                Contact details, services, payments and enquiries on a digital business card people open instantly — no app to install.
+              </p>
             </div>
-
-            {/* For Business */}
-            <div>
-              <h4 className="font-semibold text-sm mb-4 text-white">For Business</h4>
-              <div className="space-y-2.5">
-                <Link to="/resellers" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Reseller Program</Link>
-                <Link to="/refer-earn" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Refer &amp; Earn</Link>
-                <Link to="/industries" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Agencies</Link>
-                <Link to="/industries" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Freelancers</Link>
-                <Link to="/industries" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Local Businesses</Link>
-                <Link to="/contact" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Enterprise</Link>
-              </div>
-            </div>
-
-            {/* Legal */}
-            <div>
-              <h4 className="font-semibold text-sm mb-4 text-white">Legal</h4>
-              <div className="space-y-2.5">
-                <Link to="/privacy" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Privacy Policy</Link>
-                <Link to="/refund-policy" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Refund Policy</Link>
-                <Link to="/terms-of-service" className="block text-sm text-[#94A3B8] hover:text-[#F7B31C] transition-colors">Terms &amp; Conditions</Link>
-              </div>
-              <div className="mt-6 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-[#94A3B8]">
-                  <Mail size={14} className="text-[#64748B]" /> hello@digitalcarda.in
-                </div>
-                <div className="flex items-center gap-2 text-sm text-[#94A3B8]">
-                  <Phone size={14} className="text-[#64748B]" /> +91 95177 22444
-                </div>
-              </div>
+            <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+              <Link to={signupHref} className="btn-gold inline-flex h-12 items-center justify-center gap-2 px-6">
+                Create my free card <ArrowRight size={16} />
+              </Link>
+              <a href={CONTACT.whatsappHref} target="_blank" rel="noreferrer"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/15 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/5">
+                <MessageCircle size={16} className="text-[#25D366]" /> Chat on WhatsApp
+              </a>
             </div>
           </div>
 
-          <div className="border-t border-[#1E293B] mt-12 pt-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg gradient-gold flex items-center justify-center">
-                  <CreditCard size={16} className="text-[#0F172A]" />
-                </div>
-                <span className="text-lg font-bold text-white">DigitalCarda</span>
-              </div>
-              <p className="text-sm text-[#64748B] text-center">
-                DigitalCarda is a smart digital business card platform that helps businesses create, share, and track professional digital cards with AI-powered tools.
+          {/* Brand + link columns */}
+          <div className="mt-14 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8">
+            <div className="lg:col-span-4">
+              <Link to="/" className="inline-flex items-center" aria-label="DigitalCarda home">
+                <img src="/logo.png" alt="DigitalCarda" className="h-10 w-auto object-contain" loading="lazy" />
+              </Link>
+              <p className="mt-4 max-w-sm text-sm leading-relaxed text-[#94A3B8]">
+                DigitalCarda helps businesses across India create, share and track digital business cards — with AI writing, QR sharing, payments and lead capture built in.
               </p>
-              <div className="flex items-center gap-4">
-                {[Twitter, Linkedin, Instagram, Facebook].map((Icon, i) => (
-                  <span key={i} className="w-9 h-9 rounded-lg bg-[#1E293B] flex items-center justify-center text-[#94A3B8] hover:text-[#F7B31C] hover:bg-[#1E293B]/80 transition-all cursor-pointer">
-                    <Icon size={16} />
-                  </span>
-                ))}
-              </div>
+              <ul className="mt-6 space-y-3 text-sm">
+                <li>
+                  <a href={"mailto:" + CONTACT.email} className="inline-flex items-center gap-2.5 text-[#CBD5E1] transition-colors hover:text-[#F7B31C]">
+                    <Mail size={15} className="text-[#64748B]" /> {CONTACT.email}
+                  </a>
+                </li>
+                <li>
+                  <a href={CONTACT.phoneHref} className="inline-flex items-center gap-2.5 text-[#CBD5E1] transition-colors hover:text-[#F7B31C]">
+                    <Phone size={15} className="text-[#64748B]" /> {CONTACT.phone}
+                  </a>
+                </li>
+                <li>
+                  <a href={CONTACT.whatsappHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2.5 text-[#CBD5E1] transition-colors hover:text-[#F7B31C]">
+                    <MessageCircle size={15} className="text-[#64748B]" /> WhatsApp us
+                  </a>
+                </li>
+              </ul>
+              {SOCIAL_LINKS.length > 0 && (
+                <div className="mt-6 flex items-center gap-2.5">
+                  {SOCIAL_LINKS.map((s) => (
+                    <a key={s.href} href={s.href} target="_blank" rel="noreferrer me" aria-label={"DigitalCarda on " + s.label}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10 transition-colors hover:bg-white/10">
+                      <img src={s.icon} alt="" width={20} height={20} className="h-5 w-5" loading="lazy" />
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
-            <p className="text-xs text-[#64748B] text-center mt-6"> 2026 DigitalCarda. All rights reserved.</p>
+
+            <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 lg:col-span-8">
+              {FOOTER_GROUPS.map((g) => (
+                <nav key={g.title} aria-label={g.title}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#64748B]">{g.title}</p>
+                  <ul className="mt-4 space-y-2.5">
+                    {g.links.map((l) => (
+                      <li key={l.href}>
+                        <Link to={l.href} className="text-sm text-[#CBD5E1] transition-colors hover:text-white">{l.label}</Link>
+                        {l.badge && (
+                          <span className="ml-2 rounded bg-[#F7B31C]/15 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-[#F7B31C]">{l.badge}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom bar */}
+          <div className="mt-14 flex flex-col-reverse justify-between gap-4 border-t border-white/10 pt-6 md:flex-row md:items-center">
+            <p className="text-xs text-[#64748B]">© {new Date().getFullYear()} DigitalCarda. All rights reserved. · Made in India</p>
+            <nav aria-label="Legal" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+              {LEGAL_LINKS.map((l) => (
+                <Link key={l.href} to={l.href} className="text-[#94A3B8] transition-colors hover:text-white">{l.label}</Link>
+              ))}
+              <Link to="/sitemap" className="text-[#94A3B8] transition-colors hover:text-white">Sitemap</Link>
+              <a href="/sitemap.xml" className="inline-flex items-center gap-1.5 text-[#94A3B8] transition-colors hover:text-white">
+                <FileCode2 size={13} /> sitemap.xml
+              </a>
+            </nav>
           </div>
         </div>
       </footer>

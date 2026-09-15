@@ -78,6 +78,7 @@ const CustomerWhatsAppMessage = lazy(() => import("./pages/customer/WhatsAppMess
 const FreeTools = lazy(() => import("./pages/public/FreeTools"));
 const EmailSignatureGenerator = lazy(() => import("./pages/public/EmailSignatureGenerator"));
 const WhatsAppTemplates = lazy(() => import("./pages/public/WhatsAppTemplates"));
+const PublicSitemap = lazy(() => import("./pages/public/Sitemap"));
 const CustomerCustomDomain = lazy(() => import("./pages/customer/CustomDomain"));
 const AITools = lazy(() => import("./pages/customer/AITools"));
 const CustomerHome = lazy(() => import("./pages/customer/Home"));
@@ -210,6 +211,7 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/refund-policy" element={<RefundPolicy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/sitemap" element={<PublicSitemap />} />
         </Route>
 
         {/* Auth */}

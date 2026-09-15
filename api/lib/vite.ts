@@ -165,7 +165,7 @@ const SSR_PATHS = new Set([
   "/free-tools", "/email-signature-generator", "/email-signature-templates",
   "/whatsapp-message-templates", "/whatsapp-business-messages",
   "/digital-business-cards-templates", "/templates", "/card-designs",
-  "/privacy", "/refund-policy", "/terms-of-service",
+  "/privacy", "/refund-policy", "/terms-of-service", "/sitemap",
 ]);
 const PRODUCT_PATH = /^\/digital-business-cards-templates\/([^/]+)$/;
 const SSR_DATA_TIMEOUT_MS = 2500;
@@ -210,7 +210,7 @@ async function ssrSeeds(clean: string): Promise<SsrSeed[]> {
     jobs.push(run().then((data) => ({ path: procPath, input, data }), () => null));
 
   const product = clean.match(PRODUCT_PATH);
-  if (clean === "/" || clean === "/digital-business-cards-templates" || product) {
+  if (clean === "/" || clean === "/digital-business-cards-templates" || clean === "/sitemap" || product) {
     seed("product.catalogue", undefined, () => caller.product.catalogue());
   }
   if (product) {
