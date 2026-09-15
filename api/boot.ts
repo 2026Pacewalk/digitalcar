@@ -365,11 +365,45 @@ async function addHiddenIds(file: string, ids: string[]): Promise<number> {
   return cur.size;
 }
 
+/* Enquiries sent through the website's contact form. They are stored in the
+   leads table (source "website"), not the legacy enquiries file, so they are
+   shaped like the file's rows here and put in front of them — the admin Leads
+   page then shows one list. Ids are prefixed so they can never collide with a
+   legacy id, and hiding one works through the same overlay. */
+async function websiteEnquiries(): Promise<Record<string, unknown>[]> {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { leads } = await import("@db/schema");
+    const { eq, desc } = await import("drizzle-orm");
+    const rows = await getDb().select().from(leads)
+      .where(eq(leads.source, "website")).orderBy(desc(leads.createdAt)).limit(1000);
+    // The legacy rows carry India time as "YYYY-MM-DD HH:MM:SS".
+    const ist = (d: Date) => new Date(d.getTime() + 5.5 * 3600_000).toISOString().slice(0, 19).replace("T", " ");
+    return rows.map((r) => ({
+      id: `web-${r.id}`,
+      name: r.fullName,
+      contact: r.phone || "",
+      email: r.email || "",
+      description: [r.company ? `Business: ${r.company}` : "", r.message || ""].filter(Boolean).join("\n"),
+      uname: "admin",
+      created_on: ist(new Date(r.createdAt)),
+      status: r.status === "converted" ? "converted" : "",
+      reseller_convert: null,
+      converted_on: null,
+      remarks: r.notes || null,
+    }));
+  } catch (e) {
+    console.error("[admin] website enquiries skipped:", (e as Error).message);
+    return [];
+  }
+}
+
 app.get("/api/admin/data/:file", async (c) => {
   const file = c.req.param("file");
   if (!SENSITIVE.has(file)) return c.json({ error: "Not found" }, 404);
   if (!(await requireSuperAdmin(c))) return c.json({ error: "Unauthorized" }, 401);
-  const data = await readPublicJson(file);
+  let data = await readPublicJson(file);
+  if (file === "enquiries" && Array.isArray(data)) data = [...(await websiteEnquiries()), ...data];
   if ((file === "enquiries" || file === "customers") && Array.isArray(data)) {
     const hidden = await getHiddenIds(file);
     if (hidden.size) return c.json((data as Record<string, unknown>[]).filter((r) => !hidden.has(String(r.id))));

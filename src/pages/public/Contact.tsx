@@ -50,7 +50,7 @@ export default function Contact() {
   const send = trpc.contact.send.useMutation({
     onSuccess: () => {
       setSubmitted(true);
-      toast.success("Enquiry sent — we will get back to you within 24 hours.");
+      toast.success("Enquiry sent — a confirmation is on its way to your inbox.");
     },
     onError: (err) => {
       // Zod validation errors arrive as a raw JSON blob; never show that.

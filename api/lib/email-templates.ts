@@ -800,6 +800,40 @@ export function resellerApplicationReceivedEmail(o: { name?: string }): Email {
   };
 }
 
+/* The person who wrote in through the website's /contact form. Confirms the
+   enquiry arrived and says what happens next. It never repeats what they typed:
+   the form accepts any address, so echoing free text would let anyone send
+   their own words to a stranger from our domain (see api/contact-router.ts). */
+export function contactReceivedEmail(o: { name?: string | null; requirement?: string | null }): Email {
+  const rows: [string, string][] = [
+    ["WhatsApp", `<a href="https://wa.me/919517722444" style="color:${BRAND.goldDark};text-decoration:none">+91 95177 22444</a>`],
+    ["Email", `<a href="mailto:hello@digitalcarda.in" style="color:${BRAND.ink};text-decoration:none">hello@digitalcarda.in</a>`],
+  ];
+  const about = o.requirement ? ` about <strong style="color:${BRAND.ink}">${esc(o.requirement)}</strong>` : "";
+  const bodyHtml =
+    hi(o.name) +
+    p(`Thanks for contacting <strong style="color:${BRAND.ink}">DigitalCarda</strong>. We've received your enquiry${about}, and someone from our team will get back to you within 24 hours.`) +
+    p("If it's urgent, message us on WhatsApp — that's where we reply fastest.") +
+    detailTable(rows) +
+    button("Browse card templates", `${SITE}/digital-business-cards-templates`) +
+    p(`<span style="color:${BRAND.sub};font-size:13px">Want to add something? Just reply to this email.</span>`);
+  return {
+    kind: "contactReceivedEmail",
+    subject: "We've received your enquiry — DigitalCarda",
+    html: layout({
+      preheader: "Thanks for contacting DigitalCarda — we'll get back to you within 24 hours.",
+      badge: "Enquiry received", heading: "Thanks for reaching out 🙏", bodyHtml,
+      footer: "You're receiving this because you sent an enquiry on digitalcarda.in.",
+    }),
+    text: [
+      `Hi ${o.name || "there"},`, "",
+      `Thanks for contacting DigitalCarda. We've received your enquiry${o.requirement ? ` about ${o.requirement}` : ""}, and someone from our team will get back to you within 24 hours.`, "",
+      "Urgent? WhatsApp us on +91 95177 22444 or email hello@digitalcarda.in.", "",
+      `Browse card templates: ${SITE}/digital-business-cards-templates`,
+    ].join("\n"),
+  };
+}
+
 export function resellerApprovedEmail(o: { name?: string; link: string }): Email {
   const bodyHtml =
     hi(o.name) +
