@@ -650,8 +650,11 @@ app.get("/q/:publicId", async (c) => {
   return c.redirect("/", 302);
 });
 
-// Dynamic sitemap: marketing pages + every public card, so Google can discover
-// all 500+ card profiles.
+// Dynamic sitemap: marketing pages, template pages and every public card worth
+// indexing, so Google can discover the card profiles. Built from every published
+// snapshot, so the result is kept for a few minutes rather than rebuilt per hit.
+let sitemapXml: { body: string; at: number } | null = null;
+const SITEMAP_TTL = 10 * 60_000;
 app.get("/sitemap.xml", async (c) => {
   const base = "https://digitalcarda.in";
   const pages = ["", "/digital-business-cards-templates", "/templates", "/features", "/pricing", "/industries", "/bulk-cards",
@@ -660,8 +663,12 @@ app.get("/sitemap.xml", async (c) => {
     // stays out of the sitemap so the two never compete for the same terms.
     "/free-tools", "/email-signature-generator", "/whatsapp-message-templates",
     "/privacy", "/refund-policy", "/terms-of-service", "/sitemap"];
-  const customers = (await readPublicJson("customers")) as { slug?: string }[];
-  const slugs = [...new Set(customers.map((x) => String(x.slug || "").trim()).filter(Boolean))];
+  if (sitemapXml && Date.now() - sitemapXml.at < SITEMAP_TTL) {
+    return c.body(sitemapXml.body, 200, { "content-type": "application/xml; charset=utf-8" });
+  }
+  const customers = (await readPublicJson("customers")) as Record<string, unknown>[];
+  const legacyProducts = (await readPublicJson("product")) as Record<string, unknown>[];
+  const { cardSeo } = await import("../src/lib/cardSeo");
 
   // <lastmod> lets crawlers spend their visits on pages that actually changed.
   // Only real dates go in: product and card edits come from the database;
@@ -681,6 +688,9 @@ app.get("/sitemap.xml", async (c) => {
   // Published product landing pages (indexable ecommerce pages, §50).
   let productRows: { slug: string; updatedAt: Date | null }[] = [];
   const cardEdited = new Map<string, string>();
+  // Cards published from the dashboard, newest per slug: they override the
+  // legacy customers.json row, exactly as they do on the card page itself.
+  const published = new Map<string, { slug: string; customer: Record<string, unknown>; products: { name?: unknown }[] }>();
   try {
     const { getDb } = await import("./queries/connection");
     const { products, publishedCards } = await import("@db/schema");
@@ -688,22 +698,55 @@ app.get("/sitemap.xml", async (c) => {
     const db = getDb();
     productRows = (await db.select({ slug: products.slug, updatedAt: products.updatedAt }).from(products).where(eq(products.status, "published")))
       .filter((r) => r.slug);
-    for (const r of await db.select({ slug: publishedCards.slug, updatedAt: publishedCards.updatedAt }).from(publishedCards)) {
-      const key = String(r.slug || "").toLowerCase();
+    const snaps = await db.select({ slug: publishedCards.slug, data: publishedCards.data, updatedAt: publishedCards.updatedAt }).from(publishedCards);
+    snaps.sort((a, b) => new Date(a.updatedAt ?? 0).getTime() - new Date(b.updatedAt ?? 0).getTime());
+    for (const r of snaps) {
+      const key = String(r.slug || "").trim().toLowerCase();
+      if (!key) continue;
       const d = day(r.updatedAt);
       // A customer can publish more than one card on a slug over time — keep the latest.
-      if (key && d && d > (cardEdited.get(key) || "")) cardEdited.set(key, d);
+      if (d && d > (cardEdited.get(key) || "")) cardEdited.set(key, d);
+      const data = r.data as { customer?: Record<string, unknown>; products?: { name?: unknown }[] } | null;
+      if (data?.customer) published.set(key, { slug: String(r.slug).trim(), customer: data.customer, products: Array.isArray(data.products) ? data.products : [] });
     }
   } catch { /* products / published_cards may not exist yet */ }
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const url = (loc: string, pri: string, lastmod = "") =>
     `  <url><loc>${esc(loc)}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<priority>${pri}</priority></url>`;
+
+  // Cards: legacy customers.json plus cards published from the dashboard. Only
+  // cards src/lib/cardSeo.ts marks indexable are listed — the same rule that puts
+  // noindex on the card page — so the sitemap never points Google at a page
+  // that asks to be left out.
+  const legacyBySlug = new Map<string, Record<string, unknown>>();
+  const cardSlugs = new Map<string, string>(); // lowercase → as written
+  for (const r of customers) {
+    const s = String(r.slug || "").trim();
+    if (!s || legacyBySlug.has(s.toLowerCase())) continue;
+    legacyBySlug.set(s.toLowerCase(), r);
+    cardSlugs.set(s.toLowerCase(), s);
+  }
+  for (const [k, v] of published) if (!cardSlugs.has(k)) cardSlugs.set(k, v.slug);
+  const productsBySlug = new Map<string, Record<string, unknown>[]>();
+  for (const p of legacyProducts) {
+    const k = String(p.uname ?? "").toLowerCase();
+    if (k) productsBySlug.set(k, [...(productsBySlug.get(k) ?? []), p]);
+  }
+  const cardUrls: string[] = [];
+  for (const [k, s] of cardSlugs) {
+    const snap = published.get(k);
+    const customer = snap?.customer ?? legacyBySlug.get(k);
+    if (!customer) continue;
+    if (!cardSeo({ slug: k, customer, products: snap ? snap.products : productsBySlug.get(k) }).indexable) continue;
+    cardUrls.push(url(`${base}/${encodeURIComponent(s)}`, "0.5", cardEdited.get(k) || ""));
+  }
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", deployDay)).join("\n") + "\n" +
     productRows.map((r) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(r.slug)}`, "0.8", day(r.updatedAt))).join("\n") + "\n" +
-    slugs.map((s) => url(`${base}/${encodeURIComponent(s)}`, "0.5", cardEdited.get(s.toLowerCase()) || "")).join("\n") +
+    cardUrls.join("\n") +
     `\n</urlset>`;
+  sitemapXml = { body, at: Date.now() };
   return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
 });
 

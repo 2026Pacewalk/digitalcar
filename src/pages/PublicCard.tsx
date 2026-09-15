@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { downloadVCard, shareCard } from "@/lib/share";
 import { buildCardHtml, buildPausedHtml } from "@/card-template/buildCard";
 import { loadCustomerContent, decodeSpecialities, imgUrl } from "@/lib/cardContent";
+import { cardTitle } from "@/lib/cardSeo";
 
 // Only allow safe schemes for owner-supplied links — blocks javascript:/data:
 // URIs that React does not stop at runtime (Phase 31). Bare domains get https://.
@@ -202,7 +203,7 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
         if (!res.ok) { if (!cancelled) setLegacyHtml(null); return; }
         const rec = await res.json();
         const c = { ...rec, specialities: decodeSpecialities(rec.specialities), logo: imgUrl("home", rec.logo) } as unknown as Parameters<typeof buildCardHtml>[0];
-        if (rec.name) document.title = `${rec.name}${rec.company_name ? " · " + rec.company_name : ""} — DigitalCarda`;
+        if (rec.name) document.title = cardTitle(rec, slug);
         const content = await loadCustomerContent(slug).catch(() => null);
         const html = buildCardHtml(c, content?.products ?? [], content?.gallery ?? [], content?.videos ?? [], content?.offers ?? [], content?.qrcodes ?? []);
         if (!cancelled) setLegacyHtml(html);
@@ -211,17 +212,13 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
     return () => { cancelled = true; };
   }, [cardLoading, dbHasContent, slug]);
 
-  // Reflect the owner's SEO Meta Title in the browser tab for snapshot cards
-  // (crawlers get it via SSR; this covers the visible tab + client navigation).
+  // Keep the browser tab title identical to the one the server sent (the owner's
+  // SEO Meta Title, or the automatic one) — both come from src/lib/cardSeo.ts.
   useEffect(() => {
     const cust = (snapshot as { customer?: Record<string, unknown> } | null)?.customer;
     if (!cust) return;
-    const t = String(cust.seo_title ?? "").trim();
-    const nm = String(cust.name ?? "").trim();
-    const co = String(cust.company_name ?? "").trim();
-    const fallback = nm ? `${nm}${co ? " · " + co : ""} — DigitalCarda` : "";
-    if (t || fallback) document.title = t || fallback;
-  }, [snapshot]);
+    document.title = cardTitle(cust, slug);
+  }, [snapshot, slug]);
 
   const handleLeadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
