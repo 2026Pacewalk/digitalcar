@@ -25,6 +25,7 @@ import { addonRouter } from "./addon-router";
 import { nfcRouter } from "./nfc-router";
 import { couponRouter } from "./coupon-router";
 import { announcementRouter } from "./announcement-router";
+import { resellerLedgerRouter } from "./reseller-ledger-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -56,6 +57,7 @@ export const appRouter = createRouter({
   nfc: nfcRouter,
   coupon: couponRouter,
   announcement: announcementRouter,
+  resellerLedger: resellerLedgerRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -249,6 +249,64 @@ export const announcements = mysqlTable("announcements", {
 
 export type Announcement = typeof announcements.$inferSelect;
 
+// Reseller accounts — offline card orders and the cash/UPI/bank/cheque payments
+// resellers make to the super-admin (api/reseller-ledger-router.ts). An account
+// may be linked to a reseller login, but doesn't have to be (legacy retailers).
+// Created at boot by api/boot.ts if missing.
+export const resellerAccounts = mysqlTable("reseller_accounts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  company: varchar("company", { length: 160 }),
+  phone: varchar("phone", { length: 30 }),
+  email: varchar("email", { length: 160 }),
+  resellerUserId: bigint("reseller_user_id", { mode: "number", unsigned: true }),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull().default("10.00"),
+  openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).notNull().default("0.00"),
+  notes: varchar("notes", { length: 500 }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("ra_user_idx").on(table.resellerUserId),
+]);
+
+export const resellerOrders = mysqlTable("reseller_orders", {
+  id: serial("id").primaryKey(),
+  accountId: bigint("account_id", { mode: "number", unsigned: true }).notNull(),
+  orderDate: timestamp("order_date").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  plan: varchar("plan", { length: 100 }),
+  quantity: int("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  grossAmount: decimal("gross_amount", { precision: 12, scale: 2 }).notNull(),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
+  commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }).notNull(),
+  netAmount: decimal("net_amount", { precision: 12, scale: 2 }).notNull(),
+  customerNames: varchar("customer_names", { length: 1000 }),
+  status: mysqlEnum("status", ["pending", "in_progress", "delivered", "cancelled"]).notNull().default("pending"),
+  notes: varchar("notes", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("ro_account_idx").on(table.accountId),
+]);
+
+export const resellerPayments = mysqlTable("reseller_payments", {
+  id: serial("id").primaryKey(),
+  accountId: bigint("account_id", { mode: "number", unsigned: true }).notNull(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  method: mysqlEnum("method", ["cash", "upi", "bank", "cheque", "other"]).notNull(),
+  reference: varchar("reference", { length: 120 }),
+  paidOn: timestamp("paid_on").notNull(),
+  note: varchar("note", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("rp_account_idx").on(table.accountId),
+  index("rp_order_idx").on(table.orderId),
+]);
+
+
 
 
 // ─── Invoices ───────────────────────────────────────────────────

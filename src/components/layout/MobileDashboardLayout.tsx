@@ -171,6 +171,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/nfc-orders": "NFC Orders",
   "/admin/coupons": "Coupons",
   "/admin/announcements": "Offer Popups",
+  "/admin/reseller-accounts": "Reseller Accounts",
   "/dashboard/qrcode": "QR Code",
   "/dashboard/qr": "QR Codes",
   "/dashboard/media": "Gallery",

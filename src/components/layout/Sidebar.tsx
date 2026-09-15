@@ -8,7 +8,7 @@ import {
   ChevronRight, Store, X, ReceiptText,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
   Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe, MailCheck, PenLine,
-  MessageCircle, Nfc, TicketPercent, Megaphone,
+  MessageCircle, Nfc, TicketPercent, Megaphone, BookOpenCheck,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -66,6 +66,7 @@ const superAdminGroups: NavGroup[] = [
   ] },
   { title: "Manage", items: [
     { label: "Resellers", icon: Store, path: "/admin/resellers" },
+    { label: "Reseller Accounts", icon: BookOpenCheck, path: "/admin/reseller-accounts" },
     { label: "Applications", icon: ClipboardList, path: "/admin/reseller-applications" },
     { label: "Customers", icon: UserCircle, path: "/admin/customers" },
     { label: "Leads", icon: MessageSquare, path: "/admin/leads" },

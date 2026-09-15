@@ -451,6 +451,75 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// One-time, idempotent schema ensure for reseller accounts, orders and payments
+// (offline reseller ledger). Additive only.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS reseller_accounts (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        name varchar(160) NOT NULL,
+        company varchar(160) NULL,
+        phone varchar(30) NULL,
+        email varchar(160) NULL,
+        reseller_user_id bigint unsigned NULL,
+        commission_rate decimal(5,2) NOT NULL DEFAULT 10.00,
+        opening_balance decimal(12,2) NOT NULL DEFAULT 0.00,
+        notes varchar(500) NULL,
+        active tinyint(1) NOT NULL DEFAULT 1,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY ra_user_idx (reseller_user_id)
+      )
+    `));
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS reseller_orders (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        account_id bigint unsigned NOT NULL,
+        order_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        title varchar(200) NOT NULL,
+        plan varchar(100) NULL,
+        quantity int NOT NULL DEFAULT 1,
+        unit_price decimal(10,2) NOT NULL,
+        gross_amount decimal(12,2) NOT NULL,
+        commission_rate decimal(5,2) NOT NULL,
+        commission_amount decimal(12,2) NOT NULL,
+        net_amount decimal(12,2) NOT NULL,
+        customer_names varchar(1000) NULL,
+        status enum('pending','in_progress','delivered','cancelled') NOT NULL DEFAULT 'pending',
+        notes varchar(500) NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY ro_account_idx (account_id)
+      )
+    `));
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS reseller_payments (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        account_id bigint unsigned NOT NULL,
+        order_id bigint unsigned NULL,
+        amount decimal(12,2) NOT NULL,
+        method enum('cash','upi','bank','cheque','other') NOT NULL,
+        reference varchar(120) NULL,
+        paid_on timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        note varchar(500) NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY rp_account_idx (account_id),
+        KEY rp_order_idx (order_id)
+      )
+    `));
+    console.log("[schema] reseller_accounts, reseller_orders, reseller_payments ensured");
+  } catch (e) {
+    console.error("[schema] ensure reseller ledger tables failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be
