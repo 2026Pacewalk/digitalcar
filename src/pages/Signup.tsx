@@ -217,7 +217,7 @@ export default function Signup() {
 
           <div className="text-center mb-6">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E] mb-3">
-              <ShieldCheck size={12} /> 30 Days Free Cardless Trial
+              <ShieldCheck size={12} /> 30-day free trial · no card details
             </span>
             <h1 className="text-2xl sm:text-[1.7rem] font-extrabold text-[#0F172A] tracking-tight">Create Your Account</h1>
             <p className="text-sm text-[#64748B] mt-1">No credit card required · Cancel anytime</p>

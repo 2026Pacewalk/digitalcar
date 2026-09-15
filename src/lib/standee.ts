@@ -41,7 +41,7 @@ export function standeeMarkup(o: StandeeData): string {
     <div class="dc-tent">
       <div class="dc-tent-head">
         <div class="dc-tent-brand"><img src="https://digitalcarda.in/logo.png" alt="DigitalCarda" /></div>
-        <h2 class="dc-tent-name">${escapeHtml(o.brandName)}</h2>
+        <p class="dc-tent-name">${escapeHtml(o.brandName)}</p>
         ${o.subtitle ? `<div class="dc-tent-sub">${escapeHtml(o.subtitle)}</div>` : ""}
       </div>
       <div class="dc-tent-body">

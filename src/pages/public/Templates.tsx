@@ -398,7 +398,7 @@ export default function Templates() {
                   ))}
                 </div>
                 <Link to={`/signup?theme=${preview.style}&color=${encodeURIComponent(preview.primary)}&color2=${encodeURIComponent(preview.secondary || "")}`} className="btn-gold h-12 w-full inline-flex items-center justify-center gap-2">Use this template <ArrowRight size={16} /></Link>
-                <p className="text-[11px] text-[#94A3B8] text-center mt-2">30 Days Free Cardless Trial</p>
+                <p className="text-[11px] text-[#94A3B8] text-center mt-2">30-day free trial · no card details</p>
               </div>
             </div>
           </div>

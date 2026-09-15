@@ -256,7 +256,7 @@ export default function PublicLayout() {
             <MessageCircle size={20} />
           </a>
           <Link to={signupHref} className="btn-gold flex-1 h-12 flex items-center justify-center gap-2 text-base">
-            30 Days Free Cardless Trial <ArrowRight size={18} />
+            Start 30-Day Free Trial <ArrowRight size={18} />
           </Link>
         </div>
       </div>

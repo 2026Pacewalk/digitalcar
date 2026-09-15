@@ -201,7 +201,7 @@ function HeroSection() {
           {/* Left */}
           <Reveal stagger>
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-white text-[#92400E] shadow-premium ring-1 ring-[#FEF3C7]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C] animate-pulse" /> AI-Powered Digital Cards · New
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C] animate-pulse" /> AI-Powered Digital Cards
             </span>
             <h1 className="mt-6 text-[2.6rem] sm:text-5xl lg:text-[3.9rem] font-extrabold text-[#0F172A] leading-[1.05] tracking-tight">
               Create Your Smart{" "}
@@ -219,7 +219,7 @@ function HeroSection() {
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Link to="/signup" className="btn-gold h-12 px-7 flex items-center justify-center gap-2 text-base">
-                30 Days Free Cardless Trial <ArrowRight size={18} />
+                Start 30-Day Free Trial <ArrowRight size={18} />
               </Link>
               <Link to="/digital-business-cards-templates" className="btn-navy h-12 px-7 flex items-center justify-center gap-2 text-base">
                 <Eye size={18} /> View Templates
@@ -306,8 +306,8 @@ function TrustedSection() {
   // so the strip reads as proof rather than decoration.
   const rowA = ["Digital Agencies", "Doctors & Clinics", "Consultants", "Restaurants", "Real Estate", "Freelancers"];
   const rowB = ["Retail Stores", "Coaches", "Salons", "Photographers", "Event Planners", "Startups"];
-  const pill = (b: string, i: number) => (
-    <span key={`${b}-${i}`} className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-[#E2E8F0] shadow-premium text-sm font-medium text-[#475569]">
+  const pill = (b: string, i: number, copy = false) => (
+    <span key={`${b}-${i}`} aria-hidden={copy || undefined} className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-[#E2E8F0] shadow-premium text-sm font-medium text-[#475569]">
       <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C]" /> {b}
     </span>
   );
@@ -330,8 +330,8 @@ function TrustedSection() {
       </div>
 
       <div className="relative overflow-hidden mask-fade-x space-y-3">
-        <div className="marquee-track gap-3">{[...rowA, ...rowA].map(pill)}</div>
-        <div className="marquee-track marquee-track--rev gap-3">{[...rowB, ...rowB].map(pill)}</div>
+        <div className="marquee-track gap-3">{[...rowA, ...rowA].map((b, i) => pill(b, i, i >= rowA.length))}</div>
+        <div className="marquee-track marquee-track--rev gap-3">{[...rowB, ...rowB].map((b, i) => pill(b, i, i >= rowB.length))}</div>
       </div>
     </section>
   );
@@ -596,7 +596,9 @@ function AIArt() {
 
 function FeaturesSection() {
   const [build, share, leads, pay, grow, ai, resell] = FEATURE_TILES;
-  const total = FEATURE_TILES.reduce((n, t) => n + t.items.length, 0);
+  // /features lists 41 features (and its search description says so); these
+  // tiles show the headline ones, so the badge quotes the full count.
+  const FEATURE_COUNT = 41;
 
   return (
     <section className="relative overflow-hidden py-20" id="features">
@@ -607,7 +609,7 @@ function FeaturesSection() {
         <Reveal className="mx-auto mb-14 max-w-4xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full bg-white py-1 pl-1 pr-3.5 text-xs font-semibold text-[#92400E] shadow-premium ring-1 ring-[#FDE68A]">
             <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#F7B31C] to-[#FBBF24] px-2.5 py-1 text-[11px] font-bold text-[#0B1120]">
-              <Sparkles size={12} /> {total}
+              <Sparkles size={12} /> {FEATURE_COUNT}
             </span>
             features in one card
           </span>
@@ -1419,9 +1421,6 @@ function QRNFCSection() {
           </Reveal>
           <Reveal className="flex justify-center">
             <div className="relative w-full max-w-[420px]">
-              <div className="absolute -top-3 -right-3 z-10 bg-[#14B8A6] text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg">
-                <ScanLine size={12} /> NFC Ready
-              </div>
               <style>{STANDEE_STYLES}</style>
               <div dangerouslySetInnerHTML={{ __html: standeeMarkup({
                 brandName: "Aarav Mehta",
@@ -1448,7 +1447,7 @@ function QRNFCSection() {
    Laid out as an editorial two-column list rather than another card
    grid — the page already has several of those. */
 const LINK_ANSWER =
-  "You can use a digital business card link anywhere you would normally hand over contact details — in email signatures, WhatsApp and SMS, social media bios, video-call backgrounds, printed material and packaging, mobile wallets, your website, your Google Business Profile, listing and job portals, event badges and standees, invoices, and paid ad campaigns.";
+  "You can use a digital business card link anywhere you would normally hand over contact details — in email signatures, WhatsApp and SMS, social media bios, video-call backgrounds, printed material and packaging, your website, your Google Business Profile, listing and job portals, event badges and standees, invoices, and paid ad campaigns.";
 
 const LINK_PLACEMENTS = [
   { icon: Mail, title: "Email Signature", desc: "Under every outgoing email, quietly capturing leads.", accent: "#F7B31C" },
@@ -1456,7 +1455,6 @@ const LINK_PLACEMENTS = [
   { icon: Link2, title: "Social Media Bios", desc: "Your single link-in-bio on Instagram, LinkedIn and X.", accent: "#8B5CF6" },
   { icon: Monitor, title: "Video Call Backgrounds", desc: "A QR in your Zoom, Meet or Teams background.", accent: "#3B82F6" },
   { icon: FileDown, title: "Print & Packaging", desc: "Visiting cards, brochures, flyers, packaging, signage.", accent: "#EC4899" },
-  { icon: Wallet, title: "Mobile Wallet", desc: "Saved as a pass in Apple Wallet or Google Wallet.", accent: "#14B8A6" },
   { icon: Globe, title: "Website & Blog", desc: "Header, footer, author bio or Contact Us page.", accent: "#0EA5E9" },
   { icon: MapPin, title: "Google Business Profile", desc: "As your website or appointment link for local search.", accent: "#EF4444" },
   { icon: Building2, title: "Listing & Job Portals", desc: "IndiaMART, JustDial, Naukri — where one link is allowed.", accent: "#F97316" },
@@ -1672,7 +1670,10 @@ function TestimonialsSection() {
       </div>
       <div className="relative mask-fade-x">
         <div className="marquee-track gap-5 py-2">
-          {row.map((t, i) => <TestimonialCard key={i} t={t} />)}
+          {/* The second pass only exists to loop the scroll — hidden from screen readers. */}
+          {row.map((t, i) => (
+            <div key={i} className="contents" aria-hidden={i >= TESTIMONIALS.length || undefined}><TestimonialCard t={t} /></div>
+          ))}
         </div>
       </div>
     </section>
@@ -1789,7 +1790,7 @@ const FAQS = [
   },
   {
     q: "Do I need any technical or design skills?",
-    a: "No. You pick a ready template, add your details, and publish — most people finish in under ten minutes. AI can also write your about section, service descriptions and SEO text for you, and you can paste your website link to have a full card generated automatically.",
+    a: "No. You pick a ready template, add your details, and publish — most people publish their card in about two minutes. AI can also write your about section, service descriptions and SEO text for you, and you can paste your website link to have a full card generated automatically.",
   },
   {
     q: "If I redesign my card later, does my QR code stop working?",
@@ -1896,7 +1897,7 @@ function FinalCTA() {
           <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#14B8A6]/12 rounded-full blur-3xl animate-aurora-drift" style={{ animationDelay: "2s" }} />
           <div className="relative max-w-2xl mx-auto">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-[#F7B31C] ring-1 ring-white/10 mb-5">
-              <Sparkles size={12} /> Start in under 2 minutes
+              <Sparkles size={12} /> Live in about 2 minutes
             </span>
             <h2 className="text-3xl sm:text-[2.6rem] font-extrabold text-white mb-4 tracking-tight leading-tight">Create Your Digital Business Card Today</h2>
             <p className="text-base text-[#94A3B8] mb-8">Join thousands of businesses using DigitalCarda to create, share, and track professional digital cards.</p>

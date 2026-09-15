@@ -144,7 +144,7 @@ export default function ProductDetail() {
   return (
     <div className="bg-[#F8FAFC] min-h-screen pt-20">
       {/* Sticky buy-bar (desktop only) — on mobile the global layout already shows
-          a "30 Days Free Cardless Trial" bar, so we don't duplicate it here. */}
+          a "Start 30-Day Free Trial" bar, so we don't duplicate it here. */}
       <div className={`hidden lg:block fixed bottom-0 inset-x-0 z-40 transition-transform duration-300 ${showBar ? "translate-y-0" : "translate-y-full"}`}>
         <div className="bg-white/95 backdrop-blur border-t border-[#E2E8F0] shadow-[0_-6px_24px_rgba(15,23,42,0.08)]">
           <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
