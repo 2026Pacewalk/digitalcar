@@ -834,6 +834,71 @@ export function contactReceivedEmail(o: { name?: string | null; requirement?: st
   };
 }
 
+/* An NFC card / standee order is paid. Repeats exactly what will be printed
+   and where it ships, so a mistake can be caught before production. */
+export function nfcOrderConfirmedEmail(o: {
+  name?: string | null; orderId: number; productName: string; quantity: number; amount: number;
+  printLines: string[]; address: string; cardUrl: string; deliveryDays: string;
+}): Email {
+  const rows: [string, string][] = [
+    ["Order", `#${o.orderId}`],
+    ["Item", `${o.quantity} × ${esc(o.productName)}`],
+    ["Paid", esc(inr(o.amount))],
+    ["Delivery", `Free · ${esc(o.deliveryDays)}`],
+  ];
+  const bodyHtml =
+    hi(o.name) +
+    p("Thank you — your order is confirmed. Here's exactly what we'll print and where we'll send it.") +
+    detailTable(rows) +
+    note(
+      `<strong style="color:${BRAND.ink}">Printed details</strong><br>${o.printLines.map((l) => esc(l)).join("<br>")}` +
+      `<br><br><strong style="color:${BRAND.ink}">The NFC chip and QR code open</strong><br>${esc(o.cardUrl)}` +
+      `<br><br><strong style="color:${BRAND.ink}">Shipping to</strong><br>${esc(o.address)}`,
+    ) +
+    p("Spotted a mistake? Reply to this email as soon as you can, so we can correct it before printing.") +
+    button("View your order", `${SITE}/dashboard/nfc`);
+  return {
+    kind: "nfcOrderConfirmedEmail",
+    subject: `Order confirmed — ${o.quantity} × ${o.productName} (#${o.orderId})`,
+    html: layout({
+      preheader: `Your ${o.productName} order is confirmed. Free delivery in ${o.deliveryDays}.`,
+      badge: "Order confirmed", heading: "Your order is confirmed 🎉", bodyHtml,
+    }),
+    text: [
+      `Hi ${o.name || "there"},`, "",
+      `Your order #${o.orderId} is confirmed: ${o.quantity} × ${o.productName}, paid ${inr(o.amount)}.`,
+      `Delivery: free, ${o.deliveryDays}.`, "",
+      "Printed details:", ...o.printLines, "",
+      `The NFC chip and QR code open: ${o.cardUrl}`, "",
+      `Shipping to: ${o.address}`, "",
+      "Spotted a mistake? Reply to this email as soon as you can, so we can correct it before printing.",
+    ].join("\n"),
+  };
+}
+
+/* The team marked an NFC order shipped. */
+export function nfcOrderShippedEmail(o: {
+  name?: string | null; orderId: number; productName: string; quantity: number; tracking?: string | null;
+}): Email {
+  const bodyHtml =
+    hi(o.name) +
+    p(`Good news — your ${o.quantity} × ${esc(o.productName)} (order #${o.orderId}) is on its way.`) +
+    (o.tracking ? detailTable([["Tracking", esc(o.tracking)]]) : "") +
+    p("Once it arrives, tap it on your phone to check it opens your card. Any problem, just reply to this email.") +
+    button("View your order", `${SITE}/dashboard/nfc`);
+  return {
+    kind: "nfcOrderShippedEmail",
+    subject: `Shipped — your ${o.productName} (#${o.orderId})`,
+    html: layout({ preheader: `Your ${o.productName} is on its way.`, badge: "Shipped", heading: "Your order is on its way 🚚", bodyHtml }),
+    text: [
+      `Hi ${o.name || "there"},`, "",
+      `Your ${o.quantity} × ${o.productName} (order #${o.orderId}) is on its way.`,
+      ...(o.tracking ? [`Tracking: ${o.tracking}`] : []), "",
+      "Any problem, just reply to this email.",
+    ].join("\n"),
+  };
+}
+
 export function resellerApprovedEmail(o: { name?: string; link: string }): Email {
   const bodyHtml =
     hi(o.name) +

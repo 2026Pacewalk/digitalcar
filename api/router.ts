@@ -22,6 +22,7 @@ import { contactRouter } from "./contact-router";
 import { adminRouter } from "./admin-router";
 import { domainRouter } from "./domain-router";
 import { addonRouter } from "./addon-router";
+import { nfcRouter } from "./nfc-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -50,6 +51,7 @@ export const appRouter = createRouter({
   admin: adminRouter,
   domain: domainRouter,
   addon: addonRouter,
+  nfc: nfcRouter,
 });
 
 export type AppRouter = typeof appRouter;

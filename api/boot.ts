@@ -327,6 +327,53 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// One-time, idempotent schema ensure for nfc_orders (NFC card & standee orders).
+// CREATE TABLE IF NOT EXISTS is a no-op once the table exists; additive only.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    await getDb().execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS nfc_orders (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        user_id bigint unsigned NOT NULL,
+        product enum('nfc_card','nfc_standee') NOT NULL,
+        quantity int NOT NULL DEFAULT 1,
+        unit_price decimal(10,2) NOT NULL,
+        amount decimal(12,2) NOT NULL,
+        print_name varchar(120) NOT NULL,
+        print_title varchar(120) NULL,
+        print_company varchar(160) NULL,
+        print_phone varchar(40) NULL,
+        card_url varchar(255) NOT NULL,
+        logo_url varchar(500) NULL,
+        ship_name varchar(120) NOT NULL,
+        ship_phone varchar(20) NOT NULL,
+        ship_line1 varchar(255) NOT NULL,
+        ship_line2 varchar(255) NULL,
+        ship_city varchar(100) NOT NULL,
+        ship_state varchar(100) NOT NULL,
+        ship_pincode varchar(10) NOT NULL,
+        status enum('pending_payment','paid','in_production','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending_payment',
+        razorpay_order_id varchar(64) NULL,
+        razorpay_payment_id varchar(64) NULL,
+        tracking varchar(255) NULL,
+        admin_note varchar(500) NULL,
+        paid_at timestamp NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY nfc_user_idx (user_id),
+        KEY nfc_status_idx (status),
+        KEY nfc_rzp_order_idx (razorpay_order_id)
+      )
+    `));
+    console.log("[schema] nfc_orders table ensured");
+  } catch (e) {
+    console.error("[schema] ensure nfc_orders failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be

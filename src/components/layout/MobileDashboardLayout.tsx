@@ -6,7 +6,7 @@ import {
   Settings, LogOut, HelpCircle, ChevronLeft,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Star, Upload, Mail, Layers,
   Gift, Wand2, QrCode, Link2, Globe, ArrowLeft, MailCheck, PenLine,
-  MessageCircle,
+  MessageCircle, Nfc,
 } from "lucide-react";
 import { getToken, clearSession } from "@/lib/session";
 import { useAuth } from "@/hooks/useAuth";
@@ -142,6 +142,7 @@ const NAV: Record<string, NavConfig> = {
         { icon: QrCode, label: "QR & Share", path: "/dashboard/qr" },
         { icon: PenLine, label: "Email Signature", path: "/dashboard/signature" },
         { icon: MessageCircle, label: "WhatsApp Messages", path: "/dashboard/whatsapp" },
+        { icon: Nfc, label: "NFC Card & Standee", path: "/dashboard/nfc" },
         { icon: Gift, label: "Refer & Earn", path: "/dashboard/refer" },
       ] },
       { title: "Account", items: [
@@ -166,6 +167,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/dashboard/payments": "Payments",
   "/dashboard/signature": "Email Signature",
   "/dashboard/whatsapp": "WhatsApp Messages",
+  "/dashboard/nfc": "NFC Card & Standee",
+  "/admin/nfc-orders": "NFC Orders",
   "/dashboard/qrcode": "QR Code",
   "/dashboard/qr": "QR Codes",
   "/dashboard/media": "Gallery",

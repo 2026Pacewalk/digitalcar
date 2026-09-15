@@ -141,6 +141,47 @@ export const cardAddons = mysqlTable("card_addons", {
 
 export type CardAddon = typeof cardAddons.$inferSelect;
 
+// Physical NFC products (PVC card, standee) ordered from the dashboard. Prices
+// are copied onto the order at checkout, so a later price change never rewrites
+// history. Fulfilment: pending_payment → paid → in_production → shipped →
+// delivered (or cancelled). Created at boot by api/boot.ts if missing.
+export const nfcOrders = mysqlTable("nfc_orders", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  product: mysqlEnum("product", ["nfc_card", "nfc_standee"]).notNull(),
+  quantity: int("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  printName: varchar("print_name", { length: 120 }).notNull(),
+  printTitle: varchar("print_title", { length: 120 }),
+  printCompany: varchar("print_company", { length: 160 }),
+  printPhone: varchar("print_phone", { length: 40 }),
+  cardUrl: varchar("card_url", { length: 255 }).notNull(),
+  logoUrl: varchar("logo_url", { length: 500 }),
+  shipName: varchar("ship_name", { length: 120 }).notNull(),
+  shipPhone: varchar("ship_phone", { length: 20 }).notNull(),
+  shipLine1: varchar("ship_line1", { length: 255 }).notNull(),
+  shipLine2: varchar("ship_line2", { length: 255 }),
+  shipCity: varchar("ship_city", { length: 100 }).notNull(),
+  shipState: varchar("ship_state", { length: 100 }).notNull(),
+  shipPincode: varchar("ship_pincode", { length: 10 }).notNull(),
+  status: mysqlEnum("status", ["pending_payment", "paid", "in_production", "shipped", "delivered", "cancelled"]).notNull().default("pending_payment"),
+  razorpayOrderId: varchar("razorpay_order_id", { length: 64 }),
+  razorpayPaymentId: varchar("razorpay_payment_id", { length: 64 }),
+  tracking: varchar("tracking", { length: 255 }),
+  adminNote: varchar("admin_note", { length: 500 }),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("nfc_user_idx").on(table.userId),
+  index("nfc_status_idx").on(table.status),
+  index("nfc_rzp_order_idx").on(table.razorpayOrderId),
+]);
+
+export type NfcOrder = typeof nfcOrders.$inferSelect;
+
+
 // ─── Invoices ───────────────────────────────────────────────────
 export const invoices = mysqlTable("invoices", {
   id: serial("id").primaryKey(),

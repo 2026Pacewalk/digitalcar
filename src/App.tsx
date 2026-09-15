@@ -51,6 +51,7 @@ const AdminEmailLog = lazy(() => import("./pages/admin/EmailLog"));
 const AdminDomains = lazy(() => import("./pages/admin/Domains"));
 const AdminLeads = lazy(() => import("./pages/admin/Leads"));
 const AdminBulkOrders = lazy(() => import("./pages/admin/BulkOrders"));
+const AdminNfcOrders = lazy(() => import("./pages/admin/NfcOrders"));
 const AdminAiGenerator = lazy(() => import("./pages/admin/AiGenerator"));
 const AdminReferrals = lazy(() => import("./pages/admin/Referrals"));
 const AdminPaymentOrders = lazy(() => import("./pages/admin/PaymentOrders"));
@@ -79,6 +80,7 @@ const EmailSignatureGenerator = lazy(() => import("./pages/public/EmailSignature
 const WhatsAppTemplates = lazy(() => import("./pages/public/WhatsAppTemplates"));
 const PublicSitemap = lazy(() => import("./pages/public/Sitemap"));
 const CustomerCustomDomain = lazy(() => import("./pages/customer/CustomDomain"));
+const CustomerNfcOrder = lazy(() => import("./pages/customer/NfcOrder"));
 const AITools = lazy(() => import("./pages/customer/AITools"));
 const CustomerHome = lazy(() => import("./pages/customer/Home"));
 const CardStudio = lazy(() => import("./pages/customer/CardStudio"));
@@ -242,6 +244,7 @@ export default function App() {
         <Route path="/admin/analytics" element={<Navigate to="/admin" replace />} />
         <Route path="/admin/leads" element={<RoleRoute allowedRoles={["super_admin"]}><AdminLeads /></RoleRoute>} />
         <Route path="/admin/bulk-orders" element={<RoleRoute allowedRoles={["super_admin"]}><AdminBulkOrders /></RoleRoute>} />
+        <Route path="/admin/nfc-orders" element={<RoleRoute allowedRoles={["super_admin"]}><AdminNfcOrders /></RoleRoute>} />
         <Route path="/admin/ai-generator" element={<RoleRoute allowedRoles={["super_admin"]}><AdminAiGenerator /></RoleRoute>} />
         <Route path="/admin/referrals" element={<RoleRoute allowedRoles={["super_admin"]}><AdminReferrals /></RoleRoute>} />
         {/* Payment settings moved into Settings → Payment. Keep the old path working. */}
@@ -275,6 +278,7 @@ export default function App() {
         <Route path="/dashboard/signature" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSignature /></RoleRoute>} />
         <Route path="/dashboard/whatsapp" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerWhatsAppMessage /></RoleRoute>} />
         <Route path="/dashboard/domain" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerCustomDomain /></RoleRoute>} />
+        <Route path="/dashboard/nfc" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerNfcOrder /></RoleRoute>} />
         <Route path="/dashboard/ai" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><AITools /></RoleRoute>} />
         <Route path="/dashboard/build" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardStudio /></RoleRoute>} />
         <Route path="/dashboard/home" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerHome /></RoleRoute>} />

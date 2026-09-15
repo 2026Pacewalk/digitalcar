@@ -1,8 +1,9 @@
-import { Check, ArrowRight, ChevronRight, Sparkles, Zap, Crown, IdCard, QrCode, Images, Tag, MessageSquare, Globe, Star, ShieldCheck } from "lucide-react";
+import { Check, ArrowRight, ChevronRight, Sparkles, Zap, Crown, IdCard, QrCode, Images, Tag, MessageSquare, Globe, Star, ShieldCheck, Nfc, Truck } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { trpc } from "@/providers/trpc";
 import { planFeatures, type PlanPkg } from "@/lib/planFeatures";
+import { NFC_PRODUCTS, NFC_DELIVERY } from "@/lib/nfcProducts";
 import { Reveal } from "@/components/public/Reveal";
 
 /* ── Billing periods ──────────────────────────────────────────── */
@@ -124,6 +125,7 @@ const faqs = [
   { q: "What do I actually get on a paid plan?", a: "Your live digital card on a personal link and QR, with lead capture, Google reviews, payment links, gallery and video, and all 50+ templates. Gold covers one card and up to 25 products; Platinum adds up to 3 cards, unlimited products, a bigger 60-photo gallery, AI content, multi-language and priority support." },
   { q: "Monthly, Yearly or 3-Year — which should I pick?", a: "The same card, cheaper the longer you commit. Yearly saves about 16% (roughly two months free) over monthly, and the 3-Year plan is the best value — and it includes the custom-domain setup free." },
   { q: "Can I upgrade later?", a: "Anytime. Your card, link and QR stay exactly the same — you just unlock more features and higher limits instantly. We never make you rebuild anything." },
+  { q: "How do the NFC card and standee work?", a: "They are printed products with an NFC chip that opens your DigitalCarda link: tap a phone on them and your card opens, and the printed QR code works on any phone. The NFC PVC card is ₹499 per card, printed on both sides; the NFC standee is ₹1,499 per standee, printed on one side. Order from your dashboard — delivery is free across India and takes 3–7 working days." },
   { q: "How does the custom domain work?", a: "It's a one-time ₹499 add-on (free on the Platinum 3-Year plan). Buy a domain from any registrar or use one you already own — you keep full ownership — and our team connects it to your card with HTTPS, usually within 24–48 hours. The domain's own registration fee is separate." },
   { q: "What payment methods do you accept?", a: "UPI, credit/debit cards, net banking, Paytm and GPay. On yearly and 3-year plans you pay once and you're set for the whole term." },
   { q: "Cards for a whole team?", a: "Use Bulk Cards for 10+ people — the more you add, the lower the per-card price (down to ₹399/card/year), with one shared company template and branding." },
@@ -354,6 +356,48 @@ export default function Pricing() {
                 <Link to="/signup" className="mt-3 inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-white text-[#0F172A] text-[13px] font-bold hover:bg-[#F1F5F9] transition-all">Get started <ArrowRight size={14} /></Link>
               </div>
             </div>
+          </div>
+        </Reveal>
+
+        {/* NFC card & standee — printed add-ons, ordered from the dashboard */}
+        <Reveal className="mt-8 max-w-5xl mx-auto">
+          <div className="rounded-3xl bg-white p-6 sm:p-8 ring-1 ring-[#E2E8F0] shadow-premium">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#FEF3C7] text-[#92400E]"><Nfc size={12} /> ADD-ON · PRINTED &amp; DELIVERED</span>
+                <h2 className="mt-3 text-xl sm:text-2xl font-bold text-[#0F172A]">Take your card offline with NFC</h2>
+                <p className="mt-1.5 max-w-xl text-[13.5px] leading-relaxed text-[#64748B]">Tap a phone on it and your digital card opens — the printed QR code covers every other phone. It opens your card link, so updating your details never means reprinting.</p>
+              </div>
+              <p className="inline-flex shrink-0 items-center gap-1.5 text-[12.5px] font-semibold text-[#166534]"><Truck size={15} /> Free pan-India delivery · {NFC_DELIVERY.label}</p>
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              {NFC_PRODUCTS.map((p) => (
+                <div key={p.id} className="flex flex-col rounded-2xl bg-[#F8FAFC] p-5 ring-1 ring-[#EEF2F6]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0F172A] text-[#F7B31C]">{p.id === "nfc_card" ? <IdCard size={20} /> : <Nfc size={20} />}</span>
+                      <div>
+                        <h3 className="text-[15px] font-bold text-[#0F172A]">{p.name}</h3>
+                        <p className="text-[12px] font-medium text-[#B45309]">{p.print}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-extrabold text-[#0F172A]">₹{p.price.toLocaleString("en-IN")}</p>
+                      <p className="text-[11px] text-[#64748B]">per {p.unit}</p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 flex-1 space-y-2">
+                    {p.points.map((pt) => (
+                      <li key={pt} className="flex gap-2 text-[13px] leading-snug text-[#334155]"><Check size={15} className="mt-0.5 shrink-0 text-emerald-500" /> {pt}</li>
+                    ))}
+                  </ul>
+                  <Link to="/login?next=/dashboard/nfc" className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0F172A] text-[13.5px] font-bold text-white transition-colors hover:bg-[#1E293B]">
+                    Order {p.short} <ArrowRight size={15} />
+                  </Link>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-center text-[12px] text-[#94A3B8]">Ordered from your dashboard · Pay securely by UPI, card or net banking</p>
           </div>
         </Reveal>
 
