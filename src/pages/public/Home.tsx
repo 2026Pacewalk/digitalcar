@@ -403,7 +403,7 @@ function FeatureChips({ tile, dark }: { tile: FeatureTile; dark?: boolean }) {
       {tile.items.map((it) => (
         <li
           key={it.label}
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium ${
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-medium ${
             dark ? "bg-white/[0.07] text-[#E2E8F0] ring-1 ring-white/10" : "bg-[#F8FAFC] text-[#334155] ring-1 ring-[#E2E8F0]"
           }`}
         >
@@ -418,7 +418,7 @@ function FeatureChips({ tile, dark }: { tile: FeatureTile; dark?: boolean }) {
 function FeatureTileCard({ tile, dark, className = "", children }: { tile: FeatureTile; dark?: boolean; className?: string; children: React.ReactNode }) {
   return (
     <article
-      className={`group relative flex flex-col overflow-hidden rounded-[28px] p-6 transition duration-300 hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+      className={`group relative flex flex-col overflow-hidden rounded-[22px] p-5 transition duration-300 hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
         dark
           ? "bg-[#0B1120] text-white shadow-[0_30px_60px_-30px_rgba(2,6,23,0.75)]"
           : "bg-white shadow-[0_20px_50px_-32px_rgba(15,23,42,0.35)] ring-1 ring-[#0F172A]/[0.06] hover:shadow-[0_28px_60px_-28px_rgba(15,23,42,0.4)]"
@@ -429,8 +429,8 @@ function FeatureTileCard({ tile, dark, className = "", children }: { tile: Featu
         className={`pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full blur-3xl transition-opacity duration-500 ${dark ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
         style={{ background: `${tile.accent}${dark ? "22" : "1F"}` }}
       />
-      <div aria-hidden="true" className="relative">{children}</div>
-      <div className="relative mt-auto pt-6">
+      <div aria-hidden="true" className="relative flex flex-1 flex-col justify-center">{children}</div>
+      <div className="relative pt-4">
         <div className="flex items-center gap-2.5">
           <span
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
@@ -438,10 +438,10 @@ function FeatureTileCard({ tile, dark, className = "", children }: { tile: Featu
           >
             <tile.icon size={17} />
           </span>
-          <h3 className={`text-lg font-bold tracking-tight ${dark ? "text-white" : "text-[#0F172A]"}`}>{tile.title}</h3>
+          <h3 className={`text-base font-bold tracking-tight ${dark ? "text-white" : "text-[#0F172A]"}`}>{tile.title}</h3>
         </div>
-        <p className={`mt-2 text-sm leading-relaxed ${dark ? "text-[#94A3B8]" : "text-[#64748B]"}`}>{tile.text}</p>
-        <div className="mt-4"><FeatureChips tile={tile} dark={dark} /></div>
+        <p className={`mt-1.5 text-[13.5px] leading-relaxed ${dark ? "text-[#94A3B8]" : "text-[#64748B]"}`}>{tile.text}</p>
+        <div className="mt-3"><FeatureChips tile={tile} dark={dark} /></div>
       </div>
     </article>
   );
@@ -466,9 +466,9 @@ function FloatChip({ icon: Icon, label, className }: { icon: FeatureIcon; label:
 function BuildArt() {
   const gallery = ["#FDE68A", "#99F6E4", "#C4B5FD", "#FBCFE8", "#BFDBFE", "#FED7AA"];
   return (
-    <div className="relative flex h-[290px] items-center justify-center sm:h-[330px]">
+    <div className="relative flex min-h-[230px] flex-1 items-center justify-center">
       <div className="absolute inset-x-12 bottom-6 top-12 rounded-full bg-[#F7B31C]/10 blur-3xl" />
-      <div className="relative w-[196px] rounded-[32px] bg-[#1E293B] p-2 shadow-2xl ring-1 ring-white/10 motion-safe:animate-[float_6s_ease-in-out_infinite]">
+      <div className="relative w-[172px] rounded-[28px] bg-[#1E293B] p-2 shadow-2xl ring-1 ring-white/10 motion-safe:animate-[float_6s_ease-in-out_infinite]">
         <div className="overflow-hidden rounded-[26px] bg-white">
           <div className="h-16 bg-gradient-to-br from-[#F7B31C] to-[#D97706]" />
           <div className="-mt-8 flex flex-col items-center px-3 pb-4">
@@ -502,14 +502,14 @@ function BuildArt() {
 
 function ShareArt() {
   return (
-    <div className="flex h-40 items-center justify-center gap-5">
+    <div className="flex h-32 items-center justify-center gap-4">
       <div className="rounded-2xl bg-white p-3 shadow-lg ring-1 ring-[#E2E8F0] transition-transform duration-500 group-hover:-rotate-3 motion-reduce:transition-none">
         <div className="grid grid-cols-7 gap-[3px]">
-          {FEATURE_QR.map((on, i) => <span key={i} className={`h-2.5 w-2.5 rounded-[2px] ${on ? "bg-[#0F172A]" : ""}`} />)}
+          {FEATURE_QR.map((on, i) => <span key={i} className={`h-2 w-2 rounded-[2px] ${on ? "bg-[#0F172A]" : ""}`} />)}
         </div>
       </div>
       <div className="space-y-2">
-        <p className="max-w-[170px] rounded-2xl rounded-bl-md bg-[#DCF8C6] px-3 py-2 text-[12px] leading-snug text-[#14532D] shadow-sm">
+        <p className="max-w-[160px] rounded-2xl rounded-bl-md bg-[#DCF8C6] px-2.5 py-1.5 text-[11.5px] leading-snug text-[#14532D] shadow-sm">
           Here's my digital card — tap to save my number.
         </p>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[#14B8A6]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0F766E]">
@@ -526,12 +526,12 @@ function LeadsArt() {
     { who: "New enquiry", msg: "“Can you share your price list?”", when: "2m" },
   ];
   return (
-    <div className="relative h-40">
+    <div className="relative h-32">
       {rows.map((x, i) => (
         <div
           key={x.msg}
-          className={`absolute inset-x-1 flex items-start gap-3 rounded-2xl bg-white p-3 shadow-lg ring-1 ring-[#E2E8F0] transition-transform duration-500 motion-reduce:transition-none ${
-            i === 0 ? "top-3 z-10 group-hover:-translate-y-1" : "top-[4.6rem] scale-[0.94] opacity-70"
+          className={`absolute inset-x-1 flex items-start gap-3 rounded-xl bg-white p-2.5 shadow-lg ring-1 ring-[#E2E8F0] transition-transform duration-500 motion-reduce:transition-none ${
+            i === 0 ? "top-3 z-10 group-hover:-translate-y-1" : "top-[3.5rem] scale-[0.94] opacity-60"
           }`}
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#8B5CF6]/10 text-[#8B5CF6]"><Users size={16} /></span>
@@ -549,13 +549,13 @@ function LeadsArt() {
 
 function PayArt() {
   return (
-    <div className="flex h-40 items-center justify-center">
-      <div className="w-full max-w-[220px] rounded-2xl bg-gradient-to-br from-[#EC4899] to-[#BE185D] p-4 text-white shadow-[0_18px_36px_-18px_rgba(190,24,93,0.8)] transition-transform duration-500 group-hover:-translate-y-1 motion-reduce:transition-none">
+    <div className="flex h-32 items-center justify-center">
+      <div className="w-full max-w-[200px] rounded-2xl bg-gradient-to-br from-[#EC4899] to-[#BE185D] p-3.5 text-white shadow-[0_18px_36px_-18px_rgba(190,24,93,0.8)] transition-transform duration-500 group-hover:-translate-y-1 motion-reduce:transition-none">
         <span className="flex items-center justify-between">
           <span className="text-[11px] font-medium text-white/75">Pay on card</span>
           <Wallet size={15} className="text-white/80" />
         </span>
-        <span className="mt-1 block text-2xl font-extrabold tabular-nums">₹2,500</span>
+        <span className="mt-0.5 block text-xl font-extrabold tabular-nums">₹2,500</span>
         <span className="mt-3 flex gap-1.5">
           {["UPI", "GPay", "Paytm"].map((p) => <span key={p} className="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-semibold">{p}</span>)}
         </span>
@@ -567,7 +567,7 @@ function PayArt() {
 function GrowArt() {
   const bars = [38, 52, 45, 68, 60, 82, 96];
   return (
-    <div className="flex h-40 flex-col rounded-2xl bg-[#F8FAFC] p-4 ring-1 ring-[#E2E8F0]">
+    <div className="flex h-32 flex-col rounded-2xl bg-[#F8FAFC] p-3.5 ring-1 ring-[#E2E8F0]">
       <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#64748B]"><Eye size={12} className="text-[#3B82F6]" /> Card views · 7 days</span>
       <span className="mt-3 flex flex-1 items-end gap-2">
         {bars.map((h, i) => (
@@ -584,9 +584,9 @@ function GrowArt() {
 
 function AIArt() {
   return (
-    <div className="h-40 rounded-2xl bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-4 ring-1 ring-[#FDE68A]">
+    <div className="h-32 overflow-hidden rounded-2xl bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-3.5 ring-1 ring-[#FDE68A]">
       <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#B45309]"><Sparkles size={12} /> Writing your About</span>
-      <span className="mt-2 block text-[13px] leading-relaxed text-[#78350F]">
+      <span className="mt-1.5 block text-[12.5px] leading-snug text-[#78350F]">
         We help families find homes they love — with honest advice and site visits on your schedule
         <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 bg-[#F59E0B] motion-safe:animate-pulse" />
       </span>
@@ -601,12 +601,12 @@ function FeaturesSection() {
   const FEATURE_COUNT = 41;
 
   return (
-    <section className="relative overflow-hidden py-20" id="features">
+    <section className="relative overflow-hidden py-14 sm:py-16" id="features">
       <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-40 h-[480px] w-[900px] -translate-x-1/2 rounded-full bg-[#F7B31C]/[0.07] blur-3xl" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* The words "One Digital Card" sit on a small card of their own, so the
             heading shows the product rather than only naming it. */}
-        <Reveal className="mx-auto mb-14 max-w-4xl text-center">
+        <Reveal className="mx-auto mb-9 max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full bg-white py-1 pl-1 pr-3.5 text-xs font-semibold text-[#92400E] shadow-premium ring-1 ring-[#FDE68A]">
             <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#F7B31C] to-[#FBBF24] px-2.5 py-1 text-[11px] font-bold text-[#0B1120]">
               <Sparkles size={12} /> {FEATURE_COUNT}
@@ -614,24 +614,24 @@ function FeaturesSection() {
             features in one card
           </span>
 
-          <h2 className="mt-6 text-[1.9rem] font-extrabold leading-[1.12] tracking-tight text-[#0F172A] sm:text-5xl lg:text-[3.5rem]">
+          <h2 className="mt-4 text-[1.6rem] font-extrabold leading-[1.2] tracking-tight text-[#0F172A] sm:text-[2.1rem] lg:text-[2.5rem]">
             <span className="block">Everything You Need</span>{" "}
-            <span className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:mt-4 sm:gap-x-4">
+            <span className="mt-2 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-2 sm:mt-2.5">
               <span>in</span>{" "}
-              <span className="relative inline-flex -rotate-2 items-center gap-3 whitespace-nowrap rounded-2xl bg-[#0B1120] px-4 py-2 shadow-[0_22px_40px_-18px_rgba(2,6,23,0.7)] ring-1 ring-white/10 transition-transform duration-500 hover:rotate-0 motion-reduce:transition-none sm:gap-4 sm:rounded-[22px] sm:py-3 sm:pl-4 sm:pr-7">
-                <span aria-hidden="true" className="hidden h-9 w-12 shrink-0 grid-cols-3 gap-[2px] rounded-md bg-gradient-to-br from-[#FDE68A] to-[#D97706] p-1 sm:grid">
+              <span className="relative inline-flex -rotate-1 items-center gap-2.5 whitespace-nowrap rounded-xl bg-[#0B1120] px-3.5 py-1.5 shadow-[0_16px_30px_-16px_rgba(2,6,23,0.6)] ring-1 ring-white/10 transition-transform duration-500 hover:rotate-0 motion-reduce:transition-none sm:gap-2.5 sm:rounded-2xl sm:py-1.5 sm:pl-3 sm:pr-4">
+                <span aria-hidden="true" className="hidden h-6 w-8 shrink-0 grid-cols-3 gap-[2px] rounded-md bg-gradient-to-br from-[#FDE68A] to-[#D97706] p-1 sm:grid">
                   {Array.from({ length: 6 }, (_, i) => <span key={i} className="rounded-[2px] bg-[#0B1120]/20" />)}
                 </span>
                 <span className="text-gradient-gold">One Digital Card</span>
-                <span aria-hidden="true" className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#14B8A6] text-white shadow-lg ring-2 ring-[#F8FAFC] sm:h-7 sm:w-7">
+                <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#14B8A6] text-white shadow-lg ring-2 ring-[#F8FAFC]">
                   <Check size={14} />
                 </span>
               </span>
             </span>
           </h2>
 
-          <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-[#64748B] sm:text-lg">Grouped by what you want your card to do.</p>
-          <ol className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <p className="mx-auto mt-4 max-w-xl text-[14.5px] leading-relaxed text-[#64748B]">Grouped by what you want your card to do.</p>
+          <ol className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
             {[
               { icon: CreditCard, label: "Build" },
               { icon: Share2, label: "Share" },
@@ -639,7 +639,7 @@ function FeaturesSection() {
               { icon: TrendingUp, label: "Grow" },
             ].map((s, i, all) => (
               <li key={s.label} className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-sm font-semibold text-[#0F172A] shadow-premium ring-1 ring-[#E2E8F0]">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[12.5px] font-semibold text-[#0F172A] ring-1 ring-[#E2E8F0]">
                   <s.icon size={14} className="text-[#D97706]" /> {s.label}
                 </span>
                 {i < all.length - 1 && <ArrowRight aria-hidden="true" size={14} className="text-[#CBD5E1]" />}
@@ -657,22 +657,22 @@ function FeaturesSection() {
           <FeatureTileCard tile={ai} className="md:col-span-2 lg:col-span-4"><AIArt /></FeatureTileCard>
 
           {/* Reseller — a wide strip, text beside the drawing */}
-          <article className="group relative overflow-hidden rounded-[28px] bg-[#0B1120] p-6 text-white shadow-[0_30px_60px_-30px_rgba(2,6,23,0.75)] sm:p-8 md:col-span-6 lg:col-span-12">
+          <article className="group relative overflow-hidden rounded-[22px] bg-[#0B1120] p-5 text-white shadow-[0_30px_60px_-30px_rgba(2,6,23,0.75)] sm:p-6 md:col-span-6 lg:col-span-12">
             <span aria-hidden="true" className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#F7B31C]/15 blur-3xl" />
             <span aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-10 h-72 w-72 rounded-full bg-[#14B8A6]/10 blur-3xl" />
-            <div className="relative grid items-center gap-8 lg:grid-cols-[1.1fr_1fr]">
+            <div className="relative grid items-center gap-6 lg:grid-cols-[1.1fr_1fr]">
               <div>
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F7B31C]/15 text-[#F7B31C]"><resell.icon size={17} /></span>
-                  <h3 className="text-lg font-bold tracking-tight">{resell.title}</h3>
+                  <h3 className="text-base font-bold tracking-tight">{resell.title}</h3>
                 </div>
                 <p className="mt-2 max-w-md text-sm leading-relaxed text-[#94A3B8]">{resell.text}</p>
                 <div className="mt-4"><FeatureChips tile={resell} dark /></div>
-                <Link to="/resellers" className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-[#F7B31C] hover:underline">
+                <Link to="/resellers" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#F7B31C] hover:underline">
                   See the reseller program <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
                 </Link>
               </div>
-              <div aria-hidden="true" className="relative mx-auto flex h-40 w-full max-w-sm items-center justify-center">
+              <div aria-hidden="true" className="relative mx-auto flex h-32 w-full max-w-sm items-center justify-center">
                 {[
                   { tone: "#0F766E", cls: "-translate-x-24 -rotate-12" },
                   { tone: "#7C3AED", cls: "translate-x-24 rotate-12" },
@@ -698,8 +698,8 @@ function FeaturesSection() {
           </article>
         </Reveal>
 
-        <div className="mt-10 text-center">
-          <Link to="/features" className="btn-navy inline-flex h-11 items-center gap-2 px-6 text-sm">Explore all features <ChevronRight size={15} /></Link>
+        <div className="mt-8 text-center">
+          <Link to="/features" className="btn-navy inline-flex h-10 items-center gap-2 px-5 text-sm">Explore all features <ChevronRight size={15} /></Link>
         </div>
       </div>
     </section>
@@ -762,8 +762,7 @@ function WhyDigitalCardaSection() {
               ))}
             </div>
             <div className="mt-8 flex gap-3">
-              <Link to="/signup" className="btn-gold inline-flex items-center gap-2 h-11 px-6 text-sm">Get Started <ArrowRight size={14} /></Link>
-              <Link to="/features" className="h-11 px-6 inline-flex items-center gap-2 text-sm font-medium text-[#CBD5E1] border border-white/20 rounded-xl hover:bg-white/5 transition-all">Learn More</Link>
+              <Link to="/features" className="h-11 px-6 inline-flex items-center gap-2 text-sm font-medium text-[#CBD5E1] border border-white/20 rounded-xl hover:bg-white/5 transition-all">See all features <ArrowRight size={14} /></Link>
             </div>
           </Reveal>
         </div>
@@ -1086,9 +1085,6 @@ function PersonaSection() {
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/signup" className="btn-gold h-12 px-7 inline-flex items-center gap-2 text-base">
-                Start Free <ArrowRight size={17} />
-              </Link>
               <Link to="/industries" className="h-12 px-6 inline-flex items-center gap-2 text-sm font-semibold text-[#475569] border border-[#E2E8F0] rounded-xl hover:bg-[#F8FAFC] transition-all">
                 See more industries <ChevronRight size={15} />
               </Link>
@@ -1161,7 +1157,7 @@ function HowItWorksSection() {
   ];
 
   return (
-    <section className="relative overflow-hidden bg-[#0B1120] py-20 sm:py-24">
+    <section className="relative overflow-hidden bg-[#0B1120] py-14 sm:py-16">
       <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-30" />
       <div aria-hidden="true" className="pointer-events-none absolute -left-32 -top-32 h-[420px] w-[420px] rounded-full bg-[#F7B31C]/15 blur-3xl" />
       <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -right-24 h-[420px] w-[420px] rounded-full bg-[#14B8A6]/10 blur-3xl" />
@@ -1171,7 +1167,7 @@ function HowItWorksSection() {
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F7B31C]/10 px-3 py-1 text-xs font-semibold text-[#F7B31C] ring-1 ring-[#F7B31C]/20">
             <Zap size={12} /> How it works
           </span>
-          <h2 className="mt-5 text-[2rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-[3.3rem]">
+          <h2 className="mt-4 text-[1.75rem] font-extrabold leading-[1.15] tracking-tight text-white sm:text-4xl lg:text-[2.6rem]">
             Live before your{" "}
             <span className="relative inline-block whitespace-nowrap text-gradient-gold">
               chai gets cold
@@ -1180,40 +1176,40 @@ function HowItWorksSection() {
               </svg>
             </span>
           </h2>
-          <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-[#94A3B8] sm:text-lg">
+          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-[#94A3B8]">
             Three steps. About two minutes. No printing, no app to install.
           </p>
         </Reveal>
 
-        <Reveal stagger className="relative mt-14 grid gap-5 md:grid-cols-3 md:gap-6">
+        <Reveal stagger className="relative mt-9 grid gap-4 md:grid-cols-3 md:gap-5">
           {steps.map((s, i) => (
             <article
               key={s.num}
-              className="group relative flex flex-col rounded-3xl bg-white/[0.04] p-6 ring-1 ring-white/10 transition duration-300 hover:-translate-y-1 hover:bg-white/[0.06] hover:ring-[#F7B31C]/40 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-7"
+              className="group relative flex flex-col rounded-2xl bg-white/[0.04] p-5 ring-1 ring-white/10 transition duration-300 hover:-translate-y-1 hover:bg-white/[0.06] hover:ring-[#F7B31C]/40 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute right-5 top-4 select-none font-display text-7xl font-extrabold leading-none text-transparent [-webkit-text-stroke:1.5px_rgba(247,179,28,0.35)] transition-colors duration-300 group-hover:[-webkit-text-stroke:1.5px_rgba(247,179,28,0.7)]"
+                className="pointer-events-none absolute right-4 top-3 select-none font-display text-5xl font-extrabold leading-none text-transparent [-webkit-text-stroke:1.5px_rgba(247,179,28,0.35)] transition-colors duration-300 group-hover:[-webkit-text-stroke:1.5px_rgba(247,179,28,0.7)]"
               >
                 0{s.num}
               </span>
 
-              <div className="relative h-32 w-32 rounded-full bg-gradient-to-br from-[#FFF7E6] to-[#FDE68A] p-3 shadow-[0_20px_40px_-20px_rgba(247,179,28,0.7)] ring-4 ring-white/5 transition-transform duration-500 group-hover:-rotate-3 group-hover:scale-105 motion-reduce:transition-none">
-                <img src={s.img} alt="" width={128} height={128} loading="lazy" className="h-full w-full object-contain" />
+              <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-[#FFF7E6] to-[#FDE68A] p-2 shadow-[0_14px_28px_-16px_rgba(247,179,28,0.7)] ring-4 ring-white/5 transition-transform duration-500 group-hover:-rotate-3 group-hover:scale-105 motion-reduce:transition-none">
+                <img src={s.img} alt="" width={80} height={80} loading="lazy" className="h-full w-full object-contain" />
               </div>
 
-              <span className="mt-6 inline-flex items-center gap-1.5 self-start rounded-full bg-[#F7B31C]/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-[#F7B31C] ring-1 ring-[#F7B31C]/20">
+              <span className="mt-4 inline-flex items-center gap-1.5 self-start rounded-full bg-[#F7B31C]/10 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-[#F7B31C] ring-1 ring-[#F7B31C]/20">
                 <s.chipIcon size={12} /> {s.chip}
               </span>
-              <h3 className="mt-3 text-xl font-bold tracking-tight text-white">
+              <h3 className="mt-2 text-[17px] font-bold tracking-tight text-white">
                 <span className="sr-only">Step {s.num}: </span>{s.title}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#94A3B8]">{s.desc}</p>
+              <p className="mt-1 text-[13.5px] leading-relaxed text-[#94A3B8]">{s.desc}</p>
 
               {i < steps.length - 1 && (
                 <span
                   aria-hidden="true"
-                  className="absolute -right-[18px] top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-[#F7B31C] text-[#0B1120] shadow-[0_0_0_6px_#0B1120] md:flex"
+                  className="absolute -right-[16px] top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#F7B31C] text-[#0B1120] shadow-[0_0_0_6px_#0B1120] md:flex"
                 >
                   <ArrowRight size={16} />
                 </span>
@@ -1222,16 +1218,10 @@ function HowItWorksSection() {
           ))}
         </Reveal>
 
-        <Reveal className="mt-12 flex flex-col items-center gap-5">
+        <Reveal className="mt-8 flex flex-col items-center gap-3.5">
           <div className="flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
-            <Link to="/signup" className="btn-gold inline-flex h-12 w-full items-center justify-center gap-2 px-7 text-base sm:w-auto">
+            <Link to="/signup" className="btn-gold inline-flex h-11 w-full items-center justify-center gap-2 px-6 text-[15px] sm:w-auto">
               Create my card free <ArrowRight size={17} />
-            </Link>
-            <Link
-              to="/digital-business-cards-templates"
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/5 sm:w-auto"
-            >
-              Browse 50+ templates
             </Link>
           </div>
           <ul className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-[13px] text-[#94A3B8]">
@@ -1417,7 +1407,7 @@ function QRNFCSection() {
                 </div>
               ))}
             </div>
-            <div className="mt-8"><Link to="/signup" className="btn-gold inline-flex items-center gap-2">Get Your QR Code <ArrowRight size={16} /></Link></div>
+            <div className="mt-7"><Link to="/features" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#B45309] hover:underline">See every sharing feature <ArrowRight size={15} /></Link></div>
           </Reveal>
           <Reveal className="flex justify-center">
             <div className="relative w-full max-w-[420px]">
@@ -1495,9 +1485,6 @@ function WhereToUseSection() {
                 <p className="text-[14.5px] leading-relaxed text-[#334155]">{LINK_ANSWER}</p>
               </div>
 
-              <Link to="/signup" className="btn-gold mt-7 h-12 px-7 inline-flex items-center gap-2 text-base">
-                Create Your Card Link Free <ArrowRight size={17} />
-              </Link>
             </div>
           </Reveal>
 
@@ -1634,7 +1621,7 @@ function GrowSection() {
                 <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-[#0F172A] bg-[#F7B31C] rounded-full px-2 py-0.5"><TrendingUp size={11} /> +₹250 referral</div>
               </div>
             </div>
-            <div className="px-6 pb-6 mt-auto"><Link to="/signup" className="text-sm font-bold text-[#D97706] inline-flex items-center gap-1 group-hover:gap-2 transition-all">Start earning <ArrowRight size={15} /></Link></div>
+            <div className="px-6 pb-6 mt-auto"><Link to="/refer-earn" className="text-sm font-bold text-[#D97706] inline-flex items-center gap-1 group-hover:gap-2 transition-all">See how referrals work <ArrowRight size={15} /></Link></div>
           </div>
 
           {/* Bulk / Teams */}
