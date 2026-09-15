@@ -23,6 +23,8 @@ import { adminRouter } from "./admin-router";
 import { domainRouter } from "./domain-router";
 import { addonRouter } from "./addon-router";
 import { nfcRouter } from "./nfc-router";
+import { couponRouter } from "./coupon-router";
+import { announcementRouter } from "./announcement-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -52,6 +54,8 @@ export const appRouter = createRouter({
   domain: domainRouter,
   addon: addonRouter,
   nfc: nfcRouter,
+  coupon: couponRouter,
+  announcement: announcementRouter,
 });
 
 export type AppRouter = typeof appRouter;

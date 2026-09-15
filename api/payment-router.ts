@@ -10,6 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail, referralRewardEmail, resellerCommissionEmail } from "./lib/email-templates";
 import { getUpgradeOfferPercent } from "./lib/pricing";
+import { evaluateCoupon, recordRedemption, recordPaidCoupon, completeRedemptionForOrder, cancelRedemptionForOrder } from "./lib/coupons";
 import { envRazorpayCreds, credsComplete, inferMode, createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder } from "./lib/razorpay";
 
 type Order = typeof paymentOrders.$inferSelect;
@@ -38,7 +39,7 @@ export async function resolveRazorpay(db: ReturnType<typeof getDb>) {
    webhook retries) can't double-activate in the common sequential case. */
 export async function recordRazorpayPayment(
   db: ReturnType<typeof getDb>,
-  p: { userId: number; packageId: number; planName: string; billingCycle: "monthly" | "yearly" | "triennial"; amountRupees: number; paymentId: string },
+  p: { userId: number; packageId: number; planName: string; billingCycle: "monthly" | "yearly" | "triennial"; amountRupees: number; paymentId: string; couponCode?: string; couponDiscount?: number },
 ): Promise<{ ok: boolean; already?: boolean }> {
   const existing = await db.query.paymentOrders.findFirst({ where: eq(paymentOrders.reference, p.paymentId) });
   if (existing) return { ok: true, already: true };
@@ -55,6 +56,14 @@ export async function recordRazorpayPayment(
     verifiedAt: new Date(),
   });
   const order = await db.query.paymentOrders.findFirst({ where: eq(paymentOrders.id, Number(ins.insertId)) });
+  if (order && p.couponCode) {
+    try {
+      await recordPaidCoupon(db, {
+        code: p.couponCode, discount: Number(p.couponDiscount || 0), userId: p.userId, packageId: p.packageId,
+        amountPaid: p.amountRupees, paymentOrderId: order.id, paymentRef: p.paymentId,
+      });
+    } catch (e) { console.error("[coupon] could not record redemption:", (e as Error).message); }
+  }
   if (order) await activateVerifiedOrder(db, order, "razorpay");
   return { ok: true };
 }
@@ -85,7 +94,7 @@ async function setSetting(db: ReturnType<typeof getDb>, key: string, value: stri
 async function computeAmount(
   db: ReturnType<typeof getDb>,
   user: { id: number; referredById: number | null },
-  packageId: number, cycle: "monthly" | "yearly" | "triennial", wantsOffer: boolean
+  packageId: number, cycle: "monthly" | "yearly" | "triennial", wantsOffer: boolean, couponCode?: string
 ) {
   const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, packageId) });
   if (!pkg) throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
@@ -110,7 +119,16 @@ async function computeAmount(
   // The offer percentage is server-controlled; the client may only request it.
   const offer = wantsOffer ? await getUpgradeOfferPercent(db) : 0;
   if (offer) charged = round2(charged * (1 - offer / 100));
-  return { pkg, base, charged, isUpgrade: !!existingPaid };
+  // A coupon comes off last, from the price after every other discount. It is
+  // checked here on the server every time — the browser only sends the code.
+  let coupon: { id: number; code: string; discount: number; before: number } | null = null;
+  if (couponCode && couponCode.trim()) {
+    const r = await evaluateCoupon(db, couponCode, { userId: user.id, packageId, cycle, amount: charged });
+    if (!r.ok) throw new TRPCError({ code: "BAD_REQUEST", message: r.reason });
+    coupon = { id: r.coupon.id, code: r.coupon.code, discount: r.discount, before: charged };
+    charged = charged - r.discount;
+  }
+  return { pkg, base, charged, isUpgrade: !!existingPaid, coupon };
 }
 
 /* Atomically flip a pending order → verified. The WHERE status='pending' guard
@@ -245,6 +263,30 @@ export const paymentRouter = createRouter({
       return { planName: pkg.name, base, amount: charged, isUpgrade };
     }),
 
+  // Try a coupon on a plan before paying: the exact amount it leaves, or why it
+  // can't be used. Plans only — add-ons have no coupon field at all.
+  checkCoupon: authedQuery
+    .input(z.object({
+      packageId: z.number(),
+      billingCycle: z.enum(["monthly", "yearly", "triennial"]),
+      wantsOffer: z.boolean().optional(),
+      couponCode: z.string().trim().min(1).max(40),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const before = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false);
+      const r = await evaluateCoupon(db, input.couponCode, { userId: ctx.user.id, packageId: input.packageId, cycle: input.billingCycle, amount: before.charged });
+      if (!r.ok) return { valid: false as const, reason: r.reason, amount: before.charged };
+      return {
+        valid: true as const,
+        code: r.coupon.code,
+        description: r.coupon.description,
+        discount: r.discount,
+        amountBefore: before.charged,
+        amount: before.charged - r.discount,
+      };
+    }),
+
   // ─── User submits proof of a manual payment → pending order ───
   createOrder: authedQuery
     .input(z.object({
@@ -253,6 +295,7 @@ export const paymentRouter = createRouter({
       method: z.enum(["upi", "bank"]),
       reference: z.string().min(3),
       wantsOffer: z.boolean().optional(),
+      couponCode: z.string().trim().max(40).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -262,7 +305,7 @@ export const paymentRouter = createRouter({
       });
       if (pending) throw new TRPCError({ code: "BAD_REQUEST", message: "You already have a payment awaiting verification." });
 
-      const { pkg, charged } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false);
+      const { pkg, charged, coupon } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false, input.couponCode);
       const [ins] = await db.insert(paymentOrders).values({
         userId: ctx.user.id,
         packageId: input.packageId,
@@ -273,6 +316,13 @@ export const paymentRouter = createRouter({
         reference: input.reference.trim(),
         status: "pending",
       });
+      if (coupon) {
+        await recordRedemption(db, {
+          couponId: coupon.id, userId: ctx.user.id, packageId: input.packageId,
+          amountBefore: coupon.before, discount: coupon.discount, amountPaid: charged,
+          status: "pending", paymentOrderId: Number(ins.insertId),
+        });
+      }
       await db.insert(notifications).values({
         userId: ctx.user.id,
         type: "payment_pending",
@@ -317,6 +367,7 @@ export const paymentRouter = createRouter({
       packageId: z.number(),
       billingCycle: z.enum(["monthly", "yearly", "triennial"]),
       wantsOffer: z.boolean().optional(),
+      couponCode: z.string().trim().max(40).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -324,7 +375,7 @@ export const paymentRouter = createRouter({
       if (!cr.enabled) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Online payments are not enabled." });
       }
-      const { pkg, charged } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false);
+      const { pkg, charged, coupon } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false, input.couponCode);
       const amountPaise = Math.round(charged * 100);
       if (amountPaise < 100) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "This plan's payable amount is below the ₹1 online minimum — please use the manual option or contact support." });
@@ -334,7 +385,10 @@ export const paymentRouter = createRouter({
           amount: amountPaise,
           currency: "INR",
           receipt: `dc_${ctx.user.id}_${Date.now()}`.slice(0, 40),
-          notes: { userId: String(ctx.user.id), packageId: String(input.packageId), billingCycle: input.billingCycle, planName: pkg.name },
+          notes: {
+            userId: String(ctx.user.id), packageId: String(input.packageId), billingCycle: input.billingCycle, planName: pkg.name,
+            couponCode: coupon?.code ?? "", couponDiscount: String(coupon?.discount ?? 0),
+          },
         }, cr);
         // keyId lets the browser open checkout.js without needing a build-time env var.
         return { keyId: cr.keyId, orderId: order.id, amount: order.amount, currency: order.currency, planName: pkg.name };
@@ -401,6 +455,8 @@ export const paymentRouter = createRouter({
         // The gateway's own figure is the authoritative amount actually paid.
         amountRupees: Number(order.amount || 0) / 100,
         paymentId: input.razorpayPaymentId, // the gateway payment id = our proof of payment
+        couponCode: String(notes.couponCode || "") || undefined,
+        couponDiscount: Number(notes.couponDiscount || 0),
       });
       return { ok: true };
     }),
@@ -524,6 +580,7 @@ export const paymentRouter = createRouter({
       const claimed = await claimPendingOrder(db, order.id);
       if (!claimed) throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
       await activateVerifiedOrder(db, order, "manual");
+      await completeRedemptionForOrder(db, order.id);
       return { ok: true };
     }),
 
@@ -536,6 +593,7 @@ export const paymentRouter = createRouter({
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
       if (order.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
       await db.update(paymentOrders).set({ status: "rejected", adminNote: input.note?.trim() || null, verifiedAt: new Date() }).where(eq(paymentOrders.id, order.id));
+      await cancelRedemptionForOrder(db, order.id);
       await db.insert(notifications).values({
         userId: order.userId,
         type: "payment_rejected",

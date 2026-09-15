@@ -8,7 +8,7 @@ import {
   ChevronRight, Store, X, ReceiptText,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
   Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe, MailCheck, PenLine,
-  MessageCircle, Nfc,
+  MessageCircle, Nfc, TicketPercent, Megaphone,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -81,6 +81,8 @@ const superAdminGroups: NavGroup[] = [
   { title: "Growth", items: [
     { label: "Payment Orders", icon: ReceiptText, path: "/admin/payment-orders" },
     { label: "Referrals & Payouts", icon: Gift, path: "/admin/referrals" },
+    { label: "Coupons", icon: TicketPercent, path: "/admin/coupons" },
+    { label: "Offer Popups", icon: Megaphone, path: "/admin/announcements" },
   ] },
   { title: "System", items: [
     { label: "URL Conflicts", icon: Link2, path: "/admin/url-conflicts" },

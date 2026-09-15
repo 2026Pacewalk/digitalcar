@@ -4,6 +4,7 @@ import { Phone, Mail, Sparkles, MessageCircle, ArrowRight, FileCode2 } from "luc
 import { DEFAULT_SEO, seoForPath, breadcrumbJsonLd } from "@/lib/publicSeo";
 import { CONTACT, FOOTER_GROUPS, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicNav";
 import SiteHeader from "@/components/layout/SiteHeader";
+import AnnouncementPopup from "@/components/AnnouncementPopup";
 
 export default function PublicLayout() {
   const location = useLocation();
@@ -260,6 +261,8 @@ export default function PublicLayout() {
           </Link>
         </div>
       </div>
+
+      <AnnouncementPopup audience="public" />
     </div>
   );
 }

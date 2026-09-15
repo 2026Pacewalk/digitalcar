@@ -1,7 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
-import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2, BadgePercent, Copy, X, Clock } from "lucide-react";
+import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2, BadgePercent, Copy, X, Clock, TicketPercent } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
@@ -86,6 +86,9 @@ export default function CustomerSubscription() {
   const offerH = Math.floor(offerMs / 3_600_000), offerM = Math.floor((offerMs % 3_600_000) / 60_000);
   const applyOffer = (v: number) => (offerPct ? Math.round(v * (1 - offerPct / 100) * 100) / 100 : v);
 
+  // A coupon link (/dashboard/subscription?coupon=CODE) from an offer popup.
+  const [urlCoupon] = useState(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("coupon")));
+
   // Manual payment: pick a plan → open the pay modal (QR / bank + submit reference)
   const [payFor, setPayFor] = useState<{ id: number; name: string; amount: number } | null>(null);
   const choose = (packageId: number, name: string, amount: number) => setPayFor({ id: packageId, name, amount });
@@ -111,6 +114,17 @@ export default function CustomerSubscription() {
             </div>
           </div>
         </div>
+
+        {/* Arrived from an offer popup with a coupon link */}
+        {urlCoupon && (
+          <div className="flex items-center gap-3 rounded-2xl border border-[#BBF7D0] bg-gradient-to-r from-[#F0FDF4] to-[#ECFDF5] px-4 py-3">
+            <span className="w-10 h-10 rounded-xl bg-[#DCFCE7] flex items-center justify-center shrink-0"><TicketPercent size={18} className="text-[#16A34A]" /></span>
+            <div>
+              <p className="text-sm font-bold text-[#166534]">Coupon {urlCoupon.toUpperCase()} is ready</p>
+              <p className="text-[12px] text-[#15803D]">Pick a plan — it's applied at checkout if it's valid for that plan.</p>
+            </div>
+          </div>
+        )}
 
         {/* Referral discount banner */}
         {dPct > 0 && (
@@ -347,10 +361,44 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
   const { data: customer } = useCustomer();
   const [rzpBusy, setRzpBusy] = useState(false);
 
+  // ─── Coupon (plans only). The server checks it and returns the exact amount. ───
+  const checkCoupon = trpc.payment.checkCoupon.useMutation();
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string; discount: number; amount: number } | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const amount = coupon ? coupon.amount : plan.amount;
+
+  const applyCoupon = async (raw?: string) => {
+    const code = (raw ?? couponInput).trim();
+    if (!code) return;
+    setCouponError("");
+    try {
+      const r = await checkCoupon.mutateAsync({ packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0, couponCode: code });
+      if (r.valid) {
+        setCoupon({ code: r.code, discount: r.discount, amount: r.amount });
+        setCouponInput(r.code);
+        toast.success(`Coupon ${r.code} applied — you save ${inr(r.discount)}`);
+      } else {
+        setCoupon(null);
+        setCouponError(r.reason);
+      }
+    } catch (e) {
+      setCoupon(null);
+      setCouponError(e instanceof Error ? e.message : "Couldn't check this coupon.");
+    }
+  };
+
+  // Came from an offer popup with ?coupon=CODE → apply it straight away.
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("coupon");
+    if (fromUrl) { setCouponInput(fromUrl.toUpperCase()); void applyCoupon(fromUrl); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const payWithRazorpay = async () => {
     setRzpBusy(true);
     try {
-      const order = await rzpCreate.mutateAsync({ packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0 });
+      const order = await rzpCreate.mutateAsync({ packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0, couponCode: coupon?.code });
       const rzp = await openRazorpayCheckout({
         key: order.keyId,
         amount: order.amount,
@@ -396,13 +444,13 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
     }
   };
   const copy = (t: string, k: string) => { navigator.clipboard.writeText(t).then(() => { setCopied(k); setTimeout(() => setCopied(""), 1400); }); };
-  const upiLink = pay?.upiId ? `upi://pay?pa=${encodeURIComponent(pay.upiId)}&pn=${encodeURIComponent(pay.upiName || "DigitalCarda")}&am=${plan.amount}&cu=INR` : "";
+  const upiLink = pay?.upiId ? `upi://pay?pa=${encodeURIComponent(pay.upiId)}&pn=${encodeURIComponent(pay.upiName || "DigitalCarda")}&am=${amount}&cu=INR` : "";
   const qrSrc = pay?.upiQr || (upiLink ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiLink)}` : "");
 
   const submit = async () => {
     if (reference.trim().length < 3) return toast.error("Enter your UPI/transaction reference (UTR)");
     try {
-      await createOrder.mutateAsync({ packageId: plan.id, billingCycle: cycle, method, reference: reference.trim(), wantsOffer: offerPct > 0 });
+      await createOrder.mutateAsync({ packageId: plan.id, billingCycle: cycle, method, reference: reference.trim(), wantsOffer: offerPct > 0, couponCode: coupon?.code });
       toast.success("Payment submitted — we'll verify and activate your plan shortly");
       onDone();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
@@ -420,8 +468,39 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-xl w-full max-w-md relative z-10 max-h-[94vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#F1F5F9] shrink-0">
-          <div><p className="text-base font-bold text-[#0F172A]">Pay {inr(plan.amount)}</p><p className="text-[11px] text-[#94A3B8]">{plan.name} · {cycleLabel}</p></div>
+          <div><p className="text-base font-bold text-[#0F172A]">Pay {inr(amount)}</p><p className="text-[11px] text-[#94A3B8]">{plan.name} · {cycleLabel}</p></div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#F1F5F9] text-[#64748B]"><X size={18} /></button>
+        </div>
+
+        {/* Coupon — valid on plans only, never on add-ons */}
+        <div className="px-4 pt-4">
+          {coupon ? (
+            <div className="flex items-center gap-3 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-3 py-2.5">
+              <TicketPercent size={18} className="shrink-0 text-[#16A34A]" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-[#166534]">{coupon.code} applied</p>
+                <p className="text-[11.5px] text-[#15803D]">You save {inr(coupon.discount)} · was {inr(plan.amount)}</p>
+              </div>
+              <button type="button" onClick={() => { setCoupon(null); setCouponInput(""); }} className="text-[12px] font-semibold text-[#166534] hover:underline">Remove</button>
+            </div>
+          ) : (
+            <div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <TicketPercent size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                  <input value={couponInput} onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") void applyCoupon(); }}
+                    placeholder="Have a coupon code?" aria-label="Coupon code"
+                    className="h-10 w-full rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] pl-9 pr-3 text-[13px] font-semibold uppercase tracking-wide outline-none focus:border-[#F7B31C]" />
+                </div>
+                <button type="button" onClick={() => void applyCoupon()} disabled={!couponInput.trim() || checkCoupon.isPending}
+                  className="h-10 min-w-[72px] rounded-xl bg-[#0F172A] px-4 text-[13px] font-bold text-white disabled:opacity-50">
+                  {checkCoupon.isPending ? <Loader2 size={15} className="mx-auto animate-spin" /> : "Apply"}
+                </button>
+              </div>
+              {couponError && <p className="mt-1.5 text-[12px] font-medium text-[#DC2626]">{couponError}</p>}
+            </div>
+          )}
         </div>
 
         {/* Instant online checkout (Razorpay) — card / UPI / netbanking in one modal */}
@@ -431,7 +510,7 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
               className="w-full h-12 rounded-2xl bg-[#0F172A] text-white font-bold flex items-center justify-center gap-2 hover:bg-[#1E293B] active:scale-[0.99] disabled:opacity-60">
               {rzpBusy
                 ? <><Loader2 size={18} className="animate-spin" /> Opening secure checkout…</>
-                : <><Zap size={18} className="text-[#F7B31C]" /> Pay {inr(plan.amount)} instantly</>}
+                : <><Zap size={18} className="text-[#F7B31C]" /> Pay {inr(amount)} instantly</>}
             </button>
             <p className="text-[11px] text-[#94A3B8] text-center mt-1.5">Card · UPI · Netbanking · Wallets — activated instantly</p>
             <div className="flex items-center gap-3 my-3">

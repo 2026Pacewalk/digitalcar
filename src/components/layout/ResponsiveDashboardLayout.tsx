@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import DashboardLayout from "./DashboardLayout";
 import MobileDashboardLayout from "./MobileDashboardLayout";
+import AnnouncementPopup from "@/components/AnnouncementPopup";
 import { useCardHydration } from "@/hooks/useCardHydration";
 import { useAutoPublish } from "@/hooks/useAutoPublish";
 
@@ -44,7 +45,7 @@ export default function ResponsiveDashboardLayout({
   }
 
   if (isMobile) {
-    return <MobileDashboardLayout>{children}</MobileDashboardLayout>;
+    return <MobileDashboardLayout>{children}<AnnouncementPopup audience="dashboard" /></MobileDashboardLayout>;
   }
-  return <DashboardLayout title={title} subtitle={subtitle}>{children}</DashboardLayout>;
+  return <DashboardLayout title={title} subtitle={subtitle}>{children}<AnnouncementPopup audience="dashboard" /></DashboardLayout>;
 }

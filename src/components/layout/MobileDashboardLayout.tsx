@@ -169,6 +169,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/dashboard/whatsapp": "WhatsApp Messages",
   "/dashboard/nfc": "NFC Card & Standee",
   "/admin/nfc-orders": "NFC Orders",
+  "/admin/coupons": "Coupons",
+  "/admin/announcements": "Offer Popups",
   "/dashboard/qrcode": "QR Code",
   "/dashboard/qr": "QR Codes",
   "/dashboard/media": "Gallery",

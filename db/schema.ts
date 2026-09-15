@@ -181,6 +181,75 @@ export const nfcOrders = mysqlTable("nfc_orders", {
 
 export type NfcOrder = typeof nfcOrders.$inferSelect;
 
+// Discount coupons for plan purchases (never add-ons). Rules in api/lib/coupons.ts.
+// Created at boot by api/boot.ts if missing.
+export const coupons = mysqlTable("coupons", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 40 }).notNull().unique(),
+  description: varchar("description", { length: 255 }),
+  discountType: mysqlEnum("discount_type", ["percent", "flat"]).notNull().default("percent"),
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  maxDiscount: decimal("max_discount", { precision: 10, scale: 2 }),
+  minAmount: decimal("min_amount", { precision: 10, scale: 2 }),
+  validFrom: timestamp("valid_from"),
+  validUntil: timestamp("valid_until"),
+  usageLimit: int("usage_limit"),
+  perUserLimit: int("per_user_limit").notNull().default(1),
+  planIds: varchar("plan_ids", { length: 255 }),
+  cycles: varchar("cycles", { length: 60 }),
+  active: boolean("active").notNull().default(true),
+  usedCount: int("used_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("coupon_active_idx").on(table.active),
+]);
+
+export type Coupon = typeof coupons.$inferSelect;
+
+// One row per order that used a coupon: pending (manual payment awaiting
+// verification), completed (paid) or cancelled (payment rejected).
+export const couponRedemptions = mysqlTable("coupon_redemptions", {
+  id: serial("id").primaryKey(),
+  couponId: bigint("coupon_id", { mode: "number", unsigned: true }).notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  packageId: bigint("package_id", { mode: "number", unsigned: true }).notNull(),
+  paymentOrderId: bigint("payment_order_id", { mode: "number", unsigned: true }),
+  paymentRef: varchar("payment_ref", { length: 64 }),
+  amountBefore: decimal("amount_before", { precision: 12, scale: 2 }).notNull(),
+  discount: decimal("discount", { precision: 12, scale: 2 }).notNull(),
+  amountPaid: decimal("amount_paid", { precision: 12, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["pending", "completed", "cancelled"]).notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("cr_coupon_idx").on(table.couponId),
+  index("cr_user_idx").on(table.userId),
+  index("cr_order_idx").on(table.paymentOrderId),
+]);
+
+// Offer / festival announcement popups run by the super-admin.
+export const announcements = mysqlTable("announcements", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 120 }).notNull(),
+  message: varchar("message", { length: 500 }),
+  kind: mysqlEnum("kind", ["offer", "teaser", "info"]).notNull().default("offer"),
+  theme: mysqlEnum("theme", ["diwali", "holi", "newyear", "festive", "brand", "dark"]).notNull().default("festive"),
+  badge: varchar("badge", { length: 40 }),
+  couponId: bigint("coupon_id", { mode: "number", unsigned: true }),
+  ctaLabel: varchar("cta_label", { length: 40 }),
+  ctaUrl: varchar("cta_url", { length: 255 }),
+  showFrom: timestamp("show_from"),
+  showUntil: timestamp("show_until"),
+  countdownTo: timestamp("countdown_to"),
+  audience: mysqlEnum("audience", ["public", "dashboard", "both"]).notNull().default("both"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type Announcement = typeof announcements.$inferSelect;
+
+
 
 // ─── Invoices ───────────────────────────────────────────────────
 export const invoices = mysqlTable("invoices", {

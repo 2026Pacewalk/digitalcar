@@ -374,6 +374,83 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// One-time, idempotent schema ensure for coupons, coupon_redemptions and
+// announcements (coupon system + offer popups). Additive only.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS coupons (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        code varchar(40) NOT NULL,
+        description varchar(255) NULL,
+        discount_type enum('percent','flat') NOT NULL DEFAULT 'percent',
+        discount_value decimal(10,2) NOT NULL,
+        max_discount decimal(10,2) NULL,
+        min_amount decimal(10,2) NULL,
+        valid_from timestamp NULL,
+        valid_until timestamp NULL,
+        usage_limit int NULL,
+        per_user_limit int NOT NULL DEFAULT 1,
+        plan_ids varchar(255) NULL,
+        cycles varchar(60) NULL,
+        active tinyint(1) NOT NULL DEFAULT 1,
+        used_count int NOT NULL DEFAULT 0,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY coupons_code_unique (code),
+        KEY coupon_active_idx (active)
+      )
+    `));
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS coupon_redemptions (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        coupon_id bigint unsigned NOT NULL,
+        user_id bigint unsigned NOT NULL,
+        package_id bigint unsigned NOT NULL,
+        payment_order_id bigint unsigned NULL,
+        payment_ref varchar(64) NULL,
+        amount_before decimal(12,2) NOT NULL,
+        discount decimal(12,2) NOT NULL,
+        amount_paid decimal(12,2) NOT NULL,
+        status enum('pending','completed','cancelled') NOT NULL DEFAULT 'pending',
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY cr_coupon_idx (coupon_id),
+        KEY cr_user_idx (user_id),
+        KEY cr_order_idx (payment_order_id)
+      )
+    `));
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        title varchar(120) NOT NULL,
+        message varchar(500) NULL,
+        kind enum('offer','teaser','info') NOT NULL DEFAULT 'offer',
+        theme enum('diwali','holi','newyear','festive','brand','dark') NOT NULL DEFAULT 'festive',
+        badge varchar(40) NULL,
+        coupon_id bigint unsigned NULL,
+        cta_label varchar(40) NULL,
+        cta_url varchar(255) NULL,
+        show_from timestamp NULL,
+        show_until timestamp NULL,
+        countdown_to timestamp NULL,
+        audience enum('public','dashboard','both') NOT NULL DEFAULT 'both',
+        active tinyint(1) NOT NULL DEFAULT 1,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)
+      )
+    `));
+    console.log("[schema] coupons, coupon_redemptions, announcements ensured");
+  } catch (e) {
+    console.error("[schema] ensure coupon/announcement tables failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be
@@ -703,6 +780,8 @@ app.post("/api/razorpay/webhook", async (c) => {
       billingCycle,
       amountRupees: Number(order.amount || pay.amount || 0) / 100, // the authoritative charged amount
       paymentId: pay.id,
+      couponCode: String(notes.couponCode || "") || undefined,
+      couponDiscount: Number(notes.couponDiscount || 0),
     });
     console.log(`[razorpay webhook] payment.captured ${pay.id} → ${res.already ? "already recorded" : "activated"}`);
     return c.json({ ok: true });
