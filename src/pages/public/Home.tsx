@@ -42,9 +42,9 @@ function Counter({ end, duration = 2000, separator = true }: { end: number; dura
    Card slider (hero visual)
    ───────────────────────────────────────────────────────────── */
 const SLIDER_CARDS = [
-  { id: 1, name: "SHEKHAR JAIN", title: "DIRECTOR", company: "PACEWALK", phone: "+91 99881 44844", website: "pacewalk.com", email: "md@pacewalk.com", address: "SCO-209, Green Lotus Avenue, Zirakpur, Punjab", views: 5173 },
+  { id: 1, name: "AARAV MEHTA", title: "DIRECTOR", company: "NAYARA INTERIORS", phone: "+91 98110 24680", website: "nayarainteriors.in", email: "aarav@nayarainteriors.in", address: "504 Trident Tower, Sector 44, Gurugram", views: 5173 },
   { id: 2, name: "DR. PRIYA PATEL", title: "CARDIOLOGIST", company: "HEART CARE", phone: "+91 98250 33445", website: "heartcare.in", email: "dr.priya@heartcare.in", address: "Apollo Hospital, Jubilee Hills, Hyderabad", views: 3421 },
-  { id: 3, name: "RAJ SHARMA", title: "CEO", company: "PIXELCRAFT", phone: "+91 99881 44844", website: "pixelcraft.in", email: "raj@pixelcraft.in", address: "Sector 17, Chandigarh", views: 2890 },
+  { id: 3, name: "RAJ SHARMA", title: "CEO", company: "PIXELCRAFT", phone: "+91 98722 55110", website: "pixelcraft.in", email: "raj@pixelcraft.in", address: "Sector 17, Chandigarh", views: 2890 },
   { id: 4, name: "VIKRAM MEHTA", title: "FOUNDER", company: "STYLEHUB", phone: "+91 98111 22333", website: "stylehub.com", email: "vikram@stylehub.com", address: "Bandra West, Mumbai", views: 4156 },
   { id: 5, name: "CHEF SANJAY", title: "HEAD CHEF", company: "SPICE GARDEN", phone: "+91 98123 44556", website: "spicegarden.com", email: "sanjay@spicegarden.com", address: "Connaught Place, New Delhi", views: 1987 },
   { id: 6, name: "DR. ANJALI RAO", title: "CONSULTANT", company: "STRATEGY FIRST", phone: "+91 98450 66778", website: "strategyfirst.com", email: "anjali@strategyfirst.com", address: "MG Road, Bangalore", views: 2754 },
@@ -810,7 +810,7 @@ function AISection() {
                 <div className="mt-6 space-y-3">
                   <div className="flex items-center gap-2.5 h-11 px-3.5 rounded-xl bg-white/[0.06] ring-1 ring-white/10">
                     <Globe size={15} className="text-[#14B8A6] shrink-0" />
-                    <span className="text-[13px] text-white font-medium">pacewalk.com</span>
+                    <span className="text-[13px] text-white font-medium">nayarainteriors.in</span>
                     <span className="w-[2px] h-4 bg-[#F7B31C] animate-pulse rounded-full" />
                   </div>
                   <div className="flex justify-center"><ChevronRight size={16} className="text-[#475569] rotate-90" /></div>

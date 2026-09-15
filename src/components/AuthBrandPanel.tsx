@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { AUTH_MOCK_CARD } from "@/components/auth/authMockData";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -49,11 +50,11 @@ export default function AuthBrandPanel({
               </div>
               <div className="p-4">
                 <div className="text-center mb-3">
-                  <p className="text-sm font-bold text-white tracking-wide">SHEKHAR JAIN</p>
-                  <p className="text-[9px] text-[#F7B31C] font-medium mt-0.5">DIRECTOR · PACEWALK</p>
+                  <p className="text-sm font-bold text-white tracking-wide">{AUTH_MOCK_CARD.name}</p>
+                  <p className="text-[9px] text-[#F7B31C] font-medium mt-0.5">{AUTH_MOCK_CARD.role}</p>
                 </div>
                 <div className="space-y-1.5">
-                  {[{ i: Phone, t: "+91 99881 44844" }, { i: Globe, t: "pacewalk.com" }, { i: Mail, t: "md@pacewalk.com" }].map((r, k) => (
+                  {[{ i: Phone, t: AUTH_MOCK_CARD.phone }, { i: Globe, t: AUTH_MOCK_CARD.site }, { i: Mail, t: AUTH_MOCK_CARD.email }].map((r, k) => (
                     <div key={k} className="flex items-center gap-2 rounded-lg bg-white/[0.04] px-2 py-1.5">
                       <span className="w-6 h-6 rounded-md bg-[#F7B31C] flex items-center justify-center shrink-0"><r.i size={11} className="text-[#0F172A]" /></span>
                       <span className="text-[10px] text-white/80 truncate">{r.t}</span>

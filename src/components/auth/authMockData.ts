@@ -1,18 +1,19 @@
 /* Single source of truth for the decorative auth-page card mock.
 
-   These are the founder's OWN published card details (the same ones already
-   rendered at AuthBrandPanel.tsx:52-56 and Home.tsx), and the two trust figures
-   the site already publishes (AuthBrandPanel.tsx:92,94).
+   The card is a FICTIONAL sample business (the same "Aarav Mehta / Nayara
+   Interiors" the public tools and the home page use). Never put a real
+   customer's or the founder's details here — resellers sell this platform
+   under their own names and object to seeing anyone else's business on it.
 
-   Do NOT add, round up, or invent numbers here. If a figure is not already
-   published elsewhere on the site, it does not belong on an auth page. */
+   The two trust figures are the ones the site already publishes elsewhere.
+   Do NOT add, round up, or invent numbers here. */
 
 export const AUTH_MOCK_CARD = {
-  name: "SHEKHAR JAIN",
-  role: "DIRECTOR · PACEWALK",
-  phone: "+91 99881 44844",
-  site: "pacewalk.com",
-  email: "md@pacewalk.com",
+  name: "AARAV MEHTA",
+  role: "DIRECTOR · NAYARA INTERIORS",
+  phone: "+91 98110 24680",
+  site: "nayarainteriors.in",
+  email: "aarav@nayarainteriors.in",
   views: "5,173",
 } as const;
 
