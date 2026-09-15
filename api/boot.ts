@@ -684,6 +684,13 @@ app.get("/q/:publicId", async (c) => {
   return c.redirect("/", 302);
 });
 
+// /templates and /card-designs used to be a second templates page. There is one
+// page now — /digital-business-cards-templates — so the old URLs move there permanently (301),
+// keeping links and search rankings they earned. The query string is kept.
+for (const from of ["/templates", "/templates/", "/card-designs", "/card-designs/"]) {
+  app.get(from, (c) => c.redirect(`/digital-business-cards-templates${new URL(c.req.url).search}`, 301));
+}
+
 // Dynamic sitemap: marketing pages, template pages and every public card worth
 // indexing, so Google can discover the card profiles. Built from every published
 // snapshot, so the result is kept for a few minutes rather than rebuilt per hit.
@@ -691,7 +698,7 @@ let sitemapXml: { body: string; at: number } | null = null;
 const SITEMAP_TTL = 10 * 60_000;
 app.get("/sitemap.xml", async (c) => {
   const base = "https://digitalcarda.in";
-  const pages = ["", "/digital-business-cards-templates", "/templates", "/features", "/pricing", "/industries", "/bulk-cards",
+  const pages = ["", "/digital-business-cards-templates", "/features", "/pricing", "/industries", "/bulk-cards",
     "/ai-card-generator", "/resellers", "/refer-earn", "/custom-domain", "/contact",
     // Free tools — canonical URLs only; each has an alias route that deliberately
     // stays out of the sitemap so the two never compete for the same terms.

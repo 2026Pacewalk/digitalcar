@@ -12,7 +12,6 @@
  * page so pages don't compete with each other:
  *   /                                  digital business card (3.6K), digital visiting card (4.4K)
  *   /digital-business-cards-templates  digital business card templates
- *   /templates                         digital visiting card designs
  *   /pricing                           digital visiting card price
  *   /email-signature-generator         email signature generator (3.6K), free … (590)
  *   /whatsapp-message-templates        whatsapp business message templates (1K)
@@ -61,13 +60,6 @@ export const SEO_WHATSAPP_TEMPLATES: PageSeo = {
   parent: "/free-tools",
 };
 
-const SEO_TEMPLATES: PageSeo = {
-  title: "Digital Visiting Card Designs | DigitalCarda",
-  description:
-    "Pick from ready-to-use digital visiting card designs. Every one works on any phone, updates live and keeps your QR code working. Start free for 30 days.",
-  crumb: "Card Designs",
-};
-
 export const DEFAULT_SEO: PageSeo = {
   title: "Digital Business Card & Digital Visiting Card | DigitalCarda",
   description: "Create your digital visiting card in minutes — QR code, WhatsApp, UPI payments and lead capture on one link. Free 30-day trial, no card details needed.",
@@ -85,8 +77,6 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
     description: "Browse ready-made digital business card templates for every profession. Preview a live demo, then try any card free for 30 days — no app, no printing.",
     crumb: "Card Templates",
   },
-  "/templates": SEO_TEMPLATES,
-  "/card-designs": { ...SEO_TEMPLATES, canonicalPath: "/templates" },
   "/industries": {
     title: "Digital Business Cards for Every Industry | DigitalCarda",
     description: "Digital visiting cards for doctors, real estate agents, lawyers, consultants, restaurants, salons, coaches and agencies — made for how each finds clients.",

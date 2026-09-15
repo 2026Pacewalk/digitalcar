@@ -34,7 +34,6 @@ const PRODUCT: NavGroup = {
   links: [
     { label: "Features", href: "/features" },
     { label: "Card templates", href: "/digital-business-cards-templates" },
-    { label: "Card designs", href: "/templates" },
     { label: "Pricing", href: "/pricing" },
     { label: "AI card generator", href: "/ai-card-generator" },
     { label: "Custom domain", href: "/custom-domain" },
@@ -120,7 +119,6 @@ export const HEADER_MENUS: HeaderMenu[] = [
     label: "Templates",
     items: [
       { label: "Card templates", href: "/digital-business-cards-templates", desc: "Ready-made digital business cards for every profession" },
-      { label: "Card designs", href: "/templates", desc: "Change the look anytime — your QR code keeps working" },
       { label: "Industries", href: "/industries", desc: "Cards for doctors, real estate, lawyers, salons and more" },
     ],
     feature: {
@@ -183,7 +181,6 @@ export const SEARCH_PAGES: NavLink[] = [
   { label: "Contact us", href: "/contact", desc: "Call, WhatsApp or email the team" },
   { label: "Start free trial", href: "/signup", desc: "30 days free, no card details" },
   { label: "Home", href: "/", desc: "DigitalCarda home page" },
-  { label: "Card designs", href: "/templates", desc: "Digital visiting card designs" },
   { label: "Industries", href: "/industries", desc: "Cards for every industry" },
   { label: "Custom domain", href: "/custom-domain", desc: "Your card on your own domain" },
   { label: "All free tools", href: "/free-tools", desc: "Free tools, no sign-up" },

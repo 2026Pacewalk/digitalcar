@@ -26,7 +26,6 @@ const AdminResellerApplications = lazy(() => import("./pages/admin/ResellerAppli
 const Home = lazy(() => import("./pages/public/Home"));
 const Features = lazy(() => import("./pages/public/Features"));
 const Marketplace = lazy(() => import("./pages/public/Marketplace"));
-const PublicTemplates = lazy(() => import("./pages/public/Templates"));
 const ProductDetail = lazy(() => import("./pages/public/ProductDetail"));
 const CardDemo = lazy(() => import("./pages/public/CardDemo"));
 const Industries = lazy(() => import("./pages/public/Industries"));
@@ -188,8 +187,8 @@ export default function App() {
           {/* Old URLs → the consolidated Templates page (keeps existing links & SEO alive) */}
           {/* The 44-design preset gallery — pick any design → /signup?theme=… so
               a customer who signs up from a design gets it as their default. */}
-          <Route path="/templates" element={<PublicTemplates />} />
-          <Route path="/card-designs" element={<PublicTemplates />} />
+          <Route path="/templates" element={<Navigate to="/digital-business-cards-templates" replace />} />
+          <Route path="/card-designs" element={<Navigate to="/digital-business-cards-templates" replace />} />
           <Route path="/digital-business-cards" element={<Navigate to="/digital-business-cards-templates" replace />} />
           <Route path="/digital-business-cards/:slug" element={<LegacyProductRedirect />} />
           <Route path="/demo/:slug" element={<CardDemo />} />

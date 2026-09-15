@@ -194,7 +194,7 @@ export default function FreeTools() {
                 <Link to="/signup" className="btn-gold h-12 px-7 inline-flex items-center justify-center gap-2 text-base">
                   Start 30-day free trial <ArrowRight size={17} />
                 </Link>
-                <Link to="/templates" className="h-12 px-7 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">
+                <Link to="/digital-business-cards-templates" className="h-12 px-7 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">
                   <LayoutGrid size={16} /> Browse card designs
                 </Link>
               </div>

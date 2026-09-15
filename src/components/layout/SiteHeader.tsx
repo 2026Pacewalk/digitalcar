@@ -16,7 +16,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight, Building2, ChevronDown, CornerDownLeft, CreditCard, FileText, Gift, Globe, Handshake, Home,
-  Layers, LayoutGrid, LogIn, Mail, Map as MapIcon, Menu, MessageCircle, MessageSquareText, Palette, PenLine,
+  Layers, LayoutGrid, LogIn, Mail, Map as MapIcon, Menu, MessageCircle, MessageSquareText, PenLine,
   Phone, Search, Sparkles, Tag, Wand2, Wrench, X, type LucideIcon,
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
@@ -29,7 +29,6 @@ const ICONS: Record<string, LucideIcon> = {
   "/custom-domain": Globe,
   "/pricing": Tag,
   "/digital-business-cards-templates": LayoutGrid,
-  "/templates": Palette,
   "/industries": Building2,
   "/email-signature-generator": PenLine,
   "/whatsapp-message-templates": MessageSquareText,

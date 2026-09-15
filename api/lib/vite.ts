@@ -155,7 +155,7 @@ const SSR_PATHS = new Set([
   "/resellers", "/refer-earn", "/custom-domain", "/contact",
   "/free-tools", "/email-signature-generator", "/email-signature-templates",
   "/whatsapp-message-templates", "/whatsapp-business-messages",
-  "/digital-business-cards-templates", "/templates", "/card-designs",
+  "/digital-business-cards-templates",
   "/privacy", "/refund-policy", "/terms-of-service", "/sitemap",
 ]);
 const PRODUCT_PATH = /^\/digital-business-cards-templates\/([^/]+)$/;
@@ -213,7 +213,6 @@ async function ssrSeeds(clean: string): Promise<SsrSeed[]> {
     seed("package.list", undefined, () => caller.package.list());
   }
   if (clean === "/refer-earn") seed("referral.publicRates", undefined, () => caller.referral.publicRates());
-  if (clean === "/templates" || clean === "/card-designs") seed("template.presets", undefined, () => caller.template.presets());
 
   return (await Promise.all(jobs)).filter((x): x is SsrSeed => x !== null);
 }

@@ -12,7 +12,7 @@ type Feat = { name: string; link?: string };
 const DEFAULT_FEATURES: { customer: Feat[]; reseller: Feat[] } = {
   customer: [
     { name: "Your digital card + permanent link & QR", link: "/features" },
-    { name: "50+ premium templates & link-in-bio styles", link: "/templates" },
+    { name: "50+ premium templates & link-in-bio styles", link: "/digital-business-cards-templates" },
     { name: "Share anywhere — WhatsApp, QR & link", link: "/features" },
     { name: "Edit your card anytime — instant updates", link: "/features" },
     { name: "Products & services online store", link: "/digital-business-cards" },
