@@ -395,3 +395,60 @@ _______________end__________________________*/
 	z-index: -2;
 	opacity: .9;
 }
+
+/* ── Ribbon, anchored to the contact block ─────────────────────────────
+   The three .home-extra-* bands above are positioned at fixed offsets from
+   the top of the whole section (322/335/350px), which assumes the header
+   (logo + socials + name + designation) is always exactly as tall as the
+   sample card. It is not: a wrapping business name or a missing logo moves
+   the contact rows while the bands stay put, so the ribbon ends up slicing
+   through the first row — which is what it did on the Teal Breeze preview.
+
+   Drawing the ribbon from .home-details instead ties it to the one thing it
+   must stay clear of: the contact rows. It now sits in the gap above them
+   whatever the header does. The rows carry z-index:1, so the ribbon passes
+   behind them and behind the name.
+
+   The old bands are hidden rather than deleted because the markup
+   (home-extra-one..four) is shared by every template. */
+#home-section .home-extra-one,
+#home-section .home-extra-two,
+#home-section .home-extra-three{
+	display: none !important;
+}
+
+#home-section .home-details{
+	position: relative;
+	/* was 130px: the fixed-offset ribbon needed a large gap to sit in, which
+	   left an empty band under the name. */
+	/* 66px is what the ribbon needs and no more: the first page has to fit the
+	   560px preview frame, and at the old 130px this template overflowed by
+	   ~60px, clipping the CALL / WHATSAPP bar off the bottom. */
+	padding: 66px 40px 6px 60px;
+}
+
+/* One clean band rather than the original three overlapping shapes.
+
+   The angle is the constraint: rotated about its left edge, a full-width band
+   climbs width x sin(angle) by the time it reaches the right side. At the old
+   -15deg that is ~110px across a 375px card — more than the gap above the
+   contact rows, so the right end rode up over the name. At -5deg it climbs
+   ~38px, which fits inside the 66px gap with the designation clear above it
+   and the first contact row clear below. */
+#home-section .home-details::after{
+	content: "";
+	position: absolute;
+	top: 40px;
+	left: -30px;
+	width: calc(100% + 60px);
+	height: 20px;
+	background-color: var(--theme-color);
+	-webkit-transform: rotate(-5deg);
+	-ms-transform: rotate(-5deg);
+	transform: rotate(-5deg);
+	-webkit-transform-origin: left center;
+	-ms-transform-origin: left center;
+	transform-origin: left center;
+	z-index: 0;
+	pointer-events: none;
+}
