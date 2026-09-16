@@ -256,12 +256,16 @@
   animation-play-state: paused;
 }
 
-/* Scrollbar hide utility */
-.scrollbar-hide {
+/* Scrollbar hide utility. `.scrollbar-none` is an alias: components were written
+   with that name but it was never defined, so their chip rows and sidebars showed
+   a visible scrollbar (e.g. the templates filter bar on phones). */
+.scrollbar-hide,
+.scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-.scrollbar-hide::-webkit-scrollbar {
+.scrollbar-hide::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
   display: none;
 }
 
@@ -593,3 +597,59 @@ button.fab:active {
 @media (max-width: 1023px) {
   html, body { overflow-x: clip; }
 }
+
+/* Home QR & NFC: a scanner line sweeping over the sample standee's QR. */
+.dc-qr-scan .dc-tent-qr { position: relative; overflow: hidden; }
+.dc-qr-scan .dc-tent-qr::before {
+  content: ""; position: absolute; left: 10px; right: 10px; height: 46px; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(20,184,166,0) 0%, rgba(20,184,166,.28) 100%);
+  border-bottom: 3px solid #14B8A6; border-radius: 2px;
+  box-shadow: 0 6px 14px -2px rgba(20,184,166,.55);
+  animation: dc-qr-sweep 2.4s cubic-bezier(.45,0,.55,1) infinite alternate;
+}
+.dc-qr-scan .dc-tent-qr::after {
+  content: ""; position: absolute; inset: 8px; pointer-events: none; border-radius: 12px;
+  background:
+    linear-gradient(#14B8A6,#14B8A6) top left/22px 3px, linear-gradient(#14B8A6,#14B8A6) top left/3px 22px,
+    linear-gradient(#14B8A6,#14B8A6) top right/22px 3px, linear-gradient(#14B8A6,#14B8A6) top right/3px 22px,
+    linear-gradient(#14B8A6,#14B8A6) bottom left/22px 3px, linear-gradient(#14B8A6,#14B8A6) bottom left/3px 22px,
+    linear-gradient(#14B8A6,#14B8A6) bottom right/22px 3px, linear-gradient(#14B8A6,#14B8A6) bottom right/3px 22px;
+  background-repeat: no-repeat;
+  animation: dc-qr-frame 2.4s ease-in-out infinite alternate;
+}
+@keyframes dc-qr-sweep { from { top: -30px; } to { top: calc(100% - 16px); } }
+@keyframes dc-qr-frame { from { opacity: .55; transform: scale(1); } to { opacity: 1; transform: scale(.985); } }
+@media (prefers-reduced-motion: reduce) {
+  .dc-qr-scan .dc-tent-qr::before { animation: none; top: 40%; opacity: .6; }
+  .dc-qr-scan .dc-tent-qr::after { animation: none; }
+}
+
+/* Home testimonials (mobile): story progress bar. */
+@keyframes dc-story { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Pricing: shine sweep across primary buttons (on hover, and once every few seconds). */
+.dc-btn-shine { position: relative; isolation: isolate; }
+.dc-btn-shine::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 45%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  transform: skewX(-18deg); animation: dc-shine 4.5s ease-in-out infinite;
+}
+.dc-btn-shine:hover::after { animation-duration: 1.1s; }
+@keyframes dc-shine { 0%, 70% { left: -60%; } 100% { left: 130%; } }
+
+/* Pricing: rotating gradient border for the recommended plan. */
+.dc-border-spin {
+  background: conic-gradient(from 0deg, #F7B31C, #FDE68A, #E09A12, #8B5CF6, #F7B31C);
+  animation: dc-border-spin 6s linear infinite;
+}
+@keyframes dc-border-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .dc-btn-shine::after, .dc-border-spin { animation: none; }
+}
+
+/* Pricing NFC products: signal rings and a phone tapping the standee. */
+.dc-nfc-wave { opacity: 0; animation: dc-nfc-wave 2.2s ease-out infinite; }
+@keyframes dc-nfc-wave { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.1); opacity: 0; } }
+.dc-nfc-tap { animation: dc-nfc-tap 2.6s ease-in-out infinite; }
+@keyframes dc-nfc-tap { 0%, 100% { transform: translate(10px, -6px) rotate(18deg); } 45%, 60% { transform: translate(-8px, 6px) rotate(8deg); } }
+@media (prefers-reduced-motion: reduce) { .dc-nfc-wave, .dc-nfc-tap { animation: none; } .dc-nfc-wave { opacity: .35; } }

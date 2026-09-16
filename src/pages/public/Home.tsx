@@ -5,7 +5,7 @@ import {
   Check, ArrowRight, Zap, Users, Eye, MousePointer,
   Share2, Layers, Shield, Clock, TrendingUp,
   ChevronRight, ChevronLeft, Monitor, Smartphone, Globe, BarChart3,
-  Link2, Leaf, Quote, ScanLine, Gift, Building2, Plus,
+  Link2, Leaf, Quote, ScanLine, Gift, Building2, Plus, Nfc,
 } from "lucide-react";
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { trpc } from "@/providers/trpc";
@@ -14,6 +14,7 @@ import { STANDEE_STYLES, standeeMarkup } from "@/lib/standee";
 import { useReveal, Reveal, SectionHeading } from "@/components/public/Reveal";
 import JsonLd from "@/components/seo/JsonLd";
 import { webpFor } from "@/lib/imageSources";
+import { TESTIMONIALS } from "@/data/testimonials";
 
 /* ─── Animated number counter (rAF, fires when in view) ─── */
 function Counter({ end, duration = 2000, separator = true }: { end: number; duration?: number; separator?: boolean }) {
@@ -275,26 +276,109 @@ function StatsBand() {
   // for 51) instead of a number typed in once and forgotten.
   const { data: catalogue } = trpc.product.catalogue.useQuery();
   const templates = catalogue?.length ? Math.max(10, Math.floor(catalogue.length / 10) * 10) : 50;
-  const stats = [
-    { end: 91000, suffix: "+", label: "Card Views", sep: true },
-    { end: 5173, suffix: "+", label: "Active Cards", sep: true },
-    { end: 1456, suffix: "+", label: "Happy Clients", sep: true },
-    { end: templates, suffix: "+", label: "Templates" },
-    { end: 5, suffix: "", label: "Countries" },
+
+  /* The figures are the ones the site already publishes — only the
+     presentation changed. Five equal boxes left an empty sixth cell on phones;
+     this is a bento "proof board": the headline reach figure leads, and the
+     other four sit in an even 2×2 so nothing is ever left dangling. */
+  const tiles = [
+    { end: 5173, suffix: "+", label: "Active cards", note: "live digital cards in use", icon: CreditCard, tint: "#F7B31C", sep: true },
+    { end: 1456, suffix: "+", label: "Happy clients", note: "rated 4.9 out of 5", icon: Users, tint: "#14B8A6", sep: true, stars: true },
+    { end: templates, suffix: "+", label: "Templates", note: "designs ready to start from", icon: Layers, tint: "#8B5CF6", href: "/digital-business-cards-templates" },
+    { end: 5, suffix: "", label: "Countries", note: "businesses sharing cards", icon: Globe, tint: "#3B82F6" },
   ];
+
   return (
-    <section className="relative -mt-2">
+    <section className="relative -mt-2 pb-2" aria-label="DigitalCarda in numbers">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Reveal stagger className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px rounded-3xl overflow-hidden bg-[#1E293B] shadow-premium-lg gradient-navy ring-1 ring-white/5">
-          {stats.map((s, i) => (
-            <div key={i} className="bg-[#0F172A]/60 px-5 py-7 text-center">
-              <p className="text-3xl sm:text-[2.1rem] font-extrabold text-white tabular-nums">
-                <Counter end={s.end} duration={2200} separator={s.sep} />
-                <span className="text-gradient-gold">{s.suffix}</span>
-              </p>
-              <p className="mt-1.5 text-xs font-medium text-[#94A3B8] uppercase tracking-wide">{s.label}</p>
+        <Reveal className="relative overflow-hidden rounded-[28px] sm:rounded-[32px] bg-[#0B1120] ring-1 ring-white/10 shadow-[0_30px_70px_-30px_rgba(2,6,23,0.75)] p-3 sm:p-4 lg:p-5">
+          {/* Backdrop — decorative only */}
+          <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-30" />
+          <div aria-hidden="true" className="absolute -top-28 -left-20 w-80 h-80 rounded-full blur-3xl bg-[#F7B31C]/[0.14]" />
+          <div aria-hidden="true" className="absolute -bottom-32 right-0 w-96 h-96 rounded-full blur-3xl bg-[#14B8A6]/[0.10]" />
+
+          <div className="relative flex items-center justify-between gap-3 px-2 pt-1 pb-3 sm:pb-4">
+            <p className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-bold uppercase tracking-[0.16em] text-[#94A3B8]">
+              <span className="dc-live-dot h-2 w-2 rounded-full bg-[#14B8A6]" aria-hidden="true" />
+              DigitalCarda in numbers
+            </p>
+            <span className="hidden sm:inline text-xs text-[#64748B]">Real cards · real customers</span>
+          </div>
+
+          <div className="relative grid grid-cols-2 lg:grid-cols-4 lg:grid-rows-2 gap-2.5 sm:gap-3">
+            {/* ── Hero figure ── */}
+            <div className="relative col-span-2 lg:row-span-2 overflow-hidden rounded-[22px] sm:rounded-3xl p-5 sm:p-7 lg:p-8 bg-gradient-to-br from-[#1E293B] via-[#141C2E] to-[#0F172A] ring-1 ring-[#F7B31C]/25 flex flex-col justify-between min-h-[176px] lg:min-h-[300px]">
+              <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#F7B31C]/70 to-transparent" />
+
+              {/* Reach rings — "people opening your card", drawn. */}
+              <div aria-hidden="true" className="absolute -right-12 -top-12 sm:-right-4 sm:-top-4 lg:right-5 lg:top-5 w-44 h-44 lg:w-52 lg:h-52 flex items-center justify-center">
+                <span className="absolute inset-0 rounded-full border border-[#F7B31C]/15" />
+                <span className="absolute inset-[16%] rounded-full border border-[#F7B31C]/20" />
+                <span className="absolute inset-[32%] rounded-full border border-[#F7B31C]/30" />
+                <span className="absolute inset-[32%] rounded-full bg-[#F7B31C]/10 motion-safe:animate-ping [animation-duration:2.8s]" />
+                <span className="relative w-12 h-12 lg:w-14 lg:h-14 rounded-2xl gradient-gold shadow-gold flex items-center justify-center">
+                  <Eye size={22} className="text-[#0F172A]" />
+                </span>
+              </div>
+
+              <span className="relative inline-flex w-fit items-center gap-1.5 rounded-full bg-[#F7B31C]/12 border border-[#F7B31C]/25 px-2.5 py-1 text-[10.5px] sm:text-[11px] font-semibold text-[#FCD34D]">
+                <TrendingUp size={12} aria-hidden="true" /> And counting
+              </span>
+
+              <div className="relative mt-6 lg:mt-0">
+                <p className="font-display text-[2.6rem] leading-none sm:text-6xl lg:text-7xl font-extrabold text-white tabular-nums tracking-tight">
+                  <Counter end={91000} duration={2200} />
+                  <span className="text-gradient-gold">+</span>
+                </p>
+                <p className="mt-2.5 text-sm sm:text-base font-semibold text-white">Card views</p>
+                <p className="mt-0.5 text-[12.5px] sm:text-sm text-[#94A3B8] max-w-[15rem] sm:max-w-xs leading-snug">
+                  times customers have opened a DigitalCarda card
+                </p>
+              </div>
             </div>
-          ))}
+
+            {/* ── Supporting figures (always an even 2×2) ── */}
+            {tiles.map((t) => {
+              const inner = (
+                <>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ring-1 ring-white/10" style={{ background: `${t.tint}1f` }}>
+                      <t.icon size={17} style={{ color: t.tint }} aria-hidden="true" />
+                    </span>
+                    {t.href && (
+                      <span className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center text-[#94A3B8] lg:group-hover:bg-[#F7B31C] lg:group-hover:text-[#0F172A] transition-colors" aria-hidden="true">
+                        <ArrowRight size={13} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-4 sm:mt-5">
+                    <p className="font-display text-[1.7rem] sm:text-[2.1rem] leading-none font-extrabold text-white tabular-nums tracking-tight">
+                      <Counter end={t.end} duration={2200} separator={!!t.sep} />
+                      <span style={{ color: t.tint }}>{t.suffix}</span>
+                    </p>
+                    <p className="mt-2 text-[13px] sm:text-sm font-semibold text-white">{t.label}</p>
+                    <p className="mt-0.5 text-[11.5px] sm:text-xs text-[#94A3B8] leading-snug">
+                      {t.stars && (
+                        <span className="inline-flex items-center gap-px mr-1 align-[-1px]" role="img" aria-label="4.9 out of 5 stars">
+                          {[...Array(5)].map((_, k) => <Star key={k} size={10} className="fill-[#F7B31C] text-[#F7B31C]" />)}
+                        </span>
+                      )}
+                      {t.note}
+                    </p>
+                  </div>
+                  <div aria-hidden="true" className="absolute inset-x-5 bottom-0 h-[3px] rounded-t-full opacity-0 lg:group-hover:opacity-100 transition-opacity" style={{ background: t.tint }} />
+                </>
+              );
+              const cls = "group relative overflow-hidden rounded-[20px] sm:rounded-3xl p-4 sm:p-5 bg-white/[0.035] ring-1 ring-white/[0.08] lg:hover:bg-white/[0.06] lg:hover:ring-white/15 transition-all duration-300 lg:motion-safe:hover:-translate-y-0.5";
+              return t.href ? (
+                <Link key={t.label} to={t.href} className={`${cls} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]`} aria-label={`${t.end}+ templates — browse the designs`}>
+                  {inner}
+                </Link>
+              ) : (
+                <div key={t.label} className={cls}>{inner}</div>
+              );
+            })}
+          </div>
         </Reveal>
       </div>
     </section>
@@ -920,7 +1004,7 @@ function TemplatesSection() {
    tabs of different widths) and a keyed panel that re-mounts, so the
    content cross-fades on every switch. */
 type Persona = {
-  id: string; tab: string; icon: React.ComponentType<{ size?: number; className?: string }>;
+  id: string; tab: string; short: string; icon: React.ComponentType<{ size?: number; className?: string }>;
   accent: string; headline: string; pain: string; points: string[]; stat: string;
   card: { name: string; role: string; chips: string[] };
   /** Real card screenshot in a phone frame, public/hero/personas/<img>.{webp,png} (640x960, transparent). */
@@ -929,7 +1013,7 @@ type Persona = {
 
 const PERSONAS: Persona[] = [
   {
-    id: "clinics", tab: "Doctors & Clinics", icon: Plus, accent: "#14B8A6",
+    id: "clinics", tab: "Doctors & Clinics", short: "Doctors", icon: Plus, accent: "#14B8A6",
     headline: "Digital Visiting Card for Doctors & Clinics",
     pain: "Patients lose the paper slip with your OPD timings. Your card lives in their phone instead — timings, directions and a booking button always one tap away.",
     points: [
@@ -938,12 +1022,12 @@ const PERSONAS: Persona[] = [
       "Google review link that builds local trust",
       "Share reports, prescriptions and forms as PDFs",
     ],
-    stat: "Clinics see 3× more appointment enquiries",
+    stat: "Timings, directions and bookings in one tap",
     card: { name: "Dr. Anita Sharma", role: "MD Physician · Sharma Clinic", chips: ["Call", "WhatsApp", "Directions"] },
     img: "digital-business-card-doctors-clinics",
   },
   {
-    id: "realestate", tab: "Real Estate", icon: MapPin, accent: "#F7B31C",
+    id: "realestate", tab: "Real Estate", short: "Real Estate", icon: MapPin, accent: "#F7B31C",
     headline: "Digital Business Card for Real Estate Agents",
     pain: "You meet twenty people at a site visit and hand out twenty cards. Send one link instead — with your live listings already inside it.",
     points: [
@@ -952,12 +1036,12 @@ const PERSONAS: Persona[] = [
       "Google Maps directions to every project",
       "Every enquiry captured as a lead you can follow up",
     ],
-    stat: "Agents capture 4× more leads per site visit",
+    stat: "Listings, site visits and leads on one link",
     card: { name: "Rohit Malhotra", role: "Realtor · Malhotra Properties", chips: ["Listings", "Site Visit", "Directions"] },
     img: "digital-business-card-real-estate",
   },
   {
-    id: "agencies", tab: "Agencies & Freelancers", icon: Monitor, accent: "#8B5CF6",
+    id: "agencies", tab: "Agencies & Freelancers", short: "Agencies", icon: Monitor, accent: "#8B5CF6",
     headline: "Digital Business Card for Agencies & Freelancers",
     pain: "Your portfolio, your packages and your payment link should not need three different URLs and a follow-up email.",
     points: [
@@ -966,12 +1050,12 @@ const PERSONAS: Persona[] = [
       "UPI and payment links so you get paid faster",
       "Your own custom domain for a serious brand",
     ],
-    stat: "Freelancers close new work 2× faster",
+    stat: "Portfolio, services and enquiries on one link",
     card: { name: "Aarav Mehta", role: "Founder · Mehta Studio", chips: ["Portfolio", "Packages", "Pay Now"] },
     img: "digital-business-card-agencies-freelancers",
   },
   {
-    id: "retail", tab: "Restaurants & Retail", icon: ShoppingBag, accent: "#EC4899",
+    id: "retail", tab: "Restaurants & Retail", short: "Retail", icon: ShoppingBag, accent: "#EC4899",
     headline: "Digital Card & QR Menu for Restaurants and Shops",
     pain: "One QR on the table can do the job of a menu, an offer board and a review request — without reprinting anything.",
     points: [
@@ -980,12 +1064,12 @@ const PERSONAS: Persona[] = [
       "UPI payment QR right at the counter",
       "Google review link that lifts your rating",
     ],
-    stat: "Outlets collect 5× more Google reviews",
+    stat: "Menu, offers and reviews one scan away",
     card: { name: "Spice Route", role: "Multi-cuisine · Zirakpur", chips: ["Menu", "Offers", "Pay via UPI"] },
     img: "digital-business-card-restaurants-retail",
   },
   {
-    id: "salons", tab: "Salons & Wellness", icon: Sparkles, accent: "#F97316",
+    id: "salons", tab: "Salons & Wellness", short: "Salons", icon: Sparkles, accent: "#F97316",
     headline: "Digital Visiting Card for Salons & Spas",
     pain: "Clients rebook when booking takes one tap instead of one phone call they keep postponing.",
     points: [
@@ -994,12 +1078,12 @@ const PERSONAS: Persona[] = [
       "Before-and-after gallery of your work",
       "Packages and offers that bring clients back",
     ],
-    stat: "Salons see 40% more repeat bookings",
+    stat: "Services, prices and bookings in one tap",
     card: { name: "Glow Studio", role: "Hair & Skin · Chandigarh", chips: ["Services", "Book Now", "Gallery"] },
     img: "digital-business-card-salons-spas",
   },
   {
-    id: "coaches", tab: "Coaches & Consultants", icon: Users, accent: "#3B82F6",
+    id: "coaches", tab: "Coaches & Consultants", short: "Coaches", icon: Users, accent: "#3B82F6",
     headline: "Digital Business Card for Coaches & Consultants",
     pain: "Your credibility is the product. Let people see it before the first call, not during it.",
     points: [
@@ -1008,7 +1092,7 @@ const PERSONAS: Persona[] = [
       "Discovery calls booked over WhatsApp or a link",
       "Videos and free resources that build trust early",
     ],
-    stat: "Coaches book 3× more discovery calls",
+    stat: "Programmes, reviews and calls on one link",
     card: { name: "Neha Kapoor", role: "Business Coach · Delhi", chips: ["Programmes", "Book Call", "Reviews"] },
     img: "digital-business-card-coaches-consultants",
   },
@@ -1034,13 +1118,17 @@ function PersonaSection() {
 
   // Keep the chosen tab in view on narrow screens.
   useEffect(() => {
-    btnRefs.current[active]?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    const el = btnRefs.current[active];
+    const strip = tabsRef.current;
+    if (el && strip && strip.offsetParent) strip.scrollTo({ left: el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2, behavior: "smooth" });
   }, [active]);
 
   const p = PERSONAS[active];
+  const touchX = useRef<number | null>(null);
+  const go = (d: number) => setActive((i) => (i + d + PERSONAS.length) % PERSONAS.length);
 
   return (
-    <section className="py-20 bg-white relative overflow-hidden" id="built-for-you">
+    <section className="py-14 sm:py-20 bg-white relative overflow-hidden" id="built-for-you">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
       <div
         className="absolute left-1/2 top-40 -translate-x-1/2 w-[760px] h-[400px] rounded-full blur-3xl pointer-events-none transition-colors duration-700"
@@ -1053,8 +1141,43 @@ function PersonaSection() {
           subtitle="Pick your line of work — the card, the features and the pitch change to match it."
         />
 
-        {/* Persona tabs with a sliding indicator */}
-        <Reveal>
+        {/* ── Phones & tablets: every industry visible at once ── */}
+        <Reveal className="lg:hidden">
+          <p className="text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[#94A3B8] mb-3">Tap your industry</p>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3" role="tablist" aria-label="Choose your industry">
+            {PERSONAS.map((x, i) => {
+              const on = i === active;
+              return (
+                <button
+                  key={x.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  aria-controls="persona-panel"
+                  onClick={() => setActive(i)}
+                  className={`relative flex flex-col items-center justify-center gap-1.5 rounded-2xl px-1.5 py-3 text-center transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] active:scale-95 ${on ? "bg-white shadow-premium" : "bg-[#F8FAFC] ring-1 ring-[#E2E8F0]"}`}
+                  style={on ? { boxShadow: `0 0 0 2px ${x.accent}, 0 14px 28px -16px ${x.accent}` } : undefined}
+                >
+                  <span
+                    className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-300"
+                    style={{ background: on ? x.accent : `${x.accent}1A`, color: on ? "#fff" : x.accent }}
+                  >
+                    <x.icon size={19} />
+                  </span>
+                  <span className={`text-[12px] font-semibold leading-tight ${on ? "text-[#0F172A]" : "text-[#475569]"}`}>{x.short}</span>
+                  {on && (
+                    <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white ring-2 ring-white" style={{ background: x.accent }}>
+                      <Check size={11} strokeWidth={3} />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </Reveal>
+
+        {/* ── Desktop: persona tabs with a sliding indicator ── */}
+        <Reveal className="hidden lg:block">
           <div ref={tabsRef} className="relative flex gap-1.5 overflow-x-auto no-scrollbar p-1.5 rounded-2xl bg-[#F1F5F9] ring-1 ring-[#E2E8F0] mb-10">
             <span
               aria-hidden="true"
@@ -1082,8 +1205,95 @@ function PersonaSection() {
           </div>
         </Reveal>
 
-        {/* One shell, content swapped — keyed so it re-mounts and cross-fades */}
-        <div key={p.id} className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+        {/* ── Phones & tablets: one swipeable spotlight card ── */}
+        <div
+          id="persona-panel"
+          role="tabpanel"
+          aria-label={p.tab}
+          className="lg:hidden mt-6 relative rounded-[28px] bg-white ring-1 ring-[#E2E8F0] shadow-premium-lg overflow-hidden"
+          onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+          onTouchEnd={(e) => {
+            if (touchX.current == null) return;
+            const dx = e.changedTouches[0].clientX - touchX.current;
+            touchX.current = null;
+            if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+          }}
+        >
+          {/* Stage: the real card, on the industry's colour */}
+          <div key={`stage-${p.id}`} className="relative h-[300px] sm:h-[360px] overflow-hidden transition-colors duration-500" style={{ background: `linear-gradient(160deg, ${p.accent}33 0%, ${p.accent}0D 55%, #ffffff 100%)` }}>
+            <div aria-hidden="true" className="absolute inset-0 bg-dots opacity-40" />
+            <div aria-hidden="true" className="absolute left-1/2 top-24 -translate-x-1/2 w-56 h-56 rounded-full blur-3xl" style={{ background: `${p.accent}55` }} />
+
+            <div className="absolute top-4 inset-x-4 flex items-center justify-between z-10">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 backdrop-blur px-3 py-1.5 text-[12px] font-bold text-[#0F172A] shadow-sm">
+                <p.icon size={13} className="shrink-0" />
+                {p.tab}
+              </span>
+              <span className="rounded-full bg-[#0F172A]/80 backdrop-blur px-2.5 py-1 text-[11px] font-bold text-white tabular-nums">{active + 1}/{PERSONAS.length}</span>
+            </div>
+
+            <div className="absolute inset-x-0 top-14 flex justify-center">
+              <picture className="dc-swap-in block w-[230px] sm:w-[270px]">
+                <source srcSet={`/hero/personas/${p.img}.webp`} type="image/webp" />
+                <img
+                  src={`/hero/personas/${p.img}.png`}
+                  width="640" height="960"
+                  alt={`${p.card.name} — ${p.card.role}: a DigitalCarda digital business card for ${p.tab.toLowerCase()} on a smartphone`}
+                  loading="lazy" decoding="async"
+                  className="block w-full h-auto drop-shadow-[0_24px_40px_rgba(15,23,42,0.22)]"
+                />
+              </picture>
+            </div>
+            <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent" />
+
+            {/* Prev / next */}
+            <button type="button" onClick={() => go(-1)} aria-label="Previous industry"
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/90 backdrop-blur shadow-md flex items-center justify-center text-[#0F172A] active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
+              <ChevronLeft size={18} />
+            </button>
+            <button type="button" onClick={() => go(1)} aria-label="Next industry"
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/90 backdrop-blur shadow-md flex items-center justify-center text-[#0F172A] active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          <div key={`body-${p.id}`} className="dc-swap-in relative px-5 pb-6 -mt-4 sm:px-7">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold" style={{ background: `${p.accent}1A`, color: "#0F172A", boxShadow: `inset 0 0 0 1px ${p.accent}40` }}>
+              <Zap size={12} style={{ color: p.accent }} /> {p.stat}
+            </span>
+            <h3 className="mt-3 text-[1.35rem] sm:text-2xl font-extrabold text-[#0F172A] tracking-tight leading-[1.2]">{p.headline}</h3>
+            <p className="mt-2 text-[14px] text-[#64748B] leading-relaxed">{p.pain}</p>
+
+            <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#94A3B8]">What your card does</p>
+            <ul className="mt-2.5 grid gap-2 sm:grid-cols-2">
+              {p.points.map((pt, i) => (
+                <li key={pt} className="flex items-start gap-3 rounded-2xl bg-[#F8FAFC] ring-1 ring-[#F1F5F9] px-3.5 py-3">
+                  <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[11px] font-extrabold text-white tabular-nums" style={{ background: p.accent }}>{i + 1}</span>
+                  <span className="text-[13.5px] text-[#334155] leading-snug">{pt}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* Progress dots */}
+            <div className="mt-5 flex items-center justify-center gap-1.5" aria-hidden="true">
+              {PERSONAS.map((x, i) => (
+                <span key={x.id} className="h-1.5 rounded-full transition-all duration-300" style={{ width: i === active ? 22 : 6, background: i === active ? p.accent : "#E2E8F0" }} />
+              ))}
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              <Link to="/signup" className="h-12 inline-flex items-center justify-center gap-1.5 rounded-xl gradient-gold text-[#0F172A] text-[14px] font-bold active:scale-[0.98] transition-transform">
+                Create my card <ArrowRight size={15} />
+              </Link>
+              <Link to="/industries" className="h-12 inline-flex items-center justify-center gap-1 rounded-xl border border-[#E2E8F0] text-[14px] font-semibold text-[#475569] active:bg-[#F8FAFC]">
+                All industries <ChevronRight size={15} />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Desktop: one shell, content swapped — keyed so it re-mounts and cross-fades ── */}
+        <div key={p.id} className="hidden lg:grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           <div className="dc-swap-in">
             <h3 className="text-2xl sm:text-[2rem] font-extrabold text-[#0F172A] tracking-tight leading-[1.2]">{p.headline}</h3>
             <p className="mt-4 text-[15px] text-[#64748B] leading-relaxed">{p.pain}</p>
@@ -1100,7 +1310,7 @@ function PersonaSection() {
             </div>
 
             <div className="mt-7 inline-flex items-center gap-2.5 rounded-full px-4 py-2.5 ring-1" style={{ background: `${p.accent}12`, borderColor: "transparent", boxShadow: `inset 0 0 0 1px ${p.accent}33` }}>
-              <TrendingUp size={15} style={{ color: p.accent }} />
+              <Zap size={15} style={{ color: p.accent }} />
               <span className="text-[13px] font-bold text-[#0F172A]">{p.stat}</span>
             </div>
 
@@ -1283,11 +1493,140 @@ function AnalyticsSection() {
   );
 }
 
-/* ─── QR & NFC ─── */
+/* ─── QR & NFC ───
+   Desktop: copy beside the standee. Phones: the same promise told as a
+   story — the standee first, then "scan or tap", where it goes, and why the
+   QR never needs reprinting — so it reads at a glance instead of as a wall
+   of text and ticks. */
+const QR_STANDEE = () => (
+  <>
+    <style>{STANDEE_STYLES}</style>
+    <div className="dc-qr-scan" dangerouslySetInnerHTML={{ __html: standeeMarkup({
+      brandName: "Aarav Mehta",
+      subtitle: "Founder · Mehta & Co.",
+      phone: "+91 98765 43210",
+      linkText: "digitalcarda.in/aarav",
+      prompt: "Scan to view my digital card",
+      qrSrc: `https://api.qrserver.com/v1/create-qr-code/?size=440x440&margin=12&format=png&data=${encodeURIComponent("https://digitalcarda.in/digital-business-cards-templates")}&color=0F172A&bgcolor=FFFFFF`,
+    }) }} />
+  </>
+);
+
+/* The standee is designed at 400px wide. Squeezing it narrower wraps its text
+   and shrinks nothing else, so on phones it's rendered at full size and scaled
+   down as a whole — it looks exactly like the one customers download. */
+const STANDEE_W = 400;
+function ScaledStandee({ max = 290 }: { max?: number }) {
+  const outer = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ scale: 0.7, h: 0 });
+  useLayoutEffect(() => {
+    const fit = () => {
+      if (!outer.current || !inner.current) return;
+      const w = Math.min(outer.current.clientWidth, max);
+      const scale = Math.min(1, w / STANDEE_W);
+      setBox({ scale, h: inner.current.offsetHeight * scale });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    if (outer.current) ro.observe(outer.current);
+    if (inner.current) ro.observe(inner.current);
+    return () => ro.disconnect();
+  }, [max]);
+  return (
+    <div ref={outer} className="w-full flex justify-center">
+      <div className="relative" style={{ width: STANDEE_W * box.scale, height: box.h || undefined }}>
+        <div ref={inner} className="absolute left-0 top-0 origin-top-left" style={{ width: STANDEE_W, transform: `scale(${box.scale})` }}>
+          <QR_STANDEE />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const QR_PLACES = [
+  { icon: CreditCard, label: "Visiting cards & brochures", accent: "#F7B31C" },
+  { icon: ShoppingBag, label: "Counters & packaging", accent: "#EC4899" },
+  { icon: MessageCircle, label: "WhatsApp, email & SMS", accent: "#22C55E" },
+  { icon: Globe, label: "Website & social media", accent: "#3B82F6" },
+];
+
 function QRNFCSection() {
   return (
-    <section className="py-20 bg-[#F8FAFC]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-14 sm:py-20 bg-[#F8FAFC] relative overflow-hidden">
+      {/* ── Phones & tablets ── */}
+      <div className="lg:hidden relative max-w-xl mx-auto px-4 sm:px-6">
+        <div aria-hidden="true" className="absolute -top-10 left-1/2 -translate-x-1/2 w-[340px] h-[340px] rounded-full bg-[#14B8A6]/10 blur-3xl pointer-events-none" />
+
+        <Reveal className="relative text-center">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#CCFBF1] text-[#115E59]">
+            <ScanLine size={12} /> QR &amp; NFC
+          </span>
+          <h2 className="mt-3 text-[1.9rem] leading-[1.12] font-extrabold text-[#0F172A] tracking-tight">
+            Share Faster with <span className="text-gradient-gold">QR and NFC</span>
+          </h2>
+          <p className="mt-3 text-[15px] text-[#64748B] leading-relaxed">
+            No typing numbers. People <b className="text-[#0F172A]">scan</b> or <b className="text-[#0F172A]">tap</b> — your card opens instantly.
+          </p>
+        </Reveal>
+
+        {/* The real standee design, scaled as one piece so it keeps its proportions */}
+        <Reveal className="relative mt-7">
+          <ScaledStandee />
+        </Reveal>
+
+        {/* Scan or tap */}
+        <Reveal stagger className="relative mt-8 grid grid-cols-2 gap-3">
+          {[
+            { icon: QrCode, title: "Scan", text: "Any phone camera reads your QR — no app needed.", tone: "#0F172A", bg: "bg-[#0F172A]", fg: "text-white", sub: "text-[#94A3B8]", iconBg: "bg-[#F7B31C] text-[#0F172A]" },
+            { icon: Nfc, title: "Tap", text: "Put your link on an NFC card; a tap on the phone opens it.", tone: "#14B8A6", bg: "bg-white ring-1 ring-[#E2E8F0]", fg: "text-[#0F172A]", sub: "text-[#64748B]", iconBg: "bg-[#CCFBF1] text-[#0F766E]" },
+          ].map((m) => (
+            <div key={m.title} className={`relative rounded-[22px] p-4 overflow-hidden shadow-premium ${m.bg}`}>
+              <span className={`w-11 h-11 rounded-2xl flex items-center justify-center ${m.iconBg}`}><m.icon size={22} /></span>
+              <p className={`mt-3 font-display text-[1.35rem] font-extrabold leading-none ${m.fg}`}>{m.title}</p>
+              <p className={`mt-1.5 text-[12.5px] leading-snug ${m.sub}`}>{m.text}</p>
+            </div>
+          ))}
+        </Reveal>
+
+        {/* Where it goes */}
+        <Reveal className="relative mt-8">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#94A3B8] text-center">Put it everywhere</p>
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            {QR_PLACES.map((pl) => (
+              <div key={pl.label} className="flex items-center gap-2.5 rounded-2xl bg-white ring-1 ring-[#EEF2F7] px-3 py-3">
+                <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${pl.accent}1A`, color: pl.accent }}>
+                  <pl.icon size={17} />
+                </span>
+                <span className="text-[12.5px] font-semibold text-[#334155] leading-tight">{pl.label}</span>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+
+        {/* The reassurance */}
+        <Reveal className="relative mt-4">
+          <div className="relative rounded-[22px] bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A]/60 ring-1 ring-[#F7B31C]/30 p-4 flex items-start gap-3 overflow-hidden">
+            <span className="w-10 h-10 rounded-xl bg-white/80 flex items-center justify-center shrink-0 text-[#B45309]"><Shield size={19} /></span>
+            <div>
+              <p className="text-[14px] font-bold text-[#0F172A]">Print once. It never breaks.</p>
+              <p className="mt-0.5 text-[12.5px] text-[#78350F]/80 leading-snug">Your link is permanent — change your details or redesign your card and the same QR keeps working.</p>
+            </div>
+          </div>
+        </Reveal>
+
+        <Reveal className="relative mt-6 grid grid-cols-2 gap-2.5">
+          <Link to="/signup" className="h-12 inline-flex items-center justify-center gap-1.5 rounded-xl gradient-gold text-[#0F172A] text-[14px] font-bold active:scale-[0.98] transition-transform">
+            Get my QR <ArrowRight size={15} />
+          </Link>
+          <Link to="/features" className="h-12 inline-flex items-center justify-center gap-1 rounded-xl border border-[#E2E8F0] bg-white text-[14px] font-semibold text-[#475569] active:bg-[#F8FAFC]">
+            Sharing features <ChevronRight size={15} />
+          </Link>
+        </Reveal>
+      </div>
+
+      {/* ── Desktop ── */}
+      <div className="hidden lg:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <Reveal>
             <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-[#CCFBF1] text-[#115E59] mb-4">QR &amp; NFC</span>
@@ -1305,15 +1644,7 @@ function QRNFCSection() {
           </Reveal>
           <Reveal className="flex justify-center">
             <div className="relative w-full max-w-[420px]">
-              <style>{STANDEE_STYLES}</style>
-              <div dangerouslySetInnerHTML={{ __html: standeeMarkup({
-                brandName: "Aarav Mehta",
-                subtitle: "Founder · Mehta & Co.",
-                phone: "+91 98765 43210",
-                linkText: "digitalcarda.in/aarav",
-                prompt: "Scan to view my digital card",
-                qrSrc: `https://api.qrserver.com/v1/create-qr-code/?size=440x440&margin=12&format=png&data=${encodeURIComponent("https://digitalcarda.in/digital-business-cards-templates")}&color=0F172A&bgcolor=FFFFFF`,
-              }) }} />
+              <QR_STANDEE />
             </div>
           </Reveal>
         </div>
@@ -1444,14 +1775,6 @@ function CustomDomainSection() {
 /* ─────────────────────────────────────────────────────────────
    Testimonials
    ───────────────────────────────────────────────────────────── */
-const TESTIMONIALS = [
-  { name: "ADI Textiles", role: "Retail · Surat", quote: "Your services and the dealing deserve praise. Thank you DigitalCarda for providing us a customised platform.", accent: "#F7B31C" },
-  { name: "Bombay Jewellers", role: "Jewellery · Mumbai", quote: "Professional, reliable and beautifully designed. Our card now reaches customers everywhere with a single tap.", accent: "#14B8A6" },
-  { name: "Eurydice", role: "Boutique · Delhi", quote: "Fascinating for a shopkeeper like me. A single card reaches hundreds of people with a tap. Thanks a million times.", accent: "#8B5CF6" },
-  { name: "Scube Promoters", role: "Real Estate · Pune", quote: "DigitalCarda made my business easier than before. I even shared it directly to Facebook in seconds.", accent: "#3B82F6" },
-  { name: "Shivlal Jewellers", role: "Jewellery · Jaipur", quote: "A great initiative to preserve the environment with an innovative business approach. Highly recommended.", accent: "#EC4899" },
-  { name: "Availcar", role: "Auto · Chandigarh", quote: "Digital cards are pocket-friendly and easy to share anywhere. A smart way to advertise through DigitalCarda.", accent: "#0EA5E9" },
-];
 
 function TestimonialCard({ t }: { t: (typeof TESTIMONIALS)[number] }) {
   return (
@@ -1542,14 +1865,150 @@ function GrowSection() {
   );
 }
 
+/* Phones: the reviews as a "stories" deck — one big quote at a time with
+   progress bars that auto-advance (paused while touched, off-screen or with
+   reduced motion), tap left/right or swipe to move, and every business as an
+   avatar you can jump to. Desktop keeps the scrolling marquee. */
+const STORY_MS = 6000;
+
+function TestimonialStories() {
+  const [i, setI] = useState(0);
+  const [held, setHeld] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [reduce, setReduce] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const touch = useRef<{ x: number; t: number } | null>(null);
+  const n = TESTIMONIALS.length;
+  const go = useCallback((d: number) => setI((v) => (v + d + n) % n), [n]);
+
+  useEffect(() => {
+    setReduce(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+    const el = ref.current;
+    if (!el || !("IntersectionObserver" in window)) { setVisible(true); return; }
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { threshold: 0.4 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const t = TESTIMONIALS[i];
+  const next1 = TESTIMONIALS[(i + 1) % n];
+  const next2 = TESTIMONIALS[(i + 2) % n];
+  const running = visible && !held && !reduce;
+
+  return (
+    <div ref={ref} className="relative px-4 sm:px-6 max-w-md mx-auto">
+      {/* Deck */}
+      <div className="relative pt-3 pb-6">
+        <div aria-hidden="true" className="absolute inset-x-8 top-0 bottom-2 rounded-[28px] rotate-[4deg] opacity-60 transition-colors duration-500" style={{ background: `${next2.accent}33` }} />
+        <div aria-hidden="true" className="absolute inset-x-5 top-1.5 bottom-4 rounded-[28px] -rotate-[3deg] transition-colors duration-500" style={{ background: `${next1.accent}40` }} />
+
+        <figure
+          className="relative rounded-[28px] bg-[#0F172A] text-white shadow-premium-lg overflow-hidden select-none"
+          onTouchStart={(e) => { touch.current = { x: e.touches[0].clientX, t: Date.now() }; setHeld(true); }}
+          onTouchEnd={(e) => {
+            setHeld(false);
+            const st = touch.current; touch.current = null;
+            if (!st) return;
+            const dx = e.changedTouches[0].clientX - st.x;
+            if (Math.abs(dx) > 45) { go(dx < 0 ? 1 : -1); return; }
+            if (Date.now() - st.t < 250) {
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              go(e.changedTouches[0].clientX - r.left < r.width / 3 ? -1 : 1);
+            }
+          }}
+          onTouchCancel={() => { setHeld(false); touch.current = null; }}
+        >
+          <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-30" />
+          <div aria-hidden="true" className="absolute -top-24 -right-20 w-72 h-72 rounded-full blur-3xl opacity-40 transition-colors duration-700" style={{ background: t.accent }} />
+          <div aria-hidden="true" className="absolute -bottom-28 -left-16 w-60 h-60 rounded-full blur-3xl bg-[#F7B31C]/10" />
+
+          {/* Story progress */}
+          <div className="relative flex gap-1.5 px-5 pt-5" aria-hidden="true">
+            {TESTIMONIALS.map((x, k) => (
+              <span key={x.name} className="h-[3px] flex-1 rounded-full bg-white/15 overflow-hidden">
+                {k < i && <span className="block h-full w-full bg-white/80" />}
+                {k === i && (
+                  <span
+                    key={`p-${i}`}
+                    className="block h-full w-full bg-white origin-left"
+                    style={{
+                      animation: reduce ? undefined : `dc-story ${STORY_MS}ms linear forwards`,
+                      animationPlayState: running ? "running" : "paused",
+                      transform: reduce ? "scaleX(1)" : undefined,
+                    }}
+                    onAnimationEnd={() => go(1)}
+                  />
+                )}
+              </span>
+            ))}
+          </div>
+
+          <div key={t.name} className="dc-swap-in relative px-6 pt-6 pb-6 min-h-[300px] flex flex-col">
+            <div className="flex items-center justify-between">
+              <span className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${t.accent}26` }}>
+                <Quote size={24} style={{ color: t.accent }} />
+              </span>
+              <span className="flex gap-0.5" aria-label="Rated 5 out of 5">
+                {[...Array(5)].map((_, k) => <Star key={k} size={15} className="fill-[#F7B31C] text-[#F7B31C]" />)}
+              </span>
+            </div>
+
+            <blockquote className="mt-5 font-display text-[1.28rem] leading-[1.4] font-semibold tracking-tight text-white">
+              &ldquo;{t.quote}&rdquo;
+            </blockquote>
+
+            <figcaption className="mt-auto pt-6 flex items-center gap-3">
+              <span className="w-12 h-12 rounded-full flex items-center justify-center text-[#0F172A] font-extrabold text-lg shrink-0 ring-2 ring-white/20" style={{ background: t.accent }}>
+                {t.name.charAt(0)}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[15px] font-bold text-white">{t.name}</span>
+                <span className="block text-[12.5px] text-[#94A3B8]">{t.role}</span>
+              </span>
+              <span className="ml-auto text-[11px] font-bold text-[#94A3B8] tabular-nums">{i + 1}/{n}</span>
+            </figcaption>
+          </div>
+        </figure>
+      </div>
+
+      {/* Who's talking — jump to anyone */}
+      <div className="flex items-center justify-center gap-2.5" role="tablist" aria-label="Choose a review">
+        {TESTIMONIALS.map((x, k) => {
+          const on = k === i;
+          return (
+            <button
+              key={x.name}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              aria-label={`${x.name}, ${x.role}`}
+              onClick={() => setI(k)}
+              className={`rounded-full flex items-center justify-center font-extrabold text-[#0F172A] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] ${on ? "w-12 h-12 text-base" : "w-9 h-9 text-[13px] opacity-60"}`}
+              style={{ background: x.accent, boxShadow: on ? `0 0 0 3px #fff, 0 0 0 5px ${x.accent}` : undefined }}
+            >
+              {x.name.charAt(0)}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-center text-[11.5px] text-[#94A3B8]">Tap the sides or swipe · hold to pause</p>
+    </div>
+  );
+}
+
 function TestimonialsSection() {
   const row = [...TESTIMONIALS, ...TESTIMONIALS];
   return (
-    <section className="py-20 overflow-hidden">
+    <section className="py-14 sm:py-20 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Testimonials" title="They Say We Did a Great Job" subtitle="Businesses across India have replaced paper cards with DigitalCarda — here's what they think." />
       </div>
-      <div className="relative mask-fade-x">
+
+      <div className="md:hidden">
+        <TestimonialStories />
+      </div>
+
+      <div className="hidden md:block relative mask-fade-x">
         <div className="marquee-track gap-5 py-2">
           {/* The second pass only exists to loop the scroll — hidden from screen readers. */}
           {row.map((t, i) => (
@@ -1758,31 +2217,6 @@ function FaqSection() {
   );
 }
 
-function FinalCTA() {
-  return (
-    <section className="py-20">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Reveal className="relative rounded-[32px] overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] px-6 py-16 sm:px-16 sm:py-20 text-center shadow-premium-lg">
-          <div className="absolute inset-0 bg-grid-dark opacity-30" />
-          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#F7B31C]/12 rounded-full blur-3xl animate-aurora-drift" />
-          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#14B8A6]/12 rounded-full blur-3xl animate-aurora-drift" style={{ animationDelay: "2s" }} />
-          <div className="relative max-w-2xl mx-auto">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-[#F7B31C] ring-1 ring-white/10 mb-5">
-              <Sparkles size={12} /> Live in about 2 minutes
-            </span>
-            <h2 className="text-3xl sm:text-[2.6rem] font-extrabold text-white mb-4 tracking-tight leading-tight">Create Your Digital Business Card Today</h2>
-            <p className="text-base text-[#94A3B8] mb-8">Join thousands of businesses using DigitalCarda to create, share, and track professional digital cards.</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2 text-base">Start Free Trial <ArrowRight size={18} /></Link>
-              <Link to="/digital-business-cards-templates" className="h-12 px-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white border border-white/20 rounded-xl hover:bg-white/5 transition-all">View Templates</Link>
-            </div>
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
 /* ─── Page ─── */
 // Homepage section toggles — Reseller & Pricing are hidden from the homepage
 // (still reachable at /resellers and /pricing). Flip to true to bring back.
@@ -1815,7 +2249,6 @@ export default function Home() {
       {SHOW_RESELLER_SECTION && <ResellerSection />}
       {SHOW_PRICING_SECTION && <PricingSection />}
       <FaqSection />
-      <FinalCTA />
     </>
   );
 }

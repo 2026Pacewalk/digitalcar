@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Search, SlidersHorizontal, Sparkles, X, ArrowRight, Eye } from "lucide-react";
+import { Search, SlidersHorizontal, Sparkles, X, ArrowRight, Eye, Star } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import TemplateThumb from "@/components/TemplateThumb";
 import { demoForProduct } from "@/lib/demoData";
@@ -86,40 +86,44 @@ export default function Marketplace() {
             </span>
           </h1>
           <p className="mt-3.5 text-[15px] sm:text-base text-[#64748B] max-w-xl mx-auto">40+ ready designs for every industry. Preview a live demo and launch in minutes — no app, no printing.</p>
-          {/* Search */}
-          <div className="mt-6 max-w-xl mx-auto">
-            <div className="flex items-center gap-2.5 bg-white border border-[#E2E8F0] rounded-2xl px-5 py-3.5 shadow-premium-lg focus-within:border-[#F7B31C] focus-within:ring-4 focus-within:ring-[#F7B31C]/10 transition-all">
-              <Search size={18} className="text-[#94A3B8] shrink-0" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search real estate, doctor, luxury black, minimal…" className="flex-1 bg-transparent outline-none text-sm text-[#0F172A] placeholder:text-[#94A3B8]" />
-              {q && <button onClick={() => setQ("")} className="text-[#94A3B8] hover:text-[#0F172A]"><X size={16} /></button>}
+          {/* Search + quick industries, merged into one box: the input on top and
+              the industries as a single scrolling row underneath (they used to
+              wrap into four rows of chips on phones). */}
+          <div className="mt-6 max-w-xl mx-auto text-left bg-white border border-[#E2E8F0] rounded-2xl shadow-premium-lg focus-within:border-[#F7B31C] focus-within:ring-4 focus-within:ring-[#F7B31C]/10 transition-all overflow-hidden">
+            <div className="flex items-center gap-2.5 px-4 sm:px-5 py-3">
+              <Search size={18} className="text-[#94A3B8] shrink-0" aria-hidden="true" />
+              <input
+                value={q} onChange={(e) => setQ(e.target.value)}
+                placeholder="Search real estate, doctor, luxury black, minimal…"
+                aria-label="Search card designs"
+                className="flex-1 min-w-0 bg-transparent outline-none text-[16px] sm:text-sm text-[#0F172A] placeholder:text-[#94A3B8]"
+              />
+              {q && <button onClick={() => setQ("")} aria-label="Clear search" className="text-[#94A3B8] hover:text-[#0F172A]"><X size={16} /></button>}
             </div>
-          </div>
-          {/* Quick industries */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {QUICK.map((qi) => (
-              <button key={qi.label} onClick={() => setCat(cat === qi.label ? "all" : qi.label)}
-                className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-[13px] font-semibold transition-all active:scale-95 ${cat === qi.label ? "gradient-gold text-[#0F172A] shadow-gold" : "bg-white/80 ring-1 ring-[#E2E8F0] text-[#475569] hover:ring-[#F7B31C]/50 backdrop-blur"}`}>
-                <span className="text-[14px] leading-none">{qi.emoji}</span> {qi.label}
-              </button>
-            ))}
+            <div className="border-t border-[#F1F5F9] py-2">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none px-3 sm:px-4 [mask-image:linear-gradient(to_right,black_85%,transparent)]" role="group" aria-label="Filter by industry">
+                <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8] pr-1">Popular:</span>
+                {QUICK.map((qi) => (
+                  <button key={qi.label} onClick={() => setCat(cat === qi.label ? "all" : qi.label)} aria-pressed={cat === qi.label}
+                    className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12.5px] font-semibold whitespace-nowrap transition-all active:scale-95 ${cat === qi.label ? "gradient-gold text-[#0F172A] shadow-gold" : "bg-[#F8FAFC] ring-1 ring-[#E2E8F0] text-[#475569] hover:ring-[#F7B31C]/50"}`}>
+                    <span className="text-[13px] leading-none" aria-hidden="true">{qi.emoji}</span> {qi.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Sticky filter bar (app-like) */}
       <div className="sticky top-16 z-30 bg-[#F8FAFC]/90 backdrop-blur-xl border-y border-[#E2E8F0]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-3">
-          <div className="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-none -mx-1 px-1">
-            <button onClick={() => setCat("all")} className={`shrink-0 h-9 px-4 rounded-full text-[13px] font-semibold transition-all active:scale-95 ${cat === "all" ? "gradient-gold text-[#0F172A] shadow-gold" : "bg-white ring-1 ring-[#E2E8F0] text-[#64748B] hover:ring-[#F7B31C]/50"}`}>All</button>
+        <div className="max-w-7xl mx-auto pl-4 pr-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center gap-2 sm:gap-3">
+          {/* Chips scroll sideways; the right edge fades so it's clear there's more. */}
+          <div className="flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none -ml-1 pl-1 pr-6 py-0.5 -mr-3 sm:mr-0 [mask-image:linear-gradient(to_right,black_calc(100%-28px),transparent)]" role="group" aria-label="Filter by industry">
+            <button onClick={() => setCat("all")} aria-pressed={cat === "all"} className={`shrink-0 h-8 sm:h-9 px-3.5 sm:px-4 rounded-full text-[12.5px] sm:text-[13px] font-semibold transition-all active:scale-95 ${cat === "all" ? "bg-[#0F172A] text-white" : "bg-white ring-1 ring-[#E2E8F0] text-[#64748B] hover:ring-[#F7B31C]/50"}`}>All</button>
             {categories.map((c) => (
-              <button key={c} onClick={() => setCat(c)} className={`shrink-0 h-9 px-4 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all active:scale-95 ${cat === c ? "gradient-gold text-[#0F172A] shadow-gold" : "bg-white ring-1 ring-[#E2E8F0] text-[#64748B] hover:ring-[#F7B31C]/50"}`}>{c}</button>
+              <button key={c} onClick={() => setCat(c)} aria-pressed={cat === c} className={`shrink-0 h-8 sm:h-9 px-3.5 sm:px-4 rounded-full text-[12.5px] sm:text-[13px] font-semibold whitespace-nowrap transition-all active:scale-95 ${cat === c ? "bg-[#0F172A] text-white" : "bg-white ring-1 ring-[#E2E8F0] text-[#64748B] hover:ring-[#F7B31C]/50"}`}>{c}</button>
             ))}
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <SlidersHorizontal size={15} className="hidden sm:block text-[#94A3B8]" />
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortId)} className="h-9 bg-white ring-1 ring-[#E2E8F0] rounded-full px-3 text-[13px] text-[#334155] outline-none focus:ring-[#F7B31C] max-w-[130px]">
-              {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
           </div>
         </div>
       </div>
@@ -127,32 +131,63 @@ export default function Marketplace() {
       {/* Grid */}
       <section className="px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-7xl mx-auto">
-          <p className="text-[13px] text-[#64748B] mb-4">{isLoading ? "Loading cards…" : `${shown.length} card${shown.length === 1 ? "" : "s"}`}</p>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <p className="text-[13px] text-[#64748B]">{isLoading ? "Loading cards…" : `${shown.length} card${shown.length === 1 ? "" : "s"}`}</p>
+            {/* Sort: an always-visible segmented toggle (a native <select> opened
+                an unstyled picker on some phones). */}
+            <div role="radiogroup" aria-label="Sort designs" className="inline-flex items-center gap-0.5 p-1 rounded-full bg-white ring-1 ring-[#E2E8F0] shadow-sm">
+              <SlidersHorizontal size={14} className="ml-1.5 mr-0.5 text-[#94A3B8]" aria-hidden="true" />
+              {SORTS.map((s) => {
+                const on = sort === s.id;
+                return (
+                  <button key={s.id} type="button" role="radio" aria-checked={on} onClick={() => setSort(s.id)}
+                    className={`h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] ${on ? "bg-[#0F172A] text-white shadow" : "text-[#64748B] hover:text-[#0F172A]"}`}>
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
             {isLoading
               ? Array.from({ length: 8 }).map((_, i) => <div key={i} className="rounded-2xl bg-white border border-[#F1F5F9] h-[380px] animate-pulse" />)
               : shown.map((p) => {
-                const onSale = !!p.salePrice && Number(p.salePrice) < Number(p.price);
                 return (
                   <article key={p.id} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1.5 transition-all duration-300 flex flex-col">
-                    <Link to={`/digital-business-cards-templates/${p.slug}`} className="relative block active:scale-[0.99] transition-transform">
-                      <span className="absolute top-2.5 left-2.5 z-10 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/90 text-[#92400E] shadow-sm backdrop-blur">◷ {p.trialDays}d trial</span>
-                      {p.isFeatured && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0F172A] text-[#F7B31C] shadow-sm">★ Featured</span>}
-                      <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} name={p.name} />
-                      <div className="absolute inset-0 hidden md:flex items-center justify-center bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
-                        <span className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0F172A] text-[13px] font-bold shadow-lg"><Eye size={14} /> Live Preview</span>
+                    <div className="relative">
+                      <Link to={`/digital-business-cards-templates/${p.slug}`} className="relative block active:scale-[0.99] transition-transform">
+                        {p.isFeatured && <span role="img" aria-label="Featured design" title="Featured" className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-[#0F172A]/45 backdrop-blur-sm ring-1 ring-white/20 flex items-center justify-center shadow-sm"><Star size={13} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" /></span>}
+                        <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} name={p.name} />
+                        <div className="absolute inset-0 hidden md:flex items-center justify-center bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
+                          <span className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0F172A] text-[13px] font-bold shadow-lg"><Eye size={14} /> Live Preview</span>
+                        </div>
+                      </Link>
+                    </div>
+                    <div className="p-3.5 flex items-start gap-2 flex-1">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-[#F7B31C] uppercase tracking-wide truncate">{industryOf(p)}</p>
+                        <Link to={`/digital-business-cards-templates/${p.slug}`} className="hover:text-[#F7B31C] transition-colors"><h3 className="text-[13px] sm:text-[14px] font-bold text-[#0F172A] leading-snug line-clamp-3 md:line-clamp-2 min-h-[36px] mt-0.5">{p.name}</h3></Link>
                       </div>
-                    </Link>
-                    <div className="p-3.5 flex flex-col flex-1">
-                      <p className="text-[10px] font-bold text-[#F7B31C] uppercase tracking-wide truncate">{industryOf(p)}</p>
-                      <Link to={`/digital-business-cards-templates/${p.slug}`} className="hover:text-[#F7B31C] transition-colors"><h3 className="text-[14px] font-bold text-[#0F172A] leading-snug line-clamp-2 min-h-[36px] mt-0.5">{p.name}</h3></Link>
-                      {/* No per-card price: every design is included in the plan. */}
-                      <div className="flex items-baseline gap-1.5 mt-1.5">
-                        <span className="text-[12px] font-semibold text-emerald-600">Included in your plan</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-3 pt-0.5">
-                        <Link to={`/signup?product=${encodeURIComponent(p.slug)}`} className="flex-1 h-9 rounded-xl gradient-gold text-[#0F172A] text-[13px] font-bold flex items-center justify-center whitespace-nowrap hover:shadow-gold active:scale-[0.97] transition-all">Try Free</Link>
-                        <Link to={`/demo/${p.slug}`} className="h-9 px-2.5 rounded-xl border border-[#E2E8F0] text-[#334155] text-[13px] font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap hover:border-[#F7B31C] hover:text-[#F7B31C] active:scale-[0.97] transition-all"><Eye size={14} /> View</Link>
+                      {/* Actions beside the name as small see-through icons — stacked
+                          on narrow phone cards so the name keeps its width, side by
+                          side from md up. */}
+                      <div className="flex flex-col md:flex-row gap-1.5 shrink-0">
+                        <Link
+                          to={`/signup?product=${encodeURIComponent(p.slug)}`}
+                          aria-label={`Try ${p.name} free`}
+                          title="Try free"
+                          className="w-8 h-8 rounded-full bg-[#F7B31C]/20 ring-1 ring-[#F7B31C]/35 text-[#B45309] flex items-center justify-center hover:bg-[#F7B31C] hover:text-[#0F172A] active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
+                        >
+                          <Sparkles size={15} aria-hidden="true" />
+                        </Link>
+                        <Link
+                          to={`/demo/${p.slug}`}
+                          aria-label={`Live preview of ${p.name}`}
+                          title="Live preview"
+                          className="w-8 h-8 rounded-full bg-[#0F172A]/[0.05] ring-1 ring-[#0F172A]/10 text-[#334155] flex items-center justify-center hover:bg-[#0F172A] hover:text-white active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
+                        >
+                          <Eye size={15} aria-hidden="true" />
+                        </Link>
                       </div>
                     </div>
                   </article>

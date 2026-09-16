@@ -1,59 +1,124 @@
+import { Ban, BadgeCheck, CalendarCheck, Gift, HandCoins, Mail, RotateCcw, Send, Timer, Wallet, XCircle } from "lucide-react";
+import LegalLayout, { LegalLink } from "@/components/legal/LegalLayout";
+import type { LegalHighlight, LegalSection } from "@/components/legal/LegalLayout";
+import { CONTACT } from "@/lib/publicNav";
+
+const HIGHLIGHTS: LegalHighlight[] = [
+  { icon: Gift, title: "Try free for 30 days", text: "No card details needed, so there's nothing to refund." },
+  { icon: HandCoins, title: "7-day money-back", text: "Full refund within 7 days of your first purchase." },
+  { icon: Timer, title: "Back in 5–7 working days", text: "To the same card, UPI or bank account you paid from." },
+  { icon: CalendarCheck, title: "No surprise charges", text: "Plans don't renew by themselves — you only pay when you choose to." },
+];
+
+/* The refund window as a simple visual timeline. */
+function Timeline() {
+  const steps = [
+    { day: "Day 0", title: "You buy your first plan", text: "Your paid plan starts", tone: "#0F172A" },
+    { day: "Days 1–7", title: "Full refund available", text: "Email us to request it", tone: "#16A34A" },
+    { day: "Day 8 onwards", title: "No refund", text: "Your plan runs until its end date", tone: "#DC2626" },
+  ];
+  return (
+    <ol className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Refund window">
+      {steps.map((s) => (
+        <li key={s.day} className="relative rounded-xl border border-[#F1F5F9] bg-[#F8FAFC] px-4 pt-4 pb-3 overflow-hidden">
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1" style={{ background: s.tone }} />
+          <span className="block text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: s.tone }}>{s.day}</span>
+          <span className="block mt-1 text-[14px] font-bold text-[#0F172A]">{s.title}</span>
+          <span className="block text-[12.5px] text-[#64748B]">{s.text}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+const Rule = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <li className="rounded-xl bg-[#F8FAFC] border border-[#F1F5F9] px-4 py-3"><strong className="text-[#0F172A]">{label}:</strong> {children}</li>
+);
+
+const REQUEST_HREF = `mailto:${CONTACT.email}?subject=${encodeURIComponent("Refund request")}&body=${encodeURIComponent("Account email:\nPlan purchased:\nPurchase date:\nPayment / transaction ID (from your receipt):\nReason (optional, helps us improve):\n")}`;
+
+const mail = <LegalLink to={`mailto:${CONTACT.email}`}>{CONTACT.email}</LegalLink>;
+
+const SECTIONS: LegalSection[] = [
+  {
+    id: "overview", title: "Our promise", icon: BadgeCheck,
+    body: <p>We want you to pay for DigitalCarda only if it&apos;s working for your business. That&apos;s why you can try it free first, and why your first purchase comes with a 7-day money-back guarantee. This policy explains exactly when refunds apply and how to ask for one.</p>,
+  },
+  {
+    id: "free-trial", title: "Try before you pay", icon: Gift,
+    body: <p>Every new account gets a 30-day free trial with no card details needed. You&apos;re never charged during or after the trial — at the end, you simply choose whether to buy a plan. Because nothing is paid, there&apos;s nothing to cancel or refund. <LegalLink to="/signup">Start your free trial</LegalLink></p>,
+  },
+  {
+    id: "eligibility", title: "When you can get a refund", icon: RotateCcw,
+    body: (
+      <>
+        <ul className="space-y-2">
+          <Rule label="7-day money-back guarantee">if you&apos;re not happy with your first paid plan, ask within 7 days of buying it and we&apos;ll refund the full amount.</Rule>
+          <Rule label="Charged twice or by mistake">if a technical error charged you more than once for the same plan, we&apos;ll refund the extra payment whenever you tell us.</Rule>
+          <Rule label="Paid but plan not activated">if your payment went through but your plan didn&apos;t start and we can&apos;t fix it, you&apos;ll get a full refund.</Rule>
+        </ul>
+        <Timeline />
+      </>
+    ),
+  },
+  {
+    id: "not-eligible", title: "When refunds don't apply", icon: XCircle,
+    body: (
+      <ul className="space-y-2">
+        <Rule label="After 7 days">requests made more than 7 days after your first purchase.</Rule>
+        <Rule label="Renewals">payments to renew or extend an existing plan. Plans don&apos;t renew by themselves, so you&apos;re only charged when you choose to renew.</Rule>
+        <Rule label="Partly used periods">we don&apos;t refund the unused part of a plan if you stop using DigitalCarda midway; your plan stays active until its end date.</Rule>
+        <Rule label="Reseller purchases">if you bought through a DigitalCarda reseller or agency, ask them about refunds — they set their own prices and terms.</Rule>
+      </ul>
+    ),
+  },
+  {
+    id: "how-to-request", title: "How to request a refund", icon: Send,
+    body: (
+      <>
+        <ol className="space-y-2">
+          {[
+            <>Email {mail} from your account email address.</>,
+            <>Include your plan, purchase date and the payment or transaction ID from your receipt.</>,
+            <>We&apos;ll confirm we&apos;ve received it and let you know once it&apos;s approved.</>,
+          ].map((t, i) => (
+            <li key={i} className="flex gap-3 rounded-xl border border-[#F1F5F9] px-4 py-3">
+              <span className="w-6 h-6 rounded-full gradient-gold text-[#0F172A] text-[12px] font-extrabold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+              <span>{t}</span>
+            </li>
+          ))}
+        </ol>
+        <a href={REQUEST_HREF}
+          className="mt-4 inline-flex items-center gap-2 h-11 px-4 rounded-xl gradient-gold text-[#0F172A] text-[14px] font-bold hover:shadow-gold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A]">
+          <Mail size={16} aria-hidden="true" /> Email a refund request
+        </a>
+        <p className="mt-2 text-[12.5px] text-[#64748B]">Opens your email app with the details we need already listed.</p>
+      </>
+    ),
+  },
+  {
+    id: "processing", title: "How and when you're paid back", icon: Wallet,
+    body: <p>Approved refunds are sent to the same card, UPI ID or bank account you paid with, through Razorpay, within 5–7 working days. Your bank may take a few extra days to show it. When a plan is refunded it ends straight away, and your card goes back to the state it was in before you bought it.</p>,
+  },
+  {
+    id: "exceptions", title: "Exceptions", icon: Ban,
+    body: <p>We may refuse a refund where an account broke our <LegalLink to="/terms-of-service">Terms &amp; Conditions</LegalLink>, where we see fraud or abuse (such as repeatedly buying and refunding), or where a separate written agreement — for example for a large team or enterprise order — sets different refund terms.</p>,
+  },
+  {
+    id: "contact-us", title: "Questions?", icon: Mail,
+    body: <p>For anything about payments or refunds, email {mail}, call <LegalLink to={CONTACT.phoneHref}>{CONTACT.phone}</LegalLink> or <LegalLink to={CONTACT.whatsappHref}>message us on WhatsApp</LegalLink>. How we handle your payment details is explained in our <LegalLink to="/privacy">Privacy Policy</LegalLink>.</p>,
+  },
+];
+
 export default function RefundPolicy() {
   return (
-    <div className="pt-24 pb-20">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E] mb-4">Legal</span>
-          <h1 className="text-4xl sm:text-5xl font-bold text-[#0F172A]">Refund Policy</h1>
-          <p className="mt-3 text-sm text-[#94A3B8]">Last updated: May 8, 2026</p>
-        </div>
-
-        <div className="bg-white rounded-3xl p-8 sm:p-12 shadow-premium border border-[#F1F5F9] space-y-8">
-          <section>
-            <h2 className="text-lg font-semibold text-[#0F172A] mb-3">1. Overview</h2>
-            <p className="text-sm text-[#64748B] leading-relaxed">
-              At DigitalCarda, we strive to provide the best digital business card platform. If you are not satisfied with our service, we offer a refund policy as described below.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-[#0F172A] mb-3">2. Free Trial</h2>
-            <p className="text-sm text-[#64748B] leading-relaxed">
-              All new users are eligible for a 30-day free trial that requires no credit card details upfront. No payment information is required to start the trial. You can cancel anytime during the trial period without any charge.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-[#0F172A] mb-3">3. Refund Eligibility</h2>
-            <div className="space-y-2 text-sm text-[#64748B] leading-relaxed">
-              <p><strong className="text-[#0F172A]">7-Day Money-Back Guarantee:</strong> If you are not satisfied with our paid plans, you can request a full refund within 7 days of your initial purchase.</p>
-              <p><strong className="text-[#0F172A]">No Refund After 7 Days:</strong> Refund requests submitted after 7 days from the purchase date will not be eligible for a refund.</p>
-              <p><strong className="text-[#0F172A]">Renewals:</strong> Subscription renewals are not eligible for refunds. Please cancel before the renewal date if you do not wish to continue.</p>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-[#0F172A] mb-3">4. How to Request a Refund</h2>
-            <p className="text-sm text-[#64748B] leading-relaxed">
-              To request a refund, contact our support team at hello@digitalcarda.in with your account email and purchase details. Refunds are processed within 5-7 business days to the original payment method.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-[#0F172A] mb-3">5. Exceptions</h2>
-            <p className="text-sm text-[#64748B] leading-relaxed">
-              Refunds may not be granted in cases of violation of our Terms of Service, fraudulent activity, or abuse of the platform. Custom enterprise agreements may have different refund terms as specified in the contract.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-[#0F172A] mb-3">6. Contact Us</h2>
-            <p className="text-sm text-[#64748B] leading-relaxed">
-              For any refund-related queries, please contact us at hello@digitalcarda.in or call +91 95177 22444.
-            </p>
-          </section>
-        </div>
-      </div>
-    </div>
+    <LegalLayout
+      current="refund"
+      updated="September 16, 2026"
+      readMinutes={4}
+      intro="Try DigitalCarda free for 30 days. If your first paid plan isn't right for you, ask within 7 days and get your money back."
+      highlights={HIGHLIGHTS}
+      sections={SECTIONS}
+    />
   );
 }

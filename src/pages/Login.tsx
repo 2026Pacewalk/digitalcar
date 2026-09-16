@@ -12,6 +12,7 @@ import { SUPPORT, AUTH_TRUST } from "@/components/auth/authMockData";
 import { DEMO_USERS } from "@/hooks/useAuth";
 import { getToken, getSessionUser, setSession, clearSession } from "@/lib/session";
 import GoogleSignInButton, { useGoogleClientId, type GoogleSignInResult } from "@/components/auth/GoogleSignInButton";
+import { EMAIL_RE, emailSuggestion } from "@/lib/emailHelpers";
 
 /* Remembers the IDENTIFIER only — never the password. Opt-in, cleared the
    moment the box is unchecked. The first name rides along only so the page can
@@ -26,8 +27,6 @@ const inputBase =
   "h-12 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] pl-10 pr-3 text-[16px] sm:text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/25 focus:bg-white transition-all placeholder:text-[#94A3B8]";
 const iconCls = "absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none transition-colors";
 const labelCls = "block text-xs font-semibold text-[#334155] mb-1.5";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 type FormError = { title: string; hint?: string } | null;
 
@@ -69,25 +68,6 @@ function identifierKind(v: string): "email" | "phone" | "empty" | "other" {
   if (t.includes("@")) return "email";
   if (/^[+\d][\d\s()-]*$/.test(t) && t.replace(/\D/g, "").length >= 3) return "phone";
   return "other";
-}
-
-/* Common address typos (Indian mail users especially). Offered, never applied
-   silently — the person taps the suggestion to accept it. */
-const DOMAIN_FIXES: Record<string, string> = {
-  "gmial.com": "gmail.com", "gmai.com": "gmail.com", "gamil.com": "gmail.com", "gmail.co": "gmail.com",
-  "gmail.con": "gmail.com", "gmail.cm": "gmail.com", "gmail.in": "gmail.com", "gnail.com": "gmail.com", "gmaill.com": "gmail.com",
-  "yaho.com": "yahoo.com", "yahoo.co": "yahoo.com", "yahooo.com": "yahoo.com", "yhoo.com": "yahoo.com",
-  "hotmial.com": "hotmail.com", "hotmai.com": "hotmail.com", "hotmail.co": "hotmail.com",
-  "outlok.com": "outlook.com", "outlook.co": "outlook.com", "outllok.com": "outlook.com",
-  "rediffmial.com": "rediffmail.com", "redifmail.com": "rediffmail.com", "rediffmail.co": "rediffmail.com",
-  "icloud.co": "icloud.com", "iclod.com": "icloud.com",
-};
-function emailSuggestion(v: string): string {
-  const t = v.trim().toLowerCase();
-  const at = t.lastIndexOf("@");
-  if (at < 1) return "";
-  const fix = DOMAIN_FIXES[t.slice(at + 1)];
-  return fix ? `${t.slice(0, at)}@${fix}` : "";
 }
 
 const readLS = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
