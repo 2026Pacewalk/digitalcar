@@ -653,3 +653,36 @@ button.fab:active {
 .dc-nfc-tap { animation: dc-nfc-tap 2.6s ease-in-out infinite; }
 @keyframes dc-nfc-tap { 0%, 100% { transform: translate(10px, -6px) rotate(18deg); } 45%, 60% { transform: translate(-8px, 6px) rotate(8deg); } }
 @media (prefers-reduced-motion: reduce) { .dc-nfc-wave, .dc-nfc-tap { animation: none; } .dc-nfc-wave { opacity: .35; } }
+
+/* Features page animations. */
+.dc-feat-float { animation: dc-feat-float 6s ease-in-out infinite; }
+@keyframes dc-feat-float { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-10px) rotate(1deg); } }
+.dc-feat-bob { animation: dc-feat-bob 4s ease-in-out infinite; }
+@keyframes dc-feat-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.dc-feat-spin { animation: dc-feat-spin 40s linear infinite; }
+@keyframes dc-feat-spin { to { transform: rotate(360deg); } }
+.dc-feat-card { animation: dc-feat-card .5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes dc-feat-card { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+.dc-feat-type { display: inline-block; max-width: 0; animation: dc-feat-type 5s steps(19) infinite; }
+@keyframes dc-feat-type { 0% { max-width: 0; } 40%, 90% { max-width: 19ch; } 100% { max-width: 0; } }
+.dc-feat-caret { animation: dc-feat-caret 1s steps(1) infinite; }
+@keyframes dc-feat-caret { 50% { opacity: 0; } }
+.dc-feat-pop { animation: dc-feat-pop 5s ease-out infinite both; }
+@keyframes dc-feat-pop { 0%, 8% { opacity: .25; transform: translateX(-6px); } 20%, 92% { opacity: 1; transform: none; } 100% { opacity: .25; } }
+.dc-feat-fill { transform-origin: left; animation: dc-feat-fill 5s ease-out infinite both; }
+@keyframes dc-feat-fill { 0%, 8% { transform: scaleX(0); } 30%, 92% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
+.dc-feat-scan { animation: dc-feat-scan 2.4s ease-in-out infinite alternate; }
+@keyframes dc-feat-scan { from { top: 8px; } to { top: calc(100% - 11px); } }
+.dc-feat-swap-out { animation: dc-feat-swap-out 4s ease-in-out infinite; }
+.dc-feat-swap-in { animation: dc-feat-swap-in 4s ease-in-out infinite; }
+@keyframes dc-feat-swap-out { 0%, 35% { opacity: 1; transform: none; } 50%, 90% { opacity: 0; transform: translateY(-100%); } 100% { opacity: 1; transform: none; } }
+@keyframes dc-feat-swap-in { 0%, 35% { opacity: 0; transform: translateY(100%); } 50%, 90% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(100%); } }
+.dc-feat-bar { animation: dc-feat-bar 3.2s ease-in-out infinite; }
+@keyframes dc-feat-bar { 0% { transform: scaleY(.15); } 35%, 80% { transform: scaleY(1); } 100% { transform: scaleY(.15); } }
+@media (prefers-reduced-motion: reduce) {
+  .dc-feat-float, .dc-feat-bob, .dc-feat-spin, .dc-feat-card, .dc-feat-caret, .dc-feat-pop, .dc-feat-fill,
+  .dc-feat-scan, .dc-feat-swap-out, .dc-feat-bar { animation: none; }
+  .dc-feat-type { animation: none; max-width: 19ch; }
+  .dc-feat-swap-in { animation: none; opacity: 1; }
+  .dc-feat-swap-out { opacity: 0; }
+}

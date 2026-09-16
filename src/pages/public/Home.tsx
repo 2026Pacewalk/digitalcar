@@ -282,10 +282,10 @@ function StatsBand() {
      this is a bento "proof board": the headline reach figure leads, and the
      other four sit in an even 2×2 so nothing is ever left dangling. */
   const tiles = [
-    { end: 5173, suffix: "+", label: "Active cards", note: "live digital cards in use", icon: CreditCard, tint: "#F7B31C", sep: true },
-    { end: 1456, suffix: "+", label: "Happy clients", note: "rated 4.9 out of 5", icon: Users, tint: "#14B8A6", sep: true, stars: true },
-    { end: templates, suffix: "+", label: "Templates", note: "designs ready to start from", icon: Layers, tint: "#8B5CF6", href: "/digital-business-cards-templates" },
-    { end: 5, suffix: "", label: "Countries", note: "businesses sharing cards", icon: Globe, tint: "#3B82F6" },
+    { end: 5173, suffix: "+", label: "Active cards", note: "live cards in use", icon: CreditCard, tint: "#F7B31C", sep: true },
+    { end: 1456, suffix: "+", label: "Happy clients", note: "rated 4.9/5", icon: Users, tint: "#14B8A6", sep: true, stars: true },
+    { end: templates, suffix: "+", label: "Templates", note: "ready-made designs", icon: Layers, tint: "#8B5CF6", href: "/digital-business-cards-templates" },
+    { end: 5, suffix: "", label: "Countries", note: "and growing", icon: Globe, tint: "#3B82F6" },
   ];
 
   return (
@@ -298,40 +298,40 @@ function StatsBand() {
           <div aria-hidden="true" className="absolute -bottom-32 right-0 w-96 h-96 rounded-full blur-3xl bg-[#14B8A6]/[0.10]" />
 
           <div className="relative flex items-center justify-between gap-3 px-2 pt-1 pb-3 sm:pb-4">
-            <p className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-bold uppercase tracking-[0.16em] text-[#94A3B8]">
+            <p className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-medium uppercase tracking-[0.14em] text-[#94A3B8]">
               <span className="dc-live-dot h-2 w-2 rounded-full bg-[#14B8A6]" aria-hidden="true" />
               DigitalCarda in numbers
             </p>
             <span className="hidden sm:inline text-xs text-[#64748B]">Real cards · real customers</span>
           </div>
 
-          <div className="relative grid grid-cols-2 lg:grid-cols-4 lg:grid-rows-2 gap-2.5 sm:gap-3">
+          <div className="relative grid grid-cols-2 lg:grid-cols-6 gap-2.5 sm:gap-3">
             {/* ── Hero figure ── */}
-            <div className="relative col-span-2 lg:row-span-2 overflow-hidden rounded-[22px] sm:rounded-3xl p-5 sm:p-7 lg:p-8 bg-gradient-to-br from-[#1E293B] via-[#141C2E] to-[#0F172A] ring-1 ring-[#F7B31C]/25 flex flex-col justify-between min-h-[176px] lg:min-h-[300px]">
+            <div className="relative col-span-2 overflow-hidden rounded-[22px] sm:rounded-3xl p-5 sm:p-7 lg:p-5 bg-gradient-to-br from-[#1E293B] via-[#141C2E] to-[#0F172A] ring-1 ring-[#F7B31C]/25 flex flex-col justify-between min-h-[176px] lg:min-h-0">
               <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#F7B31C]/70 to-transparent" />
 
               {/* Reach rings — "people opening your card", drawn. */}
-              <div aria-hidden="true" className="absolute -right-12 -top-12 sm:-right-4 sm:-top-4 lg:right-5 lg:top-5 w-44 h-44 lg:w-52 lg:h-52 flex items-center justify-center">
+              <div aria-hidden="true" className="absolute -right-12 -top-12 sm:-right-4 sm:-top-4 lg:right-2 lg:top-1/2 lg:-translate-y-1/2 w-44 h-44 lg:w-32 lg:h-32 flex items-center justify-center">
                 <span className="absolute inset-0 rounded-full border border-[#F7B31C]/15" />
                 <span className="absolute inset-[16%] rounded-full border border-[#F7B31C]/20" />
                 <span className="absolute inset-[32%] rounded-full border border-[#F7B31C]/30" />
                 <span className="absolute inset-[32%] rounded-full bg-[#F7B31C]/10 motion-safe:animate-ping [animation-duration:2.8s]" />
-                <span className="relative w-12 h-12 lg:w-14 lg:h-14 rounded-2xl gradient-gold shadow-gold flex items-center justify-center">
+                <span className="relative w-12 h-12 lg:w-10 lg:h-10 rounded-2xl lg:rounded-xl gradient-gold shadow-gold flex items-center justify-center">
                   <Eye size={22} className="text-[#0F172A]" />
                 </span>
               </div>
 
-              <span className="relative inline-flex w-fit items-center gap-1.5 rounded-full bg-[#F7B31C]/12 border border-[#F7B31C]/25 px-2.5 py-1 text-[10.5px] sm:text-[11px] font-semibold text-[#FCD34D]">
+              <span className="relative inline-flex w-fit items-center gap-1.5 rounded-full bg-[#F7B31C]/12 border border-[#F7B31C]/25 px-2.5 py-1 text-[10.5px] sm:text-[11px] font-medium text-[#FCD34D]">
                 <TrendingUp size={12} aria-hidden="true" /> And counting
               </span>
 
-              <div className="relative mt-6 lg:mt-0">
-                <p className="font-display text-[2.6rem] leading-none sm:text-6xl lg:text-7xl font-extrabold text-white tabular-nums tracking-tight">
+              <div className="relative mt-6 lg:mt-3">
+                <p className="font-display text-[2.4rem] leading-none sm:text-5xl lg:text-[2.35rem] font-semibold text-white tabular-nums tracking-tight">
                   <Counter end={91000} duration={2200} />
-                  <span className="text-gradient-gold">+</span>
+                  <span className="text-[#F7B31C] font-medium">+</span>
                 </p>
-                <p className="mt-2.5 text-sm sm:text-base font-semibold text-white">Card views</p>
-                <p className="mt-0.5 text-[12.5px] sm:text-sm text-[#94A3B8] max-w-[15rem] sm:max-w-xs leading-snug">
+                <p className="mt-2.5 lg:mt-1.5 text-sm sm:text-[15px] lg:text-[13.5px] font-medium text-[#E2E8F0]">Card views</p>
+                <p className="mt-0.5 text-[12px] sm:text-[13px] lg:text-[11.5px] font-normal text-[#94A3B8] max-w-[15rem] sm:max-w-xs lg:max-w-[12rem] leading-snug">
                   times customers have opened a DigitalCarda card
                 </p>
               </div>
@@ -351,13 +351,13 @@ function StatsBand() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-4 sm:mt-5">
-                    <p className="font-display text-[1.7rem] sm:text-[2.1rem] leading-none font-extrabold text-white tabular-nums tracking-tight">
+                  <div className="mt-4 sm:mt-5 lg:mt-3">
+                    <p className="font-display text-[1.6rem] sm:text-[1.9rem] lg:text-[1.6rem] leading-none font-semibold text-white tabular-nums tracking-tight">
                       <Counter end={t.end} duration={2200} separator={!!t.sep} />
-                      <span style={{ color: t.tint }}>{t.suffix}</span>
+                      <span className="font-medium" style={{ color: t.tint }}>{t.suffix}</span>
                     </p>
-                    <p className="mt-2 text-[13px] sm:text-sm font-semibold text-white">{t.label}</p>
-                    <p className="mt-0.5 text-[11.5px] sm:text-xs text-[#94A3B8] leading-snug">
+                    <p className="mt-2 text-[13px] sm:text-sm lg:text-[13px] font-medium text-[#E2E8F0]">{t.label}</p>
+                    <p className="mt-0.5 text-[11.5px] lg:text-[11px] font-normal text-[#94A3B8] leading-snug lg:truncate">
                       {t.stars && (
                         <span className="inline-flex items-center gap-px mr-1 align-[-1px]" role="img" aria-label="4.9 out of 5 stars">
                           {[...Array(5)].map((_, k) => <Star key={k} size={10} className="fill-[#F7B31C] text-[#F7B31C]" />)}
@@ -369,7 +369,7 @@ function StatsBand() {
                   <div aria-hidden="true" className="absolute inset-x-5 bottom-0 h-[3px] rounded-t-full opacity-0 lg:group-hover:opacity-100 transition-opacity" style={{ background: t.tint }} />
                 </>
               );
-              const cls = "group relative overflow-hidden rounded-[20px] sm:rounded-3xl p-4 sm:p-5 bg-white/[0.035] ring-1 ring-white/[0.08] lg:hover:bg-white/[0.06] lg:hover:ring-white/15 transition-all duration-300 lg:motion-safe:hover:-translate-y-0.5";
+              const cls = "group relative overflow-hidden rounded-[20px] sm:rounded-3xl p-4 sm:p-5 lg:p-4 bg-white/[0.035] ring-1 ring-white/[0.08] lg:hover:bg-white/[0.06] lg:hover:ring-white/15 transition-all duration-300 lg:motion-safe:hover:-translate-y-0.5";
               return t.href ? (
                 <Link key={t.label} to={t.href} className={`${cls} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]`} aria-label={`${t.end}+ templates — browse the designs`}>
                   {inner}
@@ -1463,12 +1463,29 @@ function AnalyticsSection() {
     { icon: Smartphone, label: "Device Reports" }, { icon: TrendingUp, label: "Monthly Growth" },
   ];
   return (
-    <section className="py-20 bg-gradient-to-b from-white to-[#F8FAFC] relative overflow-hidden">
+    <section className="py-14 sm:py-20 bg-gradient-to-b from-white to-[#F8FAFC] relative overflow-hidden">
       <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[720px] h-[360px] bg-[#F7B31C]/[0.07] rounded-full blur-3xl pointer-events-none" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <SectionHeading eyebrow="Analytics" title={<>Track Every <span className="text-gradient-gold">Click and Lead</span></>} subtitle="Know exactly how customers interact with your card — views, WhatsApp and call clicks, QR scans, product views and enquiries." />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative lg:grid lg:grid-cols-[0.8fr_1.2fr] lg:gap-12 lg:items-center">
+        <div>
+          {/* Phones: centred heading. Laptops: left column beside the dashboard. */}
+          <div className="lg:hidden">
+            <SectionHeading eyebrow="Analytics" title={<>Track Every <span className="text-gradient-gold">Click and Lead</span></>} subtitle="Know exactly how customers interact with your card — views, WhatsApp and call clicks, QR scans, product views and enquiries." />
+          </div>
+          <Reveal className="hidden lg:block">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E]"><BarChart3 size={12} /> Analytics</span>
+            <h2 className="mt-4 text-[2.4rem] font-extrabold text-[#0F172A] tracking-tight leading-[1.1]">Track Every <span className="text-gradient-gold">Click and Lead</span></h2>
+            <p className="mt-4 text-[15px] text-[#64748B] leading-relaxed">Know exactly how customers interact with your card — views, WhatsApp and call clicks, QR scans, product views and enquiries.</p>
+          </Reveal>
+          <Reveal stagger className="hidden lg:grid mt-7 grid-cols-2 gap-2">
+            {tracked.map((s) => (
+              <span key={s.label} className="inline-flex items-center gap-2.5 h-11 px-3 rounded-xl bg-white ring-1 ring-[#E2E8F0] text-[13px] font-semibold text-[#334155] hover:ring-[#F7B31C]/50 hover:-translate-y-0.5 transition-all">
+                <span className="w-7 h-7 rounded-lg bg-[#FEF3C7] flex items-center justify-center shrink-0"><s.icon size={14} className="text-[#B45309]" /></span> {s.label}
+              </span>
+            ))}
+          </Reveal>
+        </div>
         <Reveal>
-          <div className="relative rounded-[28px] bg-white ring-1 ring-[#EEF2F7] shadow-premium-lg overflow-hidden p-2 sm:p-4">
+          <div className="relative rounded-[28px] bg-white ring-1 ring-[#EEF2F7] shadow-premium-lg overflow-hidden p-2 sm:p-3">
             <picture>
               <source srcSet="/hero/digital-business-card-analytics-dashboard.webp" type="image/webp" />
               <img
@@ -1481,9 +1498,9 @@ function AnalyticsSection() {
             </picture>
           </div>
         </Reveal>
-        <Reveal stagger className="mt-8 flex flex-wrap justify-center gap-2.5">
+        <Reveal stagger className="lg:hidden mt-8 flex flex-wrap justify-center gap-2.5">
           {tracked.map((s) => (
-            <span key={s.label} className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-white ring-1 ring-[#E2E8F0] shadow-premium text-[13px] font-medium text-[#334155] hover:ring-[#F7B31C]/50 hover:-translate-y-0.5 transition-all">
+            <span key={s.label} className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-white ring-1 ring-[#E2E8F0] shadow-premium text-[13px] font-medium text-[#334155]">
               <s.icon size={14} className="text-[#B45309]" /> {s.label}
             </span>
           ))}
@@ -1626,8 +1643,8 @@ function QRNFCSection() {
       </div>
 
       {/* ── Desktop ── */}
-      <div className="hidden lg:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div className="hidden lg:block max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center">
           <Reveal>
             <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-[#CCFBF1] text-[#115E59] mb-4">QR &amp; NFC</span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] mb-4 tracking-tight">Share Faster with <span className="text-gradient-gold">QR and NFC</span></h2>
@@ -1643,8 +1660,9 @@ function QRNFCSection() {
             <div className="mt-7"><Link to="/features" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#B45309] hover:underline">See every sharing feature <ArrowRight size={15} /></Link></div>
           </Reveal>
           <Reveal className="flex justify-center">
-            <div className="relative w-full max-w-[420px]">
-              <QR_STANDEE />
+            <div className="relative w-full max-w-[340px]">
+              <div aria-hidden="true" className="absolute -inset-8 rounded-[3rem] bg-[#F7B31C]/15 blur-3xl" />
+              <div className="relative"><ScaledStandee max={320} /></div>
             </div>
           </Reveal>
         </div>
@@ -1738,40 +1756,6 @@ function WhereToUseSection() {
 }
 
 /* ─── Custom Domain ─── */
-function CustomDomainSection() {
-  return (
-    <section className="py-20 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] relative overflow-hidden">
-      <div className="absolute inset-0 bg-grid-dark opacity-30" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <Reveal stagger className="order-2 lg:order-1 flex justify-center">
-            <div className="space-y-3 w-full max-w-sm">
-              {["card.yourbusiness.com", "profile.yourbusiness.com", "me.yourbusiness.com", "link.yourbusiness.com"].map((domain, i) => (
-                <div key={i} className="bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 flex items-center gap-3 hover:border-[#14B8A6]/40 transition-colors">
-                  <Globe size={16} className="text-[#14B8A6]" />
-                  <span className="text-sm text-white font-medium">{domain}</span>
-                  <Check size={14} className="text-emerald-400 ml-auto" />
-                </div>
-              ))}
-            </div>
-          </Reveal>
-          <Reveal className="order-1 lg:order-2">
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-[#F7B31C]/20 text-[#F7B31C] mb-4">Custom Domain</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4 tracking-tight">Use Your <span className="text-gradient-gold">Own Domain</span></h2>
-            <p className="text-base text-[#94A3B8] leading-relaxed mb-6">Connect your own domain or subdomain for stronger branding and trust. Your customers see a professional URL that matches your brand.</p>
-            <div className="space-y-3">
-              {["Strengthen brand identity", "Build customer trust", "Better SEO rankings", "Professional appearance"].map((item, i) => (
-                <div key={i} className="flex items-center gap-3"><Check size={16} className="text-[#F7B31C] shrink-0" /><span className="text-sm text-[#CBD5E1]">{item}</span></div>
-              ))}
-            </div>
-            <div className="mt-8"><Link to="/custom-domain" className="btn-gold inline-flex items-center gap-2">Learn More <ArrowRight size={16} /></Link></div>
-          </Reveal>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* ─────────────────────────────────────────────────────────────
    Testimonials
    ───────────────────────────────────────────────────────────── */
@@ -2233,16 +2217,15 @@ export default function Home() {
       {/* 2. Why switch from paper (dark) */}
       <WhyDigitalCardaSection />
       {/* 3. What you get, how easy it is, and a design to start from */}
+      <TemplatesSection />
       <FeaturesSection />
       <HowItWorksSection />
-      <TemplatesSection />
       <PersonaSection />
       {/* 4. Deeper value */}
       <AISection />
       <AnalyticsSection />
       <QRNFCSection />
       <WhereToUseSection />
-      <CustomDomainSection />
       <GrowSection />
       {/* 5. Proof, price, objections, close */}
       <TestimonialsSection />

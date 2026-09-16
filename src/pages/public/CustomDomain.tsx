@@ -380,6 +380,26 @@ export default function CustomDomain() {
         </div>
       </section>
 
+      {/* ── Related ── */}
+      <section className="pb-14" aria-labelledby="cd-related">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 id="cd-related" className="text-center text-[12px] font-bold uppercase tracking-[0.14em] text-[#94A3B8]">Goes well with your own domain</h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { to: "/features#custom-domain", t: "All card features", d: "40+ features, including custom domains" },
+              { to: "/pricing", t: "Plans & pricing", d: "₹499 setup · free on Platinum 3-Year" },
+              { to: "/digital-business-cards-templates", t: "Card designs", d: "Pick a template for your brand" },
+              { to: "/resellers", t: "White-label reseller", d: "Sell cards on your own domain" },
+            ].map((r) => (
+              <Link key={r.to} to={r.to} className="group rounded-2xl bg-white ring-1 ring-[#E2E8F0] p-4 transition-all hover:-translate-y-0.5 hover:shadow-premium hover:ring-[#F7B31C]/50">
+                <span className="flex items-center justify-between text-[14.5px] font-bold text-[#0F172A]">{r.t} <ArrowRight size={15} className="text-[#B45309] transition-transform group-hover:translate-x-1" /></span>
+                <span className="mt-1 block text-[12.5px] text-[#64748B] leading-snug">{r.d}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA ── */}
       <section className="pb-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">

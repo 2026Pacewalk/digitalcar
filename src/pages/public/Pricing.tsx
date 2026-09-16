@@ -21,6 +21,7 @@ const PERIODS: { id: Period; label: string; short: string; badge?: string }[] = 
 /* ── Plans (prices in ₹) ──────────────────────────────────────── */
 type Plan = {
   name: string; tagline: string; icon: typeof IdCard; accent: string; popular?: boolean;
+  cards: number;                    // digital cards the plan allows
   price: Record<Period, number>;
   cta: string;
   headline: string;                 // what the feature list is "on top of"
@@ -36,7 +37,7 @@ const TRIAL_SIGNUP = `/signup?promo=${TRIAL_PROMO}`;
 
 const PLANS: Plan[] = [
   {
-    name: "Free Trial", tagline: "Test-drive the full card", icon: Sparkles, accent: "#14B8A6",
+    name: "Free Trial", tagline: "Test-drive the full card", icon: Sparkles, accent: "#14B8A6", cards: 1,
     price: { monthly: 0, yearly: 0, "3year": 0 },
     cta: TRIAL_CTA,
     headline: "Everything, free for 30 days:",
@@ -50,7 +51,7 @@ const PLANS: Plan[] = [
     ],
   },
   {
-    name: "Gold", tagline: "Everything a business needs", icon: Star, accent: "#F7B31C", popular: true,
+    name: "Gold", tagline: "Everything a business needs", icon: Star, accent: "#F7B31C", popular: true, cards: 1,
     price: { monthly: 99, yearly: 999, "3year": 2499 },
     cta: "Get Gold",
     headline: "Your professional digital card:",
@@ -67,7 +68,7 @@ const PLANS: Plan[] = [
     ],
   },
   {
-    name: "Platinum", tagline: "For brands that want it all", icon: Crown, accent: "#8B5CF6",
+    name: "Platinum", tagline: "For brands that want it all", icon: Crown, accent: "#8B5CF6", cards: 3,
     price: { monthly: 199, yearly: 1999, "3year": 4999 },
     cta: "Go Platinum",
     headline: "Everything in Gold, plus:",
@@ -131,6 +132,7 @@ function buildPlans(pkgs: DbPkg[]): Plan[] {
       icon: ICON_BY[p.name] || Star,
       accent: ACCENT_BY[p.name] || "#F7B31C",
       popular: p.name === "Gold",
+      cards: Math.max(1, num(p.maxCards) || 1),
       price: { monthly, yearly, "3year": three },
       cta: isFree ? TRIAL_CTA : `Get ${p.name}`,
       headline: isFree ? "Everything, free for 30 days:" : `Your ${p.name} plan includes:`,
@@ -240,7 +242,7 @@ function NfcWaves({ className = "" }: { className?: string }) {
 
 function NfcCardArt() {
   return (
-    <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center [perspective:800px]">
+    <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center [perspective:800px] lg:scale-[0.85]">
       {/* back card */}
       <div className="absolute w-[168px] h-[104px] rounded-xl bg-white shadow-lg ring-1 ring-black/5 rotate-[10deg] translate-x-8 translate-y-3 p-2.5 flex items-end justify-end">
         <span className="grid grid-cols-4 gap-[2px]">{Array.from({ length: 16 }).map((_, i) => <span key={i} className={`w-[5px] h-[5px] ${[0,1,3,4,6,9,11,12,13,15].includes(i) ? "bg-[#0F172A]" : ""}`} />)}</span>
@@ -261,7 +263,7 @@ function NfcCardArt() {
 function NfcStandeeArt() {
   return (
     <div aria-hidden="true" className="absolute inset-0 flex items-end justify-center pb-3">
-      <div className="relative transition-transform duration-500 group-hover:-translate-y-1">
+      <div className="relative origin-bottom lg:scale-[0.8] transition-transform duration-500 group-hover:-translate-y-1">
         {/* stand base */}
         <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[112px] h-3 rounded-full bg-[#0F172A]/15 blur-[2px]" />
         <div className="relative w-[96px] h-[132px] rounded-t-[14px] rounded-b-md bg-white shadow-[0_18px_30px_-12px_rgba(15,23,42,0.45)] ring-1 ring-black/5 overflow-hidden">
@@ -293,8 +295,6 @@ function CompareCell({ v, accent }: { v: Cell; accent: string }) {
 export default function Pricing() {
   const [period, setPeriod] = useState<Period>("yearly");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const { data: featureData } = trpc.package.features.useQuery();
-  const includedFeatures = featureData?.customer ?? [];
   const { data: pkgs } = trpc.package.list.useQuery();
   const plans = pkgs && pkgs.length ? buildPlans(pkgs as unknown as DbPkg[]) : PLANS;
   const tablePkgs = pkgs && pkgs.length ? (pkgs as unknown as DbPkg[]) : FALLBACK_PKGS;
@@ -361,7 +361,7 @@ export default function Pricing() {
       <JsonLd id="dc-pricing-ld" data={ld} />
 
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] pt-28 sm:pt-32 pb-40 sm:pb-48">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] pt-28 sm:pt-32 lg:pt-28 pb-40 sm:pb-48 lg:pb-40">
         <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-40" />
         <div aria-hidden="true" className="absolute -top-40 right-[-10%] w-[560px] h-[560px] rounded-full blur-3xl bg-[#F7B31C]/20 animate-aurora-drift" />
         <div aria-hidden="true" className="absolute top-40 left-[-15%] w-[460px] h-[460px] rounded-full blur-3xl bg-[#8B5CF6]/20 animate-aurora-drift" style={{ animationDelay: "3s" }} />
@@ -372,7 +372,7 @@ export default function Pricing() {
             <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.07] px-3 py-1.5 text-[12px] font-bold uppercase tracking-[0.16em] text-[#FCD34D] ring-1 ring-white/10">
               <BadgeIndianRupee size={14} /> Simple pricing
             </span>
-            <h1 className="mt-5 font-display text-[2.4rem] sm:text-[3.4rem] lg:text-[4rem] font-extrabold leading-[1.04] tracking-tight text-white [text-wrap:balance]">
+            <h1 className="mt-5 font-display text-[2.4rem] sm:text-[3.2rem] lg:text-[3.3rem] font-extrabold leading-[1.04] tracking-tight text-white [text-wrap:balance]">
               One card. <span className="text-gradient-gold">Every way to be found.</span>
             </h1>
             <p className="mt-5 mx-auto max-w-2xl text-[15.5px] sm:text-[18px] leading-relaxed text-[#CBD5E1]">
@@ -415,7 +415,7 @@ export default function Pricing() {
         </div>
       </section>
 
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-28 sm:-mt-36">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-28 sm:-mt-36 lg:-mt-32">
         {/* ── Mobile plan switcher ── */}
         <div className="md:hidden mb-4">
           <div role="tablist" aria-label="Choose a plan" className="grid grid-cols-3 gap-1 p-1 rounded-2xl bg-white shadow-premium-lg ring-1 ring-[#E2E8F0]">
@@ -451,13 +451,13 @@ export default function Pricing() {
               <div className={`relative h-full flex flex-col rounded-[26px] bg-white overflow-hidden ${plan.popular ? "" : "ring-1 ring-[#E2E8F0] shadow-premium"}`}>
                 {/* accent wash */}
                 <div aria-hidden="true" className="absolute inset-x-0 top-0 h-40 pointer-events-none" style={{ background: `linear-gradient(180deg, ${plan.accent}1F, transparent)` }} />
-                <div className="relative p-6 sm:p-7 flex flex-col flex-1">
+                <div className="relative p-6 sm:p-7 lg:p-6 flex flex-col flex-1">
                   {/* Head */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ background: plan.accent }}><plan.icon size={22} className={plan.popular ? "text-[#0F172A]" : ""} /></span>
+                      <span className="w-12 h-12 lg:w-10 lg:h-10 rounded-2xl lg:rounded-xl flex items-center justify-center text-white shadow-lg shrink-0" style={{ background: plan.accent }}><plan.icon size={22} className={plan.popular ? "text-[#0F172A]" : ""} /></span>
                       <div>
-                        <h2 className="font-display text-[1.25rem] font-extrabold text-[#0F172A] leading-none">{plan.name}</h2>
+                        <h2 className="font-display text-[1.25rem] lg:text-[1.15rem] font-extrabold text-[#0F172A] leading-none">{plan.name}</h2>
                         <p className="text-[12px] text-[#64748B] mt-1.5">{plan.tagline}</p>
                       </div>
                     </div>
@@ -469,20 +469,26 @@ export default function Pricing() {
                   </div>
 
                   {/* Price */}
-                  <div className="mt-6 flex items-end gap-1.5">
-                    <span key={`${plan.name}-${period}`} className="dc-rise font-display text-[3rem] leading-none font-extrabold text-[#0F172A] tabular-nums tracking-tight">{isFree ? "₹0" : inr(price)}</span>
+                  <div className="mt-6 lg:mt-4 flex items-end gap-1.5">
+                    <span key={`${plan.name}-${period}`} className="dc-rise font-display text-[3rem] lg:text-[2.4rem] leading-none font-extrabold text-[#0F172A] tabular-nums tracking-tight">{isFree ? "₹0" : inr(price)}</span>
                     <span className="text-[14px] font-semibold text-[#94A3B8] mb-1.5">{isFree ? "/ 30 days" : periodLabel(period)}</span>
                   </div>
                   <div className="mt-2 min-h-[24px] flex flex-wrap items-center gap-1.5 text-[12.5px] text-[#64748B]">
                     {isFree && <span>No payment required · then from {goldPlan ? inr(Math.round(goldPlan.price.yearly / 12)) : "₹83"}/mo</span>}
-                    {!isFree && period !== "monthly" && <span className="font-semibold text-[#0F172A]">{inr(perMonth(plan, period))}/mo</span>}
-                    {!isFree && <span className="text-[#94A3B8]">≈ ₹{perDay(plan, period).toFixed(1)} a day</span>}
+                    {/* Multi-card plans are priced per card — ₹1,999 buys 3 cards, not one. */}
+                    {!isFree && plan.cards > 1 && (
+                      <span className="inline-flex items-center gap-1 font-semibold text-[#0F172A]">
+                        <IdCard size={13} style={{ color: plan.accent }} /> {plan.cards} cards · {inr(price / plan.cards)}/card{periodLabel(period)}
+                      </span>
+                    )}
+                    {!isFree && plan.cards <= 1 && period !== "monthly" && <span className="font-semibold text-[#0F172A]">{inr(perMonth(plan, period))}/mo</span>}
+                    {!isFree && plan.cards <= 1 && <span className="text-[#94A3B8]">≈ ₹{perDay(plan, period).toFixed(1)} a day</span>}
                     {sv > 0 && <span key={`sv-${period}`} className="dc-rise text-[11px] font-extrabold text-[#166534] bg-[#DCFCE7] px-2 py-0.5 rounded-full">Save {sv}%</span>}
                   </div>
 
                   {/* CTA — the free plan carries the promo code so it applies itself */}
                   <Link to={isFree ? TRIAL_SIGNUP : "/signup"}
-                    className={`dc-btn group relative mt-6 w-full h-[52px] rounded-2xl text-[15px] font-extrabold flex items-center justify-center gap-2 overflow-hidden transition-all duration-300 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#F7B31C] ${plan.popular ? "gradient-gold text-[#0F172A] shadow-gold hover:-translate-y-0.5 dc-btn-shine" : isFree ? "bg-[#0F172A] text-white hover:bg-[#1E293B] hover:-translate-y-0.5 dc-btn-shine" : "bg-white text-[#0F172A] ring-2 ring-[#0F172A] hover:bg-[#0F172A] hover:text-white"}`}>
+                    className={`dc-btn group relative mt-6 lg:mt-4 w-full h-[52px] lg:h-11 rounded-2xl lg:rounded-xl text-[15px] lg:text-[14px] font-extrabold flex items-center justify-center gap-2 overflow-hidden transition-all duration-300 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#F7B31C] ${plan.popular ? "gradient-gold text-[#0F172A] shadow-gold hover:-translate-y-0.5 dc-btn-shine" : isFree ? "bg-[#0F172A] text-white hover:bg-[#1E293B] hover:-translate-y-0.5 dc-btn-shine" : "bg-white text-[#0F172A] ring-2 ring-[#0F172A] hover:bg-[#0F172A] hover:text-white"}`}>
                     <span className="relative z-10">{plan.cta}</span>
                     <ArrowRight size={17} className="relative z-10 transition-transform duration-300 group-hover:translate-x-1" />
                   </Link>
@@ -492,18 +498,26 @@ export default function Pricing() {
                       : <span className="inline-flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-500" /> Secure checkout · UPI, card, net banking</span>}
                   </p>
 
-                  <div className="my-6 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
+                  <div className="my-6 lg:my-4 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
 
                   {/* Features */}
-                  <p className="text-[11px] font-bold text-[#94A3B8] uppercase tracking-[0.12em] mb-3.5">{plan.headline}</p>
-                  <ul className="space-y-2.5">
+                  <p className="text-[11px] font-bold text-[#94A3B8] uppercase tracking-[0.12em] mb-3.5 lg:mb-2.5">{plan.headline}</p>
+                  <ul className="space-y-2.5 lg:space-y-2">
                     {plan.features.map((f, j) => {
                       const Icon = f.icon || Check;
                       return (
-                        <li key={j} className="flex items-start gap-2.5 text-[13.5px] text-[#334155] leading-snug">
+                        (plan.cards > 1 && /digital cards/i.test(f.text)) ? (
+                          <li key={j} className="-mx-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] font-bold text-[#0F172A] leading-snug" style={{ background: `${plan.accent}1A`, boxShadow: `inset 0 0 0 1px ${plan.accent}55` }}>
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-white" style={{ background: plan.accent }}><IdCard size={13} /></span>
+                            <span className="flex-1">{f.text}</span>
+                            <span className="rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white" style={{ background: plan.accent }}>{plan.cards}×</span>
+                          </li>
+                        ) : (
+                        <li key={j} className="flex items-start gap-2.5 text-[13.5px] lg:text-[13px] text-[#334155] leading-snug">
                           <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-px" style={{ background: `${plan.accent}24`, color: plan.accent === "#F7B31C" ? "#B45309" : plan.accent }}><Icon size={11} strokeWidth={3} /></span>
                           <span>{f.text}</span>
                         </li>
+                        )
                       );
                     })}
                   </ul>
@@ -551,7 +565,7 @@ export default function Pricing() {
         </div>
 
         {/* ── How it works ── */}
-        <Reveal className="mt-14 sm:mt-20">
+        <Reveal className="mt-14 sm:mt-16">
           <div className="relative rounded-[28px] bg-white ring-1 ring-[#E2E8F0] shadow-premium p-5 sm:p-8">
             <p className="text-center text-[11px] font-bold uppercase tracking-[0.14em] text-[#94A3B8]">How paying works</p>
             <ol className="mt-5 grid gap-3 md:grid-cols-3 md:gap-6 relative">
@@ -573,7 +587,7 @@ export default function Pricing() {
         </Reveal>
 
         {/* ── Compare plans ── */}
-        <section aria-labelledby="compare-h" className="mt-16 sm:mt-24">
+        <section aria-labelledby="compare-h" className="mt-16 sm:mt-20">
           <Reveal className="text-center max-w-2xl mx-auto">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FEF3C7] px-3 py-1 text-[11.5px] font-bold uppercase tracking-[0.14em] text-[#92400E]">Compare</span>
             <h2 id="compare-h" className="mt-3 font-display text-[1.9rem] sm:text-[2.5rem] font-extrabold tracking-tight text-[#0F172A] leading-[1.1]">
@@ -586,7 +600,7 @@ export default function Pricing() {
             <div className="rounded-[26px] bg-white ring-1 ring-[#E2E8F0] shadow-premium overflow-hidden">
               <table className="w-full table-fixed border-collapse">
                 <caption className="sr-only">Plan comparison</caption>
-                <thead className="sticky top-16 z-10">
+                <thead>
                   <tr className="bg-[#0F172A] text-white">
                     <th scope="col" className="w-[40%] sm:w-[34%] text-left px-3.5 sm:px-6 py-4 text-[12px] sm:text-[13px] font-semibold text-[#94A3B8]">Features</th>
                     {plans.map((p) => (
@@ -602,12 +616,9 @@ export default function Pricing() {
                 </thead>
                 {groups.map((g) => (
                   <tbody key={g.title}>
-                    <tr>
-                      <th colSpan={plans.length + 1} scope="colgroup" className="bg-[#F8FAFC] text-left px-3.5 sm:px-6 py-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#94A3B8]">{g.title}</th>
-                    </tr>
                     {g.rows.map((r) => (
                       <tr key={r.label} className="border-t border-[#F1F5F9] hover:bg-[#FFFBEB]/60 transition-colors">
-                        <th scope="row" className="text-left px-3.5 sm:px-6 py-3 text-[12.5px] sm:text-[14px] font-medium text-[#334155] leading-snug">{r.label}</th>
+                        <th scope="row" className="text-left px-3.5 sm:px-6 py-3 lg:py-2.5 text-[12.5px] sm:text-[14px] font-medium text-[#334155] leading-snug">{r.label}</th>
                         {r.cells.slice(0, plans.length).map((c, k) => (
                           <td key={k} className={`px-1 sm:px-4 py-3 text-center ${plans[k]?.popular ? "bg-[#FFFBEB]/70" : ""}`}><CompareCell v={c} accent={plans[k]?.accent || "#F7B31C"} /></td>
                         ))}
@@ -634,7 +645,7 @@ export default function Pricing() {
         </section>
 
         {/* ── Add-ons ── */}
-        <section aria-labelledby="addons-h" className="mt-16 sm:mt-24">
+        <section aria-labelledby="addons-h" className="mt-16 sm:mt-20">
           <Reveal className="text-center max-w-2xl mx-auto">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EDE9FE] px-3 py-1 text-[11.5px] font-bold uppercase tracking-[0.14em] text-[#5B21B6]">Add-ons</span>
             <h2 id="addons-h" className="mt-3 font-display text-[1.9rem] sm:text-[2.5rem] font-extrabold tracking-tight text-[#0F172A] leading-[1.1]">Go further, <span className="text-gradient-gold">online and offline.</span></h2>
@@ -643,12 +654,34 @@ export default function Pricing() {
           <div className="mt-8 grid gap-4 lg:grid-cols-5">
             {/* Custom domain */}
             <Reveal className="lg:col-span-2">
-              <div className="relative h-full overflow-hidden rounded-[26px] bg-gradient-to-br from-[#0F172A] to-[#1E293B] p-6 sm:p-7 ring-1 ring-white/5 flex flex-col">
+              <div className="relative h-full overflow-hidden rounded-[26px] bg-gradient-to-br from-[#0F172A] to-[#1E293B] p-6 lg:p-5 ring-1 ring-white/5 flex flex-col">
                 <div aria-hidden="true" className="absolute -top-16 -right-10 w-64 h-64 bg-[#8B5CF6]/25 rounded-full blur-3xl" />
                 <span className="relative inline-flex self-start items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#8B5CF6]/20 text-[#C4B5FD]"><Globe size={12} /> CUSTOM DOMAIN</span>
                 <h3 className="relative mt-3 text-[1.35rem] font-extrabold text-white leading-tight">Your card on your own domain</h3>
                 <div className="relative mt-4"><DomainMorph /></div>
-                <p className="relative mt-4 text-[13.5px] text-[#94A3B8] leading-relaxed">Bring a domain you own (or buy one from any registrar — billed separately) and our team connects it with HTTPS.</p>
+                
+                <ol className="relative mt-4 space-y-2">
+                  {[
+                    { t: "Choose your address", d: "Use a domain you own, or buy one from any registrar — it stays yours." },
+                    { t: "We connect it for you", d: "Our team sets it up with HTTPS, usually within 24–48 hours." },
+                    { t: "Share your brand, not ours", d: "Same card, same QR — now on card.yourbrand.com." },
+                  ].map((st, k) => (
+                    <li key={st.t} className="flex gap-3 rounded-xl bg-white/[0.04] ring-1 ring-white/10 px-3 py-2.5">
+                      <span className="w-7 h-7 rounded-lg bg-[#8B5CF6] text-white text-[12px] font-extrabold flex items-center justify-center shrink-0">{k + 1}</span>
+                      <span>
+                        <span className="block text-[13.5px] font-bold text-white">{st.t}</span>
+                        <span className="block text-[12px] text-[#94A3B8] leading-snug">{st.d}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+
+                <div className="relative mt-4 flex flex-wrap gap-1.5">
+                  {["Your brand in every link", "Secure HTTPS", "You keep ownership"].map((b) => (
+                    <span key={b} className="inline-flex items-center gap-1 rounded-full bg-[#8B5CF6]/15 px-2.5 py-1 text-[11.5px] font-semibold text-[#DDD6FE]"><Check size={12} /> {b}</span>
+                  ))}
+                </div>
+
                 <div className="relative mt-auto pt-5 flex items-end justify-between gap-3">
                   <div>
                     <p className="flex items-baseline gap-1.5"><span className="text-3xl font-extrabold text-white">₹499</span><span className="text-[12px] text-[#94A3B8]">one-time</span></p>
@@ -663,7 +696,7 @@ export default function Pricing() {
 
             {/* NFC products */}
             <Reveal className="lg:col-span-3">
-              <div className="h-full rounded-[26px] bg-white p-5 sm:p-7 ring-1 ring-[#E2E8F0] shadow-premium">
+              <div className="h-full rounded-[26px] bg-white p-5 sm:p-6 ring-1 ring-[#E2E8F0] shadow-premium">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#FEF3C7] text-[#92400E]"><Nfc size={12} /> PRINTED &amp; DELIVERED</span>
@@ -678,7 +711,7 @@ export default function Pricing() {
                     return (
                       <div key={p.id} className="group relative flex flex-col overflow-hidden rounded-[22px] bg-white ring-1 ring-[#E2E8F0] transition-all duration-300 hover:-translate-y-1 hover:shadow-premium-lg hover:ring-[#F7B31C]/50">
                         {/* Product stage */}
-                        <div className={`relative h-44 overflow-hidden ${isCard ? "bg-gradient-to-br from-[#FEF3C7] via-[#FDE68A]/60 to-[#FFFBEB]" : "bg-gradient-to-br from-[#CCFBF1] via-[#99F6E4]/50 to-[#F0FDFA]"}`}>
+                        <div className={`relative h-44 lg:h-36 overflow-hidden ${isCard ? "bg-gradient-to-br from-[#FEF3C7] via-[#FDE68A]/60 to-[#FFFBEB]" : "bg-gradient-to-br from-[#CCFBF1] via-[#99F6E4]/50 to-[#F0FDFA]"}`}>
                           <div aria-hidden="true" className="absolute inset-0 bg-dots opacity-40" />
                           <span className="absolute left-3 top-3 z-10 rounded-full bg-white/90 backdrop-blur px-2.5 py-1 text-[10.5px] font-extrabold tracking-wide text-[#0F172A] shadow-sm">{p.print.toUpperCase()}</span>
                           <span className="absolute right-3 top-3 z-10 rounded-2xl bg-[#0F172A] px-3 py-1.5 text-right shadow-lg">
@@ -690,12 +723,12 @@ export default function Pricing() {
 
                         <div className="flex flex-1 flex-col p-4 sm:p-5">
                           <h4 className="font-display text-[17px] font-extrabold text-[#0F172A]">{p.name}</h4>
-                          <p className="mt-0.5 text-[12.5px] leading-snug text-[#64748B]">{p.tagline}</p>
-                          <ul className="mt-3.5 flex-1 space-y-2">
+                          <p className="mt-0.5 text-[12.5px] leading-snug text-[#64748B] lg:line-clamp-2">{p.tagline}</p>
+                          <ul className="mt-3 flex-1 space-y-1.5">
                             {p.points.map((pt, k) => {
                               const Icon = [Nfc, Images, ShieldCheck, Link2][k % 4];
                               return (
-                                <li key={pt} className="flex items-start gap-2.5 text-[12.5px] leading-snug text-[#334155]">
+                                <li key={pt} className="flex items-start gap-2.5 text-[12.5px] lg:text-[12px] leading-snug text-[#334155]">
                                   <span className={`mt-px w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${isCard ? "bg-[#FEF3C7] text-[#B45309]" : "bg-[#CCFBF1] text-[#0F766E]"}`}><Icon size={13} /></span>
                                   {pt}
                                 </li>
@@ -734,30 +767,6 @@ export default function Pricing() {
             </Link>
           </Reveal>
         </section>
-
-        {/* ── What DigitalCarda does ── */}
-        {includedFeatures.length > 0 && (
-          <section aria-labelledby="included-h" className="mt-16 sm:mt-24">
-            <Reveal className="text-center max-w-2xl mx-auto">
-              <h2 id="included-h" className="font-display text-[1.7rem] sm:text-[2.2rem] font-extrabold tracking-tight text-[#0F172A]">Everything DigitalCarda does</h2>
-              <p className="mt-2 text-[14px] text-[#64748B]">What's on each plan is in the comparison above.</p>
-            </Reveal>
-            <Reveal stagger className="mt-7 flex flex-wrap justify-center gap-2 sm:gap-2.5">
-              {includedFeatures.map((f, i) => {
-                const inner = (
-                  <>
-                    <span className="w-5 h-5 rounded-full bg-[#DCFCE7] flex items-center justify-center shrink-0"><Check size={11} strokeWidth={3} className="text-[#16A34A]" /></span>
-                    <span>{f.name}</span>
-                  </>
-                );
-                const cls = "inline-flex items-center gap-2 rounded-full bg-white ring-1 ring-[#E2E8F0] pl-1.5 pr-3.5 py-1.5 text-[12.5px] sm:text-[13px] font-medium text-[#334155] transition-all";
-                return f.link
-                  ? <Link key={i} to={f.link} className={`${cls} hover:ring-[#F7B31C] hover:-translate-y-0.5 hover:shadow-premium`}>{inner}</Link>
-                  : <span key={i} className={cls}>{inner}</span>;
-              })}
-            </Reveal>
-          </section>
-        )}
 
         {/* ── FAQs ── */}
         <section aria-labelledby="faq-h" className="mt-16 sm:mt-24 max-w-3xl mx-auto">

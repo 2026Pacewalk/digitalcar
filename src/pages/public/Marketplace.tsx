@@ -15,6 +15,20 @@ const inr = (v?: string | number | null) => "₹" + Number(v || 0).toLocaleStrin
 
 /* The industry a card belongs to (from its assigned demo persona), so the
    filter reflects every industry shown — not just the few with a DB category. */
+/* Shown first on this page, in this order, in every sort and filter they appear in. */
+const PINNED_SLUGS = ["corporate-business-card", "professional-profile-card"];
+
+const STYLES = [
+  { id: "all", label: "All" },
+  { id: "featured", label: "Featured" },
+  { id: "basic", label: "Basic" },
+  { id: "modern", label: "Modern" },
+  { id: "bio", label: "Bio" },
+  { id: "professional", label: "Professional" },
+  { id: "premium", label: "Premium" },
+] as const;
+type StyleId = (typeof STYLES)[number]["id"];
+
 const industryOf = (p: Product): string => String(demoForProduct(p).customer.nature || "Other");
 
 // No price sorting — designs carry no individual price (plan covers them all).
@@ -37,18 +51,21 @@ export default function Marketplace() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [sort, setSort] = useState<SortId>("popular");
+  const [style, setStyle] = useState<StyleId>("all");
 
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of products) { const ind = industryOf(p); if (ind) set.add(ind); }
-    return [...set].sort();
-  }, [products]);
+  // Design style (Basic / Modern / Bio / Professional / Premium) is the
+  // template category set in the admin, stored on each product.
+  const styleOf = (p: Product): string => String((p as { templateCategory?: string }).templateCategory || "modern");
+  const inStyle = (p: Product, id: StyleId) => id === "all" ? true : id === "featured" ? !!p.isFeatured : styleOf(p) === id;
+  const styleCount = (id: StyleId) => products.filter((p) => inStyle(p, id)).length;
+
 
   const shown = useMemo(() => {
     const term = q.toLowerCase().trim();
     let list = products.filter((p) => {
       const ind = industryOf(p);
       if (cat !== "all" && ind !== cat) return false;
+      if (!inStyle(p, style)) return false;
       if (!term) return true;
       return p.name.toLowerCase().includes(term) || ind.toLowerCase().includes(term) || (p.tagline || "").toLowerCase().includes(term);
     });
@@ -58,8 +75,12 @@ export default function Marketplace() {
       : sort === "price_low" ? price(a) - price(b)
       : sort === "price_high" ? price(b) - price(a)
       : (Number(b.isFeatured) - Number(a.isFeatured)) || (a.displayOrder - b.displayOrder));
+    // The flagship designs always lead, whatever the sort.
+    const pinned = PINNED_SLUGS.flatMap((slug) => list.filter((p) => p.slug === slug));
+    if (pinned.length) list = [...pinned, ...list.filter((p) => !pinned.includes(p))];
     return list;
-  }, [products, q, cat, sort]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, q, cat, sort, style]);
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
@@ -119,12 +140,27 @@ export default function Marketplace() {
       <div className="sticky top-16 z-30 bg-[#F8FAFC]/90 backdrop-blur-xl border-y border-[#E2E8F0]">
         <div className="max-w-7xl mx-auto pl-4 pr-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center gap-2 sm:gap-3">
           {/* Chips scroll sideways; the right edge fades so it's clear there's more. */}
-          <div className="flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none -ml-1 pl-1 pr-6 py-0.5 -mr-3 sm:mr-0 [mask-image:linear-gradient(to_right,black_calc(100%-28px),transparent)]" role="group" aria-label="Filter by industry">
-            <button onClick={() => setCat("all")} aria-pressed={cat === "all"} className={`shrink-0 h-8 sm:h-9 px-3.5 sm:px-4 rounded-full text-[12.5px] sm:text-[13px] font-semibold transition-all active:scale-95 ${cat === "all" ? "bg-[#0F172A] text-white" : "bg-white ring-1 ring-[#E2E8F0] text-[#64748B] hover:ring-[#F7B31C]/50"}`}>All</button>
-            {categories.map((c) => (
-              <button key={c} onClick={() => setCat(c)} aria-pressed={cat === c} className={`shrink-0 h-8 sm:h-9 px-3.5 sm:px-4 rounded-full text-[12.5px] sm:text-[13px] font-semibold whitespace-nowrap transition-all active:scale-95 ${cat === c ? "bg-[#0F172A] text-white" : "bg-white ring-1 ring-[#E2E8F0] text-[#64748B] hover:ring-[#F7B31C]/50"}`}>{c}</button>
-            ))}
+          <div className="flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none -ml-1 pl-1 pr-6 py-0.5 -mr-3 sm:mr-0 [mask-image:linear-gradient(to_right,black_calc(100%-28px),transparent)]" role="group" aria-label="Filter by design style">
+            {STYLES.map((st) => {
+              const on = style === st.id;
+              const n = styleCount(st.id);
+              if (st.id !== "all" && n === 0) return null;
+              return (
+                <button key={st.id} onClick={() => setStyle(st.id)} aria-pressed={on}
+                  className={`shrink-0 inline-flex items-center gap-1.5 h-8 sm:h-9 px-3.5 sm:px-4 rounded-full text-[12.5px] sm:text-[13px] font-semibold whitespace-nowrap transition-all active:scale-95 ${on ? "bg-[#0F172A] text-white shadow-md" : "bg-white ring-1 ring-[#E2E8F0] text-[#475569] hover:ring-[#F7B31C]/50"}`}>
+                  {st.id === "featured" && <Star size={13} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" />}
+                  {st.label}
+                  <span className={`text-[11px] font-bold tabular-nums ${on ? "text-[#F7B31C]" : "text-[#94A3B8]"}`}>{n}</span>
+                </button>
+              );
+            })}
           </div>
+          {cat !== "all" && (
+            <button onClick={() => setCat("all")} aria-label={`Clear industry filter: ${cat}`}
+              className="shrink-0 inline-flex items-center gap-1.5 h-8 sm:h-9 pl-3 pr-2 rounded-full bg-[#FEF3C7] ring-1 ring-[#F7B31C]/50 text-[12.5px] font-semibold text-[#92400E] max-w-[46%] sm:max-w-none">
+              <span className="truncate">{cat}</span> <X size={14} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -168,9 +204,9 @@ export default function Marketplace() {
                         <p className="text-[10px] font-bold text-[#F7B31C] uppercase tracking-wide truncate">{industryOf(p)}</p>
                         <Link to={`/digital-business-cards-templates/${p.slug}`} className="hover:text-[#F7B31C] transition-colors"><h3 className="text-[13px] sm:text-[14px] font-bold text-[#0F172A] leading-snug line-clamp-3 md:line-clamp-2 min-h-[36px] mt-0.5">{p.name}</h3></Link>
                       </div>
-                      {/* Actions beside the name as small see-through icons — stacked
-                          on narrow phone cards so the name keeps its width, side by
-                          side from md up. */}
+                      {/* Actions beside the name as small see-through icons. The eye
+                          (live preview) is phones-only: from md up the "Live Preview"
+                          hover overlay on the design does that job. */}
                       <div className="flex flex-col md:flex-row gap-1.5 shrink-0">
                         <Link
                           to={`/signup?product=${encodeURIComponent(p.slug)}`}
@@ -184,7 +220,7 @@ export default function Marketplace() {
                           to={`/demo/${p.slug}`}
                           aria-label={`Live preview of ${p.name}`}
                           title="Live preview"
-                          className="w-8 h-8 rounded-full bg-[#0F172A]/[0.05] ring-1 ring-[#0F172A]/10 text-[#334155] flex items-center justify-center hover:bg-[#0F172A] hover:text-white active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
+                          className="md:hidden w-8 h-8 rounded-full bg-[#0F172A]/[0.05] ring-1 ring-[#0F172A]/10 text-[#334155] flex items-center justify-center hover:bg-[#0F172A] hover:text-white active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
                         >
                           <Eye size={15} aria-hidden="true" />
                         </Link>

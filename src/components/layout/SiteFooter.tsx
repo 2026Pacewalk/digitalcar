@@ -12,7 +12,7 @@
  * the /sitemap page — so they can never list different pages. Every feature named
  * here exists in the product today; keep it that way when editing.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   ArrowRight, BarChart3, BookOpen, Check, Globe, IndianRupee, Inbox, LayoutGrid, Mail, MessageCircle, Nfc,
@@ -114,10 +114,9 @@ function FollowUs() {
   );
 }
 
-/** "Back to top", as a small rocket launch. */
-function BackToTop() {
+function useLaunch() {
   const [launching, setLaunching] = useState(false);
-  const onClick = () => {
+  const launch = () => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) { window.scrollTo({ top: 0, behavior: "auto" }); return; }
     setLaunching(true);
@@ -125,29 +124,66 @@ function BackToTop() {
     window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 280);
     window.setTimeout(() => setLaunching(false), 1150);
   };
+  return { launching, launch };
+}
+
+function RocketOrb({ size = 40 }: { size?: number }) {
+  return (
+    <span className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ width: size, height: size }} aria-hidden="true">
+      <span className="dc-top-ring absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,#F7B31C,rgba(247,179,28,0)_35%,#FDE68A_62%,rgba(247,179,28,0)_85%,#F7B31C)]" />
+      <span className="absolute inset-[2px] rounded-full bg-[radial-gradient(circle_at_50%_30%,#1E293B,#0B1120)]" />
+      <span className="dc-top-star absolute left-[9px] top-[9px] h-[2px] w-[2px] rounded-full bg-white" />
+      <span className="dc-top-star absolute right-[10px] top-[14px] h-[2px] w-[2px] rounded-full bg-white [animation-delay:.8s]" />
+      <span className="dc-top-star absolute bottom-[11px] left-[12px] h-[1.5px] w-[1.5px] rounded-full bg-white [animation-delay:1.4s]" />
+      <span className="dc-top-puff" style={{ ["--dx" as string]: "-11px" }} />
+      <span className="dc-top-puff" style={{ ["--dx" as string]: "0px" }} />
+      <span className="dc-top-puff" style={{ ["--dx" as string]: "11px" }} />
+      <span className="dc-top-rocket relative flex flex-col items-center">
+        <Rocket size={size > 44 ? 20 : 17} strokeWidth={2.2} className="-rotate-45 text-[#F7B31C]" />
+        <span className="dc-top-flame -mt-[3px] h-[7px] w-[5px] rounded-b-full bg-gradient-to-b from-[#FDE68A] via-[#F59E0B] to-[#EF4444]/0" />
+      </span>
+    </span>
+  );
+}
+
+/** Desktop: a floating rocket that appears once the page has been scrolled
+    a screen or so, and tucks itself away again near the top. */
+function FloatingBackToTop() {
+  const { launching, launch } = useLaunch();
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const on = () => setShow(window.scrollY > Math.max(600, window.innerHeight * 0.9));
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+  return (
+    <button
+      type="button"
+      onClick={launch}
+      aria-label="Back to top"
+      tabIndex={show ? 0 : -1}
+      aria-hidden={!show}
+      className={`dc-top group fixed bottom-6 right-6 z-40 hidden items-center rounded-full bg-[#0B1120]/90 p-1 shadow-[0_18px_40px_-12px_rgba(2,6,23,0.6)] ring-1 ring-white/15 backdrop-blur transition-all duration-300 hover:ring-[#F7B31C]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] md:flex ${show ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"} ${launching ? "is-launching" : ""}`}
+    >
+      <RocketOrb size={48} />
+      <span className="max-w-0 overflow-hidden whitespace-nowrap text-[13px] font-semibold text-white transition-all duration-300 group-hover:max-w-[110px] group-hover:pl-2 group-hover:pr-3 group-focus-visible:max-w-[110px] group-focus-visible:pl-2 group-focus-visible:pr-3">
+        Back to top
+      </span>
+    </button>
+  );
+}
+
+/** "Back to top", as a small rocket launch (phones and tablets, in the footer). */
+function BackToTop() {
+  const { launching, launch: onClick } = useLaunch();
   return (
     <button
       type="button"
       onClick={onClick}
       className={`dc-top group inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-white/[0.03] py-1 pl-1 pr-4 text-[12.5px] font-semibold text-[#CBD5E1] transition hover:border-[#F7B31C]/50 hover:bg-[#F7B31C]/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] ${launching ? "is-launching" : ""}`}
     >
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full" aria-hidden="true">
-        {/* Orbit: a spinning gold sweep behind a navy disc */}
-        <span className="dc-top-ring absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,#F7B31C,rgba(247,179,28,0)_35%,#FDE68A_62%,rgba(247,179,28,0)_85%,#F7B31C)]" />
-        <span className="absolute inset-[2px] rounded-full bg-[radial-gradient(circle_at_50%_30%,#1E293B,#0B1120)]" />
-        <span className="dc-top-star absolute left-[9px] top-[9px] h-[2px] w-[2px] rounded-full bg-white" />
-        <span className="dc-top-star absolute right-[10px] top-[14px] h-[2px] w-[2px] rounded-full bg-white [animation-delay:.8s]" />
-        <span className="dc-top-star absolute bottom-[11px] left-[12px] h-[1.5px] w-[1.5px] rounded-full bg-white [animation-delay:1.4s]" />
-        {/* Smoke puffs on lift-off */}
-        <span className="dc-top-puff" style={{ ["--dx" as string]: "-11px" }} />
-        <span className="dc-top-puff" style={{ ["--dx" as string]: "0px" }} />
-        <span className="dc-top-puff" style={{ ["--dx" as string]: "11px" }} />
-        {/* The rocket (Lucide's points up-right; turned to point straight up) with its flame */}
-        <span className="dc-top-rocket relative flex flex-col items-center">
-          <Rocket size={17} strokeWidth={2.2} className="-rotate-45 text-[#F7B31C]" />
-          <span className="dc-top-flame -mt-[3px] h-[7px] w-[5px] rounded-b-full bg-gradient-to-b from-[#FDE68A] via-[#F59E0B] to-[#EF4444]/0" />
-        </span>
-      </span>
+      <RocketOrb />
       Back to top
     </button>
   );
@@ -219,6 +255,7 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
   return (
     <footer className="relative overflow-hidden bg-[#070B16] text-white">
       <style>{MARQUEE_CSS}</style>
+      <FloatingBackToTop />
       {/* Ambient light and a faint grid */}
       <div aria-hidden="true" className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[#F7B31C]/[0.09] blur-[130px]" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_70%)]" />
@@ -311,17 +348,17 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
             <div className="mt-5 max-w-sm empty:hidden"><InstallAppRow /></div>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-4 lg:col-span-8">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-4 lg:col-span-8 lg:gap-x-8 lg:pl-6">
             {FOOTER_GROUPS.map((g) => (
               <nav key={g.title} aria-label={g.title}>
                 <p className="text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80">{g.title}</p>
                 <ul className="mt-4 space-y-3">
                   {g.links.map((l) => (
                     <li key={l.href}>
-                      <Link to={l.href} className="group inline-flex items-center gap-1.5 text-[14px] text-[#CBD5E1] transition-colors hover:text-white">
-                        <span className="h-px w-0 bg-[#F7B31C] transition-all duration-300 group-hover:w-3" aria-hidden="true" />
+                      <Link to={l.href} className="group inline-block text-[14px] leading-snug text-[#CBD5E1] transition-colors hover:text-white">
+                        <span className="inline-block h-px w-0 align-middle bg-[#F7B31C] transition-all duration-300 group-hover:mr-1.5 group-hover:w-3" aria-hidden="true" />
                         {l.label}
-                        {l.badge && <span className="rounded-full bg-[#22C55E]/15 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-[#4ADE80]">{l.badge}</span>}
+                        {l.badge && <span className="ml-1.5 inline-block rounded-full bg-[#22C55E]/15 px-1.5 py-0.5 align-[1px] text-[9.5px] font-bold uppercase leading-none tracking-wide text-[#4ADE80]">{l.badge}</span>}
                       </Link>
                     </li>
                   ))}
@@ -332,35 +369,34 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
         </div>
 
         {/* ── 4. Guides + NFC ────────────────────────────────────── */}
-        <div className="mt-14 grid gap-4 lg:grid-cols-4">
-          <div className="lg:col-span-3">
-            <div className="mb-4 flex items-center justify-between">
-              <p className="inline-flex items-center gap-2 text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80"><BookOpen size={14} aria-hidden="true" /> Popular guides</p>
-              <Link to="/blog" className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#CBD5E1] hover:text-white">All guides <ArrowRight size={14} aria-hidden="true" /></Link>
-            </div>
-            <ul className="grid gap-3 sm:grid-cols-3">
-              {FOOTER_GUIDES.map((g) => (
-                <li key={g.href}>
-                  <Link to={g.href} className="group flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:-translate-y-0.5 hover:border-[#F7B31C]/40 hover:bg-white/[0.05]">
-                    <span className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
-                      {g.desc}
-                      <BookOpen size={14} className="text-white/20 transition group-hover:text-[#F7B31C]" aria-hidden="true" />
-                    </span>
-                    <span className="mt-2 text-[14.5px] font-semibold leading-snug text-white">{g.label}</span>
-                    <span className="mt-auto inline-flex items-center gap-1 pt-3 text-[12.5px] font-semibold text-[#F7B31C]">Read guide <ArrowRight size={13} className="transition group-hover:translate-x-0.5" aria-hidden="true" /></span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+        <div className="mt-14">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="inline-flex items-center gap-2 text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80"><BookOpen size={14} aria-hidden="true" /> Popular guides</p>
+            <Link to="/blog" className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#CBD5E1] hover:text-white">All guides <ArrowRight size={14} aria-hidden="true" /></Link>
           </div>
-
-          <Link to="/pricing" className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#F7B31C] to-[#F59E0B] p-5 text-[#0B1120] lg:mt-9">
-            <span aria-hidden="true" className="absolute -right-6 -top-6 h-28 w-28 rounded-full border-[14px] border-white/25" />
-            <span className="relative inline-flex items-center gap-1.5 rounded-full bg-[#0B1120] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#F7B31C]"><Zap size={11} aria-hidden="true" /> Tap to share</span>
-            <span className="relative mt-3 flex items-center gap-2 font-display text-[19px] font-extrabold leading-tight"><Nfc size={20} aria-hidden="true" /> NFC card · ₹499</span>
-            <span className="relative mt-1 block text-[13px] font-medium leading-snug text-[#422006]">Tap it on a phone and your card opens. Printed on both sides.</span>
-            <span className="relative mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-bold"><Truck size={14} aria-hidden="true" /> Free delivery across India <ArrowRight size={14} className="transition group-hover:translate-x-1" aria-hidden="true" /></span>
-          </Link>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {FOOTER_GUIDES.map((g) => (
+              <li key={g.href}>
+                <Link to={g.href} className="group flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:-translate-y-0.5 hover:border-[#F7B31C]/40 hover:bg-white/[0.05]">
+                  <span className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
+                    {g.desc}
+                    <BookOpen size={14} className="text-white/20 transition group-hover:text-[#F7B31C]" aria-hidden="true" />
+                  </span>
+                  <span className="mt-2 text-[14.5px] font-semibold leading-snug text-white">{g.label}</span>
+                  <span className="mt-auto inline-flex items-center gap-1 pt-3 text-[12.5px] font-semibold text-[#F7B31C]">Read guide <ArrowRight size={13} className="transition group-hover:translate-x-0.5" aria-hidden="true" /></span>
+                </Link>
+              </li>
+            ))}
+            <li>
+            <Link to="/pricing" className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-gradient-to-br from-[#F7B31C] to-[#F59E0B] p-4 text-[#0B1120] transition hover:-translate-y-0.5">
+              <span aria-hidden="true" className="absolute -right-6 -top-6 h-28 w-28 rounded-full border-[14px] border-white/25" />
+              <span className="relative inline-flex items-center gap-1.5 rounded-full bg-[#0B1120] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#F7B31C]"><Zap size={11} aria-hidden="true" /> Tap to share</span>
+              <span className="relative mt-2.5 flex items-center gap-2 font-display text-[17px] font-extrabold leading-tight"><Nfc size={20} aria-hidden="true" /> NFC card · ₹499</span>
+              <span className="relative mt-1 block text-[13px] font-medium leading-snug text-[#422006]">Tap it on a phone and your card opens. Printed on both sides.</span>
+              <span className="relative mt-auto pt-3 inline-flex items-center gap-1.5 text-[12.5px] font-bold"><Truck size={14} aria-hidden="true" /> Free delivery across India <ArrowRight size={14} className="transition group-hover:translate-x-1" aria-hidden="true" /></span>
+            </Link>
+            </li>
+          </ul>
         </div>
 
         {/* ── 5. Wordmark + legal ────────────────────────────────── */}
@@ -393,7 +429,7 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
             ))}
           </nav>
 
-          <div className="order-1 md:order-3"><BackToTop /></div>
+          <div className="order-1 md:order-3 md:hidden"><BackToTop /></div>
         </div>
       </div>
     </footer>
