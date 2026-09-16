@@ -1,12 +1,11 @@
-import { Link, useLocation, Outlet } from "react-router";
-import { useEffect, useState } from "react";
-import { Sparkles, Home as HomeIcon, LayoutGrid, Tag, Menu, LayoutDashboard } from "lucide-react";
-import { getToken } from "@/lib/session";
-import { haptic, useEdgeToEdge } from "@/lib/nativeApp";
+import { useLocation, Outlet } from "react-router";
+import { useEffect } from "react";
+import { useEdgeToEdge } from "@/lib/nativeApp";
 import { DEFAULT_SEO, seoForPath, breadcrumbJsonLd } from "@/lib/publicSeo";
 import { SOCIAL_LINKS } from "@/lib/publicNav";
 import SiteHeader from "@/components/layout/SiteHeader";
 import SiteFooter from "@/components/layout/SiteFooter";
+import PublicTabBar from "@/components/layout/PublicTabBar";
 import AnnouncementPopup from "@/components/AnnouncementPopup";
 import JsonLd from "@/components/seo/JsonLd";
 import type { PageSeo } from "@/lib/publicSeo";
@@ -149,50 +148,5 @@ export default function PublicLayout() {
 
       <AnnouncementPopup audience="public" />
     </div>
-  );
-}
-
-/* Phones and tablets: an app-style tab bar. The raised centre button starts the
-   free trial — or, for someone already signed in, goes back to their dashboard. */
-function PublicTabBar({ signupHref }: { signupHref: string }) {
-  const { pathname } = useLocation();
-  // Read after mount: the server renders the signed-out bar, so hydration matches.
-  const [home, setHome] = useState<string | null>(null);
-  useEffect(() => {
-    setHome(getToken("main") ? "/dashboard" : getToken("admin") ? "/admin" : null);
-  }, []);
-
-  const designs = ["/digital-business-cards-templates", "/templates", "/card-designs", "/digital-business-cards", "/demo", "/industries"]
-    .some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  const tab = (active: boolean) =>
-    `flex flex-1 flex-col items-center justify-center gap-1 pt-1 text-[10.5px] leading-none active:opacity-70 ${active ? "font-bold text-[#F7B31C]" : "font-medium text-[#94A3B8]"}`;
-
-  return (
-    <nav aria-label="Quick navigation" className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#0B1120]/[0.96] backdrop-blur-xl">
-      <div className="mx-auto flex h-[62px] max-w-lg items-stretch px-1">
-        <Link to="/" onClick={() => haptic()} className={tab(pathname === "/")} aria-current={pathname === "/" ? "page" : undefined}>
-          <HomeIcon size={21} strokeWidth={pathname === "/" ? 2.4 : 1.9} /> Home
-        </Link>
-        <Link to="/digital-business-cards-templates" onClick={() => haptic()} className={tab(designs)} aria-current={designs ? "page" : undefined}>
-          <LayoutGrid size={21} strokeWidth={designs ? 2.4 : 1.9} /> Designs
-        </Link>
-        <div className="flex flex-1 justify-center">
-          <Link to={home ?? signupHref} onClick={() => haptic()}
-            className="-mt-5 flex flex-col items-center gap-1 text-[10.5px] font-bold leading-none text-white active:scale-95 transition-transform">
-            <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-gradient-to-br from-[#FBBF24] to-[#F59E0B] text-[#0B1120] shadow-[0_10px_24px_-8px_rgba(247,179,28,0.8)] ring-4 ring-[#0B1120]">
-              {home ? <LayoutDashboard size={22} /> : <Sparkles size={22} />}
-            </span>
-            {home ? "Dashboard" : "Start free"}
-          </Link>
-        </div>
-        <Link to="/pricing" onClick={() => haptic()} className={tab(pathname.startsWith("/pricing"))} aria-current={pathname.startsWith("/pricing") ? "page" : undefined}>
-          <Tag size={21} strokeWidth={pathname.startsWith("/pricing") ? 2.4 : 1.9} /> Pricing
-        </Link>
-        <button type="button" onClick={() => { haptic(); window.dispatchEvent(new Event("dc:open-site-menu")); }} className={tab(false)}>
-          <Menu size={21} strokeWidth={1.9} /> Menu
-        </button>
-      </div>
-      <div className="h-safe-bottom" />
-    </nav>
   );
 }
