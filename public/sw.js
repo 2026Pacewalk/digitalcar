@@ -96,7 +96,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   if (url.origin === self.location.origin) {
-    if (SKIP.test(url.pathname) || url.pathname === "/sw.js") return;
+    if (SKIP.test(url.pathname) || url.pathname === "/sw.js" || url.pathname === "/service-worker") return;
     if (request.mode === "navigate") { event.respondWith(page(event)); return; }
     if (url.pathname.startsWith("/assets/")) { event.respondWith(asset(request)); return; }
     if (/\.(png|jpe?g|webp|gif|svg|ico|woff2?)$/i.test(url.pathname)) { event.respondWith(image(event)); return; }

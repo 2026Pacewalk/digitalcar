@@ -93,7 +93,7 @@ export function registerServiceWorker() {
   const host = window.location.hostname;
   // Only the DigitalCarda site itself — never a customer's own card domain.
   if (host !== "digitalcarda.in" && host !== "www.digitalcarda.in") return;
-  const go = () => navigator.serviceWorker.register("/sw.js").catch(() => { /* site still works without it */ });
+  const go = () => navigator.serviceWorker.register("/service-worker", { scope: "/" }).catch(() => { /* site still works without it */ });
   if (document.readyState === "complete") go();
   else window.addEventListener("load", go, { once: true });
 }

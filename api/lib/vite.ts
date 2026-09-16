@@ -292,6 +292,19 @@ export function serveStaticFiles(app: App) {
   // handle it first to inject meta.
   app.get("/", serveHtml);
 
+  // The service worker, at an address without a file extension: Cloudflare
+  // edge-caches *.js and stretches its browser cache to hours, which would
+  // delay a worker update (or its off switch) that long. This path passes
+  // straight through, like the manifest.
+  app.get("/service-worker", (c) => {
+    let js = "";
+    try { js = fs.readFileSync(path.resolve(distPath, "sw.js"), "utf-8"); } catch { return c.notFound(); }
+    c.header("Content-Type", "text/javascript; charset=utf-8");
+    c.header("Cache-Control", "no-cache");
+    c.header("Service-Worker-Allowed", "/");
+    return c.body(js);
+  });
+
   // Vite content-hashes every build asset under /assets/, so its contents can
   // never change under a given URL — cache them for a year (immutable). This is
   // the biggest safe perf win for repeat visits + Core Web Vitals (Phase 32).
