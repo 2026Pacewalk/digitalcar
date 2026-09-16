@@ -7,6 +7,7 @@ import { getDb } from "./queries/connection";
 import { users, referrals, notifications, cards, publishedCards, cardTrials, appSettings } from "@db/schema";
 import { eq, like } from "drizzle-orm";
 import { slugTakenByOther } from "./publish-router";
+import { resolveReferrer } from "./referral-router";
 import { createToken, createResetToken, verifyResetToken, createVerifyToken, verifyVerifyToken } from "./lib/jwt";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail, verifyEmailAddressEmail } from "./lib/email-templates";
@@ -108,11 +109,12 @@ async function welcomeNewAccount(
 
   // Apply referral (Refer & Earn) — both the referrer and this new user get a discount
   if (opts.referralCode) {
-    const code = opts.referralCode.toUpperCase();
+    // A code is either the referrer card slug or their older DC... code, and
+    // resolveReferrer knows both - so ?ref=social-theory credits the right
+    // person instead of silently crediting nobody.
+    const code = opts.referralCode.trim();
     try {
-      const referrer = await db.query.users.findFirst({
-        where: eq(users.referralCode, code),
-      });
+      const referrer = await resolveReferrer(db, code);
       if (referrer && referrer.id !== insertedUser.id) {
         await db.update(users).set({ referredById: referrer.id }).where(eq(users.id, insertedUser.id));
         // Reward is credited later by an admin once this user buys a paid plan.

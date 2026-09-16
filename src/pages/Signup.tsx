@@ -262,12 +262,27 @@ export default function Signup() {
             </div>
           )}
 
-          {referralCode && (
+          {/* Only claim a referral is applied once the server has confirmed it.
+              This used to say "invited by a friend" for ANY ?ref= value, so a
+              mistyped or made-up code looked accepted and credited nobody. */}
+          {referralCode && refInfo && !refInfo.valid && (
+            <div className="flex items-center gap-3 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] px-4 py-3 mb-5">
+              <span className="w-9 h-9 rounded-xl bg-[#E2E8F0] flex items-center justify-center shrink-0"><Gift size={17} className="text-[#64748B]" /></span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-[#334155]">We couldn&apos;t find that referral code</p>
+                <p className="text-[11px] text-[#64748B]"><b>{referralCode}</b> isn&apos;t a code we recognise — you can still create your account below.</p>
+              </div>
+            </div>
+          )}
+          {referralCode && refInfo?.valid && (
             <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#FEF3C7] to-[#FFF7E6] border border-[#FDE68A] px-4 py-3 mb-5">
               <span className="w-9 h-9 rounded-xl gradient-gold flex items-center justify-center shrink-0"><Gift size={17} className="text-[#0F172A]" /></span>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-[#92400E]">{refDiscount > 0 ? `You've been referred — get ${refDiscount}% off!` : "You were invited by a friend 🎉"}</p>
-                <p className="text-[11px] text-[#B45309]">Referral <b className="uppercase">{referralCode}</b> applied{refDiscount > 0 ? ` — ${refDiscount}% off your first paid plan.` : " — welcome to DigitalCarda."}</p>
+                <p className="text-[11px] text-[#B45309]">
+                  Referred by <b>{refInfo.referrerName || referralCode}</b>
+                  {refDiscount > 0 ? ` — ${refDiscount}% off your first paid plan.` : " — welcome to DigitalCarda."}
+                </p>
               </div>
             </div>
           )}

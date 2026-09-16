@@ -4,9 +4,9 @@ import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware
 import { getDb } from "./queries/connection";
 import {
   users, referrals, walletTransactions, withdrawalRequests, appSettings,
-  subscriptions, notifications,
+  subscriptions, notifications, publishedCards,
 } from "@db/schema";
-import { eq, desc, and, gt, inArray } from "drizzle-orm";
+import { eq, desc, and, gt, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { payoutRequestAdminEmail, payoutCompletedEmail } from "./lib/email-templates";
@@ -28,6 +28,51 @@ async function getPercent(db: ReturnType<typeof getDb>, key: string, def: number
 }
 const getCommissionPercent = (db: ReturnType<typeof getDb>) => getPercent(db, COMMISSION_KEY, DEFAULT_COMMISSION);
 const getDiscountPercent = (db: ReturnType<typeof getDb>) => getPercent(db, DISCOUNT_KEY, DEFAULT_DISCOUNT);
+
+/* The card slug IS the referral code.
+
+   Codes used to be a random "DC..." string, so the link a customer shared from
+   the dashboard (?ref=DCC-R8J3) looked nothing like anything else they share,
+   while the slug-shaped link people naturally try (?ref=social-theory) matched
+   nothing at all - signup still said "invited by a friend" and credited no one.
+   A published card slug is unique and is already the customer public identity,
+   so it is the code. Any older DC... code still resolves, so links already out
+   in the world keep working. */
+async function cardSlugFor(db: ReturnType<typeof getDb>, userId: number): Promise<string | null> {
+  const rows = await db.select({ slug: publishedCards.slug }).from(publishedCards)
+    .where(eq(publishedCards.userId, userId)).orderBy(publishedCards.cardId).limit(1);
+  const slug = String(rows[0]?.slug || "").trim().toLowerCase();
+  return slug || null;
+}
+
+/** The code to SHOW a user: their card slug, else a stored code (minted once). */
+export async function referralCodeFor(
+  db: ReturnType<typeof getDb>,
+  user: { id: number; referralCode?: string | null },
+): Promise<string> {
+  const slug = await cardSlugFor(db, user.id);
+  if (slug) return slug;
+  if (user.referralCode) return user.referralCode;
+  const code = ("DC" + nanoid(6)).toUpperCase();
+  await db.update(users).set({ referralCode: code }).where(eq(users.id, user.id));
+  return code;
+}
+
+/** Whoever owns a referral code: a card slug first, then a stored code. Both
+    matched case-insensitively, because the code travels in a URL. */
+export async function resolveReferrer(db: ReturnType<typeof getDb>, codeIn: string) {
+  const code = String(codeIn || "").trim();
+  if (code.length < 2) return null;
+  const owner = await db.select({ userId: publishedCards.userId }).from(publishedCards)
+    .where(sql`LOWER(${publishedCards.slug}) = ${code.toLowerCase()}`).limit(1);
+  if (owner[0]?.userId) {
+    const byCard = await db.query.users.findFirst({ where: eq(users.id, Number(owner[0].userId)) });
+    if (byCard) return byCard;
+  }
+  return (await db.query.users.findFirst({
+    where: sql`LOWER(${users.referralCode}) = ${code.toLowerCase()}`,
+  })) ?? null;
+}
 
 /** Apply a signed amount to a user's wallet and record a statement line. */
 async function applyWallet(
@@ -63,11 +108,7 @@ export const referralRouter = createRouter({
   // ─── Customer: my referral program summary + wallet snapshot ───
   myProgram: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
-    let code = ctx.user.referralCode;
-    if (!code) {
-      code = ("DC" + nanoid(6)).toUpperCase();
-      await db.update(users).set({ referralCode: code }).where(eq(users.id, ctx.user.id));
-    }
+    const code = await referralCodeFor(db, ctx.user);
     const rows = await db.query.referrals.findMany({ where: eq(referrals.referrerId, ctx.user.id) });
     const rewarded = rows.filter((r) => r.status === "rewarded").length;
     const joined = rows.filter((r) => r.status !== "pending").length;
@@ -195,7 +236,7 @@ export const referralRouter = createRouter({
     .input(z.object({ code: z.string().min(2) }))
     .query(async ({ input }) => {
       const db = getDb();
-      const referrer = await db.query.users.findFirst({ where: eq(users.referralCode, input.code.toUpperCase()) });
+      const referrer = await resolveReferrer(db, input.code);
       return { valid: !!referrer, referrerName: referrer?.fullName ?? null, discountPercent: await getDiscountPercent(db) };
     }),
 
@@ -209,7 +250,7 @@ export const referralRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       enforceRateLimit(`refrecord:${ctx.user.id}`, 10, 300_000);
       const db = getDb();
-      const referrer = await db.query.users.findFirst({ where: eq(users.referralCode, input.code.toUpperCase()) });
+      const referrer = await resolveReferrer(db, input.code);
       if (!referrer) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid referral code" });
       if (referrer.id === ctx.user.id) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "You can't refer yourself." });
