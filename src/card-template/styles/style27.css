@@ -407,3 +407,47 @@ padding-top: 20px;
 	border-radius: 50%;
 	filter: brightness(85%);
 }
+
+/* ── Header waves, anchored to the social row ──────────────────────────
+   The waves were fixed heights measured from the top of the card (bottom edge
+   at 300-313px). That only cleared the name while the view counter was showing:
+   turn views off — or look at the catalogue thumbnail, which has no counter —
+   and the header is 25px shorter, the name moves up, and the white wave cuts
+   through the top of it.
+
+   They are now drawn from .home-social, the row directly above the name, at
+   the same distances below it as the original design, so the name keeps its
+   clearance however tall the header is. Vertical radii are given in px so the
+   curves keep their original shape while the shapes grow tall enough to reach
+   the top of the card. The old shapes are hidden, not deleted: the markup is
+   shared by every template. */
+#home-section .home-extra-two,
+#home-section .home-extra-three{
+	display: none !important;
+}
+#home-section .home-social{
+	position: relative;
+}
+#home-section .home-social::before,
+#home-section .home-social::after{
+	content: "";
+	position: absolute;
+	left: -50px;
+	width: calc(100% + 200px);
+	height: 700px;
+	pointer-events: none;
+}
+/* the white wave */
+#home-section .home-social::before{
+	bottom: -40px;
+	background-color: #fff;
+	border-radius: 0 0 50% 50% / 0 0 155px 155px;
+	z-index: -2;
+}
+/* the theme-colour crescent peeking out below it */
+#home-section .home-social::after{
+	bottom: -50px;
+	background-color: var(--theme-color);
+	border-radius: 0 0 60% 50% / 0 0 155px 155px;
+	z-index: -3;
+}

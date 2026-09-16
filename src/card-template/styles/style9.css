@@ -326,3 +326,50 @@ _______________end__________________________*/
 	left: auto;
 	right: 0;
 }
+
+/* ── Diagonal band, anchored to the contact block ──────────────────────
+   .home-extra-one was a 500px panel at a fixed top:-130px, skewed 25deg. Its
+   lower edge fell 150px across the card's width, but the gap between the job
+   title and the first contact row is only ~80px — so no fixed position could
+   clear both, and the band ran across the phone and website rows. Those rows
+   use the theme colour for their text, which made them teal-on-teal and
+   unreadable.
+
+   The band is now drawn from .home-details, so it moves with the contact rows
+   whatever the header does, and at 8deg its edge climbs ~26px either side of
+   centre: the left end stays below a two-line job title, the right end stays
+   above the first row. The icon strip is redrawn the same way so it still
+   meets the band. The old shapes are hidden, not deleted: the markup is shared
+   by every template. */
+#home-section .home-extra-one,
+#home-section .home-extra-two{
+	display: none !important;
+}
+#home-section .home-details{
+	position: relative;
+}
+#home-section .home-details::before{
+	content: "";
+	position: absolute;
+	left: 0;
+	width: 100%;
+	height: 1200px;
+	top: -1156px;
+	background-color: var(--theme-color);
+	-webkit-transform: skewY(8deg);
+	-ms-transform: skewY(8deg);
+	transform: skewY(8deg);
+	z-index: -1;
+	pointer-events: none;
+}
+#home-section .home-details::after{
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: -400px;
+	width: 60px;
+	background-color: var(--theme-color);
+	z-index: -1;
+	pointer-events: none;
+}
