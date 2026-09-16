@@ -9,13 +9,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Clock, Copy, Lightbulb, Linkedin, ListOrdered, MessageCircle,
+  AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Clock, Lightbulb, ListOrdered,
 } from "lucide-react";
-import BlogCover from "@/components/blog/BlogCover";
+import PostVisual from "@/components/blog/PostVisual";
+import { ShareCluster, ShareEnd, ShareRail } from "@/components/blog/ShareMenu";
 import PostCard from "@/components/blog/PostCard";
 import RichText from "@/components/blog/RichText";
 import {
-  BLOG_PATH, blogPostPath, categoryLabel, formatBlogDate, getBlogPost, readingMinutes, relatedPosts,
+  BLOG_PATH, blogOgPath, blogPostPath, categoryLabel, formatBlogDate, getBlogPost, readingMinutes, relatedPosts,
   type BlogBlock, type BlogPost as Post,
 } from "@/data/blog";
 
@@ -34,6 +35,12 @@ function setHead(post: Post) {
   meta("property", "og:description", post.description);
   meta("property", "og:type", "article");
   meta("property", "og:url", url);
+  const image = `${SITE}${blogOgPath(post)}`;
+  meta("property", "og:image", image);
+  meta("property", "og:image:alt", post.title);
+  meta("name", "twitter:image", image);
+  meta("name", "twitter:title", post.seoTitle);
+  meta("name", "twitter:description", post.description);
   let canon = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
   if (!canon) { canon = document.createElement("link"); canon.rel = "canonical"; document.head.appendChild(canon); }
   canon.href = url;
@@ -124,6 +131,23 @@ function Block({ block }: { block: BlogBlock }) {
           {block.caption && <figcaption className="mt-2.5 text-[13px] text-[#78716C]">{block.caption}</figcaption>}
         </figure>
       );
+    case "related": {
+      const target = getBlogPost(block.slug);
+      if (!target) return null;
+      return (
+        <aside className="mt-8">
+          <Link to={blogPostPath(target.slug)} className="group flex items-center gap-4 rounded-2xl bg-white p-4 ring-1 ring-[#E7E0CF] transition hover:ring-[#F7B31C] sm:p-5">
+            <span className="h-16 w-24 shrink-0 overflow-hidden rounded-xl sm:h-[4.5rem] sm:w-28"><PostVisual post={target} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11.5px] font-extrabold uppercase tracking-[0.14em] text-[#B45309]">Related guide</span>
+              <span className="mt-1 block font-display text-[16px] font-bold leading-snug text-[#0F172A] group-hover:underline group-hover:decoration-[#F7B31C] group-hover:decoration-2 group-hover:underline-offset-4">{target.title}</span>
+              {block.note && <span className="mt-1 block text-[14px] leading-snug text-[#78716C]">{block.note}</span>}
+            </span>
+            <ArrowRight size={18} className="shrink-0 text-[#0F172A] transition-transform group-hover:translate-x-1" aria-hidden="true" />
+          </Link>
+        </aside>
+      );
+    }
     case "cta":
       return (
         <aside className="relative mt-10 overflow-hidden rounded-3xl bg-[#0F172A] p-7 text-white sm:p-8">
@@ -136,24 +160,6 @@ function Block({ block }: { block: BlogBlock }) {
         </aside>
       );
   }
-}
-
-function ShareBar({ post }: { post: Post }) {
-  const [copied, setCopied] = useState(false);
-  const url = `${SITE}${blogPostPath(post.slug)}`;
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); } catch { /* clipboard blocked */ }
-  };
-  const btn = "flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#0F172A] ring-1 ring-[#E7E0CF] transition hover:ring-[#F7B31C] hover:-translate-y-0.5";
-  return (
-    <div className="flex items-center gap-2">
-      <a className={btn} href={`https://wa.me/?text=${encodeURIComponent(`${post.title} ${url}`)}`} target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><MessageCircle size={17} /></a>
-      <a className={btn} href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`} target="_blank" rel="noopener noreferrer" aria-label="Share on LinkedIn"><Linkedin size={16} /></a>
-      <button type="button" className={btn} onClick={copy} aria-label={copied ? "Link copied" : "Copy link"}>
-        {copied ? <Check size={16} className="text-[#15803D]" /> : <Copy size={15} />}
-      </button>
-    </div>
-  );
 }
 
 export default function BlogPost() {
@@ -218,29 +224,32 @@ export default function BlogPost() {
               <li aria-hidden="true"><ChevronRight size={13} /></li>
               <li><Link to={BLOG_PATH} className="hover:text-[#0F172A]">Blog</Link></li>
               <li aria-hidden="true"><ChevronRight size={13} /></li>
-              <li className="font-semibold text-[#44403C]">{categoryLabel(post.category)}</li>
+              <li aria-current="page" className="min-w-0 max-w-[16rem] truncate font-semibold text-[#44403C] sm:max-w-md">{post.title}</li>
             </ol>
           </nav>
-          <h1 className="mt-6 font-display text-[2.1rem] font-extrabold leading-[1.08] tracking-tight text-[#0F172A] sm:text-[3.1rem] [text-wrap:balance]">{post.title}</h1>
+          <p className="mt-6 inline-flex rounded-full bg-[#FEF3C7] px-3 py-1 text-[11.5px] font-extrabold uppercase tracking-[0.14em] text-[#92400E]">{categoryLabel(post.category)}</p>
+          <h1 className="mt-4 font-display text-[2.1rem] font-extrabold leading-[1.08] tracking-tight text-[#0F172A] sm:text-[3.1rem] [text-wrap:balance]">{post.title}</h1>
           <p className="mt-5 max-w-3xl text-[18px] leading-relaxed text-[#57534E]">{post.excerpt}</p>
           <div className="mt-7 flex flex-wrap items-center justify-between gap-5 border-y border-[#EEE9DD] py-4">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0F172A] font-display text-[14px] font-extrabold text-[#F7B31C]" aria-hidden="true">DC</span>
               <div className="text-[13.5px] leading-tight">
-                <p className="font-bold text-[#0F172A]">DigitalCarda Team</p>
+                <p className="font-bold text-[#0F172A]">By <Link to="/about" rel="author" className="underline decoration-[#F7B31C] decoration-2 underline-offset-4 hover:text-[#92400E]">the DigitalCarda team</Link></p>
                 <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[#78716C]">
-                  <span>Updated <time dateTime={post.updatedAt}>{formatBlogDate(post.updatedAt)}</time></span>
+                  {post.updatedAt > post.publishedAt
+                    ? <span>Updated <time dateTime={post.updatedAt}>{formatBlogDate(post.updatedAt)}</time></span>
+                    : <span>Published <time dateTime={post.publishedAt}>{formatBlogDate(post.publishedAt)}</time></span>}
                   <span aria-hidden="true">·</span>
                   <span className="inline-flex items-center gap-1"><Clock size={13} aria-hidden="true" /> {minutes} min read</span>
                 </p>
               </div>
             </div>
-            <ShareBar post={post} />
+            <ShareCluster post={post} />
           </div>
         </div>
         <div className="relative mx-auto mt-10 max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="aspect-[16/9] overflow-hidden rounded-[2rem] shadow-[0_40px_80px_-50px_rgba(15,23,42,0.55)] ring-1 ring-black/5 sm:aspect-[21/9]">
-            <BlogCover cover={post.cover} />
+            <PostVisual post={post} priority />
           </div>
         </div>
       </header>
@@ -248,7 +257,12 @@ export default function BlogPost() {
       {/* ── Body ───────────────────────────────────────────────── */}
       <div className="mx-auto grid max-w-6xl gap-12 px-4 pt-12 pb-20 sm:px-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:px-8">
         <div ref={articleRef} className="min-w-0">
-          <div className="mx-auto max-w-[44rem] text-[17.5px] leading-[1.8] text-[#44403C]">
+          <div className="relative mx-auto max-w-[44rem] text-[17.5px] leading-[1.8] text-[#44403C]">
+            {/* Share rail beside the article on wide screens */}
+            <div className="pointer-events-none absolute -left-[5.5rem] top-0 hidden h-full xl:block">
+              <div className="pointer-events-auto sticky top-32"><ShareRail post={post} /></div>
+            </div>
+
             {/* The short version */}
             <section aria-labelledby="short-version" className="relative overflow-hidden rounded-3xl bg-[#0F172A] p-6 text-white sm:p-8">
               <div aria-hidden="true" className="pointer-events-none absolute -right-12 -bottom-12 h-44 w-44 rounded-full bg-[#F7B31C]/20 blur-2xl" />
@@ -300,19 +314,21 @@ export default function BlogPost() {
                         {f.q}
                         <ChevronDown size={18} className="mt-0.5 shrink-0 text-[#A8A29E] transition-transform group-open:rotate-180" aria-hidden="true" />
                       </summary>
-                      <p className="px-5 pb-5 text-[16px] leading-relaxed text-[#57534E] sm:px-6">{f.a}</p>
+                      <p className="px-5 pb-5 text-[16px] leading-relaxed text-[#57534E] sm:px-6"><RichText text={f.a} /></p>
                     </details>
                   ))}
                 </div>
               </section>
             )}
 
+            <ShareEnd post={post} />
+
             {/* About */}
             <aside className="mt-14 flex gap-4 rounded-2xl border border-[#EEE9DD] bg-white p-5 sm:p-6">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0F172A] font-display text-[15px] font-extrabold text-[#F7B31C]" aria-hidden="true">DC</span>
               <div className="text-[15px] leading-relaxed">
                 <p className="font-display font-bold text-[#0F172A]">Written by the DigitalCarda team</p>
-                <p className="mt-1 text-[#57534E]">We build digital visiting cards for businesses across India — shops, clinics, consultants and sales teams — and write down what we learn from helping them get found and called back. See what a card can do on our <Link to="/features" className="font-semibold text-[#0F172A] underline decoration-[#F7B31C] decoration-2 underline-offset-4">features page</Link>.</p>
+                <p className="mt-1 text-[#57534E]">We build digital visiting cards for businesses across India — shops, clinics, consultants and sales teams — and write down what we learn from helping them get found and called back. Read <Link to="/about#how-we-write" className="font-semibold text-[#0F172A] underline decoration-[#F7B31C] decoration-2 underline-offset-4">how we write and check our guides</Link>, or see what a card can do on our <Link to="/features" className="font-semibold text-[#0F172A] underline decoration-[#F7B31C] decoration-2 underline-offset-4">features page</Link>.</p>
               </div>
             </aside>
           </div>

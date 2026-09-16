@@ -84,6 +84,7 @@ const EmailSignatureGenerator = lazy(() => import("./pages/public/EmailSignature
 const WhatsAppTemplates = lazy(() => import("./pages/public/WhatsAppTemplates"));
 const PublicSitemap = lazy(() => import("./pages/public/Sitemap"));
 const Blog = lazy(() => import("./pages/public/Blog"));
+const About = lazy(() => import("./pages/public/About"));
 const BlogPost = lazy(() => import("./pages/public/BlogPost"));
 const CustomerCustomDomain = lazy(() => import("./pages/customer/CustomDomain"));
 const CustomerNfcOrder = lazy(() => import("./pages/customer/NfcOrder"));
@@ -228,6 +229,7 @@ export default function App() {
           <Route path="/sitemap" element={<PublicSitemap />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
+          <Route path="/about" element={<About />} />
         </Route>
 
         {/* Auth */}

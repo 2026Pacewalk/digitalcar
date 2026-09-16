@@ -9,7 +9,8 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { ArrowRight, BookOpen, Clock, Search, Sparkles, X } from "lucide-react";
-import BlogCover from "@/components/blog/BlogCover";
+import PostVisual from "@/components/blog/PostVisual";
+import { ShareIconButton } from "@/components/blog/ShareMenu";
 import PostCard from "@/components/blog/PostCard";
 import {
   BLOG_CATEGORIES, BLOG_POSTS, blogPostPath, categoryLabel, formatBlogDate, plainText, readingMinutes,
@@ -102,10 +103,12 @@ export default function Blog() {
           <article className="group relative grid overflow-hidden rounded-[2rem] bg-[#0F172A] text-white shadow-[0_40px_80px_-40px_rgba(15,23,42,0.6)] lg:grid-cols-[1.15fr_1fr]">
             <div className="relative aspect-[16/10] overflow-hidden lg:aspect-auto lg:min-h-[420px]">
               <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-[1.03]">
-                <BlogCover cover={featured.cover} />
+                <PostVisual post={featured} priority />
               </div>
+              <ShareIconButton post={featured} className="absolute right-4 top-4 z-10" />
             </div>
-            <div className="relative flex flex-col justify-center p-7 sm:p-10">
+            {/* Not `relative`: the title link's ::after overlay must cover the whole card, image included. */}
+            <div className="flex flex-col justify-center p-7 sm:p-10">
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#F7B31C] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.1em] text-[#0F172A]">
                 <Sparkles size={12} aria-hidden="true" /> Start here
               </span>
@@ -118,7 +121,7 @@ export default function Blog() {
               <p className="mt-4 text-[15.5px] leading-relaxed text-[#CBD5E1]">{featured.excerpt}</p>
               <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3 text-[13px] text-[#94A3B8]">
                 <span className="inline-flex items-center gap-1.5"><Clock size={14} aria-hidden="true" /> {readingMinutes(featured)} min read</span>
-                <span>Updated {formatBlogDate(featured.updatedAt)}</span>
+                <span>{formatBlogDate(featured.publishedAt)}</span>
                 <span className="ml-auto inline-flex items-center gap-2 font-bold text-white" aria-hidden="true">
                   Read the guide <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7B31C] text-[#0F172A] transition-transform group-hover:translate-x-1"><ArrowRight size={16} /></span>
                 </span>

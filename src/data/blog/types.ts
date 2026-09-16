@@ -25,7 +25,9 @@ export type BlogBlock =
   | { type: "quote"; text: string }
   | { type: "table"; caption?: string; head: string[]; rows: string[][] }
   /** An in-article call to action. */
-  | { type: "cta"; title: string; text: string; href: string; label: string };
+  | { type: "cta"; title: string; text: string; href: string; label: string }
+  /** A "Related guide" box pointing to another article, placed where it fits the reading. */
+  | { type: "related"; slug: string; note?: string };
 
 export type BlogSection = { id: string; heading: string; blocks: BlogBlock[] };
 
@@ -52,6 +54,19 @@ export type BlogPost = {
   publishedAt: string;
   updatedAt: string;
   cover: BlogCover;
+  /**
+   * Optional feature image. Put the file in public/blog/ (e.g. public/blog/nfc-card.jpg)
+   * and set src to "/blog/nfc-card.jpg" — letters, numbers, dots, dashes and
+   * underscores only, ending .jpg, .jpeg, .png or .webp. A 1600×900 (16:9) image
+   * under ~250 KB works best. Keep the subject in the centre: cards show it at
+   * 16:9, the article header crops it wider (21:9) on larger screens, and the
+   * social preview uses a tall slice from the middle.
+   * When set, it replaces the generated cover art on the blog cards, at the top
+   * of the article and in the social preview. To change the picture later, save
+   * it under a NEW file name and update src, so cached previews refresh.
+   * `alt` describes what the picture shows, for Google Images and screen readers.
+   */
+  image?: { src: string; alt: string; width: number; height: number };
   /** "The short version" box at the top. */
   takeaways: string[];
   /** Paragraphs before the first heading. */

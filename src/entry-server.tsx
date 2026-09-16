@@ -21,8 +21,17 @@ import { StaticRouter } from "react-router";
 import { dehydrate } from "@tanstack/react-query";
 import { getQueryKey } from "@trpc/react-query";
 import superjson from "superjson";
+import { renderToStaticMarkup } from "react-dom/server";
 import App from "./App";
 import { trpc, TRPCProvider, createAppQueryClient } from "@/providers/trpc";
+import BlogCover from "@/components/blog/BlogCover";
+import type { BlogCover as Cover } from "@/data/blog";
+
+/** A blog article's cover art as a standalone SVG string — the same drawing the
+ *  page shows — for the server's social preview images (api/lib/blog-og.ts). */
+export function renderBlogCoverSvg(cover: Cover): string {
+  return renderToStaticMarkup(<BlogCover cover={cover} />);
+}
 
 /** API data fetched by the server before rendering, e.g. the product catalogue.
  *  `path` is the tRPC procedure ("product.bySlug"); `input` must be exactly what

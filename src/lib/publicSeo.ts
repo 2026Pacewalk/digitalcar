@@ -145,6 +145,11 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
   "/email-signature-templates": { ...SEO_EMAIL_SIGNATURE, canonicalPath: "/email-signature-generator" },
   "/whatsapp-message-templates": SEO_WHATSAPP_TEMPLATES,
   "/whatsapp-business-messages": { ...SEO_WHATSAPP_TEMPLATES, canonicalPath: "/whatsapp-message-templates" },
+  "/about": {
+    title: "About DigitalCarda — Digital Visiting Cards for India",
+    description: "Who makes DigitalCarda, what we build for Indian businesses, and how our guides are written, checked against official sources and kept up to date.",
+    crumb: "About",
+  },
   "/blog": {
     title: "Digital Visiting Card Blog: Guides, NFC, QR & Reviews",
     description: "Plain-English guides for Indian businesses: digital visiting cards, NFC and QR code business cards, Google review QR codes and card design ideas.",

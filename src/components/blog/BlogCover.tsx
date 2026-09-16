@@ -19,6 +19,9 @@ const TONES: Record<Cover["tone"], { a: string; b: string; ink: string; accent: 
   emerald: { a: "#ECFDF5", b: "#059669", ink: "#052E16", accent: "#F7B31C", card: "#FFFFFF", line: "#D1FAE5" },
 };
 
+/** Text alternative for a cover, also used for the article's cover <img>. */
+export const coverDescription = (cover: Cover) => DESCRIPTIONS[cover.motif];
+
 const DESCRIPTIONS: Record<Cover["motif"], string> = {
   card: "Illustration of a digital visiting card with call and WhatsApp buttons",
   nfc: "Illustration of an NFC business card sending a tap signal to a phone",

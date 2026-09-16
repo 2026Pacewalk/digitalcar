@@ -164,14 +164,17 @@ const SSR_PATHS = new Set([
   "/whatsapp-message-templates", "/whatsapp-business-messages",
   "/digital-business-cards-templates",
   "/privacy", "/refund-policy", "/terms-of-service", "/sitemap",
-  "/blog",
+  "/blog", "/about",
 ]);
 const PRODUCT_PATH = /^\/digital-business-cards-templates\/([^/]+)$/;
 const SSR_DATA_TIMEOUT_MS = 2500;
 const SSR_RENDER_TIMEOUT_MS = 4500;
 
 type SsrSeed = { path: string; input?: unknown; data: unknown };
-type SsrModule = { render: (url: string, seeds: SsrSeed[]) => Promise<{ html: string; state: string }> };
+type SsrModule = {
+  render: (url: string, seeds: SsrSeed[]) => Promise<{ html: string; state: string }>;
+  renderBlogCoverSvg?: (cover: unknown) => string;
+};
 
 let ssrModule: Promise<SsrModule | null> | undefined;
 function loadSsr(): Promise<SsrModule | null> {
@@ -189,6 +192,13 @@ function loadSsr(): Promise<SsrModule | null> {
     console.warn("[ssr] no server bundle in dist/server — serving client-rendered pages");
     return null;
   })());
+}
+
+/** A blog cover as SVG markup, drawn by the page's own component in the server
+    bundle; null when that bundle isn't available (e.g. the dev server). */
+export async function blogCoverSvg(cover: unknown): Promise<string | null> {
+  const mod = await loadSsr();
+  try { return mod?.renderBlogCoverSvg ? mod.renderBlogCoverSvg(cover) : null; } catch { return null; }
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {

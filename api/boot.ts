@@ -142,6 +142,99 @@ const ogHandler = async (c: { req: { param: (k: string) => string } }): Promise<
 app.get("/og/:file", ogHandler);
 app.get("/api/og/:file", ogHandler);
 
+/* Blog social preview images: /og/blog/<article-slug>.jpg and /og/blog/index.jpg
+   (api/lib/blog-og.ts). Meta tags add ?v=<hash of what is drawn> (blogOgPath),
+   and the cache here is keyed the same way, so an edited title or a newly added
+   feature image is picked up at once instead of after the CDN's cache expires.
+
+   Renders are shared while in flight (a link posted to a busy WhatsApp group
+   brings many scrapers at once), and an image drawn WITHOUT its artwork — or a
+   failure — is never cached, so a passing problem can't stick to the URL. */
+const blogOgCache = new Map<string, Buffer>();
+const blogOgInFlight = new Map<string, Promise<{ jpeg: Buffer; hasArt: boolean }>>();
+const blogOgHandler = async (c: { req: { param: (k: string) => string } }): Promise<Response> => {
+  const name = String(c.req.param("file") || "").replace(/\.(jpe?g|png)$/i, "").toLowerCase();
+  // <slug>.jpg is the social preview; <slug>-16x9|4x3|1x1.jpg is the text-free
+  // artwork used in structured data and at the top of the article.
+  const parts = /^([a-z0-9-]{1,80}?)(?:-(16x9|4x3|1x1))?$/.exec(name);
+  if (!parts) return new Response("Not found", { status: 404 });
+  const slug = parts[1];
+  const ratio = parts[2] as "16x9" | "4x3" | "1x1" | undefined;
+  try {
+    const { BLOG_ART_SIZES, BLOG_POSTS, blogArtPath, blogIndexOgPath, blogOgPath, categoryLabel, getBlogPost, readingMinutes } = await import("../src/data/blog");
+    const post = slug === "index" ? null : getBlogPost(slug);
+    if ((slug !== "index" || ratio) && !post) return new Response("Not found", { status: 404 });
+
+    const key = post ? (ratio ? blogArtPath(post, ratio) : blogOgPath(post)) : blogIndexOgPath();
+    const cached = blogOgCache.get(key);
+    if (cached) {
+      return new Response(new Uint8Array(cached), {
+        headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=3600, s-maxage=86400" },
+      });
+    }
+
+    let job = blogOgInFlight.get(key);
+    if (!job) {
+      job = (async () => {
+        const { renderBlogOg } = await import("./lib/blog-og");
+        const { blogCoverSvg } = await import("./lib/vite");
+        const { existsSync } = await import("node:fs");
+        const path = await import("node:path");
+        // The article (or, for the blog page, the newest article) whose artwork is drawn.
+        const subject = post ?? BLOG_POSTS[0];
+        // A feature image is a file under public/blog/ (see BlogPost.image); only
+        // plain file names inside that folder are read.
+        let imagePath: string | null = null;
+        const src = subject?.image?.src ?? "";
+        if (/^\/blog\/[A-Za-z0-9._-]+\.(jpe?g|png|webp)$/i.test(src)) {
+          imagePath = [path.resolve("./dist/public" + src), path.resolve("./public" + src)].find((p) => existsSync(p)) ?? null;
+        }
+        // The cover art is always passed too: it is the fallback if the photo can't be read.
+        const coverSvg = await blogCoverSvg(subject?.cover ?? { motif: "card", tone: "gold" });
+        if (post && ratio) {
+          const { renderBlogArt } = await import("./lib/blog-og");
+          return renderBlogArt({ ...BLOG_ART_SIZES[ratio], imagePath, coverSvg });
+        }
+        return post
+          ? renderBlogOg({
+              label: categoryLabel(post.category),
+              title: post.seoTitle,
+              footer: `digitalcarda.in/blog  ·  ${readingMinutes(post)} min read`,
+              imagePath,
+              coverSvg,
+            })
+          : renderBlogOg({
+              label: "The Card Room",
+              title: "Digital visiting card guides for Indian businesses",
+              footer: `digitalcarda.in/blog  ·  ${BLOG_POSTS.length} guides`,
+              imagePath,
+              coverSvg,
+            });
+      })().finally(() => blogOgInFlight.delete(key));
+      blogOgInFlight.set(key, job);
+    }
+
+    const { jpeg, hasArt } = await job;
+    if (hasArt) {
+      if (blogOgCache.size > 100) blogOgCache.clear();
+      blogOgCache.set(key, jpeg);
+    }
+    return new Response(new Uint8Array(jpeg), {
+      headers: {
+        "content-type": "image/jpeg",
+        // Without its artwork the image is incomplete: let caches keep it only briefly.
+        "cache-control": hasArt ? "public, max-age=3600, s-maxage=86400" : "public, max-age=60, s-maxage=60",
+      },
+    });
+  } catch (e) {
+    console.error("[og] blog render failed:", (e as Error).message);
+    // no-store, so a brief failure can't pin the generic image under this URL.
+    return new Response(null, { status: 302, headers: { location: "https://digitalcarda.in/og-default.jpg", "cache-control": "no-store" } });
+  }
+};
+app.get("/og/blog/:file", blogOgHandler);
+app.get("/api/og/blog/:file", blogOgHandler);
+
 /* A card's logo or photo at a real URL, for email signatures.
    Uploaded images live inside the card snapshot as data: URIs, and Gmail,
    Outlook and Apple Mail refuse data: URIs in <img> — the picture silently
@@ -982,7 +1075,7 @@ app.get("/sitemap.xml", async (c) => {
     // Free tools — canonical URLs only; each has an alias route that deliberately
     // stays out of the sitemap so the two never compete for the same terms.
     "/free-tools", "/email-signature-generator", "/whatsapp-message-templates",
-    "/privacy", "/refund-policy", "/terms-of-service", "/sitemap", "/blog"];
+    "/privacy", "/refund-policy", "/terms-of-service", "/sitemap", "/blog", "/about"];
   if (sitemapXml && Date.now() - sitemapXml.at < SITEMAP_TTL) {
     return c.body(sitemapXml.body, 200, { "content-type": "application/xml; charset=utf-8" });
   }
@@ -1063,9 +1156,11 @@ app.get("/sitemap.xml", async (c) => {
   // Blog articles, with the date each was last really updated.
   const { BLOG_POSTS, blogPostPath } = await import("../src/data/blog");
   const blogUrls = BLOG_POSTS.map((p) => url(`${base}${blogPostPath(p.slug)}`, "0.7", p.updatedAt));
+  // The blog page changes when an article is added or updated, not on every deploy.
+  const blogLastmod = BLOG_POSTS.map((p) => p.updatedAt).sort().at(-1) || deployDay;
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", deployDay)).join("\n") + "\n" +
+    pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", p === "/blog" ? blogLastmod : deployDay)).join("\n") + "\n" +
     blogUrls.join("\n") + "\n" +
     productRows.map((r) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(r.slug)}`, "0.8", day(r.updatedAt))).join("\n") + "\n" +
     cardUrls.join("\n") +

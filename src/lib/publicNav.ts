@@ -62,6 +62,7 @@ const BUSINESS: NavGroup = {
 const COMPANY: NavGroup = {
   title: "Company",
   links: [
+    { label: "About us", href: "/about" },
     { label: "Blog & guides", href: "/blog" },
     { label: "Contact us", href: "/contact" },
     { label: "Start free trial", href: "/signup" },

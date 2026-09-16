@@ -65,6 +65,7 @@ function blockText(b: BlogBlock): string[] {
     case "tip": return [b.title, b.text];
     case "table": return [b.caption ?? "", ...b.head, ...b.rows.flat()];
     case "cta": return [b.title, b.text];
+    case "related": return b.note ? [b.note] : [];
   }
 }
 
@@ -86,6 +87,45 @@ export function formatBlogDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"];
   return `${d} ${months[(m || 1) - 1]} ${y}`;
+}
+
+/** Short, stable hash for cache-busting tokens. */
+function hash36(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36).slice(0, 6);
+}
+
+/** Path of an article's social preview image (rendered by the server, see
+    api/lib/blog-og.ts). The ?v= token is built from everything drawn on the
+    image, so WhatsApp, Facebook and CDN caches fetch a new one after any edit.
+    (A replaced feature image must get a new file name — see BlogPost.image.) */
+export function blogOgPath(post: BlogPost): string {
+  const drawn = [post.seoTitle, categoryLabel(post.category), post.cover.motif, post.cover.tone, post.image?.src ?? "", readingMinutes(post)];
+  return `/og/blog/${post.slug}.jpg?v=${hash36(drawn.join("|"))}`;
+}
+
+export type BlogArtRatio = "16x9" | "4x3" | "1x1";
+export const BLOG_ART_SIZES: Record<BlogArtRatio, { width: number; height: number }> = {
+  "16x9": { width: 1200, height: 675 },
+  "4x3": { width: 1200, height: 900 },
+  "1x1": { width: 1200, height: 1200 },
+};
+
+/** An article's picture without any text — its feature image or cover art —
+    at one of the aspect ratios Google asks for in Article structured data.
+    Also the crawlable <img> at the top of the article. */
+export function blogArtPath(post: BlogPost, ratio: BlogArtRatio): string {
+  const drawn = [post.cover.motif, post.cover.tone, post.image?.src ?? ""];
+  return `/og/blog/${post.slug}-${ratio}.jpg?v=${hash36(drawn.join("|"))}`;
+}
+
+/** The blog page's own social preview image: the guide count and the newest
+    article's artwork are drawn on it, so both are part of its token. */
+export function blogIndexOgPath(): string {
+  const newest = POSTS[0];
+  const drawn = [POSTS.length, newest?.slug ?? "", newest?.cover.motif ?? "", newest?.cover.tone ?? "", newest?.image?.src ?? ""];
+  return `/og/blog/index.jpg?v=${hash36(drawn.join("|"))}`;
 }
 
 /** Suggested next reads: the article's own picks, then others from its category. */
