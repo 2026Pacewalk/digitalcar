@@ -45,7 +45,14 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /** One app as a round, brand-coloured bubble. */
-function AppBubble({ app, post, size = 56, showLabel = true, onDone }: { app: ShareApp; post: BlogPost; size?: number; showLabel?: boolean; onDone?: () => void }) {
+function AppBubble({ app, post, size = 56, sizeClass, showLabel = true, onDone }: {
+  app: ShareApp; post: BlogPost;
+  /** Fixed bubble size in px… */
+  size?: number;
+  /** …or responsive Tailwind size classes, e.g. "h-11 w-11 sm:h-14 sm:w-14". */
+  sizeClass?: string;
+  showLabel?: boolean; onDone?: () => void;
+}) {
   const mail = app.id === "email";
   return (
     <a
@@ -54,19 +61,19 @@ function AppBubble({ app, post, size = 56, showLabel = true, onDone }: { app: Sh
       onClick={onDone}
       aria-label={showLabel ? undefined : `Share on ${app.label}`}
       style={{ ["--brand" as string]: app.color }}
-      className="group/app flex flex-col items-center gap-2 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
+      className="group/app flex min-w-0 flex-col items-center gap-1.5 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] sm:gap-2"
     >
       <span
-        className="relative flex items-center justify-center rounded-full transition-all duration-300 ease-out group-hover/app:-translate-y-1 group-hover/app:shadow-[0_14px_28px_-10px_var(--brand)] motion-reduce:transition-none"
-        style={{ width: size, height: size }}
+        className={`relative flex shrink-0 items-center justify-center rounded-full transition-all duration-300 ease-out group-hover/app:-translate-y-1 group-hover/app:shadow-[0_14px_28px_-10px_var(--brand)] motion-reduce:transition-none ${sizeClass ?? ""}`}
+        style={sizeClass ? undefined : { width: size, height: size }}
       >
         {/* Soft brand-coloured halo that blooms on hover */}
         <span aria-hidden="true" className="absolute inset-0 scale-75 rounded-full bg-[var(--brand)] opacity-0 blur-md transition-all duration-300 group-hover/app:scale-110 group-hover/app:opacity-30" />
         {app.icon
           ? <img src={app.icon} alt="" width={size} height={size} className="relative h-full w-full" loading="lazy" />
-          : <span className="relative flex h-full w-full items-center justify-center rounded-full bg-[#F7B31C] text-[#0F172A]"><Mail size={Math.round(size * 0.42)} aria-hidden="true" /></span>}
+          : <span className="relative flex h-full w-full items-center justify-center rounded-full bg-[#F7B31C] text-[#0F172A]"><Mail className="h-[42%] w-[42%]" aria-hidden="true" /></span>}
       </span>
-      {showLabel && <span className="text-[12px] font-semibold text-[#475569] group-hover/app:text-[#0F172A]">{app.label}</span>}
+      {showLabel && <span className="max-w-full truncate text-[11px] font-semibold text-[#475569] group-hover/app:text-[#0F172A] sm:text-[12px]">{app.label}</span>}
     </a>
   );
 }
@@ -188,8 +195,9 @@ export function ShareSheet({ post, onClose }: { post: BlogPost; onClose: () => v
         </div>
 
         {/* Apps */}
-        <div className="grid grid-cols-3 gap-y-5 px-4 pt-7 sm:grid-cols-6 sm:px-5">
-          {APPS.map((app) => <AppBubble key={app.id} app={app} post={post} onDone={() => close.current()} />)}
+        {/* All six apps in one row, on phones too */}
+        <div className="grid grid-cols-6 gap-x-1 px-3 pt-7 sm:px-5">
+          {APPS.map((app) => <AppBubble key={app.id} app={app} post={post} sizeClass="h-11 w-11 min-[400px]:h-12 min-[400px]:w-12 sm:h-14 sm:w-14" onDone={() => close.current()} />)}
         </div>
 
         {/* Copy */}
@@ -307,23 +315,24 @@ export function ShareEnd({ post }: { post: BlogPost }) {
         <h2 id="share-heading" className="mt-2 font-display text-[1.6rem] font-extrabold leading-tight tracking-tight [text-wrap:balance]">Know someone still handing out paper cards?</h2>
         <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-[#CBD5E1]">Send them this guide — it takes one tap.</p>
 
-        <div className="mt-6 flex flex-wrap items-start gap-x-5 gap-y-4">
+        {/* One row of six on phones (smaller bubbles), a relaxed row from sm up */}
+        <div className="mt-6 grid grid-cols-6 items-start justify-items-center gap-1 sm:flex sm:flex-wrap sm:gap-x-5 sm:gap-y-4">
           {APPS.slice(0, 5).map((a) => (
-            <a key={a.id} href={a.href(articleUrl(post), post)} target="_blank" rel="noopener noreferrer" style={{ ["--brand" as string]: a.color }}
-              className="group/app flex flex-col items-center gap-2 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
-              <span className="relative flex h-14 w-14 items-center justify-center rounded-full transition-all duration-300 group-hover/app:-translate-y-1 motion-reduce:transition-none">
+            <a key={a.id} href={a.href(articleUrl(post), post)} target="_blank" rel="noopener noreferrer" aria-label={`Share on ${a.label}`} style={{ ["--brand" as string]: a.color }}
+              className="group/app flex min-w-0 flex-col items-center gap-1.5 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] sm:gap-2">
+              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all duration-300 group-hover/app:-translate-y-1 motion-reduce:transition-none min-[420px]:h-12 min-[420px]:w-12 sm:h-14 sm:w-14">
                 <span aria-hidden="true" className="absolute inset-0 scale-75 rounded-full bg-[var(--brand)] opacity-0 blur-lg transition-all duration-300 group-hover/app:scale-125 group-hover/app:opacity-60" />
-                <img src={a.icon} alt="" width={56} height={56} className="relative h-14 w-14 rounded-full ring-2 ring-white/10" loading="lazy" />
+                <img src={a.icon} alt="" width={56} height={56} className="relative h-full w-full rounded-full ring-2 ring-white/10" loading="lazy" />
               </span>
-              <span className="text-[12px] font-semibold text-[#CBD5E1] group-hover/app:text-white">{a.label}</span>
+              <span aria-hidden="true" className="hidden text-[12px] font-semibold text-[#CBD5E1] group-hover/app:text-white sm:block">{a.label}</span>
             </a>
           ))}
-          <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog"
-            className="group/app flex flex-col items-center gap-2 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 transition-all duration-300 group-hover/app:-translate-y-1 group-hover/app:bg-[#F7B31C] group-hover/app:text-[#0F172A]">
-              <MoreHorizontal size={22} aria-hidden="true" />
+          <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label="More ways to share"
+            className="group/app flex min-w-0 flex-col items-center gap-1.5 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] sm:gap-2">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 transition-all duration-300 group-hover/app:-translate-y-1 group-hover/app:bg-[#F7B31C] group-hover/app:text-[#0F172A] min-[420px]:h-12 min-[420px]:w-12 sm:h-14 sm:w-14">
+              <MoreHorizontal size={20} aria-hidden="true" />
             </span>
-            <span className="text-[12px] font-semibold text-[#CBD5E1] group-hover/app:text-white">More</span>
+            <span aria-hidden="true" className="hidden text-[12px] font-semibold text-[#CBD5E1] group-hover/app:text-white sm:block">More</span>
           </button>
         </div>
 

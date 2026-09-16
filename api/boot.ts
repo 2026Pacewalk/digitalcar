@@ -1099,7 +1099,7 @@ app.get("/sitemap.xml", async (c) => {
   } catch { /* dev server: no build yet */ }
 
   // Published product landing pages (indexable ecommerce pages, §50).
-  let productRows: { slug: string; updatedAt: Date | null }[] = [];
+  let productRows: { slug: string; updatedAt: Date | null; images: unknown }[] = [];
   const cardEdited = new Map<string, string>();
   // Cards published from the dashboard, newest per slug: they override the
   // legacy customers.json row, exactly as they do on the card page itself.
@@ -1109,7 +1109,7 @@ app.get("/sitemap.xml", async (c) => {
     const { products, publishedCards } = await import("@db/schema");
     const { eq } = await import("drizzle-orm");
     const db = getDb();
-    productRows = (await db.select({ slug: products.slug, updatedAt: products.updatedAt }).from(products).where(eq(products.status, "published")))
+    productRows = (await db.select({ slug: products.slug, updatedAt: products.updatedAt, images: products.images }).from(products).where(eq(products.status, "published")))
       .filter((r) => r.slug);
     const snaps = await db.select({ slug: publishedCards.slug, data: publishedCards.data, updatedAt: publishedCards.updatedAt }).from(publishedCards);
     snaps.sort((a, b) => new Date(a.updatedAt ?? 0).getTime() - new Date(b.updatedAt ?? 0).getTime());
@@ -1124,8 +1124,18 @@ app.get("/sitemap.xml", async (c) => {
     }
   } catch { /* products / published_cards may not exist yet */ }
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  const url = (loc: string, pri: string, lastmod = "") =>
-    `  <url><loc>${esc(loc)}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<priority>${pri}</priority></url>`;
+  // Image sitemap entries (Google's image extension) let the pictures on a page
+  // be found for Google Images — including ones a crawler would otherwise only
+  // meet after running JavaScript. Absolute URLs on this site only.
+  const abs = (u: string) => (/^https?:\/\//i.test(u) ? u : `${base}${u.startsWith("/") ? "" : "/"}${u}`);
+  const imageTags = (images: string[]) =>
+    images.filter(Boolean).slice(0, 5).map((i) => `<image:image><image:loc>${esc(abs(i))}</image:loc></image:image>`).join("");
+  const url = (loc: string, pri: string, lastmod = "", images: string[] = []) =>
+    `  <url><loc>${esc(loc)}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<priority>${pri}</priority>${imageTags(images)}</url>`;
+  // The pictures each marketing page shows (the page itself is server-rendered).
+  const pageImages: Record<string, string[]> = {
+    "": ["/hero/digital-business-card-app-mockup.png", "/hero/digital-business-card-nfc-card-professional.png", "/hero/digital-business-card-analytics-dashboard.png"],
+  };
 
   // Cards: legacy customers.json plus cards published from the dashboard. Only
   // cards src/lib/cardSeo.ts marks indexable are listed — the same rule that puts
@@ -1154,15 +1164,20 @@ app.get("/sitemap.xml", async (c) => {
     cardUrls.push(url(`${base}/${encodeURIComponent(s)}`, "0.5", cardEdited.get(k) || ""));
   }
   // Blog articles, with the date each was last really updated.
-  const { BLOG_POSTS, blogPostPath } = await import("../src/data/blog");
-  const blogUrls = BLOG_POSTS.map((p) => url(`${base}${blogPostPath(p.slug)}`, "0.7", p.updatedAt));
+  const { BLOG_POSTS, blogArtPath, blogPostPath } = await import("../src/data/blog");
+  // Each article's picture: its feature image when set, and the cover artwork
+  // shown at the top of the article (the same image as its structured data).
+  const blogUrls = BLOG_POSTS.map((p) => url(`${base}${blogPostPath(p.slug)}`, "0.7", p.updatedAt,
+    [...(p.image ? [p.image.src] : []), blogArtPath(p, "16x9")]));
   // The blog page changes when an article is added or updated, not on every deploy.
   const blogLastmod = BLOG_POSTS.map((p) => p.updatedAt).sort().at(-1) || deployDay;
+  // A template page shows its design images (product.images, site paths or URLs).
+  const productImages = (images: unknown) => (Array.isArray(images) ? images : []).map((i) => String(i ?? "").trim()).filter((i) => /^(https?:\/\/|\/)/i.test(i));
   const body =
-    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", p === "/blog" ? blogLastmod : deployDay)).join("\n") + "\n" +
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n` +
+    pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", p === "/blog" ? blogLastmod : deployDay, pageImages[p] ?? [])).join("\n") + "\n" +
     blogUrls.join("\n") + "\n" +
-    productRows.map((r) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(r.slug)}`, "0.8", day(r.updatedAt))).join("\n") + "\n" +
+    productRows.map((r) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(r.slug)}`, "0.8", day(r.updatedAt), productImages(r.images))).join("\n") + "\n" +
     cardUrls.join("\n") +
     `\n</urlset>`;
   sitemapXml = { body, at: Date.now() };
