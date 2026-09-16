@@ -12,10 +12,11 @@
  * the /sitemap page — so they can never list different pages. Every feature named
  * here exists in the product today; keep it that way when editing.
  */
+import { useState } from "react";
 import { Link } from "react-router";
 import {
-  ArrowRight, ArrowUp, BarChart3, BookOpen, Check, Globe, IndianRupee, Inbox, LayoutGrid, Mail, MessageCircle, Nfc,
-  PenLine, Phone, QrCode, ShieldCheck, Sparkles, Star, Truck, UserPlus, Wand2, Zap, type LucideIcon,
+  ArrowRight, BarChart3, BookOpen, Check, Globe, IndianRupee, Inbox, LayoutGrid, Mail, MessageCircle, Nfc,
+  PenLine, Phone, QrCode, Rocket, ShieldCheck, Sparkles, Star, Truck, UserPlus, Wand2, Zap, type LucideIcon,
 } from "lucide-react";
 import { CONTACT, FOOTER_GROUPS, FOOTER_GUIDES, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicNav";
 import { InstallAppRow } from "@/components/mobile/InstallApp";
@@ -43,7 +44,114 @@ const MARQUEE_CSS = `
 @keyframes dc-footer-ping { 0% { transform: scale(.85); opacity: .7 } 100% { transform: scale(1.9); opacity: 0 } }
 .dc-footer-ping { animation: dc-footer-ping 2.4s cubic-bezier(0,0,.2,1) infinite; }
 @media (prefers-reduced-motion: reduce) { .dc-footer-marquee, .dc-footer-ping { animation: none; } }
+
+/* Back to top: a rocket in a spinning gold orbit. Hover = engines on; click = lift-off. */
+@keyframes dc-top-spin { to { transform: rotate(360deg); } }
+.dc-top-ring { animation: dc-top-spin 6s linear infinite; }
+@keyframes dc-top-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.dc-top:hover .dc-top-rocket, .dc-top:focus-visible .dc-top-rocket { animation: dc-top-bob .9s ease-in-out infinite; }
+.dc-top-flame { opacity: 0; transform-origin: top center; transition: opacity .2s; }
+.dc-top:hover .dc-top-flame, .dc-top:focus-visible .dc-top-flame, .dc-top.is-launching .dc-top-flame { opacity: 1; animation: dc-top-flicker .16s ease-in-out infinite alternate; }
+@keyframes dc-top-flicker { from { transform: scaleY(.8); } to { transform: scaleY(1.5); } }
+@keyframes dc-top-launch {
+  0% { transform: translateY(0); }
+  18% { transform: translateY(3px); }
+  55% { transform: translateY(-52px); opacity: 1; }
+  56% { transform: translateY(52px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.dc-top.is-launching .dc-top-rocket { animation: dc-top-launch 1.05s cubic-bezier(.5, 0, .2, 1) forwards; }
+.dc-top-puff { position: absolute; bottom: 3px; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 9999px; background: rgba(226, 232, 240, .75); opacity: 0; }
+@keyframes dc-top-puff { 0% { transform: translate(0, 0) scale(.3); opacity: .85; } 100% { transform: translate(var(--dx), 7px) scale(1.7); opacity: 0; } }
+.dc-top.is-launching .dc-top-puff { animation: dc-top-puff .75s ease-out .12s forwards; }
+@keyframes dc-top-twinkle { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
+.dc-top-star { animation: dc-top-twinkle 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .dc-top-ring, .dc-top-rocket, .dc-top-flame, .dc-top-puff, .dc-top-star { animation: none !important; }
+}
 `;
+
+/** Brand colour for each network's hover glow. */
+const BRAND_COLORS: Record<string, string> = {
+  Pinterest: "#E60023", Instagram: "#E1306C", Facebook: "#1877F2", LinkedIn: "#0A66C2",
+  YouTube: "#FF0000", X: "#E2E8F0", Telegram: "#229ED9", WhatsApp: "#25D366", Threads: "#E2E8F0",
+};
+
+/** "Follow us": every official profile in SOCIAL_LINKS (src/lib/publicNav.ts),
+    as a brand icon that lifts and glows in the network's colour. Adding a profile
+    there adds it here and to the Organization structured data. */
+function FollowUs() {
+  if (!SOCIAL_LINKS.length) return null;
+  return (
+    <div className="mt-7">
+      <p className="text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80">Follow us</p>
+      <ul className="mt-3 flex flex-wrap items-center gap-3">
+        {SOCIAL_LINKS.map((s) => {
+          const color = BRAND_COLORS[s.label] ?? "#F7B31C";
+          return (
+            <li key={s.href}>
+              <a
+                href={s.href}
+                target="_blank"
+                rel="noopener noreferrer me"
+                aria-label={`Follow DigitalCarda on ${s.label}`}
+                style={{ ["--brand" as string]: color }}
+                className="group relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04] ring-1 ring-white/10 transition duration-300 hover:-translate-y-1 hover:bg-white/[0.07] hover:shadow-[0_14px_30px_-12px_var(--brand)] hover:ring-[var(--brand)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
+              >
+                {/* Soft glow in the network's colour */}
+                <span aria-hidden="true" className="absolute inset-1 rounded-xl bg-[var(--brand)] opacity-0 blur-md transition duration-300 group-hover:opacity-40" />
+                <img src={s.icon} alt="" width={26} height={26} className="relative h-[26px] w-[26px] transition duration-300 group-hover:scale-110" loading="lazy" />
+                {/* Name tooltip */}
+                <span aria-hidden="true" className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg bg-white px-2 py-1 text-[11px] font-bold text-[#0B1120] opacity-0 shadow-lg transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
+                  {s.label}
+                </span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** "Back to top", as a small rocket launch. */
+function BackToTop() {
+  const [launching, setLaunching] = useState(false);
+  const onClick = () => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) { window.scrollTo({ top: 0, behavior: "auto" }); return; }
+    setLaunching(true);
+    // Lift-off first, then the page follows the rocket up.
+    window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 280);
+    window.setTimeout(() => setLaunching(false), 1150);
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`dc-top group inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-white/[0.03] py-1 pl-1 pr-4 text-[12.5px] font-semibold text-[#CBD5E1] transition hover:border-[#F7B31C]/50 hover:bg-[#F7B31C]/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] ${launching ? "is-launching" : ""}`}
+    >
+      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full" aria-hidden="true">
+        {/* Orbit: a spinning gold sweep behind a navy disc */}
+        <span className="dc-top-ring absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,#F7B31C,rgba(247,179,28,0)_35%,#FDE68A_62%,rgba(247,179,28,0)_85%,#F7B31C)]" />
+        <span className="absolute inset-[2px] rounded-full bg-[radial-gradient(circle_at_50%_30%,#1E293B,#0B1120)]" />
+        <span className="dc-top-star absolute left-[9px] top-[9px] h-[2px] w-[2px] rounded-full bg-white" />
+        <span className="dc-top-star absolute right-[10px] top-[14px] h-[2px] w-[2px] rounded-full bg-white [animation-delay:.8s]" />
+        <span className="dc-top-star absolute bottom-[11px] left-[12px] h-[1.5px] w-[1.5px] rounded-full bg-white [animation-delay:1.4s]" />
+        {/* Smoke puffs on lift-off */}
+        <span className="dc-top-puff" style={{ ["--dx" as string]: "-11px" }} />
+        <span className="dc-top-puff" style={{ ["--dx" as string]: "0px" }} />
+        <span className="dc-top-puff" style={{ ["--dx" as string]: "11px" }} />
+        {/* The rocket (Lucide's points up-right; turned to point straight up) with its flame */}
+        <span className="dc-top-rocket relative flex flex-col items-center">
+          <Rocket size={17} strokeWidth={2.2} className="-rotate-45 text-[#F7B31C]" />
+          <span className="dc-top-flame -mt-[3px] h-[7px] w-[5px] rounded-b-full bg-gradient-to-b from-[#FDE68A] via-[#F59E0B] to-[#EF4444]/0" />
+        </span>
+      </span>
+      Back to top
+    </button>
+  );
+}
 
 function FeaturePill({ icon: Icon, label, href, hidden = false }: { icon: LucideIcon; label: string; href: string; hidden?: boolean }) {
   return (
@@ -197,16 +305,7 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
               </div>
             </div>
 
-            {SOCIAL_LINKS.length > 0 && (
-              <div className="mt-5 flex items-center gap-2.5">
-                {SOCIAL_LINKS.map((s) => (
-                  <a key={s.href} href={s.href} target="_blank" rel="noopener noreferrer me" aria-label={`DigitalCarda on ${s.label}`}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10 transition hover:-translate-y-0.5 hover:bg-white/10">
-                    <img src={s.icon} alt="" width={20} height={20} className="h-5 w-5" loading="lazy" />
-                  </a>
-                ))}
-              </div>
-            )}
+            <FollowUs />
 
             {/* Shown only where the browser can add the site to the home screen. */}
             <div className="mt-5 max-w-sm empty:hidden"><InstallAppRow /></div>
@@ -289,13 +388,7 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
               ))}
               <Link to="/sitemap" className="text-[#94A3B8] transition-colors hover:text-white">Sitemap</Link>
             </nav>
-            <button
-              type="button"
-              onClick={() => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })}
-              className="group inline-flex h-9 items-center gap-1.5 rounded-full border border-white/15 px-3.5 text-[12.5px] font-semibold text-[#CBD5E1] transition hover:border-[#F7B31C]/50 hover:text-white"
-            >
-              Back to top <ArrowUp size={14} className="transition group-hover:-translate-y-0.5" aria-hidden="true" />
-            </button>
+            <BackToTop />
           </div>
         </div>
       </div>
