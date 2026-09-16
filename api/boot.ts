@@ -84,13 +84,6 @@ const ogHandler = async (c: { req: { param: (k: string) => string } }): Promise<
   const slug = file.replace(/\.png$/i, "").toLowerCase();
   if (!slug || !/^[a-z0-9_-]{2,80}$/.test(slug)) return new Response("Not found", { status: 404 });
 
-  const hit = ogCache.get(slug);
-  if (hit && Date.now() - hit.at < OG_TTL) {
-    return new Response(new Uint8Array(hit.png), {
-      headers: { "content-type": "image/png", "cache-control": "public, max-age=600, s-maxage=86400" },
-    });
-  }
-
   try {
     const { getDb } = await import("./queries/connection");
     const { publishedCards } = await import("@db/schema");
@@ -107,6 +100,19 @@ const ogHandler = async (c: { req: { param: (k: string) => string } }): Promise<
     }
     if (!cust) return new Response("Not found", { status: 404 });
 
+    // Key the cache by what the image is MADE of, not just the slug. Keyed by
+    // slug alone, a logo change kept serving the old PNG for up to OG_TTL - and
+    // the CDN then pinned those stale bytes for a day under the fresh ?v= URL,
+    // so the preview stayed wrong long after the edit.
+    const { ogSignature } = await import("./lib/card-og");
+    const key = slug + "|" + ogSignature(cust, slug);
+    const hit = ogCache.get(key);
+    if (hit && Date.now() - hit.at < OG_TTL) {
+      return new Response(new Uint8Array(hit.png), {
+        headers: { "content-type": "image/png", "cache-control": "public, max-age=600, s-maxage=86400" },
+      });
+    }
+
     const { renderCardOg } = await import("./lib/og-image");
     const png = await renderCardOg({
       slug,
@@ -121,7 +127,7 @@ const ogHandler = async (c: { req: { param: (k: string) => string } }): Promise<
       accent: (cust.color as string) || null,
       second: (cust.color2 as string) || null,
     });
-    ogCache.set(slug, { png, at: Date.now() });
+    ogCache.set(key, { png, at: Date.now() });
     if (ogCache.size > 500) ogCache.clear();   // crude bound; it refills lazily
     return new Response(new Uint8Array(png), {
       headers: { "content-type": "image/png", "cache-control": "public, max-age=600, s-maxage=86400" },

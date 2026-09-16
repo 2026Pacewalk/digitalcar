@@ -84,11 +84,24 @@ export function metaFor(pathname: string, distPath: string): CardMeta | null {
 }
 
 /** Short content hash → cache-busting token for the OG image URL. */
-function ogVersion(parts: unknown[]): string {
+export function ogVersion(parts: unknown[]): string {
   const s = parts.map((p) => String(p ?? "")).join("|");
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
   return h.toString(36).slice(0, 6);
+}
+
+/** Everything that can change what /og/<slug>.png looks like.
+
+    Meta tags carry this as ?v=, and the OG route keys its own cache by it, so
+    swapping a logo busts every cache at once - browser, CDN and ours. It used
+    to cover only name/role/company/logo here, so a colour or photo change kept
+    the old preview. */
+export function ogSignature(c: Record<string, unknown>, slug: string): string {
+  return ogVersion([
+    String(c.name ?? slug).trim(), c.company_name, c.designation,
+    c.logo, c.photo, c.mobile1, c.email, c.url, c.color, c.color2,
+  ]);
 }
 
 /** A customer's website as an absolute http(s) URL, or "" when it isn't one.
@@ -150,7 +163,7 @@ export function cardMetaFor(pathname: string, distPath: string): CardMeta | null
   const logo = String(row.logo || "");
   // Generated per card (name, role, company, logo + a QR of this card's URL)
   // so a shared link previews as that person's card, not a stock photo.
-  const image = `${SITE}/og/${encodeURIComponent(slug)}.png?v=${ogVersion([String(row.name || slug).trim(), row.company_name, row.designation, logo])}`;
+  const image = `${SITE}/og/${encodeURIComponent(slug)}.png?v=${ogSignature(row, slug)}`;
   // The legacy card shows the products whose `uname` matches its slug
   // (src/lib/cardContent.ts loadCustomerContent) — the same ones are used here.
   const products = legacyRows(distPath, "product").filter((p) => String(p.uname ?? "").toLowerCase() === slug);
