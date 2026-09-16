@@ -31,6 +31,8 @@ export type SignatureData = {
   logo: string;      // absolute https URL (or a data: URI)
   cardUrl: string;   // https://digitalcarda.in/<slug>
   qrSrc: string;     // absolute QR image URL
+  /** Display picture — the person's photo, or a logo standing in (absolute URL). */
+  photo?: string;
   /** `platform` selects the brand icon; `label` is the accessible name. */
   socials: { platform: string; label: string; url: string }[];
 };
@@ -42,6 +44,10 @@ export type SignatureOptions = {
   showSocials: boolean;
   showAddress: boolean;
   tagline: string;    // optional call-to-action under the card link
+  /** Show the display picture in the layouts that have one. Defaults to on. */
+  showPhoto?: boolean;
+  /** Confidentiality note printed under the signature; empty hides it. */
+  disclaimer?: string;
 };
 
 export type SignatureTemplate = {
@@ -212,6 +218,182 @@ function tint(hex: string, amount: number): string {
 
 const OPEN = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody>`;
 const CLOSE = `</tbody></table>`;
+
+const LINK = "#1d4ed8";
+const RULE = "#a3a3a3";
+
+/** A solid horizontal rule. A sized div with a background survives every
+    client; <hr> and borders render inconsistently. */
+const rule = (color: string, h = 2) =>
+  `<div style="height:${h}px;line-height:${h}px;font-size:0;background:${color};">&nbsp;</div>`;
+
+const wantsPhoto = (d: SignatureData, o: SignatureOptions) => o.showPhoto !== false && !!d.photo;
+
+/** The display picture. Nothing without a source (an empty src loads the page
+    itself). Rounded corners are a progressive nicety: Outlook shows a square. */
+function photoImg(d: SignatureData, size: number, round: boolean, ring = ""): string {
+  if (!d.photo) return "";
+  const border = ring ? `border:3px solid ${ring};` : "border:0;";
+  // min-width + max-width:none stop a narrow table cell (a phone, or a squeezed
+  // reading pane) shrinking the width while the height stays fixed, which turns
+  // a round photo into an oval.
+  return `<img src="${esc(d.photo)}" width="${size}" height="${size}" alt="${esc(d.name)}" ` +
+    `style="display:block;${border}outline:none;width:${size}px;height:${size}px;min-width:${size}px;max-width:none;object-fit:cover;border-radius:${round ? "50%" : "3px"};" />`;
+}
+
+/** For the photo-led layouts: the photo, else the logo, else nothing. */
+const pictureOrLogo = (d: SignatureData, o: SignatureOptions, size: number, round: boolean, ring = "") =>
+  wantsPhoto(d, o) ? photoImg(d, size, round, ring) : (o.showLogo && d.logo ? logoImg(d, size) : "");
+
+/** "Role - Company" on one line. */
+const roleLine = (d: SignatureData) => [d.designation, d.company].filter(Boolean).map(esc).join(" - ");
+
+/** Labelled lines — E: / W: / P: / A: — with the label in the accent colour. */
+function labelledRows(d: SignatureData, o: SignatureOptions): string {
+  const label = (k: string) => `<span style="font-family:${FONT};font-size:13px;font-weight:bold;color:${o.accent};">${k}:</span>&nbsp;`;
+  const rows: string[] = [];
+  const ew = [
+    d.email ? `${label("E")}${a(`mailto:${d.email}`, d.email, LINK)}` : "",
+    d.website ? `${label("W")}${a(d.website, prettyUrl(d.website), LINK)}` : "",
+  ].filter(Boolean).join("&nbsp;&nbsp;");
+  if (ew) rows.push(ew);
+  if (d.phone) rows.push(`${label("P")}${a(`tel:${digits(d.phone)}`, d.phone, INK)}`);
+  if (d.whatsapp && waDigits(d.whatsapp) !== waDigits(d.phone)) rows.push(`${label("WA")}${a(`https://wa.me/${waDigits(d.whatsapp)}`, d.whatsapp, INK)}`);
+  if (o.showAddress && d.address) rows.push(`${label("A")}<span style="font-family:${FONT};font-size:13px;color:${INK};">${esc(d.address)}</span>`);
+  if (!rows.length) return "";
+  return `${OPEN}${rows.map((r) => `<tr><td style="padding:0 0 7px;font-family:${FONT};font-size:13px;line-height:1.45;color:${INK};">${r}</td></tr>`).join("")}${CLOSE}`;
+}
+
+/** "Phone : value" rows with a fixed label column, so the values line up. */
+function keyValueRows(d: SignatureData, o: SignatureOptions): string {
+  const rows: [string, string][] = [];
+  if (d.phone) rows.push(["Phone", a(`tel:${digits(d.phone)}`, d.phone, INK)]);
+  if (d.whatsapp && waDigits(d.whatsapp) !== waDigits(d.phone)) rows.push(["WhatsApp", a(`https://wa.me/${waDigits(d.whatsapp)}`, d.whatsapp, INK)]);
+  if (d.email) rows.push(["Email", a(`mailto:${d.email}`, d.email, LINK)]);
+  if (d.website) rows.push(["Website", a(d.website, prettyUrl(d.website), LINK)]);
+  if (o.showAddress && d.address) rows.push(["Address", `<span style="font-family:${FONT};color:${INK};">${esc(d.address)}</span>`]);
+  if (!rows.length) return "";
+  return `${OPEN}${rows.map(([k, v]) => `<tr>
+      <td valign="top" style="width:64px;padding:0 0 5px;font-family:${FONT};font-size:12px;font-weight:bold;color:${o.accent};white-space:nowrap;">${k}</td>
+      <td valign="top" style="padding:0 6px 5px;font-family:${FONT};font-size:12px;color:${MUTED};">:</td>
+      <td valign="top" style="padding:0 0 5px;font-family:${FONT};font-size:12px;line-height:1.45;color:${INK};">${v}</td>
+    </tr>`).join("")}${CLOSE}`;
+}
+
+/* A — Classic: uppercase name, the role in the accent colour, a grey rule, then
+       the picture beside E / W / P / A lines and the social icons. */
+function classic(d: SignatureData, o: SignatureOptions): string {
+  const pic = pictureOrLogo(d, o, 108, false);
+  const socials = socialRow(d, o, 24);
+  const role = roleLine(d);
+  const qr = o.showQr ? qrImg(d, 80) : "";
+  return `${OPEN}
+    <tr><td style="padding:0 0 3px;font-family:${FONT};font-size:19px;font-weight:bold;color:${INK};letter-spacing:.5px;text-transform:uppercase;">${esc(d.name)}</td></tr>
+    ${role ? `<tr><td style="padding:0 0 10px;font-family:${FONT};font-size:13.5px;color:${o.accent};">${role}</td></tr>` : ""}
+    <tr><td style="padding:0 0 12px;">${rule(RULE)}</td></tr>
+    <tr><td style="padding:0;">
+      ${OPEN}<tr>
+        ${pic ? `<td valign="top" style="padding:0 18px 0 0;">${pic}</td>` : ""}
+        <td valign="top" style="padding:0;">
+          ${labelledRows(d, o)}
+          ${socials ? gap(2) + socials : ""}
+          ${d.cardUrl ? gap(10) + cardButton(d, o) : ""}
+        </td>
+        ${qr ? `<td valign="top" style="padding:0 0 0 18px;">${qr}</td>` : ""}
+      </tr>${CLOSE}
+    </td></tr>${CLOSE}`;
+}
+
+/* B — Portrait: name and role beside a round photo, centred over an accent
+       rule, then the labelled lines. */
+function portrait(d: SignatureData, o: SignatureOptions): string {
+  const pic = wantsPhoto(d, o) ? photoImg(d, 64, true) : (o.showLogo && d.logo ? logoImg(d, 72) : "");
+  const socials = socialRow(d, o, 22);
+  const role = roleLine(d);
+  return `${OPEN}
+    <tr><td align="center" style="padding:0 0 10px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-collapse:collapse;"><tbody><tr>
+        <td valign="middle" align="right" style="padding:0 ${pic ? "12px" : "0"} 0 0;text-align:right;">
+          <div style="font-family:${FONT};font-size:16px;font-weight:bold;color:${o.accent};line-height:1.25;">${esc(d.name)}</div>
+          ${role ? `<div style="font-family:${FONT};font-size:12px;color:${MUTED};padding-top:2px;">${role}</div>` : ""}
+        </td>
+        ${pic ? `<td valign="middle" style="padding:0;">${pic}</td>` : ""}
+      </tr></tbody></table>
+    </td></tr>
+    <tr><td style="padding:0 0 12px;">${rule(o.accent)}</td></tr>
+    <tr><td style="padding:0;">${labelledRows(d, o)}</td></tr>
+    ${socials ? `<tr><td style="padding:2px 0 0;">${socials}</td></tr>` : ""}
+    ${d.cardUrl ? `<tr><td style="padding:12px 0 0;">${cardButton(d, o)}${taglineLine(o)}</td></tr>` : ""}
+    ${CLOSE}`;
+}
+
+/* C — Profile ring: a round photo in an accent ring, a vertical rule, and the
+       details stacked with icons. */
+function profileRing(d: SignatureData, o: SignatureOptions): string {
+  const pic = pictureOrLogo(d, o, 96, true, o.accent);
+  const socials = socialRow(d, o, 22);
+  const role = roleLine(d);
+  const qr = o.showQr ? qrImg(d, 78) : "";
+  return `${OPEN}<tr>
+    ${pic ? `<td valign="middle" style="padding:0 18px 0 0;">${pic}</td>
+    <td width="2" style="width:2px;background:${o.accent};font-size:0;line-height:0;">&nbsp;</td>` : ""}
+    <td valign="middle" style="padding:0 0 0 ${pic ? "18px" : "0"};">
+      <div style="font-family:${FONT};font-size:17px;font-weight:bold;color:${o.accent};line-height:1.25;">${esc(d.name)}</div>
+      ${role ? `<div style="font-family:${FONT};font-size:12px;color:${MUTED};padding-top:2px;">${role}</div>` : ""}
+      ${gap(8)}
+      ${contactStack(d, o)}
+      ${socials ? gap(8) + socials : ""}
+      ${d.cardUrl ? gap(10) + cardButton(d, o) : ""}
+    </td>
+    ${qr ? `<td valign="middle" style="padding:0 0 0 18px;">${qr}</td>` : ""}
+  </tr>${CLOSE}`;
+}
+
+/* D — Split column: photo, name and role in a centred column, an accent rule,
+       then "Phone : …" rows. */
+function splitColumn(d: SignatureData, o: SignatureOptions): string {
+  const pic = pictureOrLogo(d, o, 76, true);
+  const socials = socialRow(d, o, 22);
+  return `${OPEN}<tr>
+    <td valign="middle" align="center" style="padding:0 18px 0 0;text-align:center;">
+      ${pic ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tbody><tr><td>${pic}</td></tr></tbody></table>${gap(6)}` : ""}
+      <div style="font-family:${FONT};font-size:14px;font-weight:bold;color:${o.accent};line-height:1.25;">${esc(d.name)}</div>
+      ${d.designation ? `<div style="font-family:${FONT};font-size:11.5px;color:${MUTED};padding-top:2px;">${esc(d.designation)}</div>` : ""}
+      ${d.company ? `<div style="font-family:${FONT};font-size:11.5px;color:${MUTED};">${esc(d.company)}</div>` : ""}
+    </td>
+    <td width="2" style="width:2px;background:${o.accent};font-size:0;line-height:0;">&nbsp;</td>
+    <td valign="middle" style="padding:0 0 0 18px;">
+      ${keyValueRows(d, o)}
+      ${socials ? gap(4) + socials : ""}
+      ${d.cardUrl ? gap(10) + cardButton(d, o) : ""}
+    </td>
+  </tr>${CLOSE}`;
+}
+
+/* E — Letterhead photo: name and role over a strong rule with a square photo to
+       the right, contact lines beneath. */
+function letterheadPhoto(d: SignatureData, o: SignatureOptions): string {
+  const pic = wantsPhoto(d, o) ? photoImg(d, 60, false) : (o.showLogo && d.logo ? logoImg(d, 72) : "");
+  const socials = socialRow(d, o, 22);
+  const role = roleLine(d);
+  const body = contactLines(d, o, INK, true)
+    .map((l) => `<tr><td style="padding:0 0 5px;font-family:${FONT};font-size:12.5px;line-height:1.45;color:${INK};">${l.html}</td></tr>`).join("");
+  return `${OPEN}
+    <tr><td style="padding:0 0 8px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;"><tbody><tr>
+        <td valign="bottom" style="padding:0;">
+          <div style="font-family:${FONT};font-size:17px;font-weight:bold;color:${o.accent};letter-spacing:.4px;text-transform:uppercase;line-height:1.25;">${esc(d.name)}</div>
+          ${role ? `<div style="font-family:${FONT};font-size:12px;color:${MUTED};padding-top:2px;">${role}</div>` : ""}
+        </td>
+        ${pic ? `<td valign="bottom" align="right" style="padding:0 0 0 16px;">${pic}</td>` : ""}
+      </tr></tbody></table>
+    </td></tr>
+    <tr><td style="padding:0 0 10px;">${rule(INK)}</td></tr>
+    ${body ? `<tr><td style="padding:0;">${OPEN}${body}${CLOSE}</td></tr>` : ""}
+    ${socials ? `<tr><td style="padding:4px 0 0;">${socials}</td></tr>` : ""}
+    ${d.cardUrl ? `<tr><td style="padding:12px 0 0;">${cardButton(d, o)}</td></tr>` : ""}
+    ${CLOSE}`;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    TEMPLATES
@@ -537,6 +719,11 @@ function ruled(d: SignatureData, o: SignatureOptions): string {
 }
 
 export const SIGNATURE_TEMPLATES: SignatureTemplate[] = [
+  { id: "classic", name: "Classic", blurb: "Uppercase name, a grey rule, your photo beside labelled details.", build: classic },
+  { id: "portrait", name: "Portrait", blurb: "Name and role beside a round photo, over a colour rule.", build: portrait },
+  { id: "ring", name: "Profile ring", blurb: "Round photo in a colour ring, details stacked beside it.", build: profileRing },
+  { id: "split", name: "Split column", blurb: "Photo and name in a column, contact rows to the right.", build: splitColumn },
+  { id: "letterhead", name: "Letterhead photo", blurb: "Name over a strong rule, with your photo to the right.", build: letterheadPhoto },
   { id: "corporate", name: "Corporate", blurb: "Logo, accent rule, then your details. The safest all-rounder.", build: corporate },
   { id: "executive", name: "Executive", blurb: "Letterhead style — name across the top, logo and QR to the right.", build: executive },
   { id: "slim", name: "Slim", blurb: "A few tight lines. Stays unobtrusive down a long reply chain.", build: slim },
@@ -555,7 +742,16 @@ export const SIGNATURE_TEMPLATES: SignatureTemplate[] = [
 
 export function buildSignature(templateId: string, d: SignatureData, o: SignatureOptions): string {
   const t = SIGNATURE_TEMPLATES.find((x) => x.id === templateId) || SIGNATURE_TEMPLATES[0];
-  return t.build(d, o);
+  const body = t.build(d, o);
+  const note = String(o.disclaimer || "").trim();
+  if (!note) return body;
+  // The disclaimer sits under every layout the same way: a grey rule, then
+  // small muted text, capped to a readable width.
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;"><tbody>
+    <tr><td style="padding:0;">${body}</td></tr>
+    <tr><td style="padding:16px 0 0;">${rule(RULE)}</td></tr>
+    <tr><td style="padding:10px 0 0;font-family:${FONT};font-size:11px;line-height:1.6;color:${MUTED};">${esc(note)}</td></tr>
+  </tbody></table>`;
 }
 
 /* The plain-text flavour that rides along on the clipboard, for plain-text
@@ -572,5 +768,7 @@ export function buildSignatureText(d: SignatureData, o: SignatureOptions): strin
     o.tagline || "",
     o.showSocials && d.socials.length ? d.socials.map((s) => `${s.label}: ${s.url}`).join("\n") : "",
   ];
-  return lines.filter(Boolean).join("\n");
+  const text = lines.filter(Boolean).join("\n");
+  const note = String(o.disclaimer || "").trim();
+  return note ? `${text}\n\n${note}` : text;
 }

@@ -142,6 +142,52 @@ const ogHandler = async (c: { req: { param: (k: string) => string } }): Promise<
 app.get("/og/:file", ogHandler);
 app.get("/api/og/:file", ogHandler);
 
+/* A card's logo or photo at a real URL, for email signatures.
+   Uploaded images live inside the card snapshot as data: URIs, and Gmail,
+   Outlook and Apple Mail refuse data: URIs in <img> — the picture silently
+   vanishes from the signature. Serving the same bytes from a URL is what lets
+   it show everywhere. Public by design: these images are already on the public
+   card. Raster types only — never SVG, which can carry script. */
+const SIG_IMG_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const sigImgHandler = async (c: { req: { param: (k: string) => string } }): Promise<Response> => {
+  const slug = String(c.req.param("slug") || "").toLowerCase();
+  const kind = String(c.req.param("file") || "").replace(/\.(png|jpe?g|webp|gif)$/i, "").toLowerCase();
+  if (!/^[a-z0-9_-]{2,80}$/.test(slug) || (kind !== "logo" && kind !== "photo")) {
+    return new Response("Not found", { status: 404 });
+  }
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { publishedCards } = await import("@db/schema");
+    const { eq } = await import("drizzle-orm");
+    const rows = await getDb().select({ data: publishedCards.data })
+      .from(publishedCards).where(eq(publishedCards.slug, slug)).limit(1);
+    let value = String(((rows[0]?.data as { customer?: Record<string, unknown> })?.customer || {})[kind] || "");
+    if (!value && kind === "logo") {
+      // Legacy customers.json card: its logo is a file in the migrated uploads.
+      const list = (await readPublicJson("customers")) as Record<string, unknown>[] | null;
+      const row = (Array.isArray(list) ? list : []).find((r) => String(r.slug || "").toLowerCase() === slug);
+      const file = String(row?.logo || "");
+      if (file) value = /^https?:\/\//i.test(file) ? file : `https://digitalcarda.in/otdo-panel/uploads/home/${encodeURIComponent(file)}`;
+    }
+    if (!value) return new Response("Not found", { status: 404 });
+    if (/^https?:\/\//i.test(value)) return Response.redirect(value, 302);
+    const m = /^data:([a-z]+\/[a-z0-9.+-]+);base64,([\s\S]+)$/i.exec(value);
+    if (!m || !SIG_IMG_TYPES.has(m[1].toLowerCase())) return new Response("Not found", { status: 404 });
+    return new Response(new Uint8Array(Buffer.from(m[2], "base64")), {
+      headers: {
+        "content-type": m[1].toLowerCase(),
+        "cache-control": "public, max-age=86400, s-maxage=604800",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  } catch (e) {
+    console.error("[sig-img] failed:", (e as Error).message);
+    return new Response("Not found", { status: 404 });
+  }
+};
+app.get("/sig-img/:slug/:file", sigImgHandler);
+app.get("/api/sig-img/:slug/:file", sigImgHandler);
+
 // Public enquiry capture for the legacy (customers.json) cards — stores the lead
 // when the slug maps to a known card, and always emails the owner.
 app.post("/api/enquiry", async (c) => {

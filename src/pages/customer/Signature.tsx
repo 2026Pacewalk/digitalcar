@@ -1,56 +1,29 @@
-import { useMemo, useRef, useState } from "react";
-import { PenLine, Copy, Check, Code2, AlertTriangle, ChevronDown, Info, Mail, ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  PenLine, Copy, Check, Code2, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight,
+  ExternalLink, RotateCcw, Image as ImageIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router";
-import ModuleShell, { Panel, Field, fieldCls, Tip } from "@/components/customer/ModuleShell";
-import { useCustomer, getActiveCardId } from "@/hooks/useCustomer";
+import ModuleShell from "@/components/customer/ModuleShell";
+import { useCustomer, getActiveCardId, scopedKey, readCustomer } from "@/hooks/useCustomer";
 import { trpc } from "@/providers/trpc";
 import { readSocialLinks, SOCIAL_BY_KEY } from "@/lib/socialPlatforms";
+import { imgUrl } from "@/lib/cardContent";
+import { copyRichHtml, copyText } from "@/lib/clipboard";
 import {
   SIGNATURE_TEMPLATES, buildSignature, buildSignatureText,
   type SignatureData, type SignatureOptions,
 } from "@/lib/emailSignature";
 
 const ORIGIN = "https://digitalcarda.in";
-const ACCENTS = ["#F7B31C", "#0F172A", "#14B8A6", "#3B82F6", "#8B5CF6", "#EF4444", "#16A34A", "#EC4899"];
+const ACCENTS = ["#E8590C", "#F7B31C", "#0F172A", "#1D4ED8", "#0F766E", "#7C3AED", "#DC2626", "#16A34A", "#DB2777"];
+const SOCIAL_KEYS = ["facebook", "instagram", "linkedin", "x", "youtube", "whatsapp"];
 
-/* Copy the signature as RICH TEXT.
-
-   navigator.clipboard.writeText() would paste the HTML *source* into the
-   signature box — the classic way this feature ships broken. We put a real
-   text/html flavour on the clipboard (plus text/plain for plain-text
-   composers). Where ClipboardItem isn't available we select the rendered node
-   and use execCommand("copy"), which also yields rich text. */
-async function copyRichHtml(html: string, plain: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard && "write" in navigator.clipboard && typeof ClipboardItem !== "undefined") {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
-          "text/plain": new Blob([plain], { type: "text/plain" }),
-        }),
-      ]);
-      return true;
-    }
-  } catch { /* fall through to the selection-based copy */ }
-
-  try {
-    const host = document.createElement("div");
-    host.setAttribute("contenteditable", "true");
-    host.style.cssText = "position:fixed;left:-99999px;top:0;white-space:normal;";
-    host.innerHTML = html;
-    document.body.appendChild(host);
-    const range = document.createRange();
-    range.selectNodeContents(host);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    const ok = document.execCommand("copy");
-    sel?.removeAllRanges();
-    document.body.removeChild(host);
-    return ok;
-  } catch { return false; }
-}
+const DEFAULT_DISCLAIMER =
+  "This email and any files sent with it are confidential and meant only for the person or organisation " +
+  "it is addressed to. If it reached you by mistake, please let the sender know and delete it. Please don't " +
+  "copy, forward or share its contents without permission.";
 
 const HOW_TO: { client: string; steps: string[] }[] = [
   { client: "Gmail (web)", steps: [
@@ -67,7 +40,7 @@ const HOW_TO: { client: string; steps: string[] }[] = [
   { client: "Outlook (desktop, Windows)", steps: [
     "File → Options → Mail → Signatures.",
     "New (or select a signature), click into the edit box and paste.",
-    "OK. If the layout shifts, use the Classic or Plain text design — Outlook's Word renderer is the fussiest.",
+    "OK. If the layout shifts, try Classic or Plain text — Outlook's Word renderer is the fussiest.",
   ]},
   { client: "Apple Mail (Mac)", steps: [
     "Mail → Settings → Signatures.",
@@ -76,242 +49,460 @@ const HOW_TO: { client: string; steps: string[] }[] = [
   ]},
 ];
 
-export default function CustomerSignature() {
-  const { data } = useCustomer();
-  const { data: mine } = trpc.publish.mine.useQuery({ cardId: getActiveCardId() }, { retry: false });
+type Picture = "photo" | "logo" | "link" | "none";
+type Fields = {
+  first: string; last: string; email: string;
+  picture: Picture; pictureLink: string;
+  company: string; designation: string;
+  phone: string; whatsapp: string; address: string; website: string;
+  socials: Record<string, string>;
+  tagline: string; disclaimer: string;
+};
+type Saved = {
+  v: 1;
+  fields: Fields;
+  templateId: string;
+  accent: string;
+  showPhoto: boolean; showLogo: boolean; showQr: boolean;
+  showSocials: boolean; showAddress: boolean; showDisclaimer: boolean;
+};
 
-  const [templateId, setTemplateId] = useState("corporate");
-  const [accent, setAccent] = useState("#F7B31C");
-  const [showLogo, setShowLogo] = useState(true);
-  const [showQr, setShowQr] = useState(true);
-  const [showSocials, setShowSocials] = useState(true);
-  const [showAddress, setShowAddress] = useState(false);
-  const [tagline, setTagline] = useState("Save my contact, see my services and pay — all from one link.");
-  const [copied, setCopied] = useState<"rich" | "html" | null>(null);
-  const [openHelp, setOpenHelp] = useState<number | null>(0);
-  const previewRef = useRef<HTMLDivElement>(null);
+const str = (v: unknown) => String(v ?? "").trim();
 
-  const slug = String(mine?.slug || data.slug || "");
-  const cardUrl = `${ORIGIN}/${slug}`;
-  const logo = String(data.logo || "");
-  const logoIsEmbedded = /^data:/i.test(logo);
-
-  const sig: SignatureData = useMemo(() => ({
-    name: String(data.name || ""),
-    designation: String(data.designation || ""),
-    company: String(data.company_name || ""),
-    phone: String(data.mobile1 || ""),
-    whatsapp: String(data.mobile2 || data.mobile1 || ""),
-    email: String(data.email || ""),
-    website: String(data.url || ""),
-    address: String(data.address || ""),
-    logo,
-    cardUrl,
-    qrSrc: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=6&data=${encodeURIComponent(cardUrl)}`,
-    socials: readSocialLinks(data as Record<string, unknown>)
-      .map((l) => ({ platform: l.platform, label: SOCIAL_BY_KEY[l.platform]?.label || l.platform, url: l.url }))
-      .slice(0, 6),
-  }), [data, logo, cardUrl]);
-
-  const opts: SignatureOptions = { accent, showLogo, showQr, showSocials, showAddress, tagline: tagline.trim() };
-  const html = useMemo(() => buildSignature(templateId, sig, opts), [templateId, sig, accent, showLogo, showQr, showSocials, showAddress, tagline]);
-  const plain = useMemo(() => buildSignatureText(sig, opts), [sig, showAddress, showSocials, tagline]);
-  const active = SIGNATURE_TEMPLATES.find((t) => t.id === templateId);
-
-  /* Every design rendered at once for the picker thumbnails. Cheap — these are
-     string builds, not network calls — and it means the grid shows the customer
-     THEIR signature in each layout, with their own colour and toggles applied,
-     instead of a stock screenshot that never matches what they get. */
-  const thumbs = useMemo(() => Object.fromEntries(
-    SIGNATURE_TEMPLATES.map((t) => [t.id, buildSignature(t.id, sig, opts)]),
-  ) as Record<string, string>, [sig, accent, showLogo, showQr, showSocials, showAddress, tagline]);
-
-  // A signature with no name/contact is worse than none — point them at the editor.
-  const missing = [!sig.name && "your name", !sig.phone && "a phone number", !sig.email && "an email"].filter(Boolean) as string[];
-
-  const doCopy = async () => {
-    const ok = await copyRichHtml(html, plain);
-    if (ok) { setCopied("rich"); toast.success("Signature copied — now paste it into your email settings"); setTimeout(() => setCopied(null), 2200); }
-    else toast.error("Copy failed — use \"Copy HTML\" and paste that instead");
+/* Everything starts from the card, so a customer sees their own signature the
+   moment the page opens — then any field can be changed for the signature
+   alone, without touching the card. */
+function fromCard(c: Record<string, unknown>): Saved {
+  const [first = "", ...rest] = str(c.name).split(/\s+/).filter(Boolean);
+  const socials: Record<string, string> = {};
+  for (const l of readSocialLinks(c)) if (l.url && !socials[l.platform]) socials[l.platform] = l.url;
+  return {
+    v: 1,
+    fields: {
+      first, last: rest.join(" "), email: str(c.email),
+      picture: str(c.photo) ? "photo" : str(c.logo) ? "logo" : "none", pictureLink: "",
+      company: str(c.company_name), designation: str(c.designation),
+      phone: str(c.mobile1), whatsapp: str(c.mobile2) || str(c.mobile1),
+      address: str(c.address), website: str(c.url),
+      socials,
+      tagline: "Save my contact, see my services and pay — all from one link.",
+      disclaimer: DEFAULT_DISCLAIMER,
+    },
+    templateId: "classic",
+    accent: "#E8590C",
+    showPhoto: true, showLogo: true, showQr: false,
+    showSocials: true, showAddress: true, showDisclaimer: true,
   };
+}
 
-  const doCopyHtml = async () => {
-    try {
-      await navigator.clipboard.writeText(html);
-      setCopied("html"); toast.success("HTML copied"); setTimeout(() => setCopied(null), 2200);
-    } catch { toast.error("Copy failed"); }
-  };
+function loadSaved(key: string): Saved | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return p && p.v === 1 && p.fields ? (p as Saved) : null;
+  } catch { return null; }
+}
 
-  const Toggle = ({ on, set, label }: { on: boolean; set: (v: boolean) => void; label: string }) => (
-    <button onClick={() => set(!on)} type="button"
-      className={`flex items-center gap-2 h-9 px-3 rounded-xl text-[13px] font-semibold transition-colors ${on ? "bg-[#FEF3C7] text-[#92400E] ring-1 ring-[#FDE68A]" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>
-      <span className={`w-4 h-4 rounded-md flex items-center justify-center ${on ? "bg-[#F7B31C]" : "bg-white ring-1 ring-[#CBD5E1]"}`}>
-        {on && <Check size={11} className="text-[#0F172A]" />}
+/* Mail clients refuse data: URIs in <img>, and uploaded card images are stored
+   as data: URIs. Point the signature at the server's copy of the SAME image
+   (/sig-img), versioned by content so a new upload is never served stale. */
+const IS_LOCAL = typeof window !== "undefined" && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+const IMG_BASE = IS_LOCAL ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/sig-img` : `${ORIGIN}/sig-img`;
+
+function contentVersion(v: string): string {
+  let h = 5381;
+  const t = `${v.length}:${v.slice(0, 256)}${v.slice(-256)}`;
+  for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+function webImage(value: string, slug: string, kind: "photo" | "logo"): string {
+  const v = str(value);
+  if (!v) return "";
+  if (/^https?:\/\//i.test(v)) return v;
+  if (/^data:image\//i.test(v)) {
+    return slug ? `${IMG_BASE}/${encodeURIComponent(slug)}/${kind}.${kind === "photo" ? "jpg" : "png"}?v=${contentVersion(v)}` : "";
+  }
+  return kind === "logo" ? imgUrl("home", v) : "";
+}
+
+/* ── Form pieces (outside the page component, so typing never remounts them
+      and steals focus) ── */
+const inputCls = "mt-0.5 w-full bg-transparent text-[14px] text-[#0F172A] outline-none placeholder:text-[#A0AEC0]";
+
+function Box({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <label className="block rounded-xl border border-[#D9E0EA] bg-white px-3.5 pb-2 pt-2 transition focus-within:border-[#F7B31C] focus-within:ring-2 focus-within:ring-[#F7B31C]/20">
+      <span className="block text-[11px] font-semibold text-[#64748B]">{label}</span>
+      {children}
+      {hint && <span className="mt-1 block text-[10.5px] leading-snug text-[#94A3B8]">{hint}</span>}
+    </label>
+  );
+}
+
+function TextBox({ label, value, onChange, placeholder, type = "text", hint }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; hint?: string;
+}) {
+  return (
+    <Box label={label} hint={hint}>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={inputCls} />
+    </Box>
+  );
+}
+
+function AreaBox({ label, value, onChange, placeholder, rows = 3 }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+}) {
+  return (
+    <Box label={label}>
+      <textarea rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        className={`${inputCls} resize-y leading-relaxed`} />
+    </Box>
+  );
+}
+
+function Group({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="space-y-2.5">
+      <div className="flex min-h-[22px] items-center justify-between">
+        <h3 className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#94A3B8]">{title}</h3>
+        {right}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)}
+      className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-left transition-colors hover:border-[#CBD5E1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
+      <span className="text-[13px] font-medium text-[#334155]">{label}</span>
+      <span className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${on ? "bg-[#F7B31C]" : "bg-[#CBD5E1]"}`}>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
       </span>
-      {label}
     </button>
   );
+}
+
+export default function CustomerSignature() {
+  const { data } = useCustomer();
+  const rec = data as unknown as Record<string, unknown>;
+  const { data: mine } = trpc.publish.mine.useQuery({ cardId: getActiveCardId() }, { retry: false });
+
+  const storeKey = scopedKey("dc_signature_v1");
+  const [st, setSt] = useState<Saved>(() => loadSaved(storeKey) ?? fromCard(readCustomer() as unknown as Record<string, unknown>));
+  const [copied, setCopied] = useState<"rich" | "html" | null>(null);
+  const [openHelp, setOpenHelp] = useState<number | null>(null);
+  const strip = useRef<HTMLDivElement>(null);
+
+  // Edits persist in this browser; the card itself is never changed from here.
+  useEffect(() => {
+    try { localStorage.setItem(storeKey, JSON.stringify(st)); } catch { /* storage full — keep in memory */ }
+  }, [st, storeKey]);
+
+  const f = st.fields;
+  const setField = <K extends keyof Fields>(k: K, v: Fields[K]) => setSt((p) => ({ ...p, fields: { ...p.fields, [k]: v } }));
+  const setSocial = (k: string, v: string) => setSt((p) => ({ ...p, fields: { ...p.fields, socials: { ...p.fields.socials, [k]: v } } }));
+  const setOpt = <K extends keyof Saved>(k: K, v: Saved[K]) => setSt((p) => ({ ...p, [k]: v }));
+  const resetToCard = () => {
+    setSt((p) => ({ ...fromCard(readCustomer() as unknown as Record<string, unknown>), templateId: p.templateId, accent: p.accent }));
+    toast.success("Details filled in again from your card");
+  };
+
+  const slug = str(mine?.slug || rec.slug);
+  const cardUrl = slug ? `${ORIGIN}/${slug}` : "";
+  const cardPhoto = webImage(str(rec.photo), slug, "photo");
+  const cardLogo = webImage(str(rec.logo), slug, "logo");
+  const picture = f.picture === "photo" ? cardPhoto : f.picture === "logo" ? cardLogo : f.picture === "link" ? str(f.pictureLink) : "";
+
+  const socialKeys = useMemo(
+    () => [...new Set([...SOCIAL_KEYS, ...Object.keys(f.socials)])].filter((k) => k !== "website" && !!SOCIAL_BY_KEY[k]),
+    [f.socials],
+  );
+
+  const sig: SignatureData = useMemo(() => ({
+    name: `${f.first} ${f.last}`.trim(),
+    designation: f.designation, company: f.company,
+    phone: f.phone, whatsapp: f.whatsapp, email: f.email, website: f.website, address: f.address,
+    logo: cardLogo,
+    photo: picture,
+    cardUrl,
+    qrSrc: cardUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=6&data=${encodeURIComponent(cardUrl)}` : "",
+    socials: socialKeys
+      .filter((k) => str(f.socials[k]))
+      .map((k) => ({ platform: k, label: SOCIAL_BY_KEY[k]?.label || k, url: str(f.socials[k]) }))
+      .slice(0, 6),
+  }), [f, cardLogo, picture, cardUrl, socialKeys]);
+
+  const opts: SignatureOptions = useMemo(() => ({
+    accent: st.accent,
+    showLogo: st.showLogo,
+    showQr: st.showQr && !!cardUrl,
+    showSocials: st.showSocials,
+    showAddress: st.showAddress,
+    showPhoto: st.showPhoto,
+    tagline: str(f.tagline),
+    disclaimer: st.showDisclaimer ? str(f.disclaimer) : "",
+  }), [st.accent, st.showLogo, st.showQr, st.showSocials, st.showAddress, st.showPhoto, st.showDisclaimer, f.tagline, f.disclaimer, cardUrl]);
+
+  const html = useMemo(() => buildSignature(st.templateId, sig, opts), [st.templateId, sig, opts]);
+  const plain = useMemo(() => buildSignatureText(sig, opts), [sig, opts]);
+  const designs = useMemo(() => SIGNATURE_TEMPLATES.map((t) => ({ ...t, html: buildSignature(t.id, sig, opts) })), [sig, opts]);
+  const active = SIGNATURE_TEMPLATES.find((t) => t.id === st.templateId) || SIGNATURE_TEMPLATES[0];
+
+  // Bring the chosen design into view in the strip on first load.
+  useEffect(() => {
+    const box = strip.current;
+    const el = box?.querySelector<HTMLElement>(`[data-design="${st.templateId}"]`);
+    if (box && el) box.scrollLeft = Math.max(0, el.offsetLeft - box.clientWidth / 2 + el.clientWidth / 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const missing = [!sig.name && "your name", !sig.phone && !sig.email && "a phone number or email"].filter(Boolean) as string[];
+
+  const doCopy = async () => {
+    if (await copyRichHtml(html, plain)) {
+      setCopied("rich"); toast.success("Signature copied — paste it into your email settings");
+      setTimeout(() => setCopied(null), 2200);
+    } else toast.error("Copy failed — use Copy HTML code instead");
+  };
+  const doCopyHtml = async () => {
+    if (await copyText(html)) {
+      setCopied("html"); toast.success("HTML code copied");
+      setTimeout(() => setCopied(null), 2200);
+    } else toast.error("Copy failed");
+  };
+  const scrollStrip = (dir: number) => strip.current?.scrollBy({ left: dir * 520, behavior: "smooth" });
+
+  const PICTURE_CHOICES: [Picture, string, boolean][] = [
+    ["photo", "Card photo", !cardPhoto],
+    ["logo", "Card logo", !cardLogo],
+    ["link", "Image link", false],
+    ["none", "None", false],
+  ];
 
   return (
     <ModuleShell title="Email Signature" subtitle="Put your card link at the bottom of every email you send" icon={PenLine}
-      /* No phone preview: this page shows the signature itself, and a card
-         mock-up beside it competes with the thing being previewed. */
+      /* The signature is the preview here; a phone mock-up beside it would compete with it. */
       preview={false} wide>
 
+      <p className="-mt-1 mb-4 text-[13px] leading-relaxed text-[#475569]">
+        Build a professional email signature from your card. Change any detail, pick a design, then copy it into Gmail, Outlook or Apple Mail.
+      </p>
+
       {missing.length > 0 && (
-        <div className="flex items-start gap-3 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] px-4 py-3">
-          <AlertTriangle size={16} className="text-[#DC2626] mt-0.5 shrink-0" />
+        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[#DC2626]" />
           <p className="text-xs text-[#991B1B]">
-            Your card is still missing {missing.join(", ")}. The signature is built from your card, so
-            {" "}<Link to="/dashboard/build" className="underline font-semibold">fill that in first</Link>.
+            Add {missing.join(" and ")} below — or <Link to="/dashboard/build" className="font-semibold underline">complete your card</Link> and press “Reset to card”.
           </p>
         </div>
       )}
 
-      {/* Two columns on desktop: choose on the left, the live result stays put
-          on the right. Picking a design is a compare-and-contrast job, so the
-          preview must never scroll out of view while you browse. */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_430px] gap-4 sm:gap-5 items-start">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-5">
 
-        {/* ── Left: designs and options ── */}
-        <div className="min-w-0 space-y-4 sm:space-y-5">
-          <Panel title="Choose a design" subtitle={`${SIGNATURE_TEMPLATES.length} layouts, every one built from the details already on your card`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {SIGNATURE_TEMPLATES.map((t) => (
-                <button key={t.id} type="button" onClick={() => setTemplateId(t.id)}
-                  aria-pressed={templateId === t.id}
-                  className={`group text-left rounded-2xl overflow-hidden transition-all ${
-                    templateId === t.id
-                      ? "ring-2 ring-[#F7B31C] bg-[#FFFBEB] shadow-premium"
-                      : "ring-1 ring-[#E2E8F0] bg-white hover:ring-[#F7B31C]/60 hover:shadow-premium"}`}>
-                  {/* A real, scaled-down render — you pick by looking, not by
-                      reading a description of what it might look like. */}
-                  <div className="h-[132px] bg-white border-b border-[#F1F5F9] overflow-hidden relative">
-                    <div className="absolute inset-0 origin-top-left pointer-events-none"
-                      style={{ transform: "scale(0.46)", width: "217%", padding: "14px 16px" }}
-                      dangerouslySetInnerHTML={{ __html: thumbs[t.id] }} />
-                  </div>
-                  <div className="px-3 py-2.5 flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-bold text-[#0F172A] leading-tight">{t.name}</p>
-                      <p className="text-[11px] text-[#64748B] leading-snug mt-0.5">{t.blurb}</p>
-                    </div>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                      templateId === t.id ? "bg-[#F7B31C]" : "bg-[#F1F5F9] group-hover:bg-[#E2E8F0]"}`}>
-                      {templateId === t.id && <Check size={12} className="text-[#0F172A]" />}
-                    </span>
-                  </div>
-                </button>
-              ))}
+        {/* ── Details ── */}
+        <aside className="order-2 rounded-2xl border border-[#EEF2F7] bg-[#FBFCFE] p-4 lg:sticky lg:top-4 lg:order-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[14px] font-bold text-[#0F172A]">Your details</p>
+              <p className="text-[11px] text-[#94A3B8]">Changes here affect only the signature</p>
             </div>
-          </Panel>
-
-          <Panel title="What to include">
-            <div className="flex flex-wrap gap-2">
-              <Toggle on={showLogo} set={setShowLogo} label="Logo" />
-              <Toggle on={showQr} set={setShowQr} label="QR code" />
-              <Toggle on={showSocials} set={setShowSocials} label="Social links" />
-              <Toggle on={showAddress} set={setShowAddress} label="Address" />
-            </div>
-
-            {showLogo && logoIsEmbedded && (
-              <div className="flex items-start gap-2.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] px-3 py-2.5 mt-3">
-                <Info size={14} className="text-[#B45309] mt-0.5 shrink-0" />
-                <p className="text-[11px] text-[#92400E] leading-snug">
-                  Your logo is stored inside the card rather than as a web address. Gmail and Apple Mail usually
-                  re-upload it when you paste, but Outlook may drop it — if it disappears, turn the logo off or
-                  use the Plain text design.
-                </p>
-              </div>
-            )}
-
-            <div className="mt-4">
-              <p className="text-[11px] font-semibold text-[#334155] mb-2">Accent colour</p>
-              <div className="flex flex-wrap gap-2">
-                {ACCENTS.map((c) => (
-                  <button key={c} type="button" onClick={() => setAccent(c)} aria-label={`Accent ${c}`}
-                    className={`w-8 h-8 rounded-lg transition-transform ${accent === c ? "ring-2 ring-offset-2 ring-[#0F172A] scale-105" : "ring-1 ring-[#E2E8F0] hover:scale-105"}`}
-                    style={{ background: c }} />
-                ))}
-              </div>
-              <p className="text-[11px] text-[#94A3B8] mt-2">Monochrome ignores this — that design is black and white by definition.</p>
-            </div>
-
-            <div className="mt-4 max-w-lg">
-              <Field label="Tagline under the link" hint="Leave empty to hide it">
-                <input value={tagline} onChange={(e) => setTagline(e.target.value)} className={fieldCls} maxLength={90} />
-              </Field>
-            </div>
-          </Panel>
-
-          <Panel title="Where to paste it" subtitle="One-time setup per email account">
-            <div className="divide-y divide-[#F1F5F9]">
-              {HOW_TO.map((h, i) => (
-                <div key={h.client}>
-                  <button type="button" onClick={() => setOpenHelp(openHelp === i ? null : i)}
-                    className="w-full flex items-center justify-between py-3 text-left">
-                    <span className="text-[13px] font-semibold text-[#0F172A]">{h.client}</span>
-                    <ChevronDown size={16} className={`text-[#94A3B8] transition-transform ${openHelp === i ? "rotate-180" : ""}`} />
-                  </button>
-                  {openHelp === i && (
-                    <ol className="pb-3 pl-1 space-y-1.5">
-                      {h.steps.map((s, k) => (
-                        <li key={k} className="flex gap-2.5 text-[12px] text-[#475569] leading-snug">
-                          <span className="w-4 h-4 rounded-full bg-[#F1F5F9] text-[#64748B] text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{k + 1}</span>
-                          {s}
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Panel>
-        </div>
-
-        {/* ── Right: the result, pinned ── */}
-        <aside className="xl:sticky xl:top-6 space-y-3">
-          <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden">
-            <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[#F1F5F9]">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="w-7 h-7 rounded-lg bg-[#FEF3C7] flex items-center justify-center shrink-0">
-                  <Mail size={14} className="text-[#B45309]" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[12px] font-bold text-[#0F172A] truncate">{active?.name}</p>
-                  <p className="text-[10px] text-[#94A3B8]">Exactly what lands in the inbox</p>
-                </div>
-              </div>
-            </div>
-
-            {/* A faux message footer, so it is judged in context. */}
-            <div className="p-4 overflow-x-auto">
-              <p className="text-[13px] text-[#94A3B8] mb-2">Thanks and regards,</p>
-              <div ref={previewRef} dangerouslySetInnerHTML={{ __html: html }} />
-            </div>
-          </div>
-
-          <button onClick={doCopy} type="button"
-            className="w-full h-12 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.98]">
-            {copied === "rich" ? <><Check size={17} /> Copied — now paste it</> : <><Copy size={17} /> Copy signature</>}
-          </button>
-
-          <div className="flex gap-2">
-            <button onClick={doCopyHtml} type="button"
-              className="flex-1 h-10 rounded-xl bg-[#F1F5F9] text-[#334155] text-[12px] font-semibold flex items-center justify-center gap-2 hover:bg-[#E2E8F0] transition-colors">
-              {copied === "html" ? <Check size={14} className="text-emerald-500" /> : <Code2 size={14} />} Copy HTML
+            <button type="button" onClick={resetToCard}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-[11px] font-semibold text-[#334155] hover:border-[#F7B31C] hover:text-[#92400E]">
+              <RotateCcw size={12} /> Reset to card
             </button>
-            <a href={cardUrl} target="_blank" rel="noreferrer"
-              className="flex-1 h-10 rounded-xl bg-[#F1F5F9] text-[#334155] text-[12px] font-semibold flex items-center justify-center gap-2 hover:bg-[#E2E8F0] transition-colors">
-              <ExternalLink size={14} /> Open my card
-            </a>
           </div>
 
-          <p className="text-[11px] text-[#94A3B8] leading-snug">
-            “Copy signature” keeps the formatting — paste it straight into your email signature box.
-            “Copy HTML” is the raw code, for signature editors that ask for HTML.
-          </p>
+          <div className="space-y-5">
+            <Group title="You">
+              <div className="grid grid-cols-2 gap-2.5">
+                <TextBox label="First name" value={f.first} onChange={(v) => setField("first", v)} placeholder="First" />
+                <TextBox label="Last name" value={f.last} onChange={(v) => setField("last", v)} placeholder="Last" />
+              </div>
+              <TextBox label="Designation" value={f.designation} onChange={(v) => setField("designation", v)} placeholder="e.g. Managing Director" />
+              <TextBox label="Organisation" value={f.company} onChange={(v) => setField("company", v)} placeholder="Company name" />
+            </Group>
+
+            <Group title="Display picture">
+              <div className="rounded-xl border border-[#D9E0EA] bg-white p-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#F1F5F9] ring-1 ring-[#E2E8F0]">
+                    {picture ? <img src={picture} alt="" className="h-full w-full object-cover" /> : <ImageIcon size={18} className="text-[#94A3B8]" />}
+                  </span>
+                  <div className="grid flex-1 grid-cols-2 gap-1.5" role="radiogroup" aria-label="Display picture">
+                    {PICTURE_CHOICES.map(([k, label, disabled]) => {
+                      const on = f.picture === k;
+                      return (
+                        <button key={k} type="button" role="radio" aria-checked={on} disabled={disabled}
+                          onClick={() => setField("picture", k)}
+                          className={`h-8 rounded-lg text-[11.5px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                            on ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0]"}`}>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {f.picture === "link" && (
+                  <input value={f.pictureLink} onChange={(e) => setField("pictureLink", e.target.value)}
+                    placeholder="https://… a public link to your photo"
+                    className="mt-2.5 h-9 w-full rounded-lg border border-[#E2E8F0] px-3 text-[13px] outline-none focus:border-[#F7B31C]" />
+                )}
+                {(f.picture === "photo" || f.picture === "logo") && (
+                  <p className="mt-2 text-[10.5px] leading-snug text-[#94A3B8]">
+                    Served from your published card, so it shows in Gmail, Outlook and Apple Mail. Changed it recently? Publish your card first.
+                  </p>
+                )}
+              </div>
+            </Group>
+
+            <Group title="Contact">
+              <TextBox label="Email" type="email" value={f.email} onChange={(v) => setField("email", v)} placeholder="you@business.com" />
+              <TextBox label="Phone" type="tel" value={f.phone} onChange={(v) => setField("phone", v)} placeholder="+91 …" />
+              <TextBox label="WhatsApp" type="tel" value={f.whatsapp} onChange={(v) => setField("whatsapp", v)} placeholder="+91 …" hint="Shown only when it differs from your phone" />
+              <TextBox label="Website" value={f.website} onChange={(v) => setField("website", v)} placeholder="https://…" />
+              <AreaBox label="Address" value={f.address} onChange={(v) => setField("address", v)} placeholder="Office address" rows={2} />
+            </Group>
+
+            <Group title="Social links">
+              {socialKeys.map((k) => (
+                <TextBox key={k} label={SOCIAL_BY_KEY[k]?.label || k} value={f.socials[k] || ""} onChange={(v) => setSocial(k, v)} placeholder="https://…" />
+              ))}
+            </Group>
+
+            <Group title="Disclaimer" right={
+              <button type="button" role="switch" aria-checked={st.showDisclaimer} aria-label="Show disclaimer"
+                onClick={() => setOpt("showDisclaimer", !st.showDisclaimer)}
+                className={`relative h-5 w-9 rounded-full transition-colors ${st.showDisclaimer ? "bg-[#F7B31C]" : "bg-[#CBD5E1]"}`}>
+                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${st.showDisclaimer ? "left-[18px]" : "left-0.5"}`} />
+              </button>
+            }>
+              {st.showDisclaimer
+                ? <AreaBox label="Confidentiality note" value={f.disclaimer} onChange={(v) => setField("disclaimer", v)} rows={4} />
+                : <p className="text-[12px] text-[#94A3B8]">Turned off — no note under your signature.</p>}
+            </Group>
+
+            <Group title="Style">
+              <div>
+                <p className="mb-2 text-[12px] font-semibold text-[#334155]">Accent colour</p>
+                <div className="flex flex-wrap gap-2">
+                  {ACCENTS.map((c) => (
+                    <button key={c} type="button" onClick={() => setOpt("accent", c)} aria-label={`Accent colour ${c}`} aria-pressed={st.accent === c}
+                      className={`h-7 w-7 rounded-lg transition-transform ${st.accent === c ? "scale-105 ring-2 ring-[#0F172A] ring-offset-2" : "ring-1 ring-[#E2E8F0] hover:scale-105"}`}
+                      style={{ background: c }} />
+                  ))}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Switch label="Display picture" on={st.showPhoto} onChange={(v) => setOpt("showPhoto", v)} />
+                <Switch label="Company logo" on={st.showLogo} onChange={(v) => setOpt("showLogo", v)} />
+                <Switch label="QR code to my card" on={st.showQr} onChange={(v) => setOpt("showQr", v)} />
+                <Switch label="Social icons" on={st.showSocials} onChange={(v) => setOpt("showSocials", v)} />
+                <Switch label="Address" on={st.showAddress} onChange={(v) => setOpt("showAddress", v)} />
+              </div>
+              <TextBox label="Line under your card button" value={f.tagline} onChange={(v) => setField("tagline", v)} placeholder="Leave empty to hide it" />
+            </Group>
+          </div>
         </aside>
+
+        {/* ── Preview canvas + designs ── */}
+        <section className="order-1 min-w-0 overflow-hidden rounded-2xl bg-[#ECEFF4] lg:order-2">
+          <div className="px-3 pb-5 pt-5 sm:px-8 sm:pt-8">
+            <div className="mx-auto max-w-[720px]">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#334155] ring-1 ring-[#E2E8F0]">{active.name}</span>
+                <span className="text-[11px] text-[#64748B]">Exactly what lands in the inbox</span>
+              </div>
+              <div className="overflow-x-auto rounded-xl bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_14px_34px_-14px_rgba(15,23,42,0.22)] sm:p-7">
+                <div dangerouslySetInnerHTML={{ __html: html }} />
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <button onClick={doCopy} type="button"
+                  className="inline-flex h-11 items-center gap-2 rounded-xl gradient-gold px-5 text-sm font-bold text-[#0F172A] transition-all hover:shadow-gold active:scale-[0.98]">
+                  {copied === "rich" ? <><Check size={16} /> Copied — now paste it</> : <><Copy size={16} /> Copy signature</>}
+                </button>
+                <button onClick={doCopyHtml} type="button"
+                  className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-[13px] font-semibold text-[#334155] ring-1 ring-[#E2E8F0] transition-colors hover:ring-[#CBD5E1]">
+                  {copied === "html" ? <Check size={15} className="text-emerald-500" /> : <Code2 size={15} />} Copy HTML code
+                </button>
+                {cardUrl && (
+                  <a href={cardUrl} target="_blank" rel="noreferrer"
+                    className="inline-flex h-11 items-center gap-2 rounded-xl px-3 text-[13px] font-semibold text-[#475569] hover:text-[#0F172A]">
+                    <ExternalLink size={15} /> Open my card
+                  </a>
+                )}
+              </div>
+              <p className="mt-3 text-center text-[12px] leading-relaxed text-[#64748B]">
+                Your edits are saved in this browser and change only the signature — your card stays as it is.
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-[#DDE2EA] bg-white/70 pb-3 pt-3">
+            <div className="mb-2 flex items-center justify-between px-4">
+              <p className="text-[12px] font-bold text-[#0F172A]">
+                Designs <span className="font-normal text-[#94A3B8]">· {SIGNATURE_TEMPLATES.length}</span>
+              </p>
+              <div className="flex gap-1.5">
+                <button type="button" onClick={() => scrollStrip(-1)} aria-label="Previous designs"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#334155] ring-1 ring-[#E2E8F0] hover:ring-[#CBD5E1]"><ChevronLeft size={16} /></button>
+                <button type="button" onClick={() => scrollStrip(1)} aria-label="More designs"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#334155] ring-1 ring-[#E2E8F0] hover:ring-[#CBD5E1]"><ChevronRight size={16} /></button>
+              </div>
+            </div>
+            <div ref={strip} className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth px-4 pb-1" role="listbox" aria-label="Signature designs">
+              {designs.map((t) => {
+                const on = t.id === st.templateId;
+                return (
+                  <button key={t.id} type="button" data-design={t.id} role="option" aria-selected={on} title={t.blurb}
+                    onClick={() => setOpt("templateId", t.id)}
+                    className={`w-[236px] shrink-0 snap-start overflow-hidden rounded-xl bg-white text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] ${
+                      on ? "shadow-md ring-2 ring-[#F7B31C]" : "ring-1 ring-[#E2E8F0] hover:shadow hover:ring-[#CBD5E1]"}`}>
+                    <div className="relative h-[146px] overflow-hidden border-b border-[#F1F5F9]">
+                      {/* A real render of THEIR signature, scaled down — picked by looking. */}
+                      <div className="pointer-events-none absolute left-0 top-0 origin-top-left"
+                        style={{ width: 590, padding: 18, transform: "scale(0.4)" }}
+                        dangerouslySetInnerHTML={{ __html: t.html }} />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                      <span className="truncate text-[12px] font-semibold text-[#0F172A]">{t.name}</span>
+                      {on && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#F7B31C]"><Check size={10} className="text-[#0F172A]" /></span>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-[#F1F5F9] bg-white px-4 shadow-premium">
+        <p className="pb-1 pt-3 text-[13px] font-bold text-[#0F172A]">Where to paste it</p>
+        <div className="divide-y divide-[#F1F5F9]">
+          {HOW_TO.map((h, i) => (
+            <div key={h.client}>
+              <button type="button" onClick={() => setOpenHelp(openHelp === i ? null : i)} aria-expanded={openHelp === i}
+                className="flex w-full items-center justify-between py-3 text-left">
+                <span className="text-[13px] font-semibold text-[#334155]">{h.client}</span>
+                <ChevronDown size={16} className={`text-[#94A3B8] transition-transform ${openHelp === i ? "rotate-180" : ""}`} />
+              </button>
+              {openHelp === i && (
+                <ol className="space-y-1.5 pb-3 pl-1">
+                  {h.steps.map((s, k) => (
+                    <li key={k} className="flex gap-2.5 text-[12px] leading-snug text-[#475569]">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#F1F5F9] text-[10px] font-bold text-[#64748B]">{k + 1}</span>
+                      {s}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </ModuleShell>
   );
