@@ -79,6 +79,15 @@ export const LEGAL_LINKS: NavLink[] = [
 
 export const FOOTER_GROUPS: NavGroup[] = [PRODUCT, FREE_TOOLS, BUSINESS, COMPANY];
 
+/** Blog guides featured in the footer. Hand-picked (this file stays import-free,
+ *  so it can't read the blog data); api/lib/public-nav.test.ts fails if a slug
+ *  stops matching a real article. `desc` is the article's topic. */
+export const FOOTER_GUIDES: (NavLink & { desc: string })[] = [
+  { label: "How to make a digital visiting card online", href: "/blog/how-to-make-a-digital-visiting-card", desc: "Getting started" },
+  { label: "NFC business cards in India: how they work and price", href: "/blog/nfc-business-card-india", desc: "NFC & QR codes" },
+  { label: "Google review QR code: get more reviews", href: "/blog/google-review-qr-code", desc: "Grow your business" },
+];
+
 /** Everything, for /sitemap: the footer groups plus home and the legal pages. */
 export const SITEMAP_GROUPS: NavGroup[] = [
   { title: "Start here", links: [{ label: "Home", href: "/" }, ...COMPANY.links.filter((l) => l.href !== "/sitemap")] },
