@@ -560,7 +560,7 @@ export default function AdminCustomers() {
 
   return (
     <ResponsiveDashboardLayout title="Customer List" subtitle="Manage all customer cards & subscriptions">
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map((s) => (
@@ -582,9 +582,9 @@ export default function AdminCustomers() {
         </div>
 
         {/* Toolbar */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-2 text-sm text-[#64748B]">
+        <div className="flex flex-col-reverse lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          <div className="-mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 pb-0.5 no-scrollbar sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:gap-2.5 [&_select]:shrink-0">
+            <div className="flex shrink-0 items-center gap-2 text-sm text-[#64748B]">
               Show
               <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="h-10 bg-white rounded-lg px-2 border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
                 {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -620,8 +620,8 @@ export default function AdminCustomers() {
               </select>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="relative w-full sm:w-56">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-nowrap sm:flex-wrap">
+            <div className="relative min-w-0 flex-1 sm:w-56 sm:flex-none">
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
               <input type="text" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 bg-white rounded-lg pl-10 pr-4 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/20 transition-all placeholder:text-[#94A3B8]" />
             </div>

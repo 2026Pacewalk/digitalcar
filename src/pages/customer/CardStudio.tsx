@@ -625,7 +625,7 @@ export default function CardStudio() {
       </div>
 
       {/* Mobile bottom bar -- three plain questions instead of 13 icons */}
-      <div className="lg:hidden fixed inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#E2E8F0] pb-1.5" style={{ bottom: "calc(4rem + env(safe-area-inset-bottom, 0px))" }}>
+      <div className="lg:hidden fixed inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#E2E8F0] pb-1.5" style={{ bottom: "calc(62px + env(safe-area-inset-bottom, 0px))" }}>
         <div className="grid grid-cols-3 gap-1.5 px-2.5 pt-2">
           {TOOL_GROUPS.map((g, i) => {
             const Icon = i === 0 ? User : i === 1 ? Palette : LayoutGrid;

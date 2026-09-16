@@ -11,6 +11,8 @@ import { trpc } from "@/providers/trpc";
 import { readSocialLinks, SOCIAL_BY_KEY, type SocialPlatform } from "@/lib/socialPlatforms";
 import { imgUrl } from "@/lib/cardContent";
 import { copyRichHtml, copyText } from "@/lib/clipboard";
+import FitToWidth from "@/components/mobile/FitToWidth";
+import { haptic, useKeyboardOpen } from "@/lib/nativeApp";
 import {
   SIGNATURE_TEMPLATES, buildSignature, buildSignatureText,
   type SignatureData, type SignatureOptions,
@@ -218,6 +220,7 @@ export default function CustomerSignature() {
   const [copied, setCopied] = useState<"rich" | "html" | null>(null);
   const [openHelp, setOpenHelp] = useState<number | null>(null);
   const strip = useRef<HTMLDivElement>(null);
+  const typing = useKeyboardOpen();
 
   // Edits persist in this browser; the card itself is never changed from here.
   useEffect(() => {
@@ -286,13 +289,13 @@ export default function CustomerSignature() {
 
   const doCopy = async () => {
     if (await copyRichHtml(html, plain)) {
-      setCopied("rich"); toast.success("Signature copied — paste it into your email settings");
+      setCopied("rich"); haptic("success"); toast.success("Signature copied — paste it into your email settings");
       setTimeout(() => setCopied(null), 2200);
     } else toast.error("Copy failed — use Copy HTML code instead");
   };
   const doCopyHtml = async () => {
     if (await copyText(html)) {
-      setCopied("html"); toast.success("HTML code copied");
+      setCopied("html"); haptic("success"); toast.success("HTML code copied");
       setTimeout(() => setCopied(null), 2200);
     } else toast.error("Copy failed");
   };
@@ -310,7 +313,7 @@ export default function CustomerSignature() {
       /* The signature is the preview here; a phone mock-up beside it would compete with it. */
       preview={false} wide>
 
-      <p className="-mt-1 mb-4 text-[13px] leading-relaxed text-[#475569]">
+      <p className="-mt-1 mb-4 hidden text-[13px] leading-relaxed text-[#475569] md:block">
         Build a professional email signature from your card. Change any detail, pick a design, then copy it into Gmail, Outlook or Apple Mail.
       </p>
 
@@ -410,10 +413,10 @@ export default function CustomerSignature() {
             </Group>
 
             <Group title="Style">
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2 md:gap-1.5">
                 {ACCENTS.map((c) => (
                   <button key={c} type="button" onClick={() => setOpt("accent", c)} aria-label={`Accent colour ${c}`} aria-pressed={st.accent === c}
-                    className={`h-6 w-6 rounded-md transition-transform ${st.accent === c ? "scale-105 ring-2 ring-[#0F172A] ring-offset-1" : "ring-1 ring-[#E2E8F0] hover:scale-105"}`}
+                    className={`h-8 w-8 rounded-lg transition-transform md:h-6 md:w-6 md:rounded-md ${st.accent === c ? "scale-105 ring-2 ring-[#0F172A] ring-offset-1" : "ring-1 ring-[#E2E8F0] hover:scale-105"}`}
                     style={{ background: c }} />
                 ))}
               </div>
@@ -431,17 +434,19 @@ export default function CustomerSignature() {
 
         {/* ── Preview canvas + designs ── */}
         <section className="order-1 min-w-0 overflow-hidden rounded-2xl bg-[#ECEFF4] lg:order-2">
-          <div className="px-3 pb-5 pt-5 sm:px-8 sm:pt-8">
+          <div className="px-2.5 pb-4 pt-3 sm:px-8 sm:pb-5 sm:pt-8">
             <div className="mx-auto max-w-[720px]">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#334155] ring-1 ring-[#E2E8F0]">{active.name}</span>
-                <span className="text-[11px] text-[#64748B]">Exactly what lands in the inbox</span>
+                <span className="text-[11px] text-[#64748B]"><span className="md:hidden">Shown to fit · </span>Exactly what lands in the inbox</span>
               </div>
-              <div className="overflow-x-auto rounded-xl bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_14px_34px_-14px_rgba(15,23,42,0.22)] sm:p-7">
-                <div dangerouslySetInnerHTML={{ __html: html }} />
+              <div className="rounded-xl bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_14px_34px_-14px_rgba(15,23,42,0.22)] sm:p-7">
+                <FitToWidth>
+                  <div dangerouslySetInnerHTML={{ __html: html }} />
+                </FitToWidth>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <div className="mt-4 hidden flex-wrap items-center justify-center gap-2 md:flex">
                 <button onClick={doCopy} type="button"
                   className="inline-flex h-11 items-center gap-2 rounded-xl gradient-gold px-5 text-sm font-bold text-[#0F172A] transition-all hover:shadow-gold active:scale-[0.98]">
                   {copied === "rich" ? <><Check size={16} /> Copied — now paste it</> : <><Copy size={16} /> Copy signature</>}
@@ -468,7 +473,7 @@ export default function CustomerSignature() {
               <p className="text-[12px] font-bold text-[#0F172A]">
                 Designs <span className="font-normal text-[#94A3B8]">· {SIGNATURE_TEMPLATES.length}</span>
               </p>
-              <div className="flex gap-1.5">
+              <div className="hidden gap-1.5 md:flex">
                 <button type="button" onClick={() => scrollStrip(-1)} aria-label="Previous designs"
                   className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#334155] ring-1 ring-[#E2E8F0] hover:ring-[#CBD5E1]"><ChevronLeft size={16} /></button>
                 <button type="button" onClick={() => scrollStrip(1)} aria-label="More designs"
@@ -523,6 +528,27 @@ export default function CustomerSignature() {
               )}
             </div>
           ))}
+        </div>
+      </div>
+      {/* Room so the last section isn't hidden behind the action bar */}
+      <div className="h-16 md:hidden" />
+      <div className={`dc-bar fixed inset-x-0 z-40 px-3 md:hidden ${typing ? "dc-bar-hidden" : ""}`}
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 70px)" }}>
+        <div className="mx-auto flex max-w-lg items-center gap-2 rounded-2xl bg-white/95 p-2 shadow-[0_14px_36px_-14px_rgba(2,6,23,0.45)] ring-1 ring-[#E2E8F0] backdrop-blur-xl">
+          <button onClick={doCopy} type="button"
+            className="dc-press inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl gradient-gold text-[14px] font-bold text-[#0F172A]">
+            {copied === "rich" ? <><Check size={16} /> Copied — now paste it</> : <><Copy size={16} /> Copy signature</>}
+          </button>
+          <button onClick={doCopyHtml} type="button" aria-label="Copy HTML code"
+            className="dc-press inline-flex h-11 items-center gap-1.5 rounded-xl bg-[#F1F5F9] px-3 text-[13px] font-semibold text-[#334155]">
+            {copied === "html" ? <Check size={15} className="text-emerald-500" /> : <Code2 size={15} />} HTML
+          </button>
+          {cardUrl && (
+            <a href={cardUrl} target="_blank" rel="noreferrer" aria-label="Open my card"
+              className="dc-press inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#F1F5F9] text-[#334155]">
+              <ExternalLink size={16} />
+            </a>
+          )}
         </div>
       </div>
     </ModuleShell>

@@ -1,7 +1,8 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import type { ReactNode } from "react";
-import { useState } from "react";
-import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, ChevronUp, ChevronDown, Move } from "lucide-react";
+import { Link } from "react-router";
+import { useState, useSyncExternalStore } from "react";
+import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, ChevronUp, ChevronDown, Move, ExternalLink } from "lucide-react";
 import { fileToDataUrl, useCustomer, scopedKey } from "@/hooks/useCustomer";
 import ImageAdjuster, { type AdjustOptions } from "@/components/customer/ImageAdjuster";
 import NotificationBell from "@/components/NotificationBell";
@@ -10,6 +11,8 @@ import CardSwitcher from "@/components/customer/CardSwitcher";
 import { useMobileChrome } from "@/components/layout/MobileDashboardLayout";
 import { JourneyStrip, JourneyContinue } from "@/components/customer/EditCardJourney";
 import LivePreview from "@/components/customer/LivePreview";
+import AppSheet from "@/components/mobile/AppSheet";
+import { haptic, useKeyboardOpen } from "@/lib/nativeApp";
 
 /* Auto-save status pill for module pages (no Save buttons — edits persist
    automatically; this shows the user that it happened). */
@@ -71,6 +74,11 @@ function MobileChromeRegistrar({ action }: { action: ReactNode }) {
   useMobileChrome(null, action);
   return null;
 }
+
+/* Phone width (the mobile app shell). Hidden previews are not mounted there —
+   each one is a live iframe of the whole card. */
+const onResize = (cb: () => void) => { window.addEventListener("resize", cb); return () => window.removeEventListener("resize", cb); };
+const usePhone = () => useSyncExternalStore(onResize, () => window.innerWidth < 768, () => false);
 
 export const fieldCls =
   "h-10 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-[13px] text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#94A3B8]";
@@ -215,6 +223,11 @@ export default function ModuleShell({
   const [canvas, setCanvas] = useState(() => {
     try { return localStorage.getItem("dc_preview_open") !== "0"; } catch { return true; }
   });
+  // Phones: the card opens full-height in a sheet from a floating button, so
+  // the form gets the whole screen instead of sharing it with a cropped card.
+  const [sheet, setSheet] = useState(false);
+  const phone = usePhone();
+  const typing = useKeyboardOpen();
   const toggleCanvas = () => setCanvas((v) => {
     const n = !v;
     try { localStorage.setItem("dc_preview_open", n ? "1" : "0"); } catch { /* ignore */ }
@@ -225,7 +238,7 @@ export default function ModuleShell({
       {/* Rendered below MobileDashboardLayout's provider, so it can hoist this
           page's Save action into the native app bar on mobile. */}
       <MobileChromeRegistrar action={actions ?? null} />
-      <div className={`p-4 sm:p-6 mx-auto w-full ${preview || wide ? "max-w-[1360px]" : "max-w-4xl"}`}>
+      <div className={`px-4 pt-3 pb-4 sm:p-6 mx-auto w-full ${preview || wide ? "max-w-[1360px]" : "max-w-4xl"}`}>
         {/* Desktop header (hidden on mobile — the app bar shows the title instead) */}
         <header className="hidden md:flex items-center justify-between gap-3 mb-4 sm:mb-5">
           <div className="flex items-center gap-3">
@@ -248,7 +261,7 @@ export default function ModuleShell({
             {/* Mobile/tablet: sticky live canvas — edit below, watch it change */}
             {preview && (
               <div
-                className="xl:hidden sticky z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-1.5 pb-2 bg-[#F8FAFC]/95 backdrop-blur-md border-b border-[#E2E8F0]"
+                className="hidden md:block xl:hidden sticky z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-1.5 pb-2 bg-[#F8FAFC]/95 backdrop-blur-md border-b border-[#E2E8F0]"
                 style={{ top: "calc(env(safe-area-inset-top, 0px) + 3.5rem)" }}
               >
                 <button type="button" onClick={toggleCanvas} aria-expanded={canvas}
@@ -264,7 +277,7 @@ export default function ModuleShell({
                   </span>
                   {canvas ? <ChevronUp size={16} className="text-[#94A3B8] shrink-0" /> : <ChevronDown size={16} className="text-[#94A3B8] shrink-0" />}
                 </button>
-                {canvas && <div className="mt-1.5"><LivePreview height={200} frame={false} /></div>}
+                {canvas && !phone && <div className="mt-1.5"><LivePreview height={200} frame={false} /></div>}
               </div>
             )}
             <JourneyStrip />
@@ -275,12 +288,32 @@ export default function ModuleShell({
           {/* Desktop: the card updates as you edit, right beside the form */}
           {preview && (
             <aside className="hidden xl:block sticky top-6">
-              <LivePreview height={620} />
+              {!phone && <LivePreview height={620} />}
             </aside>
           )}
         </div>
       </div>
 
+      {preview && (
+        <>
+          <button type="button" onClick={() => { haptic(); setSheet(true); }}
+            className={`dc-bar md:hidden fixed right-4 z-40 inline-flex h-11 items-center gap-2 rounded-full bg-[#0F172A] pl-3 pr-4 text-[13px] font-bold text-white shadow-[0_12px_28px_-10px_rgba(2,6,23,0.65)] active:scale-95 ${typing ? "dc-bar-hidden" : ""}`}
+            style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 76px)" }}>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#F7B31C]"><Smartphone size={13} className="text-[#0F172A]" /></span>
+            Preview
+          </button>
+          <AppSheet open={sheet} onClose={() => setSheet(false)} tall
+            title={<span className="inline-flex items-center gap-2">Live card <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> updates as you edit</span></span>}
+            footer={
+              <Link to="/dashboard/view" onClick={() => setSheet(false)}
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0F172A] text-[14px] font-semibold text-white active:scale-[0.98]">
+                <ExternalLink size={15} /> Open full card
+              </Link>
+            }>
+            {sheet && <div className="overflow-hidden rounded-2xl"><LivePreview height="calc(92dvh - 170px)" frame={false} /></div>}
+          </AppSheet>
+        </>
+      )}
     </ResponsiveDashboardLayout>
   );
 }

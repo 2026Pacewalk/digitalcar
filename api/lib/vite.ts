@@ -266,6 +266,9 @@ export function serveStaticFiles(app: App) {
       // With rendered markup the page has its real <h1>; the hidden placeholder
       // heading is only for pages that still arrive empty.
       if (meta) { content = injectCardMeta(content, ssr ? { ...meta, h1: undefined, bodyHtml: undefined } : meta); cacheable = true; }
+      // A customer's card saved to a home screen should open that card, not the
+      // DigitalCarda dashboard app the manifest describes.
+      if (meta?.ogType === "profile") content = content.replace(/<link rel="manifest"[^>]*>\s*/, "");
       if (ssr) {
         // The data lives in a JSON <script> OUTSIDE #root, so it isn't part of
         // what React hydrates. `<` is escaped so no value can close the tag.
@@ -306,6 +309,14 @@ export function serveStaticFiles(app: App) {
     if (c.res.status === 200 && /\.(png|jpe?g|webp|gif|svg|ico|woff2?|ttf|otf|mp4)$/i.test(new URL(c.req.url).pathname)) {
       c.header("Cache-Control", "public, max-age=86400");
     }
+  });
+  // The service worker and manifest must be re-checked on every visit, or a
+  // fix to either could sit in browser/CDN caches for hours.
+  app.use("*", async (c, next) => {
+    await next();
+    const p = new URL(c.req.url).pathname;
+    if (p === "/sw.js" || p === "/site.webmanifest" || p === "/offline.html") c.header("Cache-Control", "no-cache");
+    if (p === "/site.webmanifest") c.header("Content-Type", "application/manifest+json");
   });
   app.use("*", serveStatic({ root: "./dist/public" }));
   app.notFound((c) => {

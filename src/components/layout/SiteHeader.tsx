@@ -92,6 +92,12 @@ export default function SiteHeader({ signupHref }: { signupHref: string }) {
     setSearchOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    const open = () => setMobileOpen(true);
+    window.addEventListener("dc:open-site-menu", open);
+    return () => window.removeEventListener("dc:open-site-menu", open);
+  }, []);
+
   // Open the mobile menu on the group that holds the current page.
   useEffect(() => {
     if (mobileOpen) setMobileGroup(HEADER_MENUS.find((m) => m.items.some((i) => isActive(pathname, i.href)))?.id ?? null);
@@ -241,7 +247,7 @@ export default function SiteHeader({ signupHref }: { signupHref: string }) {
                 rel="noreferrer"
                 aria-label="Chat with us on WhatsApp"
                 title="Chat on WhatsApp"
-                className="hidden h-10 w-10 items-center justify-center rounded-xl text-[#4ADE80] transition-colors hover:bg-[#25D366]/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F7B31C] xl:inline-flex"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#4ADE80] transition-colors hover:bg-[#25D366]/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F7B31C] lg:hidden xl:inline-flex"
               >
                 <MessageCircle size={18} />
               </a>
@@ -264,7 +270,7 @@ export default function SiteHeader({ signupHref }: { signupHref: string }) {
                 onClick={() => setMobileOpen(true)}
                 aria-label="Open menu"
                 aria-expanded={mobileOpen}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06] text-white transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F7B31C] lg:hidden"
+                className="hidden h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06] text-white transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F7B31C]"
               >
                 <Menu size={19} />
               </button>

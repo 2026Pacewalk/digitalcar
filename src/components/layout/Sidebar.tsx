@@ -18,12 +18,12 @@ interface SidebarProps {
   onMobileToggle: () => void;
 }
 
-type NavLink = { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; path: string; children?: NavLink[] };
-type NavGroup = { title: string; items: NavLink[] };
+export type NavLink = { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; path: string; children?: NavLink[] };
+export type NavGroup = { title: string; items: NavLink[] };
 
 // Core journey first (§39): the card-section editors are nested UNDER Edit Card,
 // then Grow, then account.
-const customerGroups: NavGroup[] = [
+export const customerGroups: NavGroup[] = [
   { title: "My Card", items: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     // Ordered top-to-bottom to match the sections on the public card: Templates
@@ -60,7 +60,7 @@ const customerGroups: NavGroup[] = [
   ] },
 ];
 
-const superAdminGroups: NavGroup[] = [
+export const superAdminGroups: NavGroup[] = [
   { title: "Overview", items: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/admin" },
   ] },
@@ -93,7 +93,7 @@ const superAdminGroups: NavGroup[] = [
   ] },
 ];
 
-const resellerGroups: NavGroup[] = [
+export const resellerGroups: NavGroup[] = [
   { title: "Overview", items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/reseller" }] },
   { title: "Manage", items: [
     { label: "My Customers", icon: Users, path: "/reseller/customers" },

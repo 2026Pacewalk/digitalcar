@@ -1,20 +1,30 @@
-import { useState, useEffect, createContext, useContext, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext, type ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  Home, Palette, Users, BarChart3, User, LayoutDashboard, Store, UserCircle, Package, ClipboardList,
-  Plus, Eye, Share2, CreditCard, Menu, MessageSquare,
-  Settings, LogOut, HelpCircle, ChevronLeft,
-  Info, ShoppingBag, Wallet, Image as ImageIcon, Star, Upload, Mail, Layers,
-  Gift, Wand2, QrCode, Link2, Globe, ArrowLeft, MailCheck, PenLine,
-  MessageCircle, Nfc,
+  Home, Users, BarChart3, LayoutDashboard, UserCircle, MessageSquare, Wallet, ReceiptText,
+  Eye, Share2, Settings, LogOut, ChevronLeft, ChevronRight, Wand2, QrCode, Mail, ArrowLeft,
+  LayoutGrid, MessageCircle, RefreshCw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { getToken, clearSession } from "@/lib/session";
 import { useAuth } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
+import { readCustomer } from "@/hooks/useCustomer";
+import { CONTACT } from "@/lib/publicNav";
+import { haptic, useEdgeToEdge, useKeyboardOpen } from "@/lib/nativeApp";
 import ProfileMenu from "@/components/ProfileMenu";
 import NotificationBell from "@/components/NotificationBell";
+import AppSheet from "@/components/mobile/AppSheet";
+import { InstallAppBanner, InstallAppRow } from "@/components/mobile/InstallApp";
+import { customerGroups, superAdminGroups, resellerGroups, type NavGroup, type NavLink } from "@/components/layout/Sidebar";
 
-/* ─── Mobile Layout Context (drawer) ─── */
+/* ─── Phone shell for the customer, reseller and admin dashboards ───────────
+ * Built like a native app: an app bar (back / title / actions), a bottom tab
+ * bar whose last tab opens a "More" sheet with every other screen, pull down
+ * to refresh, bars that step aside for the keyboard, and an install offer. */
+
+/* Drawer context — kept for callers; "the drawer" is now the More sheet. */
 interface MobileLayoutContextType {
   openDrawer: () => void;
   closeDrawer: () => void;
@@ -44,115 +54,49 @@ export function useMobileChrome(title: string | null, action: ReactNode) {
   }, [chrome, title, action]);
 }
 
-type NavItem = { icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>; label: string; path: string; children?: NavItem[] };
-type NavGroup = { title: string; items: NavItem[] };
-interface NavConfig { tabs: NavItem[]; drawer: NavGroup[]; roots: string[]; profile: string; settings?: string; bell: string; fab: boolean }
+type Icon = React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+type Tab = { icon: Icon; label: string; path: string; match: (p: string) => boolean };
+interface NavConfig { home: string; profile: string; tabs: Tab[]; groups: NavGroup[] }
 
-/* ─── Per-role navigation (mirrors the desktop Sidebar) ─── */
+const under = (...prefixes: string[]) => (p: string) => prefixes.some((x) => p === x || p.startsWith(`${x}/`));
+
+/* Tabs claim the screens that belong to them, so the right tab stays lit deep
+   inside a flow (e.g. Edit while on About Us). Anything unclaimed lights More. */
 const NAV: Record<string, NavConfig> = {
-  super_admin: {
-    profile: "/admin/profile",
-    settings: "/admin/settings",
-    bell: "/admin/leads",
-    fab: false,
-    roots: ["/admin"],
+  customer: {
+    home: "/dashboard",
+    profile: "/dashboard/profile",
     tabs: [
-      { icon: LayoutDashboard, label: "Home", path: "/admin" },
-      { icon: Store, label: "Resellers", path: "/admin/resellers" },
-      { icon: UserCircle, label: "Customers", path: "/admin/customers" },
-      { icon: MessageSquare, label: "Leads", path: "/admin/leads" },
+      { icon: Home, label: "Home", path: "/dashboard", match: (p) => p === "/dashboard" },
+      { icon: Wand2, label: "Edit", path: "/dashboard/build", match: under(
+        "/dashboard/build", "/dashboard/home", "/dashboard/templates", "/dashboard/social", "/dashboard/about",
+        "/dashboard/products", "/dashboard/payments", "/dashboard/media", "/dashboard/reviews", "/dashboard/uploads",
+        "/dashboard/view", "/dashboard/builder", "/dashboard/cards", "/dashboard/ai") },
+      { icon: QrCode, label: "Share", path: "/dashboard/qr", match: under("/dashboard/qr", "/dashboard/signature", "/dashboard/whatsapp") },
+      { icon: Mail, label: "Leads", path: "/dashboard/leads", match: under("/dashboard/leads", "/dashboard/enquiry") },
     ],
-    drawer: [
-      { title: "Overview", items: [
-        { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
-      ] },
-      { title: "Manage", items: [
-        { icon: Store, label: "Resellers", path: "/admin/resellers" },
-        { icon: ClipboardList, label: "Applications", path: "/admin/reseller-applications" },
-        { icon: UserCircle, label: "Customers", path: "/admin/customers" },
-        { icon: MessageSquare, label: "Leads", path: "/admin/leads" },
-      ] },
-      { title: "Catalog", items: [
-        { icon: Package, label: "Packages", path: "/admin/packages" },
-        { icon: Palette, label: "Templates", path: "/admin/templates" },
-      ] },
-      { title: "Growth", items: [
-        { icon: Wallet, label: "Payments", path: "/admin/payments" },
-        { icon: Gift, label: "Referrals & Payouts", path: "/admin/referrals" },
-      ] },
-      { title: "System", items: [
-        { icon: Link2, label: "URL Conflicts", path: "/admin/url-conflicts" },
-        { icon: Globe, label: "Custom Domains", path: "/admin/domains" },
-        { icon: MailCheck, label: "Email Log", path: "/admin/email-log" },
-        { icon: Settings, label: "Settings", path: "/admin/settings" },
-      ] },
+    groups: customerGroups,
+  },
+  super_admin: {
+    home: "/admin",
+    profile: "/admin/profile",
+    tabs: [
+      { icon: LayoutDashboard, label: "Home", path: "/admin", match: (p) => p === "/admin" },
+      { icon: UserCircle, label: "Customers", path: "/admin/customers", match: under("/admin/customers") },
+      { icon: MessageSquare, label: "Leads", path: "/admin/leads", match: under("/admin/leads") },
+      { icon: ReceiptText, label: "Payments", path: "/admin/payment-orders", match: under("/admin/payment-orders", "/admin/payments") },
     ],
+    groups: superAdminGroups,
   },
   reseller: {
+    home: "/reseller",
     profile: "/reseller/profile",
-    bell: "/reseller",
-    fab: false,
-    roots: ["/reseller"],
     tabs: [
-      { icon: LayoutDashboard, label: "Home", path: "/reseller" },
-      { icon: Users, label: "Customers", path: "/reseller/customers" },
-      { icon: User, label: "Profile", path: "/reseller/profile" },
+      { icon: LayoutDashboard, label: "Home", path: "/reseller", match: (p) => p === "/reseller" },
+      { icon: Users, label: "Customers", path: "/reseller/customers", match: under("/reseller/customers") },
+      { icon: Wallet, label: "Payments", path: "/reseller/payments", match: under("/reseller/payments") },
     ],
-    drawer: [
-      { title: "Overview", items: [{ icon: LayoutDashboard, label: "Dashboard", path: "/reseller" }] },
-      { title: "Manage", items: [
-        { icon: Users, label: "My Customers", path: "/reseller/customers" },
-        { icon: User, label: "Profile", path: "/reseller/profile" },
-      ] },
-    ],
-  },
-  customer: {
-    profile: "/dashboard/profile",
-    settings: "/dashboard/settings",
-    bell: "/dashboard/enquiry",
-    fab: false,
-    roots: ["/dashboard", "/dashboard/home"],
-    tabs: [
-      { icon: Home, label: "Home", path: "/dashboard" },
-      { icon: Wand2, label: "Edit", path: "/dashboard/build" },
-      { icon: QrCode, label: "QR", path: "/dashboard/qr" },
-      { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
-      { icon: User, label: "Profile", path: "/dashboard/profile" },
-    ],
-    drawer: [
-      { title: "My Card", items: [
-        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-        // Card-section editors nested under Edit Card, ordered to match the public
-        // card's section flow (same as the desktop sidebar).
-        { icon: Wand2, label: "Edit Card", path: "/dashboard/build", children: [
-          { icon: Palette, label: "Templates", path: "/dashboard/templates" },
-          { icon: Share2, label: "Social Links", path: "/dashboard/social" },
-          { icon: Info, label: "About Us", path: "/dashboard/about" },
-          { icon: ShoppingBag, label: "Products / Services", path: "/dashboard/products?tab=products" },
-          { icon: Wallet, label: "Payments", path: "/dashboard/payments" },
-          { icon: ImageIcon, label: "Gallery & Videos", path: "/dashboard/media" },
-          { icon: Star, label: "Google Reviews", path: "/dashboard/reviews" },
-          { icon: Upload, label: "Uploads", path: "/dashboard/uploads" },
-          { icon: Eye, label: "View Card", path: "/dashboard/view" },
-        ] },
-      ] },
-      { title: "Grow", items: [
-        { icon: Mail, label: "Leads", path: "/dashboard/leads" },
-        { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
-        { icon: QrCode, label: "QR & Share", path: "/dashboard/qr" },
-        { icon: PenLine, label: "Email Signature", path: "/dashboard/signature" },
-        { icon: MessageCircle, label: "WhatsApp Messages", path: "/dashboard/whatsapp" },
-        { icon: Nfc, label: "NFC Card & Standee", path: "/dashboard/nfc" },
-        { icon: Gift, label: "Refer & Earn", path: "/dashboard/refer" },
-      ] },
-      { title: "Account", items: [
-        { icon: CreditCard, label: "Subscription", path: "/dashboard/subscription" },
-        { icon: Globe, label: "Custom Domain", path: "/dashboard/domain" },
-        { icon: Layers, label: "Bulk Create", path: "/dashboard/bulk" },
-        { icon: User, label: "Profile", path: "/dashboard/profile" },
-        { icon: Settings, label: "Settings", path: "/dashboard/settings?tab=module" },
-      ] },
-    ],
+    groups: resellerGroups,
   },
 };
 
@@ -160,28 +104,21 @@ const NAV: Record<string, NavConfig> = {
 const ROUTE_TITLES: Record<string, string> = {
   // Customer
   "/dashboard": "Dashboard",
-  "/dashboard/home": "Home",
+  "/dashboard/build": "Edit Card",
+  "/dashboard/home": "Basics",
   "/dashboard/about": "About Us",
   "/dashboard/products": "Products / Services",
-  "/dashboard/offers": "Offers & Deals",
   "/dashboard/payments": "Payments",
   "/dashboard/signature": "Email Signature",
   "/dashboard/whatsapp": "WhatsApp Messages",
   "/dashboard/nfc": "NFC Card & Standee",
-  "/admin/nfc-orders": "NFC Orders",
-  "/admin/coupons": "Coupons",
-  "/admin/announcements": "Offer Popups",
-  "/admin/reseller-accounts": "Reseller Accounts",
-  "/dashboard/qrcode": "QR Code",
-  "/dashboard/qr": "QR Codes",
-  "/dashboard/media": "Gallery",
+  "/dashboard/qr": "QR & Share",
+  "/dashboard/media": "Gallery & Videos",
   "/dashboard/social": "Social Links",
   "/dashboard/reviews": "Google Reviews",
   "/dashboard/uploads": "Uploads",
   "/dashboard/settings": "Settings",
   "/dashboard/view": "My Card",
-  "/dashboard/enquiry": "Enquiries",
-  "/dashboard/builder": "Card Builder",
   "/dashboard/leads": "Leads",
   "/dashboard/analytics": "Analytics",
   "/dashboard/profile": "Profile",
@@ -190,252 +127,383 @@ const ROUTE_TITLES: Record<string, string> = {
   "/dashboard/refer": "Refer & Earn",
   "/dashboard/templates": "Templates",
   "/dashboard/subscription": "Subscription",
+  "/dashboard/billing": "Billing",
   "/dashboard/domain": "Custom Domain",
   "/dashboard/ai": "AI Tools",
   // Admin
   "/admin": "Dashboard",
   "/admin/resellers": "Resellers",
-  "/admin/reseller-applications": "Reseller Applications",
+  "/admin/reseller-accounts": "Reseller Accounts",
+  "/admin/reseller-applications": "Applications",
   "/admin/customers": "Customers",
+  "/admin/products": "Products",
   "/admin/packages": "Packages",
   "/admin/templates": "Templates",
   "/admin/migration": "Migration",
+  "/admin/url-conflicts": "URL Conflicts",
+  "/admin/domains": "Custom Domains",
+  "/admin/email-log": "Email Log",
   "/admin/analytics": "Analytics",
   "/admin/leads": "Leads",
+  "/admin/bulk-orders": "Bulk Orders",
+  "/admin/nfc-orders": "NFC Orders",
+  "/admin/coupons": "Coupons",
+  "/admin/announcements": "Offer Popups",
+  "/admin/ai-generator": "AI Generator",
   "/admin/referrals": "Referrals & Payouts",
   "/admin/payments": "Payments",
+  "/admin/payment-orders": "Payment Orders",
   "/admin/settings": "Settings",
   "/admin/profile": "Profile",
   // Reseller
   "/reseller": "Dashboard",
   "/reseller/customers": "My Customers",
+  "/reseller/payments": "Payment Orders",
   "/reseller/profile": "Profile",
 };
 
-const FAB_ACTIONS = [
-  { icon: Eye, label: "Preview Card", color: "bg-[#0F172A]", action: "/dashboard/view" },
-  { icon: Share2, label: "Share Card", color: "bg-[#14B8A6]", action: "share" },
-  { icon: CreditCard, label: "My Cards", color: "bg-[#8B5CF6]", action: "/dashboard/cards" },
-  { icon: Plus, label: "Bulk Create", color: "bg-[#EC4899]", action: "/dashboard/bulk" },
-];
+/* Icon tints per menu section, so a long list scans like a phone's settings. */
+const TINTS: Record<string, string> = {
+  "My Card": "bg-[#FEF3C7] text-[#B45309]",
+  "Overview": "bg-[#FEF3C7] text-[#B45309]",
+  "Grow": "bg-[#DCFCE7] text-[#15803D]",
+  "Growth": "bg-[#DCFCE7] text-[#15803D]",
+  "Manage": "bg-[#DBEAFE] text-[#1D4ED8]",
+  "Catalog": "bg-[#EDE9FE] text-[#6D28D9]",
+  "Account": "bg-[#E2E8F0] text-[#334155]",
+  "System": "bg-[#E2E8F0] text-[#334155]",
+};
+
+/* ─── Pull to refresh ─────────────────────────────────────────────────────── */
+const PULL_TRIGGER = 64;
+
+function usePullToRefresh(onRefresh: () => Promise<unknown>, enabled: boolean) {
+  const [pull, setPull] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const busy = useRef(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let startY: number | null = null;
+    let startX = 0;
+    let dist = 0;
+    let active = false;
+    let armed = false;
+
+    // A gesture that starts inside something scrolled (a list, a sheet) belongs to it.
+    const ownedByInner = (t: EventTarget | null) => {
+      for (let el = t as HTMLElement | null; el && el !== document.body; el = el.parentElement) {
+        if (el.getAttribute?.("role") === "dialog") return true;
+        const oy = getComputedStyle(el).overflowY;
+        if ((oy === "auto" || oy === "scroll") && el.scrollTop > 0) return true;
+      }
+      return false;
+    };
+
+    const onStart = (e: TouchEvent) => {
+      startY = null;
+      if (busy.current || e.touches.length !== 1 || window.scrollY > 0) return;
+      if (document.body.style.overflow === "hidden" || ownedByInner(e.target)) return;
+      startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX;
+      dist = 0; active = false; armed = false;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (startY == null) return;
+      const dy = e.touches[0].clientY - startY;
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      if (!active) {
+        if (dy < -4 || dx > 14) { startY = null; return; }
+        if (dy > 10 && dy > dx * 1.6 && window.scrollY <= 0) active = true;
+        else return;
+      }
+      dist = Math.min(110, Math.max(0, dy - 10) * 0.5);
+      setPull(dist);
+      if (dist >= PULL_TRIGGER && !armed) { armed = true; haptic(); }
+      else if (dist < PULL_TRIGGER) armed = false;
+    };
+    const onEnd = async () => {
+      if (startY == null) return;
+      startY = null;
+      if (!active) return;
+      if (dist < PULL_TRIGGER) { setPull(0); return; }
+      busy.current = true;
+      setRefreshing(true);
+      setPull(PULL_TRIGGER);
+      try {
+        await Promise.all([onRefresh(), new Promise((r) => setTimeout(r, 700))]);
+      } finally {
+        busy.current = false;
+        setRefreshing(false);
+        setPull(0);
+      }
+    };
+
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd);
+    window.addEventListener("touchcancel", onEnd);
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, [enabled, onRefresh]);
+
+  return { pull, refreshing };
+}
 
 export default function MobileDashboardLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const [moreOpen, setMoreOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const [headerAction, setHeaderAction] = useState<ReactNode>(null);
+  const typing = useKeyboardOpen();
+  useEdgeToEdge();
 
   const role = user?.role || "customer";
   const cfg = NAV[role] || NAV.customer;
   const theme = roleTheme(role);
-
-  // One drawer row — used for top-level items and their nested (indented) children.
-  const renderDrawerItem = (item: NavItem, child: boolean, key: number = 0) => {
-    const [p, q] = item.path.split("?");
-    const defaultTab = p === "/dashboard/products" ? "products" : "module";
-    const curTab = new URLSearchParams(location.search).get("tab") || defaultTab;
-    const wantTab = q ? new URLSearchParams(q).get("tab") : null;
-    const isActive = location.pathname === p && (!wantTab || wantTab === curTab);
-    return (
-      <button
-        key={key}
-        onClick={() => { navigate(item.path); setDrawerOpen(false); }}
-        className={`w-full flex items-center gap-3 rounded-xl font-medium transition-all ${child ? "px-3 py-2 text-[12.5px]" : "px-3 py-2.5 text-[13px]"} ${isActive ? "bg-[#0F172A] text-white" : "text-[#64748B] active:bg-[#F1F5F9]"}`}
-      >
-        <item.icon size={child ? 15 : 17} /> {item.label}
-      </button>
-    );
-  };
+  const path = location.pathname;
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 6);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
+  // A new screen opens at its top, like a pushed view.
+  useEffect(() => { window.scrollTo(0, 0); setMoreOpen(false); }, [path]);
 
-  // Active tab = the tab with the longest matching path prefix.
-  let activeNav = -1, activeLen = -1;
-  cfg.tabs.forEach((item, i) => {
-    const match = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
-    if (match && item.path.length > activeLen) { activeNav = i; activeLen = item.path.length; }
-  });
+  const refresh = useCallback(async () => {
+    window.dispatchEvent(new Event("dc:refresh"));
+    await queryClient.invalidateQueries();
+  }, [queryClient]);
+  const { pull, refreshing } = usePullToRefresh(refresh, !moreOpen);
 
-  const rootPaths = new Set([...cfg.tabs.map((t) => t.path), ...cfg.roots]);
-  const isRoot = rootPaths.has(location.pathname);
-  let title = pageTitle || ROUTE_TITLES[location.pathname] || "DigitalCarda";
-  if (location.pathname === "/dashboard/products") {
-    title = new URLSearchParams(location.search).get("tab") === "offers" ? "Offers / Deals" : "Products / Services";
-  }
-
-  const handleFabAction = (action: string) => {
-    setFabOpen(false);
-    if (action === "share") {
-      const url = window.location.origin + "/dashboard/view";
-      if (navigator.share) navigator.share({ title: "My Digital Card", url });
-      else navigator.clipboard?.writeText(url);
-    } else {
-      navigate(action);
+  const activeTab = cfg.tabs.findIndex((t) => t.match(path));
+  const onTabRoot = cfg.tabs.some((t) => t.path === path);
+  const title = (() => {
+    if (pageTitle) return pageTitle;
+    if (path === "/dashboard/products") {
+      return new URLSearchParams(location.search).get("tab") === "offers" ? "Offers / Deals" : "Products / Services";
     }
+    return ROUTE_TITLES[path] || "DigitalCarda";
+  })();
+
+  // Back goes to the previous screen; opened directly (a shortcut, a link) it
+  // goes up to the section home instead of leaving the app.
+  const goBack = () => {
+    haptic();
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) navigate(-1);
+    else navigate(cfg.home, { replace: true });
   };
 
+  const go = (to: string) => { haptic(); navigate(to); };
+
+  const shareCard = async () => {
+    haptic();
+    const slug = String(readCustomer()?.slug || "");
+    if (!slug) { navigate("/dashboard/qr"); return; }
+    const url = `${window.location.origin}/${slug}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "My digital business card", url });
+      else { await navigator.clipboard.writeText(url); toast.success("Card link copied"); }
+    } catch { /* share sheet dismissed */ }
+  };
+
+  const impersonating = !path.startsWith("/admin") && !!getToken("admin");
+  const initial = (user?.fullName || "U").charAt(0).toUpperCase();
+  const moreActive = activeTab === -1;
+
   return (
-    <MobileLayoutContext.Provider value={{ openDrawer: () => setDrawerOpen(true), closeDrawer: () => setDrawerOpen(false), isDrawerOpen: drawerOpen }}>
+    <MobileLayoutContext.Provider value={{ openDrawer: () => setMoreOpen(true), closeDrawer: () => setMoreOpen(false), isDrawerOpen: moreOpen }}>
       <MobileChromeContext.Provider value={{ setTitle: setPageTitle, setAction: setHeaderAction }}>
-        <div className={`min-h-screen bg-[#F8FAFC] touch-pan-y overscroll-contain ${cfg.tabs.length ? "pb-24" : "pb-6"}`}>
+        <div className="min-h-screen bg-[#F4F6F9] pb-[calc(env(safe-area-inset-bottom,0px)+84px)]">
 
-          {/* ─── Native App Bar ─── */}
+          {/* ─── App bar ─── */}
           <header
-            className={`sticky top-0 z-40 bg-white/90 backdrop-blur-xl pt-safe transition-shadow duration-200 ${theme.badge ? "border-t-2 " + theme.topAccent : ""} ${
-              scrolled ? "shadow-[0_1px_0_0_#E2E8F0,0_4px_16px_-8px_rgba(15,23,42,0.15)]" : "border-b border-[#F1F5F9]"
-            }`}
+            className={`sticky top-0 z-40 bg-white/90 pt-safe backdrop-blur-xl transition-shadow duration-200 ${theme.badge ? `border-t-2 ${theme.topAccent}` : ""} ${
+              scrolled ? "shadow-[0_1px_0_0_#E2E8F0,0_6px_18px_-12px_rgba(15,23,42,0.25)]" : "shadow-[0_1px_0_0_#EEF1F5]"}`}
           >
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center h-14 px-2">
-              <div className="flex items-center justify-start">
-                {isRoot ? (
-                  <button onClick={() => setDrawerOpen(true)} aria-label="Menu" className="w-10 h-10 flex items-center justify-center rounded-full active:bg-[#F1F5F9] transition-colors">
-                    <Menu size={22} className="text-[#0F172A]" />
-                  </button>
-                ) : (
-                  <button onClick={() => navigate(-1)} aria-label="Back" className="w-10 h-10 flex items-center justify-center rounded-full active:bg-[#F1F5F9] transition-colors">
-                    <ChevronLeft size={26} className="text-[#0F172A]" />
-                  </button>
-                )}
-              </div>
-
-              <div className="flex flex-col items-center justify-center min-w-0 px-1 leading-none">
-                <h1 className="text-[17px] font-bold text-[#0F172A] tracking-tight truncate max-w-[58vw]">{title}</h1>
+            <div className="flex h-14 items-center gap-1 pl-1.5 pr-2">
+              {onTabRoot ? (
+                <span className="w-2.5 shrink-0" />
+              ) : (
+                <button onClick={goBack} aria-label="Back"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#0F172A] active:bg-[#F1F5F9]">
+                  <ChevronLeft size={26} />
+                </button>
+              )}
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <h1 className={`truncate tracking-tight text-[#0F172A] ${onTabRoot ? "text-[21px] font-extrabold" : "text-[17px] font-bold"}`}>{title}</h1>
                 {theme.badge && (
-                  <span className={`mt-0.5 text-[8px] px-1.5 py-px rounded font-bold tracking-wider ${theme.badgeCls}`}>{theme.badge}</span>
+                  <span className={`shrink-0 rounded px-1.5 py-px text-[9px] font-bold tracking-wider ${theme.badgeCls}`}>{theme.badge}</span>
                 )}
               </div>
-
-              <div className="flex items-center justify-end gap-0.5">
+              <div className="flex shrink-0 items-center gap-0.5">
                 {headerAction && (
-                  <span className="flex items-center mr-0.5 [&_a]:!h-8 [&_a]:!px-3 [&_a]:!text-[12px] [&_a]:!rounded-lg [&_a]:!gap-1 [&_a]:!whitespace-nowrap [&_button]:!h-8 [&_button]:!px-3 [&_button]:!text-[12px] [&_button]:!font-semibold [&_button]:!rounded-lg [&_button]:!gap-1 [&_button]:!whitespace-nowrap [&_svg]:!w-3.5 [&_svg]:!h-3.5">
+                  <span className="mr-0.5 flex items-center [&_a]:!h-8 [&_a]:!gap-1 [&_a]:!whitespace-nowrap [&_a]:!rounded-lg [&_a]:!px-3 [&_a]:!text-[12px] [&_button]:!h-8 [&_button]:!gap-1 [&_button]:!whitespace-nowrap [&_button]:!rounded-lg [&_button]:!px-3 [&_button]:!text-[12px] [&_button]:!font-semibold [&_svg]:!h-3.5 [&_svg]:!w-3.5">
                     {headerAction}
                   </span>
                 )}
                 <NotificationBell />
-                <ProfileMenu />
+                {onTabRoot && <ProfileMenu />}
               </div>
             </div>
           </header>
 
-          {/* ─── Main Content ─── */}
-          <main className="max-w-lg mx-auto w-full">{children}</main>
-
-          {/* ─── Floating Action Button (customer only) ─── */}
-          {cfg.fab && (
-            <div className="fixed bottom-[86px] right-4 z-40 flex flex-col items-end gap-2">
-              {fabOpen && (
-                <>
-                  <div className="fixed inset-0 -z-10" onClick={() => setFabOpen(false)} />
-                  <div className="flex flex-col items-end gap-2.5 mb-1">
-                    {FAB_ACTIONS.map((item, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleFabAction(item.action)}
-                        className="flex items-center gap-2.5 animate-fab-pop"
-                        style={{ animationDelay: `${i * 40}ms` }}
-                      >
-                        <span className="text-[11px] font-semibold text-white bg-[#0F172A]/85 px-2.5 py-1.5 rounded-lg shadow-lg">{item.label}</span>
-                        <div className={`w-11 h-11 ${item.color} rounded-full flex items-center justify-center shadow-lg`}>
-                          <item.icon size={17} className="text-white" />
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              <button onClick={() => setFabOpen(!fabOpen)} className="fab gradient-gold text-[#0F172A]" aria-label="Quick actions">
-                <span className={`transition-transform duration-300 ${fabOpen ? "rotate-45" : ""}`}><Plus size={24} /></span>
-              </button>
+          {/* ─── Pull-to-refresh indicator ─── */}
+          {(pull > 0 || refreshing) && (
+            <div className="pointer-events-none fixed inset-x-0 z-30 flex justify-center"
+              style={{ top: `calc(env(safe-area-inset-top, 0px) + 56px + ${pull - 44}px)` }}>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_6px_18px_-6px_rgba(15,23,42,0.35)] ring-1 ring-[#EEF1F5]">
+                <RefreshCw size={18}
+                  className={`text-[#D97706] ${refreshing ? "dc-ptr-spin" : ""}`}
+                  style={refreshing ? undefined : { transform: `rotate(${pull * 4}deg)`, opacity: Math.min(1, pull / PULL_TRIGGER) }} />
+              </span>
             </div>
           )}
 
-          {/* ─── Bottom Tab Bar ─── */}
-          <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/92 backdrop-blur-xl border-t border-[#F1F5F9]">
-            <div className="flex items-stretch justify-around h-16 px-1">
-              {cfg.tabs.map((item, i) => {
-                const active = activeNav === i;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => navigate(item.path)}
-                    className="flex-1 flex flex-col items-center justify-center gap-1 pt-1.5 active:scale-95 transition-transform"
-                    aria-label={item.label}
-                  >
-                    <span className={`flex items-center justify-center h-8 w-14 rounded-full transition-colors ${active ? "bg-[#FEF3C7]" : ""}`}>
-                      <item.icon size={21} strokeWidth={active ? 2.4 : 2} className={active ? "text-[#D97706]" : "text-[#475569]"} />
-                    </span>
-                    <span className={`text-[10px] font-semibold leading-none ${active ? "text-[#B45309]" : "text-[#475569]"}`}>{item.label}</span>
-                  </button>
-                );
-              })}
+          {/* ─── Screen ─── */}
+          <main className="dc-screen-in mx-auto w-full max-w-lg">{children}</main>
+
+          <InstallAppBanner hidden={typing || moreOpen} />
+
+          {/* ─── Bottom tab bar ─── */}
+          <nav aria-label="Main"
+            className={`dc-bar fixed inset-x-0 bottom-0 z-50 border-t border-[#E9EDF2] bg-white/95 backdrop-blur-xl ${typing ? "dc-bar-hidden" : ""}`}>
+            <div className="mx-auto flex h-[62px] max-w-lg items-stretch px-1">
+              {cfg.tabs.map((t, i) => (
+                <TabButton key={t.path} icon={t.icon} label={t.label} active={activeTab === i}
+                  onClick={() => { if (activeTab === i && path === t.path) window.scrollTo({ top: 0, behavior: "smooth" }); else go(t.path); }} />
+              ))}
+              <TabButton icon={LayoutGrid} label="More" active={moreActive || moreOpen} onClick={() => { haptic(); setMoreOpen(true); }} />
             </div>
             <div className="h-safe-bottom" />
           </nav>
 
-          {/* ─── Slide Drawer ─── */}
-          {drawerOpen && (
-            <div className="fixed inset-0 z-[100]">
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => setDrawerOpen(false)} />
-              <div className="absolute left-0 top-0 bottom-0 w-[284px] bg-white shadow-2xl animate-drawer-in flex flex-col pt-safe">
-                <div className="p-5 border-b border-[#F1F5F9]">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl gradient-gold flex items-center justify-center">
-                      <span className="text-[#0F172A] text-lg font-bold">{(user?.fullName || "U").charAt(0).toUpperCase()}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#0F172A] truncate">{user?.fullName || "User"}</p>
-                      <p className="text-[11px] text-[#94A3B8] truncate capitalize">{role.replace("_", " ")}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex-1 p-3 overflow-y-auto">
-                  {cfg.drawer.map((group, gi) => (
-                    <div key={group.title} className={gi > 0 ? "mt-4" : ""}>
-                      <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8]">{group.title}</p>
-                      <div className="space-y-0.5">
-                        {group.items.map((item, i) => (
-                          <div key={i}>
-                            {renderDrawerItem(item, false)}
-                            {item.children && (
-                              <div className="mt-0.5 mb-1 ml-[26px] pl-2 border-l border-[#F1F5F9] space-y-0.5">
-                                {item.children.map((ch, ci) => renderDrawerItem(ch, true, ci))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-3 border-t border-[#F1F5F9] space-y-1 pb-safe">
-                  {!window.location.pathname.startsWith("/admin") && !!getToken("admin") && (
-                    <button onClick={() => { clearSession("main"); window.location.href = "/admin/customers"; }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-[#0F172A] bg-[#FEF3C7] active:brightness-105 transition-all">
-                      <ArrowLeft size={18} /> Return to admin
-                    </button>
-                  )}
-                  <button onClick={() => { navigate(cfg.profile); setDrawerOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-[#64748B] active:bg-[#F1F5F9] transition-all">
-                    <HelpCircle size={18} /> Help & Support
-                  </button>
-                  <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-red-500 active:bg-red-50 transition-all">
-                    <LogOut size={18} /> Logout
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* ─── More ─── */}
+          <AppSheet open={moreOpen} onClose={() => setMoreOpen(false)} tall>
+            <button type="button" onClick={() => go(cfg.profile)}
+              className="dc-press mt-1 flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left ring-1 ring-[#E7EAF0]">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full gradient-gold text-lg font-bold text-[#0F172A]">{initial}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-bold text-[#0F172A]">{user?.fullName || "My account"}</span>
+                <span className="block truncate text-[12px] text-[#64748B]">{user?.email || role.replace("_", " ")}</span>
+              </span>
+              <ChevronRight size={17} className="text-[#CBD5E1]" />
+            </button>
 
+            {role === "customer" && (
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {[
+                  { icon: Eye, label: "My card", onClick: () => go("/dashboard/view") },
+                  { icon: Share2, label: "Share", onClick: shareCard },
+                  { icon: BarChart3, label: "Analytics", onClick: () => go("/dashboard/analytics") },
+                  { icon: Settings, label: "Settings", onClick: () => go("/dashboard/settings?tab=module") },
+                ].map((q) => (
+                  <button key={q.label} type="button" onClick={q.onClick}
+                    className="dc-press flex flex-col items-center gap-1.5 rounded-2xl bg-white py-3 ring-1 ring-[#E7EAF0]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0F172A] text-[#F7B31C]"><q.icon size={17} /></span>
+                    <span className="text-[11.5px] font-semibold text-[#334155]">{q.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-3"><InstallAppRow /></div>
+
+            {cfg.groups.map((g) => (
+              <MenuGroup key={g.title} group={g} path={path} search={location.search} onGo={go} />
+            ))}
+
+            <p className="mb-1.5 mt-5 px-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#94A3B8]">Support</p>
+            <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#E7EAF0]">
+              <a href={CONTACT.whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-3 py-3 active:bg-[#F8FAFC]">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DCFCE7] text-[#15803D]"><MessageCircle size={16} /></span>
+                <span className="flex-1 text-[14px] font-medium text-[#0F172A]">Chat with support</span>
+                <ChevronRight size={16} className="text-[#CBD5E1]" />
+              </a>
+              {impersonating && (
+                <button type="button" onClick={() => { clearSession("main"); window.location.href = "/admin/customers"; }}
+                  className="flex w-full items-center gap-3 border-t border-[#F1F5F9] px-3 py-3 text-left active:bg-[#F8FAFC]">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FEF3C7] text-[#B45309]"><ArrowLeft size={16} /></span>
+                  <span className="flex-1 text-[14px] font-semibold text-[#0F172A]">Return to admin</span>
+                </button>
+              )}
+              <button type="button" onClick={() => { haptic("warning"); logout(); }}
+                className="flex w-full items-center gap-3 border-t border-[#F1F5F9] px-3 py-3 text-left active:bg-[#FEF2F2]">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FEE2E2] text-[#DC2626]"><LogOut size={16} /></span>
+                <span className="flex-1 text-[14px] font-semibold text-[#DC2626]">Log out</span>
+              </button>
+            </div>
+            <p className="mt-4 text-center text-[11px] text-[#94A3B8]">DigitalCarda · digitalcarda.in</p>
+          </AppSheet>
         </div>
       </MobileChromeContext.Provider>
     </MobileLayoutContext.Provider>
+  );
+}
+
+function TabButton({ icon: I, label, active, onClick }: { icon: Icon; label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={label} aria-current={active ? "page" : undefined}
+      className="flex flex-1 flex-col items-center justify-center gap-[3px] pt-1 active:opacity-70">
+      <span className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors duration-200 ${active ? "bg-[#FEF3C7]" : ""}`}>
+        <I size={21} strokeWidth={active ? 2.4 : 1.9} className={active ? "text-[#D97706]" : "text-[#64748B]"} />
+      </span>
+      <span className={`text-[10.5px] leading-none ${active ? "font-bold text-[#B45309]" : "font-medium text-[#64748B]"}`}>{label}</span>
+    </button>
+  );
+}
+
+/* One section of the More sheet as a grouped list. Items with sub-screens
+   (Edit Card) list those as their own group underneath. */
+function MenuGroup({ group, path, search, onGo }: { group: NavGroup; path: string; search: string; onGo: (to: string) => void }) {
+  const tint = TINTS[group.title] || TINTS.Account;
+  const rows: NavLink[] = group.items;
+  const nested = rows.filter((r) => r.children?.length);
+
+  const isOn = (to: string) => {
+    const [p, q] = to.split("?");
+    if (p !== path) return false;
+    if (!q) return true;
+    const want = new URLSearchParams(q).get("tab");
+    const cur = new URLSearchParams(search).get("tab") || (p === "/dashboard/products" ? "products" : "module");
+    return !want || want === cur;
+  };
+
+  const list = (title: string, items: NavLink[], t: string) => (
+    <div key={title}>
+      <p className="mb-1.5 mt-5 px-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#94A3B8]">{title}</p>
+      <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#E7EAF0]">
+        {items.map((it, i) => {
+          const on = isOn(it.path);
+          return (
+            <button key={it.path} type="button" onClick={() => onGo(it.path)} aria-current={on ? "page" : undefined}
+              className={`flex w-full items-center gap-3 px-3 py-[11px] text-left active:bg-[#F8FAFC] ${i ? "border-t border-[#F1F5F9]" : ""} ${on ? "bg-[#FFFBEB]" : ""}`}>
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${t}`}><it.icon size={16} /></span>
+              <span className={`flex-1 truncate text-[14px] ${on ? "font-bold text-[#B45309]" : "font-medium text-[#0F172A]"}`}>{it.label}</span>
+              <ChevronRight size={16} className="shrink-0 text-[#CBD5E1]" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {list(group.title, rows, tint)}
+      {nested.map((n) => list(`${n.label} · sections`, n.children!, "bg-[#FFF7ED] text-[#C2410C]"))}
+    </>
   );
 }

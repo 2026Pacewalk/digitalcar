@@ -1,19 +1,28 @@
 {
-  "name": "DigitalCarda",
+  "id": "/dashboard",
+  "name": "DigitalCarda — Digital Business Card",
   "short_name": "DigitalCarda",
-  "icons": [
-    {
-      "src": "/android-chrome-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/android-chrome-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ],
+  "description": "Create, share and track your digital business card — QR, WhatsApp, leads and analytics in one app.",
+  "start_url": "/dashboard?source=app",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
   "theme_color": "#0F172A",
   "background_color": "#0F172A",
-  "display": "standalone"
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "/icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Edit my card", "short_name": "Edit card", "url": "/dashboard/build?source=shortcut", "icons": [{ "src": "/icons/shortcut-edit.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Share my QR code", "short_name": "Share QR", "url": "/dashboard/qr?source=shortcut", "icons": [{ "src": "/icons/shortcut-share.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "My leads", "short_name": "Leads", "url": "/dashboard/leads?source=shortcut", "icons": [{ "src": "/icons/shortcut-leads.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Card analytics", "short_name": "Analytics", "url": "/dashboard/analytics?source=shortcut", "icons": [{ "src": "/icons/shortcut-analytics.png", "sizes": "96x96", "type": "image/png" }] }
+  ]
 }

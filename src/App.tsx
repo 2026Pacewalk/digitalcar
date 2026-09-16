@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 import { getToken, getSessionUser, setSessionUser, clearSession } from "@/lib/session";
 import PublicLayout from "@/components/layout/PublicLayout";
+import { isStandalone } from "@/lib/nativeApp";
 const CustomDomainCard = lazy(() => import("@/components/CustomDomainCard"));
 
 // Hosts that are the DigitalCarda app itself (never treated as a custom card domain).
@@ -145,7 +146,14 @@ function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allo
   }
 
   if (isLoading || (hasToken && me.isLoading)) return <Spinner />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    // The home-screen app always opens /dashboard; someone signed in only to the
+    // admin portal belongs on /admin, not the login screen.
+    const fromApp = typeof window !== "undefined"
+      && (new URLSearchParams(window.location.search).get("source") === "app" || isStandalone());
+    if (fromApp && !window.location.pathname.startsWith("/admin") && getToken("admin")) return <Navigate to="/admin" replace />;
+    return <Navigate to="/login" replace />;
+  }
 
   // Prefer the server-verified role for the access decision.
   const role = me.data?.role ?? user.role;
