@@ -719,7 +719,7 @@ function WhyDigitalCardaSection() {
   ];
 
   return (
-    <section className="pt-12 lg:pt-10 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] relative overflow-hidden">
+    <section className="pt-12 lg:pt-8 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] relative overflow-hidden">
       <div className="absolute inset-0 bg-grid-dark opacity-40" />
       <div className="absolute top-1/2 left-1/4 w-[400px] h-[400px] bg-[#F7B31C]/8 rounded-full blur-3xl -translate-y-1/2" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
@@ -736,7 +736,7 @@ function WhyDigitalCardaSection() {
                 width="1100" height="1011"
                 alt="Smiling professional holding a smartphone showing a DigitalCarda digital business card in one hand and a contactless NFC card with a QR code in the other"
                 loading="lazy"
-                className="block w-full max-w-[26rem] drop-shadow-2xl"
+                className="block w-full max-w-[26rem] lg:max-w-none drop-shadow-2xl"
               />
             </picture>
             <div className="absolute bottom-8 left-0 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-3">
@@ -749,7 +749,7 @@ function WhyDigitalCardaSection() {
             </div>
           </Reveal>
 
-          <Reveal className="order-1 lg:order-2 self-center lg:py-10">
+          <Reveal className="order-1 lg:order-2 self-center lg:py-6">
             <p className="text-[#F7B31C] text-xs font-bold uppercase tracking-widest mb-2">Why DigitalCarda?</p>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">Inspire Your Client Digitally</h2>
             <p className="text-sm text-[#94A3B8] leading-relaxed mb-6">
