@@ -224,8 +224,8 @@ export default function Pricing() {
           <div className="relative inline-flex items-center gap-1 p-1 rounded-2xl bg-white ring-1 ring-[#E2E8F0] shadow-premium">
             <span
               aria-hidden="true"
-              className="absolute top-1 bottom-1 rounded-xl gradient-gold shadow-gold transition-all duration-500 ease-[cubic-bezier(.2,.8,.2,1)]"
-              style={{ left: pill.left, width: pill.width }}
+              className="absolute top-1 bottom-1 rounded-xl gradient-gold shadow-gold transition-all duration-500"
+              style={{ left: pill.left, width: pill.width, transitionTimingFunction: "cubic-bezier(0.2, 0.8, 0.2, 1)" }}
             />
             {PERIODS.map((p, i) => (
               <button

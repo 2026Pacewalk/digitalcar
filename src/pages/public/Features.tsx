@@ -260,8 +260,8 @@ export default function Features() {
             <div className="relative flex gap-1.5 overflow-x-auto no-scrollbar p-1.5 rounded-2xl bg-[#F1F5F9] ring-1 ring-[#E2E8F0] mb-10">
               <span
                 aria-hidden="true"
-                className="absolute top-1.5 bottom-1.5 rounded-xl bg-[#0F172A] shadow-premium transition-all duration-500 ease-[cubic-bezier(.2,.8,.2,1)]"
-                style={{ left: pill.left, width: pill.width }}
+                className="absolute top-1.5 bottom-1.5 rounded-xl bg-[#0F172A] shadow-premium transition-all duration-500"
+                style={{ left: pill.left, width: pill.width, transitionTimingFunction: "cubic-bezier(0.2, 0.8, 0.2, 1)" }}
               />
               {CATS.map((c, i) => {
                 const on = c.id === cat;
