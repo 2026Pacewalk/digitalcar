@@ -26,6 +26,8 @@ export const CONTACT = {
 /** Official profiles only. `icon` is a hosted brand mark (public/sig). Also
  *  feeds the Organization `sameAs` structured data in PublicLayout. */
 export const SOCIAL_LINKS: { label: string; href: string; icon: string }[] = [
+  { label: "Instagram", href: "https://www.instagram.com/digitalcarda/", icon: "/sig/s-instagram.png" },
+  { label: "Facebook", href: "https://www.facebook.com/DigitalCarda/", icon: "/sig/s-facebook.png" },
   { label: "Pinterest", href: "https://in.pinterest.com/digitalcarda/", icon: "/sig/s-pinterest.png" },
 ];
 

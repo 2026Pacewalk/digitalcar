@@ -370,26 +370,30 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
           </p>
         </div>
 
-        <div className="flex flex-col gap-4 border-t border-white/10 py-6 pb-28 md:flex-row md:items-center md:justify-between lg:pb-6">
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-[#64748B]">
-            <span>© {year} DigitalCarda. All rights reserved.</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="flex h-2.5 w-4 flex-col overflow-hidden rounded-[2px]" aria-hidden="true">
-                <span className="flex-1 bg-[#FF9933]" /><span className="flex-1 bg-white" /><span className="flex-1 bg-[#138808]" />
+        {/* Phones: a centred stack — back to top, the legal links in a tidy 2×2
+            grid, then the badges and copyright. From md up: one row. */}
+        <div className="flex flex-col items-center gap-6 border-t border-white/10 pt-8 pb-28 text-center md:flex-row md:items-center md:justify-between md:gap-4 md:py-6 md:text-left lg:pb-6">
+          <div className="order-3 flex flex-col items-center gap-2.5 md:order-1 md:flex-row md:flex-wrap md:gap-x-4 md:gap-y-1">
+            <p className="order-2 text-[12.5px] text-[#64748B] md:order-1">© {year} DigitalCarda. All rights reserved.</p>
+            <p className="order-1 flex items-center justify-center gap-x-4 text-[12.5px] text-[#94A3B8] md:order-2 md:gap-x-3 md:text-[#64748B]">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="flex h-2.5 w-4 flex-col overflow-hidden rounded-[2px]" aria-hidden="true">
+                  <span className="flex-1 bg-[#FF9933]" /><span className="flex-1 bg-white" /><span className="flex-1 bg-[#138808]" />
+                </span>
+                Made in India
               </span>
-              Made in India
-            </span>
-            <span className="inline-flex items-center gap-1"><ShieldCheck size={13} className="text-[#22C55E]" aria-hidden="true" /> Secure payments</span>
-          </p>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <nav aria-label="Legal" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12.5px]">
-              {LEGAL_LINKS.map((l) => (
-                <Link key={l.href} to={l.href} className="text-[#94A3B8] transition-colors hover:text-white">{l.label}</Link>
-              ))}
-              <Link to="/sitemap" className="text-[#94A3B8] transition-colors hover:text-white">Sitemap</Link>
-            </nav>
-            <BackToTop />
+              <span className="h-3 w-px bg-white/15 md:hidden" aria-hidden="true" />
+              <span className="inline-flex items-center gap-1.5"><ShieldCheck size={13} className="text-[#22C55E]" aria-hidden="true" /> Secure payments</span>
+            </p>
           </div>
+
+          <nav aria-label="Legal" className="order-2 grid w-full max-w-xs grid-cols-2 gap-x-4 gap-y-3 text-[13px] md:flex md:w-auto md:max-w-none md:flex-wrap md:items-center md:gap-x-5 md:gap-y-2 md:text-[12.5px]">
+            {[...LEGAL_LINKS, { label: "Sitemap", href: "/sitemap" }].map((l) => (
+              <Link key={l.href} to={l.href} className="rounded-lg py-1 text-[#94A3B8] transition-colors hover:text-white md:py-0">{l.label}</Link>
+            ))}
+          </nav>
+
+          <div className="order-1 md:order-3"><BackToTop /></div>
         </div>
       </div>
     </footer>
