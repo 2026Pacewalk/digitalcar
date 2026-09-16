@@ -719,12 +719,16 @@ function WhyDigitalCardaSection() {
   ];
 
   return (
-    <section className="py-20 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] relative overflow-hidden">
+    <section className="pt-12 lg:pt-10 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] relative overflow-hidden">
       <div className="absolute inset-0 bg-grid-dark opacity-40" />
       <div className="absolute top-1/2 left-1/4 w-[400px] h-[400px] bg-[#F7B31C]/8 rounded-full blur-3xl -translate-y-1/2" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <Reveal className="relative flex justify-center">
+        {/* Compact: the photo is cut off at the waist, so it stands on the section's
+            bottom edge (no bottom padding, column aligned to the end) while the
+            copy stays vertically centred. On mobile the copy comes first so the
+            photo is still last, touching the bottom. */}
+        <div className="grid lg:grid-cols-2 gap-6 lg:gap-10 items-end">
+          <Reveal className="relative flex justify-center order-2 lg:order-1">
             <picture>
               <source srcSet="/hero/digital-business-card-nfc-card-professional.webp" type="image/webp" />
               <img
@@ -732,26 +736,26 @@ function WhyDigitalCardaSection() {
                 width="1100" height="1011"
                 alt="Smiling professional holding a smartphone showing a DigitalCarda digital business card in one hand and a contactless NFC card with a QR code in the other"
                 loading="lazy"
-                className="w-full max-w-md drop-shadow-2xl"
+                className="block w-full max-w-[26rem] drop-shadow-2xl"
               />
             </picture>
             <div className="absolute bottom-8 left-0 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-3">
               <p className="text-2xl font-bold text-[#F7B31C]">5,173+</p>
               <p className="text-[10px] text-[#94A3B8]">Active Digital Cards</p>
             </div>
-            <div className="absolute top-12 right-0 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-3">
+            <div className="absolute top-10 right-0 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-3">
               <p className="text-2xl font-bold text-[#14B8A6]">98%</p>
               <p className="text-[10px] text-[#94A3B8]">Client Satisfaction</p>
             </div>
           </Reveal>
 
-          <Reveal>
+          <Reveal className="order-1 lg:order-2 self-center lg:py-10">
             <p className="text-[#F7B31C] text-xs font-bold uppercase tracking-widest mb-2">Why DigitalCarda?</p>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">Inspire Your Client Digitally</h2>
-            <p className="text-sm text-[#94A3B8] leading-relaxed mb-8">
+            <p className="text-sm text-[#94A3B8] leading-relaxed mb-6">
               Forget old printed visiting cards that end up in the bin. Share contact info with one-click actions — Call, Email, WhatsApp, Maps, Bank Details, Website & Social Links — all from a single smart card.
             </p>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {benefits.map((b, i) => (
                 <div key={i} className="flex items-start gap-4 group">
                   <div className="w-9 h-9 rounded-xl bg-[#F7B31C]/15 ring-1 ring-[#F7B31C]/20 flex items-center justify-center shrink-0 group-hover:bg-[#F7B31C] transition-colors">
@@ -761,7 +765,7 @@ function WhyDigitalCardaSection() {
                 </div>
               ))}
             </div>
-            <div className="mt-8 flex gap-3">
+            <div className="mt-6 flex gap-3">
               <Link to="/features" className="h-11 px-6 inline-flex items-center gap-2 text-sm font-medium text-[#CBD5E1] border border-white/20 rounded-xl hover:bg-white/5 transition-all">See all features <ArrowRight size={14} /></Link>
             </div>
           </Reveal>
