@@ -8,7 +8,7 @@ import { Link } from "react-router";
 import ModuleShell from "@/components/customer/ModuleShell";
 import { useCustomer, getActiveCardId, scopedKey, readCustomer } from "@/hooks/useCustomer";
 import { trpc } from "@/providers/trpc";
-import { readSocialLinks, SOCIAL_BY_KEY } from "@/lib/socialPlatforms";
+import { readSocialLinks, SOCIAL_BY_KEY, type SocialPlatform } from "@/lib/socialPlatforms";
 import { imgUrl } from "@/lib/cardContent";
 import { copyRichHtml, copyText } from "@/lib/clipboard";
 import {
@@ -127,46 +127,41 @@ function webImage(value: string, slug: string, kind: "photo" | "logo"): string {
   return kind === "logo" ? imgUrl("home", v) : "";
 }
 
-/* ── Form pieces (outside the page component, so typing never remounts them
-      and steals focus) ── */
-const inputCls = "mt-0.5 w-full bg-transparent text-[14px] text-[#0F172A] outline-none placeholder:text-[#A0AEC0]";
+/* ── Compact form pieces ─────────────────────────────────────────────────────
+   Defined outside the page component so typing never remounts an input (which
+   would drop focus after every keystroke). Sized for density: the panel sits
+   beside a large preview, so it should show as many fields as possible at once. */
+const inputCls = "w-full bg-transparent text-[13px] leading-5 text-[#0F172A] outline-none placeholder:text-[#A0AEC0]";
+const boxCls = "block rounded-lg border border-[#D9E0EA] bg-white px-2.5 pb-1.5 pt-1 transition focus-within:border-[#F7B31C] focus-within:ring-2 focus-within:ring-[#F7B31C]/20";
 
-function Box({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function TextBox({ label, value, onChange, placeholder, type = "text", className = "" }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string;
+}) {
   return (
-    <label className="block rounded-xl border border-[#D9E0EA] bg-white px-3.5 pb-2 pt-2 transition focus-within:border-[#F7B31C] focus-within:ring-2 focus-within:ring-[#F7B31C]/20">
-      <span className="block text-[11px] font-semibold text-[#64748B]">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-[10.5px] leading-snug text-[#94A3B8]">{hint}</span>}
+    <label className={`${boxCls} ${className}`}>
+      <span className="block text-[10px] font-semibold leading-4 text-[#64748B]">{label}</span>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={inputCls} />
     </label>
   );
 }
 
-function TextBox({ label, value, onChange, placeholder, type = "text", hint }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; hint?: string;
-}) {
-  return (
-    <Box label={label} hint={hint}>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={inputCls} />
-    </Box>
-  );
-}
-
-function AreaBox({ label, value, onChange, placeholder, rows = 3 }: {
+function AreaBox({ label, value, onChange, placeholder, rows = 2 }: {
   label: string; value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
 }) {
   return (
-    <Box label={label}>
+    <label className={boxCls}>
+      <span className="block text-[10px] font-semibold leading-4 text-[#64748B]">{label}</span>
       <textarea rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-        className={`${inputCls} resize-y leading-relaxed`} />
-    </Box>
+        className={`${inputCls} resize-y`} />
+    </label>
   );
 }
 
 function Group({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
   return (
-    <section className="space-y-2.5">
-      <div className="flex min-h-[22px] items-center justify-between">
-        <h3 className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#94A3B8]">{title}</h3>
+    <section className="space-y-1.5">
+      <div className="flex min-h-[20px] items-center justify-between">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#94A3B8]">{title}</h3>
         {right}
       </div>
       {children}
@@ -174,15 +169,42 @@ function Group({ title, right, children }: { title: string; right?: ReactNode; c
   );
 }
 
-function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+function MiniSwitch({ on }: { on: boolean }) {
+  return (
+    <span className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${on ? "bg-[#F7B31C]" : "bg-[#CBD5E1]"}`}>
+      <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all ${on ? "left-[14px]" : "left-0.5"}`} />
+    </span>
+  );
+}
+
+function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)}
-      className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-left transition-colors hover:border-[#CBD5E1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
-      <span className="text-[13px] font-medium text-[#334155]">{label}</span>
-      <span className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${on ? "bg-[#F7B31C]" : "bg-[#CBD5E1]"}`}>
-        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
-      </span>
+      className="flex h-8 items-center justify-between gap-2 rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-left transition-colors hover:border-[#CBD5E1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
+      <span className="truncate text-[11.5px] font-medium text-[#334155]">{label}</span>
+      <MiniSwitch on={on} />
     </button>
+  );
+}
+
+function BrandIcon({ p, size }: { p: SocialPlatform; size: number }) {
+  if (p.svg) {
+    return <span style={{ width: size, height: size, display: "inline-flex" }}
+      dangerouslySetInnerHTML={{ __html: p.svg.replace("<svg", `<svg width="${size}" height="${size}"`) }} />;
+  }
+  return <i className={p.fa} style={{ fontSize: size }} aria-hidden />;
+}
+
+/* One social link: the brand mark stands in for the label. */
+function SocialBox({ p, value, onChange }: { p: SocialPlatform; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex h-9 items-center gap-2 rounded-lg border border-[#D9E0EA] bg-white pl-1.5 pr-2 transition focus-within:border-[#F7B31C] focus-within:ring-2 focus-within:ring-[#F7B31C]/20">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ background: p.color, color: p.fg || "#FFFFFF" }}>
+        <BrandIcon p={p} size={11} />
+      </span>
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={p.label} aria-label={`${p.label} link`}
+        className="min-w-0 flex-1 bg-transparent text-[12px] text-[#0F172A] outline-none placeholder:text-[#A0AEC0]" />
+    </label>
   );
 }
 
@@ -277,9 +299,9 @@ export default function CustomerSignature() {
   const scrollStrip = (dir: number) => strip.current?.scrollBy({ left: dir * 520, behavior: "smooth" });
 
   const PICTURE_CHOICES: [Picture, string, boolean][] = [
-    ["photo", "Card photo", !cardPhoto],
-    ["logo", "Card logo", !cardLogo],
-    ["link", "Image link", false],
+    ["photo", "Photo", !cardPhoto],
+    ["logo", "Logo", !cardLogo],
+    ["link", "Link", false],
     ["none", "None", false],
   ];
 
@@ -296,50 +318,51 @@ export default function CustomerSignature() {
         <div className="mb-4 flex items-start gap-3 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3">
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[#DC2626]" />
           <p className="text-xs text-[#991B1B]">
-            Add {missing.join(" and ")} below — or <Link to="/dashboard/build" className="font-semibold underline">complete your card</Link> and press “Reset to card”.
+            Add {missing.join(" and ")} below — or <Link to="/dashboard/build" className="font-semibold underline">complete your card</Link> and press “Reset”.
           </p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-5">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-5">
 
-        {/* ── Details ── */}
-        <aside className="order-2 rounded-2xl border border-[#EEF2F7] bg-[#FBFCFE] p-4 lg:sticky lg:top-4 lg:order-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-[14px] font-bold text-[#0F172A]">Your details</p>
-              <p className="text-[11px] text-[#94A3B8]">Changes here affect only the signature</p>
+        {/* ── Details (compact) ── */}
+        <aside className="order-2 rounded-2xl border border-[#EEF2F7] bg-[#FBFCFE] p-3 lg:sticky lg:top-4 lg:order-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold leading-tight text-[#0F172A]">Your details</p>
+              <p className="truncate text-[10.5px] text-[#94A3B8]">Changes here affect only the signature</p>
             </div>
-            <button type="button" onClick={resetToCard}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-[11px] font-semibold text-[#334155] hover:border-[#F7B31C] hover:text-[#92400E]">
-              <RotateCcw size={12} /> Reset to card
+            <button type="button" onClick={resetToCard} title="Fill every field in again from your card"
+              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-[#E2E8F0] bg-white px-2 text-[11px] font-semibold text-[#334155] hover:border-[#F7B31C] hover:text-[#92400E]">
+              <RotateCcw size={11} /> Reset
             </button>
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-3.5">
             <Group title="You">
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-1.5">
                 <TextBox label="First name" value={f.first} onChange={(v) => setField("first", v)} placeholder="First" />
                 <TextBox label="Last name" value={f.last} onChange={(v) => setField("last", v)} placeholder="Last" />
+                <TextBox label="Designation" value={f.designation} onChange={(v) => setField("designation", v)} placeholder="Founder" />
+                <TextBox label="Organisation" value={f.company} onChange={(v) => setField("company", v)} placeholder="Company" />
               </div>
-              <TextBox label="Designation" value={f.designation} onChange={(v) => setField("designation", v)} placeholder="e.g. Managing Director" />
-              <TextBox label="Organisation" value={f.company} onChange={(v) => setField("company", v)} placeholder="Company name" />
             </Group>
 
             <Group title="Display picture">
-              <div className="rounded-xl border border-[#D9E0EA] bg-white p-3">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#F1F5F9] ring-1 ring-[#E2E8F0]">
-                    {picture ? <img src={picture} alt="" className="h-full w-full object-cover" /> : <ImageIcon size={18} className="text-[#94A3B8]" />}
+              <div className="rounded-lg border border-[#D9E0EA] bg-white p-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#F1F5F9] ring-1 ring-[#E2E8F0]">
+                    {picture ? <img src={picture} alt="" className="h-full w-full object-cover" /> : <ImageIcon size={15} className="text-[#94A3B8]" />}
                   </span>
-                  <div className="grid flex-1 grid-cols-2 gap-1.5" role="radiogroup" aria-label="Display picture">
+                  <div className="grid flex-1 grid-cols-4 gap-1 rounded-lg bg-[#F1F5F9] p-0.5" role="radiogroup" aria-label="Display picture">
                     {PICTURE_CHOICES.map(([k, label, disabled]) => {
                       const on = f.picture === k;
                       return (
                         <button key={k} type="button" role="radio" aria-checked={on} disabled={disabled}
+                          title={disabled ? `Your card has no ${label.toLowerCase()} yet` : undefined}
                           onClick={() => setField("picture", k)}
-                          className={`h-8 rounded-lg text-[11.5px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                            on ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0]"}`}>
+                          className={`h-7 rounded-md text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                            on ? "bg-[#0F172A] text-white shadow-sm" : "text-[#475569] hover:bg-white"}`}>
                           {label}
                         </button>
                       );
@@ -348,62 +371,60 @@ export default function CustomerSignature() {
                 </div>
                 {f.picture === "link" && (
                   <input value={f.pictureLink} onChange={(e) => setField("pictureLink", e.target.value)}
-                    placeholder="https://… a public link to your photo"
-                    className="mt-2.5 h-9 w-full rounded-lg border border-[#E2E8F0] px-3 text-[13px] outline-none focus:border-[#F7B31C]" />
+                    placeholder="https://… public link to your photo" aria-label="Picture link"
+                    className="mt-1.5 h-8 w-full rounded-md border border-[#E2E8F0] px-2.5 text-[12px] outline-none focus:border-[#F7B31C]" />
                 )}
                 {(f.picture === "photo" || f.picture === "logo") && (
-                  <p className="mt-2 text-[10.5px] leading-snug text-[#94A3B8]">
-                    Served from your published card, so it shows in Gmail, Outlook and Apple Mail. Changed it recently? Publish your card first.
-                  </p>
+                  <p className="mt-1.5 text-[10px] leading-snug text-[#94A3B8]">From your published card, so it shows in every inbox.</p>
                 )}
               </div>
             </Group>
 
             <Group title="Contact">
               <TextBox label="Email" type="email" value={f.email} onChange={(v) => setField("email", v)} placeholder="you@business.com" />
-              <TextBox label="Phone" type="tel" value={f.phone} onChange={(v) => setField("phone", v)} placeholder="+91 …" />
-              <TextBox label="WhatsApp" type="tel" value={f.whatsapp} onChange={(v) => setField("whatsapp", v)} placeholder="+91 …" hint="Shown only when it differs from your phone" />
+              <div className="grid grid-cols-2 gap-1.5">
+                <TextBox label="Phone" type="tel" value={f.phone} onChange={(v) => setField("phone", v)} placeholder="+91 …" />
+                <TextBox label="WhatsApp" type="tel" value={f.whatsapp} onChange={(v) => setField("whatsapp", v)} placeholder="If different" />
+              </div>
               <TextBox label="Website" value={f.website} onChange={(v) => setField("website", v)} placeholder="https://…" />
               <AreaBox label="Address" value={f.address} onChange={(v) => setField("address", v)} placeholder="Office address" rows={2} />
             </Group>
 
             <Group title="Social links">
-              {socialKeys.map((k) => (
-                <TextBox key={k} label={SOCIAL_BY_KEY[k]?.label || k} value={f.socials[k] || ""} onChange={(v) => setSocial(k, v)} placeholder="https://…" />
-              ))}
+              <div className="grid grid-cols-2 gap-1.5">
+                {socialKeys.map((k) => SOCIAL_BY_KEY[k] && (
+                  <SocialBox key={k} p={SOCIAL_BY_KEY[k]} value={f.socials[k] || ""} onChange={(v) => setSocial(k, v)} />
+                ))}
+              </div>
             </Group>
 
             <Group title="Disclaimer" right={
               <button type="button" role="switch" aria-checked={st.showDisclaimer} aria-label="Show disclaimer"
-                onClick={() => setOpt("showDisclaimer", !st.showDisclaimer)}
-                className={`relative h-5 w-9 rounded-full transition-colors ${st.showDisclaimer ? "bg-[#F7B31C]" : "bg-[#CBD5E1]"}`}>
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${st.showDisclaimer ? "left-[18px]" : "left-0.5"}`} />
+                onClick={() => setOpt("showDisclaimer", !st.showDisclaimer)} className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
+                <MiniSwitch on={st.showDisclaimer} />
               </button>
             }>
               {st.showDisclaimer
-                ? <AreaBox label="Confidentiality note" value={f.disclaimer} onChange={(v) => setField("disclaimer", v)} rows={4} />
-                : <p className="text-[12px] text-[#94A3B8]">Turned off — no note under your signature.</p>}
+                ? <AreaBox label="Confidentiality note" value={f.disclaimer} onChange={(v) => setField("disclaimer", v)} rows={3} />
+                : <p className="text-[11px] text-[#94A3B8]">Off — no note under your signature.</p>}
             </Group>
 
             <Group title="Style">
-              <div>
-                <p className="mb-2 text-[12px] font-semibold text-[#334155]">Accent colour</p>
-                <div className="flex flex-wrap gap-2">
-                  {ACCENTS.map((c) => (
-                    <button key={c} type="button" onClick={() => setOpt("accent", c)} aria-label={`Accent colour ${c}`} aria-pressed={st.accent === c}
-                      className={`h-7 w-7 rounded-lg transition-transform ${st.accent === c ? "scale-105 ring-2 ring-[#0F172A] ring-offset-2" : "ring-1 ring-[#E2E8F0] hover:scale-105"}`}
-                      style={{ background: c }} />
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-1.5">
+                {ACCENTS.map((c) => (
+                  <button key={c} type="button" onClick={() => setOpt("accent", c)} aria-label={`Accent colour ${c}`} aria-pressed={st.accent === c}
+                    className={`h-6 w-6 rounded-md transition-transform ${st.accent === c ? "scale-105 ring-2 ring-[#0F172A] ring-offset-1" : "ring-1 ring-[#E2E8F0] hover:scale-105"}`}
+                    style={{ background: c }} />
+                ))}
               </div>
-              <div className="grid gap-2">
-                <Switch label="Display picture" on={st.showPhoto} onChange={(v) => setOpt("showPhoto", v)} />
-                <Switch label="Company logo" on={st.showLogo} onChange={(v) => setOpt("showLogo", v)} />
-                <Switch label="QR code to my card" on={st.showQr} onChange={(v) => setOpt("showQr", v)} />
-                <Switch label="Social icons" on={st.showSocials} onChange={(v) => setOpt("showSocials", v)} />
-                <Switch label="Address" on={st.showAddress} onChange={(v) => setOpt("showAddress", v)} />
+              <div className="grid grid-cols-2 gap-1.5">
+                <Toggle label="Picture" on={st.showPhoto} onChange={(v) => setOpt("showPhoto", v)} />
+                <Toggle label="Logo" on={st.showLogo} onChange={(v) => setOpt("showLogo", v)} />
+                <Toggle label="QR code" on={st.showQr} onChange={(v) => setOpt("showQr", v)} />
+                <Toggle label="Social icons" on={st.showSocials} onChange={(v) => setOpt("showSocials", v)} />
+                <Toggle label="Address" on={st.showAddress} onChange={(v) => setOpt("showAddress", v)} />
               </div>
-              <TextBox label="Line under your card button" value={f.tagline} onChange={(v) => setField("tagline", v)} placeholder="Leave empty to hide it" />
+              <TextBox label="Line under the card button" value={f.tagline} onChange={(v) => setField("tagline", v)} placeholder="Leave empty to hide" />
             </Group>
           </div>
         </aside>
