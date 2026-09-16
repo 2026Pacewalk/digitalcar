@@ -917,6 +917,8 @@ type Persona = {
   id: string; tab: string; icon: React.ComponentType<{ size?: number; className?: string }>;
   accent: string; headline: string; pain: string; points: string[]; stat: string;
   card: { name: string; role: string; chips: string[] };
+  /** Real card screenshot in a phone frame, public/hero/personas/<img>.{webp,png} (640x960, transparent). */
+  img: string;
 };
 
 const PERSONAS: Persona[] = [
@@ -932,6 +934,7 @@ const PERSONAS: Persona[] = [
     ],
     stat: "Clinics see 3× more appointment enquiries",
     card: { name: "Dr. Anita Sharma", role: "MD Physician · Sharma Clinic", chips: ["Call", "WhatsApp", "Directions"] },
+    img: "digital-business-card-doctors-clinics",
   },
   {
     id: "realestate", tab: "Real Estate", icon: MapPin, accent: "#F7B31C",
@@ -945,6 +948,7 @@ const PERSONAS: Persona[] = [
     ],
     stat: "Agents capture 4× more leads per site visit",
     card: { name: "Rohit Malhotra", role: "Realtor · Malhotra Properties", chips: ["Listings", "Site Visit", "Directions"] },
+    img: "digital-business-card-real-estate",
   },
   {
     id: "agencies", tab: "Agencies & Freelancers", icon: Monitor, accent: "#8B5CF6",
@@ -958,6 +962,7 @@ const PERSONAS: Persona[] = [
     ],
     stat: "Freelancers close new work 2× faster",
     card: { name: "Aarav Mehta", role: "Founder · Mehta Studio", chips: ["Portfolio", "Packages", "Pay Now"] },
+    img: "digital-business-card-agencies-freelancers",
   },
   {
     id: "retail", tab: "Restaurants & Retail", icon: ShoppingBag, accent: "#EC4899",
@@ -971,6 +976,7 @@ const PERSONAS: Persona[] = [
     ],
     stat: "Outlets collect 5× more Google reviews",
     card: { name: "Spice Route", role: "Multi-cuisine · Zirakpur", chips: ["Menu", "Offers", "Pay via UPI"] },
+    img: "digital-business-card-restaurants-retail",
   },
   {
     id: "salons", tab: "Salons & Wellness", icon: Sparkles, accent: "#F97316",
@@ -984,6 +990,7 @@ const PERSONAS: Persona[] = [
     ],
     stat: "Salons see 40% more repeat bookings",
     card: { name: "Glow Studio", role: "Hair & Skin · Chandigarh", chips: ["Services", "Book Now", "Gallery"] },
+    img: "digital-business-card-salons-spas",
   },
   {
     id: "coaches", tab: "Coaches & Consultants", icon: Users, accent: "#3B82F6",
@@ -997,6 +1004,7 @@ const PERSONAS: Persona[] = [
     ],
     stat: "Coaches book 3× more discovery calls",
     card: { name: "Neha Kapoor", role: "Business Coach · Delhi", chips: ["Programmes", "Book Call", "Reviews"] },
+    img: "digital-business-card-coaches-consultants",
   },
 ];
 
@@ -1055,6 +1063,8 @@ function PersonaSection() {
                   ref={(el) => { btnRefs.current[i] = el; }}
                   type="button"
                   onClick={() => setActive(i)}
+                  onPointerEnter={() => { new window.Image().src = `/hero/personas/${x.img}.webp`; }}
+                  onFocus={() => { new window.Image().src = `/hero/personas/${x.img}.webp`; }}
                   aria-pressed={on}
                   className={`relative z-10 shrink-0 inline-flex items-center gap-2 h-11 px-4 rounded-xl text-[13px] font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] ${on ? "text-white" : "text-[#475569] hover:text-[#0F172A]"}`}
                 >
@@ -1095,40 +1105,20 @@ function PersonaSection() {
             </div>
           </div>
 
-          {/* Card mock in that persona's world */}
+          {/* The real card for that persona, in a phone frame */}
           <div className="dc-swap-in dc-swap-d1 flex justify-center">
-            <div className="relative w-full max-w-[330px]">
-              <div className="absolute -inset-4 rounded-[2rem] blur-2xl opacity-60 transition-colors duration-700" style={{ background: `${p.accent}1F` }} />
-              <div className="relative rounded-[1.75rem] bg-white ring-1 ring-[#E7EBF2] shadow-premium-lg overflow-hidden">
-                <div className="h-24 relative" style={{ background: `linear-gradient(135deg, ${p.accent}, ${p.accent}B3)` }}>
-                  <div className="absolute inset-0 bg-grid-dark opacity-20" />
-                </div>
-                <div className="px-5 pb-6 -mt-10 relative">
-                  <div className="w-20 h-20 rounded-2xl bg-white ring-4 ring-white shadow-premium flex items-center justify-center mx-auto" style={{ color: p.accent }}>
-                    <p.icon size={30} />
-                  </div>
-                  <p className="mt-3.5 text-center text-[17px] font-extrabold text-[#0F172A] leading-tight">{p.card.name}</p>
-                  <p className="mt-1 text-center text-[12px] text-[#64748B]">{p.card.role}</p>
-
-                  <div className="mt-5 grid grid-cols-3 gap-2">
-                    {p.card.chips.map((c) => (
-                      <span key={c} className="h-9 rounded-xl text-[11px] font-bold flex items-center justify-center text-center px-1 leading-tight" style={{ background: `${p.accent}14`, color: p.accent }}>
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 space-y-2">
-                    <div className="h-2 rounded-full bg-[#F1F5F9]" />
-                    <div className="h-2 rounded-full bg-[#F1F5F9] w-4/5" />
-                    <div className="h-2 rounded-full bg-[#F1F5F9] w-3/5" />
-                  </div>
-
-                  <div className="mt-5 flex items-center justify-center gap-2 text-[10.5px] font-semibold text-[#94A3B8]">
-                    <QrCode size={13} /> digitalcarda.in/{p.id}
-                  </div>
-                </div>
-              </div>
+            <div className="relative w-full max-w-[300px] sm:max-w-[320px]">
+              <div className="absolute inset-x-6 top-16 bottom-10 rounded-[3rem] blur-3xl opacity-70 transition-colors duration-700" style={{ background: `${p.accent}33` }} />
+              <picture>
+                <source srcSet={`/hero/personas/${p.img}.webp`} type="image/webp" />
+                <img
+                  src={`/hero/personas/${p.img}.png`}
+                  width="640" height="960"
+                  alt={`${p.card.name} — ${p.card.role}: a DigitalCarda digital business card for ${p.tab.toLowerCase()} on a smartphone`}
+                  loading="lazy" decoding="async"
+                  className="relative block w-full h-auto drop-shadow-[0_24px_40px_rgba(15,23,42,0.18)]"
+                />
+              </picture>
             </div>
           </div>
         </div>
