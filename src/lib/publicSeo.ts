@@ -10,11 +10,14 @@
  *
  * Keyword mapping (Semrush, India database, Sept 2026) — one primary term per
  * page so pages don't compete with each other:
- *   /                                  digital business card (3.6K), digital visiting card (4.4K)
- *   /digital-business-cards-templates  digital business card templates
- *   /pricing                           digital visiting card price
+ *   /                                  digital visiting card (4.4K), digital business card (3.6K),
+ *                                      visiting card maker (8.1K), digital visiting card maker (1K)
+ *   /digital-business-cards-templates  visiting card design (90.5K), digital business card templates
+ *   /pricing                           digital visiting card price, nfc card price (590)
+ *   /industries                        visiting card for doctor (1K)
  *   /email-signature-generator         email signature generator (3.6K), free … (590)
  *   /whatsapp-message-templates        whatsapp business message templates (1K)
+ *   /blog/*                            one article per informational cluster — see src/data/blog
  *
  * Length rules the titles and descriptions are held to: title ≤ 60 characters,
  * description ≤ 155, so neither is cut off in Indian mobile results.
@@ -61,8 +64,8 @@ export const SEO_WHATSAPP_TEMPLATES: PageSeo = {
 };
 
 export const DEFAULT_SEO: PageSeo = {
-  title: "Digital Business Card & Digital Visiting Card | DigitalCarda",
-  description: "Create your digital visiting card in minutes — QR code, WhatsApp, UPI payments and lead capture on one link. Free 30-day trial, no card details needed.",
+  title: "Digital Visiting Card Maker & Digital Business Card India",
+  description: "Make your digital visiting card online in minutes: QR code, NFC tap, WhatsApp, UPI payments and lead capture on one link. Free for 30 days, no payment.",
 };
 
 export const PUBLIC_SEO: Record<string, PageSeo> = {
@@ -73,18 +76,18 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
     crumb: "Features",
   },
   "/digital-business-cards-templates": {
-    title: "Digital Business Card Templates for Every Profession",
-    description: "Browse ready-made digital business card templates for every profession. Preview a live demo, then try any card free for 30 days — no app, no printing.",
+    title: "Digital Visiting Card Designs & Business Card Templates",
+    description: "Browse 50+ digital visiting card designs and business card templates for every profession. Open a live demo, then try any design free for 30 days.",
     crumb: "Card Templates",
   },
   "/industries": {
-    title: "Digital Business Cards for Every Industry | DigitalCarda",
+    title: "Digital Visiting Cards for Doctors, Real Estate & More",
     description: "Digital visiting cards for doctors, real estate agents, lawyers, consultants, restaurants, salons, coaches and agencies — made for how each finds clients.",
     crumb: "Industries",
   },
   "/pricing": {
     title: "Digital Visiting Card Price in India — From Rs. 99/month",
-    description: "Digital visiting card plans from Rs. 99/month with AI tools, QR codes, analytics and custom domains. Start a 30-day free trial, no card details needed.",
+    description: "Digital visiting card plans from Rs. 99/month, NFC business cards at Rs. 499, QR codes, analytics and custom domains. Free for 30 days, no payment.",
     crumb: "Pricing",
   },
   "/ai-card-generator": {
@@ -142,6 +145,11 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
   "/email-signature-templates": { ...SEO_EMAIL_SIGNATURE, canonicalPath: "/email-signature-generator" },
   "/whatsapp-message-templates": SEO_WHATSAPP_TEMPLATES,
   "/whatsapp-business-messages": { ...SEO_WHATSAPP_TEMPLATES, canonicalPath: "/whatsapp-message-templates" },
+  "/blog": {
+    title: "Digital Visiting Card Blog: Guides, NFC, QR & Reviews",
+    description: "Plain-English guides for Indian businesses: digital visiting cards, NFC and QR code business cards, Google review QR codes and card design ideas.",
+    crumb: "Blog",
+  },
   "/sitemap": {
     title: "Sitemap — Every DigitalCarda Page",
     description: "Every public page on DigitalCarda in one place: features, pricing, all digital business card templates, free tools, business programmes and policies.",

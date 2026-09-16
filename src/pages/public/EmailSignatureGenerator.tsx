@@ -4,6 +4,7 @@ import { PenLine, Copy, Check, Code2, ArrowRight, Sparkles, ShieldCheck, Zap, Up
 import { toast } from "sonner";
 import { Reveal } from "@/components/public/Reveal";
 import { usePageSeo } from "@/lib/seo";
+import JsonLd from "@/components/seo/JsonLd";
 import { SEO_EMAIL_SIGNATURE } from "@/lib/publicSeo";
 import { copyRichHtml, copyText } from "@/lib/clipboard";
 import {
@@ -81,20 +82,21 @@ function Toggle({ on, set, label }: { on: boolean; set: (v: boolean) => void; la
   );
 }
 
+const PAGE_LD = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Email Signature Generator",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Any",
+  description: "Free email signature generator with 14 professional templates for Gmail, Outlook and Apple Mail.",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
+  publisher: { "@type": "Organization", name: "DigitalCarda", url: "https://digitalcarda.in" },
+};
+
 export default function EmailSignatureGenerator() {
   usePageSeo({
     ...SEO_EMAIL_SIGNATURE,
     canonical: "/email-signature-generator",
-    jsonLd: {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      name: "Email Signature Generator",
-      applicationCategory: "BusinessApplication",
-      operatingSystem: "Any",
-      description: "Free email signature generator with 14 professional templates for Gmail, Outlook and Apple Mail.",
-      offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
-      publisher: { "@type": "Organization", name: "DigitalCarda", url: "https://digitalcarda.in" },
-    },
   });
 
   const [f, setF] = useState<Fields>(SAMPLE);
@@ -174,6 +176,7 @@ export default function EmailSignatureGenerator() {
 
   return (
     <div className="bg-[#F8FAFC]">
+      <JsonLd id="page-jsonld" data={PAGE_LD} />
       {/* ── Hero ── */}
       <section className="bg-[#0F172A] px-4 pb-14 pt-28 sm:pb-16 sm:pt-32">
         <div className="mx-auto max-w-4xl text-center">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X, ZoomIn, Play } from "lucide-react";
+import { webpFor } from "@/lib/imageSources";
 
 /* Template showcase gallery. Shows a template's marketing mockups as a carousel
    the visitor can move through (arrows, dots, thumbnails, keyboard, swipe) and
@@ -9,7 +10,11 @@ import { ChevronLeft, ChevronRight, X, ZoomIn, Play } from "lucide-react";
 
    An optional `liveCard` node (the interactive/generated card preview) is
    appended as the LAST slide, so the real marketing mockups lead and the live
-   preview sits at the end. */
+   preview sits at the end.
+
+   Each <img> sits in a <picture> offering the WebP version first (bundled
+   /products PNGs only — see webpFor). The <picture> is display:contents so the
+   <img> keeps exactly the same box and sizing it had without the wrapper. */
 export default function MockupGallery({ images, name, liveCard }: { images: string[]; name: string; liveCard?: React.ReactNode }) {
   const pics = (images || []).filter(Boolean);
   const hasLive = !!liveCard;
@@ -81,13 +86,16 @@ export default function MockupGallery({ images, name, liveCard }: { images: stri
             className="group block w-full h-full"
             aria-label="Zoom image"
           >
-            <img
-              src={pics[i]}
-              alt={`${name} — digital business card mockup ${i + 1}`}
-              loading={i === 0 ? "eager" : "lazy"}
-              draggable={false}
-              className="w-full h-full object-contain"
-            />
+            <picture className="contents">
+              {webpFor(pics[i]) && <source srcSet={webpFor(pics[i])!} type="image/webp" />}
+              <img
+                src={pics[i]}
+                alt={`${name} — digital business card mockup ${i + 1}`}
+                loading={i === 0 ? "eager" : "lazy"}
+                draggable={false}
+                className="w-full h-full object-contain"
+              />
+            </picture>
             <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[11px] font-semibold text-[#0F172A] bg-white/90 backdrop-blur px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><ZoomIn size={12} /> Click to zoom</span>
           </button>
         )}
@@ -110,7 +118,10 @@ export default function MockupGallery({ images, name, liveCard }: { images: stri
               className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${k === i ? "border-[#F7B31C] ring-2 ring-[#F7B31C]/25" : "border-[#E2E8F0] hover:border-[#CBD5E1]"}`}>
               {isLive(k)
                 ? <span className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-[#0F172A] text-white"><Play size={15} className="text-[#F7B31C]" /><span className="text-[8px] font-bold uppercase tracking-wide">Live</span></span>
-                : <img src={pics[k]} alt={`${name} thumbnail ${k + 1}`} loading="lazy" draggable={false} className="w-full h-full object-cover" />}
+                : <picture className="contents">
+                    {webpFor(pics[k]) && <source srcSet={webpFor(pics[k])!} type="image/webp" />}
+                    <img src={pics[k]} alt={`${name ? `${name} ` : ""}digital business card — view ${k + 1} of ${pics.length} (thumbnail)`} loading="lazy" draggable={false} className="w-full h-full object-cover" />
+                  </picture>}
             </button>
           ))}
         </div>
@@ -124,7 +135,10 @@ export default function MockupGallery({ images, name, liveCard }: { images: stri
           <button onClick={() => setZoom(false)} aria-label="Close" className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"><X size={20} /></button>
           {n > 1 && <button onClick={prev} aria-label="Previous" className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"><ChevronLeft size={22} /></button>}
           {n > 1 && <button onClick={next} aria-label="Next" className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"><ChevronRight size={22} /></button>}
-          <img src={pics[i]} alt={`${name} — digital business card mockup ${i + 1}`} draggable={false} className="relative max-w-full max-h-full object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+          <picture className="contents">
+            {webpFor(pics[i]) && <source srcSet={webpFor(pics[i])!} type="image/webp" />}
+            <img src={pics[i]} alt={`${name} — digital business card mockup ${i + 1}`} draggable={false} className="relative max-w-full max-h-full object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+          </picture>
           <span className="absolute bottom-5 left-1/2 -translate-x-1/2 text-[12px] font-medium text-white/80 bg-black/40 px-3 py-1 rounded-full">{i + 1} / {n}</span>
         </div>,
         document.body

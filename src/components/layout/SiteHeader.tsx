@@ -15,7 +15,7 @@
 import { Link, useLocation, useNavigate } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowRight, Building2, ChevronDown, CornerDownLeft, CreditCard, FileText, Gift, Globe, Handshake, Home,
+  ArrowRight, BookOpen, Building2, ChevronDown, CornerDownLeft, CreditCard, FileText, Gift, Globe, Handshake, Home,
   Layers, LayoutGrid, LogIn, Mail, Map as MapIcon, Menu, MessageCircle, MessageSquareText, PenLine,
   Phone, Search, Sparkles, Tag, Wand2, Wrench, X, type LucideIcon,
 } from "lucide-react";
@@ -40,6 +40,7 @@ const ICONS: Record<string, LucideIcon> = {
   "/signup": Sparkles,
   "/login": LogIn,
   "/sitemap": MapIcon,
+  "/blog": BookOpen,
 };
 const iconFor = (href: string): LucideIcon => ICONS[href] ?? (href.startsWith("/digital-business-cards-templates/") ? CreditCard : FileText);
 

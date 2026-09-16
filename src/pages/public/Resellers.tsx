@@ -15,6 +15,7 @@ import {
   Handshake, Printer, Building2, Layers, BadgePercent, Sparkles, IndianRupee,
 } from "lucide-react";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
+import JsonLd from "@/components/seo/JsonLd";
 
 /* ── Commission model ──────────────────────────────────────────────
    AVG_PLAN is the yearly value of a typical customer subscription and is
@@ -71,6 +72,16 @@ const FAQS = [
   { q: "What support do I get as a reseller?", a: "You get onboarding help, ready-made sales material, and a support channel for you rather than a general queue. Elite-tier partners also get a named account manager." },
 ];
 
+const FAQ_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+
 /* Twelve months of a book of business compounding — the hero visual. */
 const REVENUE_BARS = [8, 14, 19, 27, 34, 44, 52, 63, 71, 82, 91, 100];
 
@@ -83,29 +94,9 @@ export default function Resellers() {
   const yearly = customers * AVG_PLAN * (band.rate / 100);
   const monthly = yearly / 12;
 
-  useEffect(() => {
-    const ld = {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: FAQS.map((f) => ({
-        "@type": "Question",
-        name: f.q,
-        acceptedAnswer: { "@type": "Answer", text: f.a },
-      })),
-    };
-    let s = document.getElementById("dc-reseller-ld");
-    if (!s) {
-      s = document.createElement("script");
-      s.id = "dc-reseller-ld";
-      (s as HTMLScriptElement).type = "application/ld+json";
-      document.head.appendChild(s);
-    }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("dc-reseller-ld")?.remove(); };
-  }, []);
-
   return (
     <div className="overflow-hidden">
+      <JsonLd id="dc-reseller-ld" data={FAQ_LD} />
       {/* ── Hero ── */}
       <section className="relative pt-28 pb-16 sm:pt-32 sm:pb-20">
         <div className="absolute inset-0 bg-grid mask-fade-b opacity-70" />

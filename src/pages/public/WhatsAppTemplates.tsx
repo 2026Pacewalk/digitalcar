@@ -7,6 +7,7 @@ import {
 import { toast } from "sonner";
 import { Reveal } from "@/components/public/Reveal";
 import { usePageSeo } from "@/lib/seo";
+import JsonLd from "@/components/seo/JsonLd";
 import { SEO_WHATSAPP_TEMPLATES } from "@/lib/publicSeo";
 import { copyText } from "@/lib/clipboard";
 import { WA_TEMPLATES, buildWaMessage, waPreviewHtml, WA_SOFT_LIMIT, type WaData, type WaTemplate } from "@/lib/whatsappMessage";
@@ -55,20 +56,21 @@ function Input({ label, value, onChange, placeholder, wide }: {
   );
 }
 
+const PAGE_LD = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "WhatsApp Business Message Templates",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Any",
+  description: "Twelve free WhatsApp Business message templates — greeting, away and quick replies.",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
+  publisher: { "@type": "Organization", name: "DigitalCarda", url: "https://digitalcarda.in" },
+};
+
 export default function WhatsAppTemplates() {
   usePageSeo({
     ...SEO_WHATSAPP_TEMPLATES,
     canonical: "/whatsapp-message-templates",
-    jsonLd: {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      name: "WhatsApp Business Message Templates",
-      applicationCategory: "BusinessApplication",
-      operatingSystem: "Any",
-      description: "Twelve free WhatsApp Business message templates — greeting, away and quick replies.",
-      offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
-      publisher: { "@type": "Organization", name: "DigitalCarda", url: "https://digitalcarda.in" },
-    },
   });
 
   const [f, setF] = useState<Fields>(SAMPLE);
@@ -106,6 +108,7 @@ export default function WhatsAppTemplates() {
 
   return (
     <div className="bg-[#F8FAFC]">
+      <JsonLd id="page-jsonld" data={PAGE_LD} />
       {/* ── Hero ── */}
       <section className="bg-[#0F172A] px-4 pb-14 pt-28 sm:pb-16 sm:pt-32">
         <div className="mx-auto max-w-4xl text-center">

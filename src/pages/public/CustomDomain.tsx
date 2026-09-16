@@ -15,6 +15,7 @@ import {
   ChevronRight, Sparkles, KeyRound, MousePointerClick, Clock, X,
 } from "lucide-react";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
+import JsonLd from "@/components/seo/JsonLd";
 
 const PRICE = 499; // mirrors DOMAIN_ADDON_PRICE in api/domain-router.ts
 
@@ -44,6 +45,12 @@ const FAQS = [
   { q: "Who owns the domain?", a: "You do. We never take ownership or registrar control — the DNS record simply points the address at your card, and you can remove it whenever you like." },
 ];
 
+const FAQ_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+};
+
 function useReducedMotion(): boolean {
   const [reduce, setReduce] = useState(false);
   useEffect(() => {
@@ -70,23 +77,6 @@ export default function CustomDomain() {
     return () => clearInterval(t);
   }, [reduce]);
 
-  useEffect(() => {
-    const ld = {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: FAQS.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
-    };
-    let s = document.getElementById("dc-domain-ld");
-    if (!s) {
-      s = document.createElement("script");
-      s.id = "dc-domain-ld";
-      (s as HTMLScriptElement).type = "application/ld+json";
-      document.head.appendChild(s);
-    }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("dc-domain-ld")?.remove(); };
-  }, []);
-
   const domain = DOMAINS[idx];
 
   const copyExample = async () => {
@@ -95,6 +85,7 @@ export default function CustomDomain() {
 
   return (
     <div className="bg-[#F8FAFC] overflow-hidden">
+      <JsonLd id="dc-domain-ld" data={FAQ_LD} />
       {/* ── Hero ── */}
       <section className="relative pt-28 pb-16 sm:pt-32 sm:pb-20">
         <div aria-hidden="true" className="absolute inset-0 bg-grid mask-fade-b opacity-60" />

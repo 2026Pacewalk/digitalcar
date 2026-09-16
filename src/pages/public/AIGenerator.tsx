@@ -9,6 +9,7 @@ import { trpc } from "@/providers/trpc";
 import { buildCardHtml, buildCardThumb } from "@/card-template/buildCard";
 import { toast } from "sonner";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
+import JsonLd from "@/components/seo/JsonLd";
 
 type AiCard = {
   tagline: string; about: string; services: { name: string; description: string }[];
@@ -74,6 +75,17 @@ const AI_FAQS = [
   { q: "How long does it take?", a: "About five seconds when you describe your business, and around ten when the AI has to read your website first. The preview updates instantly after that." },
 ];
 
+// FAQPage schema, matching the copy rendered below the tool.
+const AI_FAQ_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: AI_FAQS.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+
 export default function AIGenerator() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"form" | "generating" | "result">("form");
@@ -100,28 +112,6 @@ export default function AIGenerator() {
     if (step === "generating") { timerRef.current = setInterval(() => setMsgIdx((i) => Math.min(i + 1, GEN_MSGS.length - 1)), 1100); }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [step]);
-
-  // FAQPage schema, matching the copy rendered below the tool.
-  useEffect(() => {
-    const ld = {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: AI_FAQS.map((f) => ({
-        "@type": "Question",
-        name: f.q,
-        acceptedAnswer: { "@type": "Answer", text: f.a },
-      })),
-    };
-    let s = document.getElementById("dc-ai-ld");
-    if (!s) {
-      s = document.createElement("script");
-      s.id = "dc-ai-ld";
-      (s as HTMLScriptElement).type = "application/ld+json";
-      document.head.appendChild(s);
-    }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("dc-ai-ld")?.remove(); };
-  }, []);
 
   const generate = async () => {
     if (!form.businessName.trim() || !form.profession.trim()) { toast.error("Add your business name and profession"); return; }
@@ -209,6 +199,7 @@ export default function AIGenerator() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFFBEB] via-white to-white pt-24 pb-20 relative">
+      <JsonLd id="dc-ai-ld" data={AI_FAQ_LD} />
       {/* Ambient backdrop — decorative only, and already covered by the
           reduced-motion kill list via animate-aurora-drift. */}
       <div aria-hidden="true" className="absolute inset-0 bg-grid mask-fade-b opacity-60 pointer-events-none" />

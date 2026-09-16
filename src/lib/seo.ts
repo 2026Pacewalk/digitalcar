@@ -6,6 +6,10 @@ import { useEffect } from "react";
  * — each public page sets them on mount. The pattern was already copied by hand
  * across several pages; this is the same thing in one place, so a page cannot
  * accidentally ship without a canonical link or with a stale og:title.
+ *
+ * Structured data is not handled here: an effect never runs on the server, so
+ * JSON-LD injected from it was missing from the server-rendered HTML. Pages
+ * render it with <JsonLd> from "@/components/seo/JsonLd" instead.
  */
 
 type Seo = {
@@ -13,12 +17,9 @@ type Seo = {
   description: string;
   /** Path only, e.g. "/email-signature-generator". Made absolute here. */
   canonical?: string;
-  /** JSON-LD, injected as a single <script> keyed by page. */
-  jsonLd?: Record<string, unknown>;
 };
 
 const ORIGIN = "https://digitalcarda.in";
-const LD_ID = "page-jsonld";
 
 function setMeta(selector: string, attr: string, value: string): void {
   let el = document.querySelector(selector);
@@ -30,7 +31,7 @@ function setMeta(selector: string, attr: string, value: string): void {
   el.setAttribute("content", value);
 }
 
-export function usePageSeo({ title, description, canonical, jsonLd }: Seo): void {
+export function usePageSeo({ title, description, canonical }: Seo): void {
   useEffect(() => {
     document.title = title;
     setMeta('meta[name="description"]', "description", description);
@@ -49,18 +50,5 @@ export function usePageSeo({ title, description, canonical, jsonLd }: Seo): void
       link.setAttribute("href", href);
       setMeta('meta[property="og:url"]', "og:url", href);
     }
-
-    // Replaced rather than appended, so navigating between pages cannot leave
-    // two competing structured-data blocks in the document.
-    document.getElementById(LD_ID)?.remove();
-    if (jsonLd) {
-      const s = document.createElement("script");
-      s.id = LD_ID;
-      s.type = "application/ld+json";
-      s.textContent = JSON.stringify(jsonLd);
-      document.head.appendChild(s);
-    }
-    return () => { document.getElementById(LD_ID)?.remove(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, canonical, JSON.stringify(jsonLd ?? null)]);
+  }, [title, description, canonical]);
 }

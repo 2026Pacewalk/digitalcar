@@ -982,7 +982,7 @@ app.get("/sitemap.xml", async (c) => {
     // Free tools — canonical URLs only; each has an alias route that deliberately
     // stays out of the sitemap so the two never compete for the same terms.
     "/free-tools", "/email-signature-generator", "/whatsapp-message-templates",
-    "/privacy", "/refund-policy", "/terms-of-service", "/sitemap"];
+    "/privacy", "/refund-policy", "/terms-of-service", "/sitemap", "/blog"];
   if (sitemapXml && Date.now() - sitemapXml.at < SITEMAP_TTL) {
     return c.body(sitemapXml.body, 200, { "content-type": "application/xml; charset=utf-8" });
   }
@@ -1060,9 +1060,13 @@ app.get("/sitemap.xml", async (c) => {
     if (!cardSeo({ slug: k, customer, products: snap ? snap.products : productsBySlug.get(k) }).indexable) continue;
     cardUrls.push(url(`${base}/${encodeURIComponent(s)}`, "0.5", cardEdited.get(k) || ""));
   }
+  // Blog articles, with the date each was last really updated.
+  const { BLOG_POSTS, blogPostPath } = await import("../src/data/blog");
+  const blogUrls = BLOG_POSTS.map((p) => url(`${base}${blogPostPath(p.slug)}`, "0.7", p.updatedAt));
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", deployDay)).join("\n") + "\n" +
+    blogUrls.join("\n") + "\n" +
     productRows.map((r) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(r.slug)}`, "0.8", day(r.updatedAt))).join("\n") + "\n" +
     cardUrls.join("\n") +
     `\n</urlset>`;

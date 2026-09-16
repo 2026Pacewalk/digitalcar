@@ -10,6 +10,7 @@ import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
 import { demoForProduct } from "@/lib/demoData";
 import { logFunnel } from "@/lib/funnel";
 import MockupGallery from "@/components/MockupGallery";
+import { webpFor } from "@/lib/imageSources";
 
 const inr = (v?: string | number | null) => "₹" + Number(v || 0).toLocaleString("en-IN");
 const THUMB_W = 375, THUMB_H = 560;
@@ -329,7 +330,12 @@ export default function ProductDetail() {
                 return (
                   <Link key={p.id} to={`/digital-business-cards-templates/${p.slug}`} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1 transition-all">
                     {feat
-                      ? <div className="w-full bg-gradient-to-b from-[#F8FAFC] to-[#EEF2F7]" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }}><img src={feat} alt={`${p.name} — digital business card`} loading="lazy" className="w-full h-full object-cover object-top" /></div>
+                      ? <div className="w-full bg-gradient-to-b from-[#F8FAFC] to-[#EEF2F7]" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }}>
+                          <picture className="contents">
+                            {webpFor(feat) && <source srcSet={webpFor(feat)!} type="image/webp" />}
+                            <img src={feat} alt={`${p.name} — digital business card`} loading="lazy" className="w-full h-full object-cover object-top" />
+                          </picture>
+                        </div>
                       : <ThumbFrame style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />}
                     <div className="p-3">
                       <p className="text-[13px] font-bold text-[#0F172A] line-clamp-1">{p.name}</p>

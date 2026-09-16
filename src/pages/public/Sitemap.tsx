@@ -13,9 +13,10 @@
  * cards are already in sitemap.xml, which is where search engines need them.
  */
 import { Link } from "react-router";
-import { FileCode2, ArrowUpRight, LayoutGrid } from "lucide-react";
+import { FileCode2, ArrowUpRight, LayoutGrid, BookOpen } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { SITEMAP_GROUPS } from "@/lib/publicNav";
+import { BLOG_PATH, BLOG_POSTS, blogPostPath } from "@/data/blog";
 
 export default function Sitemap() {
   const { data: products = [] } = trpc.product.catalogue.useQuery();
@@ -67,6 +68,22 @@ export default function Sitemap() {
             </section>
           ))}
         </div>
+
+        <section className="mt-5 rounded-2xl border border-[#EEF2F6] bg-white p-6 sm:p-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="inline-flex items-center gap-2 text-sm font-bold text-[#0F172A]">
+              <BookOpen size={16} className="text-[#F7B31C]" /> Blog guides
+            </h2>
+            <Link to={BLOG_PATH} className="text-sm font-semibold text-[#B45309] hover:underline">All {BLOG_POSTS.length} guides</Link>
+          </div>
+          <ul className="mt-5 columns-1 gap-8 sm:columns-2">
+            {BLOG_POSTS.map((p) => (
+              <li key={p.slug} className="break-inside-avoid py-1.5">
+                <Link to={blogPostPath(p.slug)} className="text-sm text-[#475569] transition-colors hover:text-[#B45309]">{p.title}</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         {products.length > 0 && (
           <section className="mt-5 rounded-2xl border border-[#EEF2F6] bg-white p-6 sm:p-8">

@@ -9,6 +9,7 @@ import ModuleShell from "@/components/customer/ModuleShell";
 import { useCustomer, getActiveCardId, scopedKey, readCustomer } from "@/hooks/useCustomer";
 import { trpc } from "@/providers/trpc";
 import { readSocialLinks, SOCIAL_BY_KEY, type SocialPlatform } from "@/lib/socialPlatforms";
+import { ensureFontAwesome } from "@/lib/fontAwesome";
 import { imgUrl } from "@/lib/cardContent";
 import { copyRichHtml, copyText } from "@/lib/clipboard";
 import FitToWidth from "@/components/mobile/FitToWidth";
@@ -190,6 +191,8 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 }
 
 function BrandIcon({ p, size }: { p: SocialPlatform; size: number }) {
+  // Font Awesome isn't in index.html any more — load it the first time a brand icon shows.
+  useEffect(() => { ensureFontAwesome(); }, []);
   if (p.svg) {
     return <span style={{ width: size, height: size, display: "inline-flex" }}
       dangerouslySetInnerHTML={{ __html: p.svg.replace("<svg", `<svg width="${size}" height="${size}"`) }} />;

@@ -56,6 +56,20 @@ const HEAD = `<meta charset="utf-8"><meta name="viewport" content="width=device-
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&family=Sora:wght@600;700;800&family=Manrope:wght@500;600;700;800&display=swap">`;
 
+/* Alt text for the brand logo: the company name, else the person's name, else a
+   generic label (company_name is optional, and an empty alt hides the logo from
+   screen readers). Already HTML-escaped. */
+const logoAlt = (c: PCRecord) => esc(s(c.company_name) || s(c.name) || "Company logo");
+/* Gallery alt text. Captions are usually the uploaded file's name ("IMG_2041.jpg"),
+   which says nothing — keep a caption only when it isn't a bare file name, else
+   describe it as the owner's gallery photo. Raw text: escape before HTML use. */
+const galleryAlt = (c: PCRecord, g: { name?: string }, i: number) => {
+  const n = s(g.name);
+  if (n && !/\.(jpe?g|png|gif|webp|avif|heic|heif|bmp|svg)$/i.test(n)) return n;
+  const who = s(c.company_name) || s(c.name);
+  return who ? `${who} gallery photo ${i + 1}` : `Gallery photo ${i + 1}`;
+};
+
 const initialPh = (c: PCRecord, bg: string) => {
   const i = (s(c.name)[0] || "D").toUpperCase();
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='200' height='220'><rect width='200' height='220' fill='${bg}'/><text x='50%' y='50%' font-size='96' fill='#fff' text-anchor='middle' font-family='Arial' dominant-baseline='central'>${i}</text></svg>`).replace(/'/g, "%27")}`;
@@ -110,7 +124,7 @@ function idCard(c: PCRecord): string {
   .idc-sign small{display:inline-block;border-top:1.5px solid #cbd5e1;padding-top:4px;margin-top:2px;font-size:10.5px;color:#94a3b8;letter-spacing:.05em;}
   .idc-foot{margin-top:auto;background:${dark};color:${accent};text-align:center;padding:15px;font-weight:700;letter-spacing:.22em;font-size:11px;text-transform:uppercase;}
   `;
-  const brand = logo ? `<img src="${esc(logo)}" alt="${esc(c.company_name)}" ${IMG}>` : `<span style="font-weight:800;font-size:17px;color:${dark}">${esc(c.company_name) || "COMPANY"}</span>`;
+  const brand = logo ? `<img src="${esc(logo)}" alt="${logoAlt(c)}" ${IMG}>` : `<span style="font-weight:800;font-size:17px;color:${dark}">${esc(c.company_name) || "COMPANY"}</span>`;
   return `<!doctype html><html><head>${HEAD}<style>${css}</style></head><body><div class="idc">
     <div class="idc-top">
       <div class="idc-logo">${brand}</div>
@@ -165,7 +179,7 @@ function membershipCard(c: PCRecord): string {
   .mem-qr img{width:96px;height:96px;display:block;}
   .mem-thanks{color:${gold};font-size:12.5px;font-weight:600;margin-top:auto;}
   `;
-  const brand = logo ? `<img src="${esc(logo)}" alt="${esc(c.company_name)}" ${IMG}>` : `<span style="font-weight:800;font-size:15px;color:${gold}">${esc(c.company_name) || "BRAND"}</span>`;
+  const brand = logo ? `<img src="${esc(logo)}" alt="${logoAlt(c)}" ${IMG}>` : `<span style="font-weight:800;font-size:15px;color:${gold}">${esc(c.company_name) || "BRAND"}</span>`;
   return `<!doctype html><html><head>${HEAD}<style>${css}</style></head><body><div class="mem"><div class="mem-in">
     <div class="mem-top"><span class="mem-logo">${brand}</span><span class="mem-tier">${tier} Member</span></div>
     <div class="mem-badge"><i class="fa fa-crown"></i> Membership Card</div>
@@ -173,7 +187,7 @@ function membershipCard(c: PCRecord): string {
     <div class="mem-name">${name}</div>
     <div class="mem-stars">${stars}</div>
     <div class="mem-fields">${fields}</div>
-    <div class="mem-qr"><img src="${qrSrc}" alt="QR" ${IMG}></div>
+    <div class="mem-qr"><img src="${qrSrc}" alt="${esc(`QR code linking to ${s(c.name) ? `${s(c.name)}'s` : "this"} membership card`)}" ${IMG}></div>
     <div class="mem-thanks">Thank you for being a valued member!</div>
   </div></div></body></html>`;
 }
@@ -207,7 +221,9 @@ export function svcMeta(nm: string): { icon: string; desc: string } {
 function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: { skip?: string[]; products?: PCProduct[] } = {}): { css: string; html: string; js: string } {
   const on = (v: unknown, def = 1) => Number(v ?? def) === 1;
   const skip = o.skip || [];
-  const strip = (v: unknown) => s(v).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  // Who the card belongs to, for image alt text (raw — escaped at each use).
+  const altWho = s(c.company_name) || s(c.name);
+  const strip =(v: unknown) => s(v).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   // Compact layout: sections collapse into tap-to-open accordions (same option
   // the classic templates honour — Card Builder → Design → Card layout).
   const compact = s(c.layout_mode) === "compact";
@@ -259,7 +275,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   const offers = (extras.offers || []).filter((o) => (s(o.title) || s(o.filename)) && !offerEnded(s(o.valid)));
   const offersHtml = on(c.offer_on, 0) && offers.length ? sec("offers-section", s(c.offer) || "Latest Offers", offers.map((o) => {
     return `<div class="pwx-offer">
-      ${s(o.filename) ? `<div class="pwx-offer-media"><span class="pwx-offer-tag"><i class="fa fa-tag"></i> Offer</span><img class="pwx-offer-img" src="${esc(o.filename)}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
+      ${s(o.filename) ? `<div class="pwx-offer-media"><span class="pwx-offer-tag"><i class="fa fa-tag"></i> Offer</span><img class="pwx-offer-img" src="${esc(o.filename)}" alt="${esc(s(o.title) || (altWho ? `${altWho} offer` : "Special offer"))}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
       <div class="pwx-offer-b">
         ${s(o.title) ? `<b>${esc(o.title)}</b>` : ""}
         ${s(o.valid) ? `<span class="pwx-valid"><i class="fa fa-clock"></i> Valid till ${esc(o.valid)}</span>` : ""}
@@ -284,14 +300,14 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   // Gallery — grid with a minimal lightbox.
   const gallery = (extras.gallery || []).filter((g) => s(g.filename));
   const galleryHtml = on(c.gallery_on) && gallery.length ? sec("gallery-section", s(c.gallery) || "Gallery",
-    `<div class="pwx-gal${s(c.gallery_layout) === "compact" ? " compact" : ""}">${gallery.map((g, i) => `<img src="${esc(g.filename)}" alt="${esc(g.name) || "Gallery image"}" loading="lazy" ${IMG} onclick="pwxLb(${i})" onerror="this.style.display='none'">`).join("")}</div>`) : "";
+    `<div class="pwx-gal${s(c.gallery_layout) === "compact" ? " compact" : ""}">${gallery.map((g, i) => `<img src="${esc(g.filename)}" alt="${esc(galleryAlt(c, g, i))}" loading="lazy" ${IMG} onclick="pwxLb(${i})" onerror="this.style.display='none'">`).join("")}</div>`) : "";
 
   // Videos — YouTube plays inline; anything else opens in a new tab.
   const videos = (extras.videos || []).filter((v) => s(v.url));
   const videoCard = (v: { title?: string; url: string }) => {
     const inf = parseVideo(v.url);
     if (inf?.provider === "youtube") {
-      return `<div class="pwx-vid" onclick="pwxPlay(this,'${inf.id}')"><img src="${inf.thumb}" loading="lazy" ${IMG}><span class="pwx-vid-p"><i class="fa fa-play"></i></span>${s(v.title) ? `<span class="pwx-vid-t">${esc(v.title)}</span>` : ""}</div>`;
+      return `<div class="pwx-vid" onclick="pwxPlay(this,'${inf.id}')"><img src="${inf.thumb}" alt="${esc(s(v.title) ? `${s(v.title)} — video thumbnail` : altWho ? `${altWho} video thumbnail` : "Video thumbnail")}" loading="lazy" ${IMG}><span class="pwx-vid-p"><i class="fa fa-play"></i></span>${s(v.title) ? `<span class="pwx-vid-t">${esc(v.title)}</span>` : ""}</div>`;
     }
     return `<a class="pwx-vid pwx-vid-ext" href="${esc(v.url)}" target="_blank" rel="noopener"><span class="pwx-vid-p"><i class="fa fa-play"></i></span>${s(v.title) ? `<span class="pwx-vid-t">${esc(v.title)}</span>` : ""}</a>`;
   };
@@ -490,10 +506,14 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   .pwx-sent{text-align:center;font-weight:700;color:#118a4e;padding:16px 0;}`;
 
   const galUrls = gallery.map((g) => s(g.filename));
+  // Alt text for the enlarged image, set by pwxLb (a DOM property, not HTML, so
+  // raw text; "<" is escaped so a caption can't close the inline <script>).
+  const galAlts = gallery.map((g, i) => galleryAlt(c, g, i));
   const js = `
   var PWX_GAL=${JSON.stringify(galUrls)};
+  var PWX_GAL_ALT=${JSON.stringify(galAlts).replace(/</g, "\\u003c")};
   function pwxAcc(h){var sec=h.parentElement;var open=sec.classList.toggle('open');h.setAttribute('aria-expanded',open?'true':'false');}
-  function pwxLb(i){var el=document.getElementById('pwxLb');if(!el||!PWX_GAL[i])return;el.querySelector('img').src=PWX_GAL[i];el.style.display='flex';}
+  function pwxLb(i){var el=document.getElementById('pwxLb');if(!el||!PWX_GAL[i])return;var im=el.querySelector('img');im.src=PWX_GAL[i];im.alt=PWX_GAL_ALT[i]||'Enlarged gallery image';el.style.display='flex';}
   function pwxLbClose(){var el=document.getElementById('pwxLb');if(el)el.style.display='none';}
   function pwxPlay(el,id){el.innerHTML='<iframe src="https://www.youtube.com/embed/'+id+'?autoplay=1&playsinline=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>';el.onclick=null;}
   function pwxVScroll(btn,dir){var w=btn.parentNode.querySelector('.pwx-vswipe');if(w)w.scrollBy({left:dir*w.clientWidth*0.9,behavior:'smooth'});}
@@ -507,7 +527,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
     else{try{fetch('/api/enquiry',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(d),keepalive:true}).catch(function(){});}catch(_){}}
   }catch(_){}form.innerHTML='<p class="pwx-sent">✓ Thank you! We will get back to you shortly.</p>';return false;}`;
 
-  return { css, html: html + `<div id="pwxLb" onclick="pwxLbClose()"><button type="button" class="x" aria-label="Close image">&times;</button><img alt=""></div>`, js };
+  return { css, html: html + `<div id="pwxLb" onclick="pwxLbClose()"><button type="button" class="x" aria-label="Close image">&times;</button><img alt="Enlarged gallery image"></div>`, js };
 }
 
 function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolean; extras?: PremiumExtras }): string {

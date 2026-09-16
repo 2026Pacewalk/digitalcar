@@ -10,7 +10,7 @@
  *    running in their head anyway.
  *  - A feature-level FAQ, mirrored into FAQPage JSON-LD.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
   CreditCard, QrCode, MessageCircle, Download, FileDown, FileText, ShoppingBag,
@@ -20,6 +20,7 @@ import {
   UserPlus, Rocket, PauseCircle, Wand2, Crop, PanelsTopLeft, Receipt, CalendarClock,
 } from "lucide-react";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
+import JsonLd from "@/components/seo/JsonLd";
 
 /* ── The catalogue, grouped by the job each feature does ───────── */
 type Cat = "create" | "share" | "sell" | "grow" | "scale";
@@ -162,6 +163,17 @@ const FAQS = [
   },
 ];
 
+// Feature-level FAQ schema, text identical to what is on screen.
+const FAQ_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+
 /* ── Page ──────────────────────────────────────────────────────── */
 export default function Features() {
   const [cat, setCat] = useState<Cat | "all">("all");
@@ -183,33 +195,12 @@ export default function Features() {
     return () => window.removeEventListener("resize", measure);
   }, [activeIdx]);
 
-  // Feature-level FAQ schema, text identical to what is on screen.
-  useEffect(() => {
-    const ld = {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: FAQS.map((f) => ({
-        "@type": "Question",
-        name: f.q,
-        acceptedAnswer: { "@type": "Answer", text: f.a },
-      })),
-    };
-    let s = document.getElementById("dc-features-ld");
-    if (!s) {
-      s = document.createElement("script");
-      s.id = "dc-features-ld";
-      (s as HTMLScriptElement).type = "application/ld+json";
-      document.head.appendChild(s);
-    }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("dc-features-ld")?.remove(); };
-  }, []);
-
   const shown = cat === "all" ? FEATURES : FEATURES.filter((f) => f.cat === cat);
   const countFor = (id: Cat | "all") => (id === "all" ? FEATURES.length : FEATURES.filter((f) => f.cat === id).length);
 
   return (
     <div>
+      <JsonLd id="dc-features-ld" data={FAQ_LD} />
       {/* ── Hero ── */}
       <section className="relative pt-28 pb-16 sm:pt-32 sm:pb-20 overflow-hidden">
         <div className="absolute inset-0 bg-grid mask-fade-b opacity-70" />

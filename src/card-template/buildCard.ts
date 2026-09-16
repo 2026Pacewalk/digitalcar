@@ -291,6 +291,17 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   // passing it along (refers to the business by name, not "my").
   const shareName = s(c.company_name) || s(c.name) || "this business";
   const shareSub = [s(c.company_name) ? s(c.name) : "", s(c.designation)].filter(Boolean).join(" · ");
+  // Who the card belongs to, for image alt text (empty when neither name is set,
+  // so each alt below can fall back to a generic description). Raw text — every
+  // use runs through esc() (HTML attributes) or JSON (inline script).
+  const altWho = s(c.company_name) || s(c.name);
+  // Gallery captions are usually the uploaded file's name ("IMG_2041.jpg"), which
+  // is useless as alt text — only keep a caption that isn't a bare file name.
+  const galAlt = (g: Gallery, i: number) => {
+    const n = s(g.name);
+    if (n && !/\.(jpe?g|png|gif|webp|avif|heic|heif|bmp|svg)$/i.test(n)) return n;
+    return altWho ? `${altWho} gallery photo ${i + 1}` : `Gallery photo ${i + 1}`;
+  };
   const waShareText =
     `Hi 👋\n\n` +
     `Take a look at *${shareName}*'s digital visiting card 📇` +
@@ -384,7 +395,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
         const save = mrp > 0 && now > 0 && now < mrp ? Math.round(mrp - now) : 0;
         return `
         <div class="product-card dc-prod">
-          ${p.filename && !svcIconsOnly ? `<div class="dc-prod-media"><img src="${esc(p.filename)}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
+          ${p.filename && !svcIconsOnly ? `<div class="dc-prod-media"><img src="${esc(p.filename)}" alt="${esc(s(p.name) || (altWho ? `${altWho} product photo` : "Product photo"))}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
           <div class="dc-prod-body">
             <h5 class="dc-prod-name">${esc(p.name)}</h5>
             ${(p.price || p.offer_price) ? `<div class="dc-prod-price">
@@ -438,10 +449,10 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
   const hasQr = on(c.qrcode_on) && (qrcodes.length || (slug && (hasPay || hasBank)));
   const qrContent = hasQr
     ? (qrcodes.length ? qrcodes.map((q) => `<div class="qrcode-card" style="text-align:center;margin-bottom:16px">
-        <img src="${esc(q.filename)}" style="max-width:240px;width:100%;border-radius:6px" ${IMG} onerror="this.style.display='none'">
+        <img src="${esc(q.filename)}" alt="${esc(`${s(q.name) ? `${s(q.name)} — ` : ""}QR code to pay ${altWho || "this business"}`)}" style="max-width:240px;width:100%;border-radius:6px" ${IMG} onerror="this.style.display='none'">
         <div><a href="${cardUrl}" class="qrcode-enquiry-btn" target="_blank">${esc(q.name) || "Pay Online"}</a></div>
       </div>`).join("") : `<div class="qrcode-card" style="text-align:center">
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(cardUrl)}" style="width:170px;height:170px" ${IMG}>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(cardUrl)}" alt="${esc(`QR code linking to ${altWho ? `${altWho}'s` : "this"} digital card`)}" style="width:170px;height:170px" ${IMG}>
         <div><a href="${cardUrl}" class="qrcode-enquiry-btn" target="_blank">Pay Online</a></div>
       </div>`)
     : "";
@@ -539,7 +550,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
         const tag = `<span class="dc-offer-tag"><i class="fa fa-tag"></i> Offer</span>`;
         const validPill = o.valid ? `<span class="dc-offer-valid"><i class="fa fa-clock"></i> Valid till ${esc(o.valid)}</span>` : "";
         return `<div class="dc-offer">
-        ${o.filename ? `<div class="dc-offer-media">${tag}<img src="${esc(o.filename)}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
+        ${o.filename ? `<div class="dc-offer-media">${tag}<img src="${esc(o.filename)}" alt="${esc(s(o.title) || (altWho ? `${altWho} offer` : "Special offer"))}" ${IMG} onerror="this.parentNode.style.display='none'"></div>` : ""}
         <div class="dc-offer-body">
           ${o.filename ? "" : tag}
           ${o.title ? `<h5 class="dc-offer-title">${esc(o.title)}</h5>` : ""}
@@ -558,7 +569,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     <div id="gallery-section" class="section-container">
       <div class="section-header">${esc(s(c.gallery) || "Graphic Portfolio")}</div>
       <div class="gallery ${galleryCompact ? "dc-gal-grid" : "card-columns"}">
-        ${gallery.map((g, gi) => `<div class="card"><img src="${esc(g.filename)}" class="img-fluid" style="width:100%;border-radius:4px;cursor:pointer" ${IMG} onclick="lbOpen(${gi})" onerror="this.parentNode.style.display='none'"></div>`).join("")}
+        ${gallery.map((g, gi) => `<div class="card"><img src="${esc(g.filename)}" alt="${esc(galAlt(g, gi))}" class="img-fluid" style="width:100%;border-radius:4px;cursor:pointer" ${IMG} onclick="lbOpen(${gi})" onerror="this.parentNode.style.display='none'"></div>`).join("")}
       </div>
     </div>` : "";
 
@@ -574,7 +585,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       return `<div class="dc-vid-item${vert}">
         <div class="video-thumb dc-vid-media" onclick="playVid(this,'${info.id}','youtube',${info.vertical ? 1 : 0})">
           <span class="dc-vid-bg" style="background-image:url('${info.thumb}')"></span>
-          <img class="dc-vid-fg" src="${info.thumb}" ${IMG}>
+          <img class="dc-vid-fg" src="${info.thumb}" alt="${esc(s(v.title) ? `${s(v.title)} — video thumbnail` : altWho ? `${altWho} video thumbnail` : "Video thumbnail")}" ${IMG}>
           ${playBtn("rgba(255,0,0,.9)")}${titleOverlay(v.title)}
         </div></div>`;
     }
@@ -887,7 +898,7 @@ ${footer}
 <div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:99999;align-items:center;justify-content:center;flex-direction:column">
   <span onclick="lbClose()" style="position:absolute;top:12px;right:18px;color:#fff;font-size:32px;line-height:1;cursor:pointer">&times;</span>
   <span onclick="lbPrev(event)" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);color:#fff;font-size:40px;cursor:pointer;padding:12px;user-select:none">&#8249;</span>
-  <img id="lbImg" referrerpolicy="no-referrer" style="max-width:90%;max-height:80%;border-radius:6px;box-shadow:0 4px 30px rgba(0,0,0,.6)">
+  <img id="lbImg" alt="Enlarged gallery image" referrerpolicy="no-referrer" style="max-width:90%;max-height:80%;border-radius:6px;box-shadow:0 4px 30px rgba(0,0,0,.6)">
   <span onclick="lbNext(event)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);color:#fff;font-size:40px;cursor:pointer;padding:12px;user-select:none">&#8250;</span>
   <div id="lbCount" style="color:#fff;margin-top:14px;font-size:13px;letter-spacing:1px"></div>
 </div>
@@ -1051,8 +1062,9 @@ document.addEventListener('click', function(e){
   if(lower.indexOf('http')===0) return dcTrack('website');
 }, true);
 var galImgs = ${JSON.stringify(gallery.map((g) => s(g.filename)))};
+var galAlts = ${JSON.stringify(gallery.map(galAlt)).replace(/</g, "\\u003c")};
 var lbI = 0;
-function lbShow(){ document.getElementById('lbImg').src = galImgs[lbI]; document.getElementById('lbCount').textContent = (lbI+1)+' / '+galImgs.length; }
+function lbShow(){ var im = document.getElementById('lbImg'); im.src = galImgs[lbI]; im.alt = galAlts[lbI] || 'Enlarged gallery image'; document.getElementById('lbCount').textContent = (lbI+1)+' / '+galImgs.length; }
 function lbOpen(i){ lbI=i; document.getElementById('lightbox').style.display='flex'; lbShow(); }
 function lbClose(){ document.getElementById('lightbox').style.display='none'; }
 function lbPrev(e){ if(e&&e.stopPropagation)e.stopPropagation(); lbI=(lbI-1+galImgs.length)%galImgs.length; lbShow(); }
@@ -1209,7 +1221,7 @@ ${chrome ? ".footer{display:none !important;}" : "#home-card-share,.view,.footer
   ${chrome && Number(c.share_on ?? 1) !== 0 ? `<a href="javascript:void(0)" id="home-card-share"><i class="fa fa-share-alt"></i></a>` : ""}
   <div class="home-section-content">
     ${chrome && Number(c.views_on ?? 1) !== 0 ? `<div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p>${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>` : ""}
-    <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" style="border-radius:${s(c.logo_shape) === "round" ? "50%" : s(c.logo_shape) === "plain" ? "0" : "10px"}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'"></div></div>
+    <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" alt="${esc(s(c.company_name) || s(c.name) ? `${s(c.company_name) || s(c.name)} logo` : "Company logo")}" style="border-radius:${s(c.logo_shape) === "round" ? "50%" : s(c.logo_shape) === "plain" ? "0" : "10px"}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'"></div></div>
     <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
     <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation) || "Designation"}</p></div>
     <div class="home-details">${homeDetails}</div>

@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-title" content="DigitalCarda" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="application-name" content="DigitalCarda" />
-    <title>DigitalCarda</title>
+    <title>DigitalCarda — Digital Visiting Card &amp; Business Card Maker</title>
     <link rel="icon" href="/favicon.ico?v=2" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=2" />
@@ -25,9 +25,9 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <!-- Font Awesome brand icons — used by the Social Links picker so users see
-         the real platform logos when choosing what to add. -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <!-- Font Awesome is NOT linked here: only the dashboard's social-link icons
+         use it, so those components load it on demand (src/lib/fontAwesome.ts)
+         instead of every page waiting on a render-blocking stylesheet. -->
     <!-- Scroll-reveal sections start transparent and fade in once JavaScript
          marks them visible. Public pages are now rendered on the server, so
          without JavaScript the text is in the page but would stay invisible. -->

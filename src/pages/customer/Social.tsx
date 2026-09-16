@@ -3,10 +3,12 @@ import { Share2, Trash2, Palette, Plus, Check } from "lucide-react";
 import ModuleShell, { Panel, Field, fieldCls, Tip, AutoSaveBadge } from "@/components/customer/ModuleShell";
 import { useCardAutosave } from "@/hooks/useCardAutosave";
 import { SOCIAL_PLATFORMS, SOCIAL_BY_KEY, readSocialLinks, type SocialLink, type SocialPlatform } from "@/lib/socialPlatforms";
+import { ensureFontAwesome } from "@/lib/fontAwesome";
 
 // Render a platform's real brand glyph — an inline SVG (X, TikTok) or a Font
-// Awesome icon (loaded in index.html). `currentColor` picks up the parent colour.
+// Awesome icon (stylesheet loaded on demand). `currentColor` picks up the parent colour.
 function PlatformIcon({ p, size = 16 }: { p: SocialPlatform; size?: number }) {
+  useEffect(() => { ensureFontAwesome(); }, []);
   if (p.svg) return <span style={{ width: size, height: size, display: "inline-flex" }} dangerouslySetInnerHTML={{ __html: p.svg.replace("<svg", `<svg width="${size}" height="${size}"`) }} />;
   return <i className={p.fa} style={{ fontSize: Math.round(size * 0.92) }} aria-hidden />;
 }

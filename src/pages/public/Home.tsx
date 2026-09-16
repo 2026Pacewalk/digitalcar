@@ -12,6 +12,8 @@ import { trpc } from "@/providers/trpc";
 import TemplateThumb, { THUMB_W, THUMB_H } from "@/components/TemplateThumb";
 import { STANDEE_STYLES, standeeMarkup } from "@/lib/standee";
 import { useReveal, Reveal, SectionHeading } from "@/components/public/Reveal";
+import JsonLd from "@/components/seo/JsonLd";
+import { webpFor } from "@/lib/imageSources";
 
 /* ─── Animated number counter (rAF, fires when in view) ─── */
 function Counter({ end, duration = 2000, separator = true }: { end: number; duration?: number; separator?: boolean }) {
@@ -84,6 +86,7 @@ function CardContactSlider() {
               width="1000" height="1403"
               alt="Two smartphones showing DigitalCarda digital business cards — a marketing consultant and an event & wedding planner profile with call, WhatsApp, email and QR sharing"
               loading="eager"
+              fetchPriority="high"
               className="w-[300px] sm:w-[330px] h-auto drop-shadow-2xl"
             />
           </picture>
@@ -881,9 +884,12 @@ function TemplatesSection() {
                     {/* Prefer the product's uploaded feature image; fall back to the generated card thumbnail. */}
                     {feat
                       ? <div className="w-full bg-gradient-to-b from-[#F8FAFC] to-[#EEF2F7]" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }}>
-                          <img src={feat} alt={`${p.name} — digital business card`} loading="lazy" className="w-full h-full object-cover object-top" />
+                          <picture>
+                            {webpFor(feat) && <source srcSet={webpFor(feat)!} type="image/webp" />}
+                            <img src={feat} alt={`${p.name} — digital business card`} loading="lazy" className="w-full h-full object-cover object-top" />
+                          </picture>
                         </div>
-                      : <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />}
+                      : <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} name={p.name} />}
                     <div className="absolute inset-0 hidden md:flex items-center justify-center bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
                       <span className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0F172A] text-[13px] font-bold shadow-lg"><Eye size={14} /> Live Preview</span>
                     </div>
@@ -1135,16 +1141,19 @@ function HowItWorksSection() {
   const steps = [
     {
       num: 1, img: "/step-create.png", chip: "About 2 minutes", chipIcon: Clock,
+      alt: "Creating a digital business card on a tablet by filling in your name and designation",
       title: "Pick. Fill. Done.",
       desc: "Choose one of 50+ templates, add your details and make it yours — no designer needed.",
     },
     {
       num: 2, img: "/step-save.png", chip: "Updates live", chipIcon: Zap,
+      alt: "Saving a digital visiting card to a phone and a laptop",
       title: "Always in your pocket",
       desc: "Save it to your phone, tablet or desktop. Change a detail once and every shared link updates.",
     },
     {
       num: 3, img: "/step-share.png", chip: "WhatsApp · QR · Email", chipIcon: Share2,
+      alt: "Sharing a digital business card by WhatsApp, email, QR code and social media",
       title: "One tap, everywhere",
       desc: "Send it on WhatsApp, by email, as a QR code or on social media — people save you in a tap.",
     },
@@ -1189,7 +1198,7 @@ function HowItWorksSection() {
               </span>
 
               <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-[#FFF7E6] to-[#FDE68A] p-2 shadow-[0_14px_28px_-16px_rgba(247,179,28,0.7)] ring-4 ring-white/5 transition-transform duration-500 group-hover:-rotate-3 group-hover:scale-105 motion-reduce:transition-none">
-                <img src={s.img} alt="" width={80} height={80} loading="lazy" className="h-full w-full object-contain" />
+                <img src={s.img} alt={s.alt} width={80} height={80} loading="lazy" className="h-full w-full object-contain" />
               </div>
 
               <span className="mt-4 inline-flex items-center gap-1.5 self-start rounded-full bg-[#F7B31C]/10 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-[#F7B31C] ring-1 ring-[#F7B31C]/20">
@@ -1628,7 +1637,7 @@ function PricingSection() {
                   </div>
                 ))}
               </div>
-              <Link to={"href" in plan ? plan.href : "/signup"} className={`w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center transition-all ${plan.popular ? "gradient-gold text-[#0F172A] hover:shadow-gold" : "border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC] hover:border-[#F7B31C]/40"}`}>
+              <Link to={(plan as { href?: string }).href ?? "/signup"} className={`w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center transition-all ${plan.popular ? "gradient-gold text-[#0F172A] hover:shadow-gold" : "border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC] hover:border-[#F7B31C]/40"}`}>
                 {plan.cta}
               </Link>
             </div>
@@ -1678,40 +1687,30 @@ const FAQS = [
   },
 ];
 
+const FAQ_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    ...FAQS.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+    // The "where to use your card link" answer block, higher up the page.
+    {
+      "@type": "Question",
+      name: "Where can I use a digital business card link?",
+      acceptedAnswer: { "@type": "Answer", text: LINK_ANSWER },
+    },
+  ],
+};
+
 function FaqSection() {
   const [open, setOpen] = useState<number | null>(0);
 
-  useEffect(() => {
-    const ld = {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: [
-        ...FAQS.map((f) => ({
-          "@type": "Question",
-          name: f.q,
-          acceptedAnswer: { "@type": "Answer", text: f.a },
-        })),
-        // The "where to use your card link" answer block, higher up the page.
-        {
-          "@type": "Question",
-          name: "Where can I use a digital business card link?",
-          acceptedAnswer: { "@type": "Answer", text: LINK_ANSWER },
-        },
-      ],
-    };
-    let s = document.getElementById("dc-faq-ld");
-    if (!s) {
-      s = document.createElement("script");
-      s.id = "dc-faq-ld";
-      (s as HTMLScriptElement).type = "application/ld+json";
-      document.head.appendChild(s);
-    }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("dc-faq-ld")?.remove(); };
-  }, []);
-
   return (
     <section className="py-20 bg-[#F8FAFC] relative overflow-hidden" id="faq">
+      <JsonLd id="dc-faq-ld" data={FAQ_LD} />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <SectionHeading

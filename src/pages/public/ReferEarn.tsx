@@ -10,7 +10,7 @@
  * reads faster for a much smaller decision.
  */
 import { Link } from "react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Gift, Share2, UserCheck, Wallet, Banknote, ArrowRight, ArrowDownToLine,
   Check, Sparkles, Link2, Users, Percent, ShieldCheck, Send, ChevronRight,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
+import JsonLd from "@/components/seo/JsonLd";
 
 /* Average first paid plan value, used only for the worked examples and shown
    on screen so the estimate is never presented as a promise. */
@@ -56,32 +57,21 @@ export default function ReferEarnPublic() {
     { q: "Do I earn again if my friend upgrades later?", a: "The reward is one-time per referred user, on their first paid plan. Later upgrades adjust their existing balance toward the new plan rather than creating a second reward." },
   ];
 
-  // FAQPage schema — rebuilt when the live rates arrive so the text always
-  // matches what is rendered.
-  useEffect(() => {
-    const ld = {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: faqs.map((f) => ({
-        "@type": "Question",
-        name: f.q,
-        acceptedAnswer: { "@type": "Answer", text: f.a },
-      })),
-    };
-    let s = document.getElementById("dc-refer-ld");
-    if (!s) {
-      s = document.createElement("script");
-      s.id = "dc-refer-ld";
-      (s as HTMLScriptElement).type = "application/ld+json";
-      document.head.appendChild(s);
-    }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("dc-refer-ld")?.remove(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [commission, discount]);
+  // FAQPage schema — built from the same `faqs` on every render, so it follows
+  // the live rates and the text always matches what is rendered.
+  const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
 
   return (
     <div className="overflow-hidden">
+      <JsonLd id="dc-refer-ld" data={faqLd} />
       {/* ── Hero ── */}
       <section className="relative pt-28 pb-16 sm:pt-32 sm:pb-20">
         <div className="absolute inset-0 bg-grid mask-fade-b opacity-70" />

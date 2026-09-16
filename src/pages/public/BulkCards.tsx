@@ -9,7 +9,7 @@
  * sells the volume pricing and hands off to sales or WhatsApp.
  */
 import { Link } from "react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Users, Building2, Briefcase, Check, ArrowRight, TrendingDown,
   ShieldCheck, Zap, Clock, MessageSquare, BadgePercent, Layers, Phone, Mail,
@@ -17,6 +17,7 @@ import {
   Store, Handshake, IdCard,
 } from "lucide-react";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
+import JsonLd from "@/components/seo/JsonLd";
 
 /* ── Pricing config ────────────────────────────────────────────── */
 const BASE_PRICE = 999; // single-card yearly price, used to compute savings
@@ -82,34 +83,24 @@ const FAQS = [
   { q: "Is white-label or reseller branding available?", a: "Yes, from the Enterprise package upward. You can fully white-label the cards with your own domain and branding, which is what most agencies and reseller partners use it for." },
 ];
 
+// FAQPage schema, text identical to what is rendered on screen.
+const FAQ_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+
 /* ── Page ──────────────────────────────────────────────────────── */
 export default function BulkCards() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  // FAQPage schema, text identical to what is rendered on screen.
-  useEffect(() => {
-    const ld = {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: FAQS.map((f) => ({
-        "@type": "Question",
-        name: f.q,
-        acceptedAnswer: { "@type": "Answer", text: f.a },
-      })),
-    };
-    let s = document.getElementById("dc-bulk-ld");
-    if (!s) {
-      s = document.createElement("script");
-      s.id = "dc-bulk-ld";
-      (s as HTMLScriptElement).type = "application/ld+json";
-      document.head.appendChild(s);
-    }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("dc-bulk-ld")?.remove(); };
-  }, []);
-
   return (
     <div className="overflow-hidden">
+      <JsonLd id="dc-bulk-ld" data={FAQ_LD} />
       {/* ── Hero ── */}
       <section className="relative pt-28 pb-16 sm:pt-32 sm:pb-20">
         <div className="absolute inset-0 bg-grid mask-fade-b opacity-70" />

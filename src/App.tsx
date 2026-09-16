@@ -83,6 +83,8 @@ const FreeTools = lazy(() => import("./pages/public/FreeTools"));
 const EmailSignatureGenerator = lazy(() => import("./pages/public/EmailSignatureGenerator"));
 const WhatsAppTemplates = lazy(() => import("./pages/public/WhatsAppTemplates"));
 const PublicSitemap = lazy(() => import("./pages/public/Sitemap"));
+const Blog = lazy(() => import("./pages/public/Blog"));
+const BlogPost = lazy(() => import("./pages/public/BlogPost"));
 const CustomerCustomDomain = lazy(() => import("./pages/customer/CustomDomain"));
 const CustomerNfcOrder = lazy(() => import("./pages/customer/NfcOrder"));
 const AITools = lazy(() => import("./pages/customer/AITools"));
@@ -224,6 +226,8 @@ export default function App() {
           <Route path="/refund-policy" element={<RefundPolicy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/sitemap" element={<PublicSitemap />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
         </Route>
 
         {/* Auth */}

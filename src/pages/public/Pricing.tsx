@@ -1,10 +1,11 @@
 import { Check, ArrowRight, ChevronRight, Sparkles, Zap, Crown, IdCard, QrCode, Images, Tag, MessageSquare, Globe, Star, ShieldCheck, Nfc, Truck } from "lucide-react";
 import { Link } from "react-router";
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useLayoutEffect, useRef } from "react";
 import { trpc } from "@/providers/trpc";
 import { planFeatures, type PlanPkg } from "@/lib/planFeatures";
 import { NFC_PRODUCTS, NFC_DELIVERY } from "@/lib/nfcProducts";
 import { Reveal } from "@/components/public/Reveal";
+import JsonLd from "@/components/seo/JsonLd";
 
 /* ── Billing periods ──────────────────────────────────────────── */
 type Period = "monthly" | "yearly" | "3year";
@@ -164,49 +165,41 @@ export default function Pricing() {
   }, [periodIdx]);
 
   /* Structured data: the FAQ, plus the paid plans as real Offers built from the
-     LIVE prices so the markup can never drift from what is on screen. */
-  useEffect(() => {
-    const paid = plans.filter((p) => p.price.monthly > 0);
-    const ld = {
-      "@context": "https://schema.org",
-      "@graph": [
-        {
-          "@type": "FAQPage",
-          mainEntity: faqs.map((f) => ({
-            "@type": "Question",
-            name: f.q,
-            acceptedAnswer: { "@type": "Answer", text: f.a },
-          })),
-        },
-        ...(paid.length ? [{
-          "@type": "Product",
-          name: "DigitalCarda digital business card",
-          description: "A digital business card with QR code, WhatsApp chat, payment links, products, gallery, lead capture and analytics.",
-          brand: { "@type": "Brand", name: "DigitalCarda" },
-          offers: paid.map((p) => ({
-            "@type": "Offer",
-            name: p.name,
-            price: String(p.price.monthly),
-            priceCurrency: "INR",
-            availability: "https://schema.org/InStock",
-            url: "https://digitalcarda.in/pricing",
-          })),
-        }] : []),
-      ],
-    };
-    let s = document.getElementById("dc-pricing-ld");
-    if (!s) {
-      s = document.createElement("script");
-      s.id = "dc-pricing-ld";
-      (s as HTMLScriptElement).type = "application/ld+json";
-      document.head.appendChild(s);
-    }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("dc-pricing-ld")?.remove(); };
-  }, [plans]);
+     LIVE prices so the markup can never drift from what is on screen. Built
+     during render from the same `plans` the cards use, so it is in the
+     server-rendered HTML and matches on hydration. */
+  const paid = plans.filter((p) => p.price.monthly > 0);
+  const ld = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "FAQPage",
+        mainEntity: faqs.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+      },
+      ...(paid.length ? [{
+        "@type": "Product",
+        name: "DigitalCarda digital business card",
+        description: "A digital business card with QR code, WhatsApp chat, payment links, products, gallery, lead capture and analytics.",
+        brand: { "@type": "Brand", name: "DigitalCarda" },
+        offers: paid.map((p) => ({
+          "@type": "Offer",
+          name: p.name,
+          price: String(p.price.monthly),
+          priceCurrency: "INR",
+          availability: "https://schema.org/InStock",
+          url: "https://digitalcarda.in/pricing",
+        })),
+      }] : []),
+    ],
+  };
 
   return (
     <div className="pt-24 pb-20 bg-[#F8FAFC] relative">
+      <JsonLd id="dc-pricing-ld" data={ld} />
       <div aria-hidden="true" className="absolute inset-0 bg-grid mask-fade-b opacity-50 pointer-events-none" />
       <div aria-hidden="true" className="absolute top-0 right-0 w-[520px] h-[520px] bg-[#F7B31C]/12 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4 animate-aurora-drift pointer-events-none" />
       <div aria-hidden="true" className="absolute top-56 left-0 w-[380px] h-[380px] bg-[#8B5CF6]/10 rounded-full blur-3xl -translate-x-1/3 animate-aurora-drift pointer-events-none" style={{ animationDelay: "3s" }} />

@@ -62,6 +62,7 @@ const BUSINESS: NavGroup = {
 const COMPANY: NavGroup = {
   title: "Company",
   links: [
+    { label: "Blog & guides", href: "/blog" },
     { label: "Contact us", href: "/contact" },
     { label: "Start free trial", href: "/signup" },
     { label: "Sign in", href: "/login" },
@@ -166,6 +167,7 @@ export const HEADER_MENUS: HeaderMenu[] = [
 /** Plain links beside the menus. */
 export const HEADER_LINKS: NavLink[] = [
   { label: "Pricing", href: "/pricing" },
+  { label: "Blog", href: "/blog" },
   { label: "Contact", href: "/contact" },
 ];
 
@@ -179,6 +181,7 @@ export const SEARCH_PAGES: NavLink[] = [
   { label: "Email signature generator", href: "/email-signature-generator", desc: "Free · 14 signature designs" },
   { label: "WhatsApp message templates", href: "/whatsapp-message-templates", desc: "Free · greeting, away and quick replies" },
   { label: "Contact us", href: "/contact", desc: "Call, WhatsApp or email the team" },
+  { label: "Blog & guides", href: "/blog", desc: "Digital visiting cards, NFC, QR codes and Google reviews" },
   { label: "Start free trial", href: "/signup?promo=FREE30D", desc: "30 days free, no payment needed" },
   { label: "Home", href: "/", desc: "DigitalCarda home page" },
   { label: "Industries", href: "/industries", desc: "Cards for every industry" },

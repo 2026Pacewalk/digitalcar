@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
 import { usePageSeo } from "@/lib/seo";
+import JsonLd from "@/components/seo/JsonLd";
 import { SEO_FREE_TOOLS } from "@/lib/publicSeo";
 import { SIGNATURE_TEMPLATES } from "@/lib/emailSignature";
 import { WA_TEMPLATES } from "@/lib/whatsappMessage";
@@ -68,29 +69,31 @@ const PROMISES = [
   { icon: Gift, title: "Actually free", desc: "No trial timer, no watermark, no card details. Copy the result and keep it." },
 ];
 
+const PAGE_LD = {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: "Free business tools",
+  url: "https://digitalcarda.in/free-tools",
+  mainEntity: {
+    "@type": "ItemList",
+    itemListElement: TOOLS.map((t, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: t.name,
+      url: `https://digitalcarda.in${t.href}`,
+    })),
+  },
+};
+
 export default function FreeTools() {
   usePageSeo({
     ...SEO_FREE_TOOLS,
     canonical: "/free-tools",
-    jsonLd: {
-      "@context": "https://schema.org",
-      "@type": "CollectionPage",
-      name: "Free business tools",
-      url: "https://digitalcarda.in/free-tools",
-      mainEntity: {
-        "@type": "ItemList",
-        itemListElement: TOOLS.map((t, i) => ({
-          "@type": "ListItem",
-          position: i + 1,
-          name: t.name,
-          url: `https://digitalcarda.in${t.href}`,
-        })),
-      },
-    },
   });
 
   return (
     <div className="bg-[#F8FAFC]">
+      <JsonLd id="page-jsonld" data={PAGE_LD} />
       {/* ── Hero: dark, to match the tool pages it leads into ── */}
       <section className="relative bg-[#0F172A] pt-28 pb-16 sm:pt-32 sm:pb-20 px-4 overflow-hidden">
         <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-30" />

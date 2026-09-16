@@ -7,6 +7,7 @@ import { pathToFileURL } from "url";
 import { metaFor, injectCardMeta, cardSummaryHtml, type CardMeta } from "./card-og";
 import { cardSeo } from "../../src/lib/cardSeo";
 import { ogSignature } from "./card-og";
+import { blogMeta, BLOG_POST_PATH } from "./blog-meta";
 
 type App = Hono<{ Bindings: HttpBindings }>;
 const SITE = "https://digitalcarda.in";
@@ -67,6 +68,18 @@ async function productMeta(pathname: string, distPath: string): Promise<CardMeta
   } catch { result = null; }
   metaCache.set(slug, { meta: result, at: Date.now() });
   return result;
+}
+
+/* /demo/<product> opens a template as a working sample card. It duplicates the
+   product page, so it is served with that page as its canonical and kept out of
+   the index — before this it had the bare shell title "DigitalCarda" and no
+   canonical at all. */
+async function demoMeta(pathname: string, distPath: string): Promise<CardMeta | null> {
+  const m = pathname.match(/^\/demo\/([^/]+)\/?$/);
+  if (!m) return null;
+  const product = await productMeta(`/digital-business-cards-templates/${m[1]}`, distPath);
+  if (!product) return null;
+  return { ...product, title: `${product.h1 ?? product.title} — Live Demo | DigitalCarda`, robots: "noindex, follow", jsonLd: undefined, h1: `${product.h1 ?? product.title} — live demo card` };
 }
 
 // Per-card SEO/OG from the owner's PUBLISHED snapshot — so the Meta Title, Meta
@@ -151,6 +164,7 @@ const SSR_PATHS = new Set([
   "/whatsapp-message-templates", "/whatsapp-business-messages",
   "/digital-business-cards-templates",
   "/privacy", "/refund-policy", "/terms-of-service", "/sitemap",
+  "/blog",
 ]);
 const PRODUCT_PATH = /^\/digital-business-cards-templates\/([^/]+)$/;
 const SSR_DATA_TIMEOUT_MS = 2500;
@@ -243,7 +257,8 @@ export function serveStaticFiles(app: App) {
     const reqUrl = new URL(c.req.url);
     const pathname = reqUrl.pathname;
     const clean = pathname.replace(/\/+$/, "") || "/";
-    const ssrWanted = SSR_ENABLED && (SSR_PATHS.has(clean) || PRODUCT_PATH.test(clean));
+    const isBlogPost = BLOG_POST_PATH.test(clean);
+    const ssrWanted = SSR_ENABLED && (SSR_PATHS.has(clean) || PRODUCT_PATH.test(clean) || isBlogPost);
     // Rendered markup can depend on the query string, so it's part of the key
     // for rendered routes; head-only pages ignore it, as before.
     const cacheKey = ssrWanted ? pathname + reqUrl.search : pathname;
@@ -255,17 +270,29 @@ export function serveStaticFiles(app: App) {
     }
     let content = readShell();
     let cacheable = false;
+    let status: 200 | 404 = 200;
     try {
-      const meta = (await productMeta(pathname, distPath)) || (await cardSnapshotMeta(pathname)) || metaFor(pathname, distPath);
+      // The blog is checked first: its paths are ours, so a customer card that
+      // happened to use the slug "blog" can never take over the blog's meta.
+      const meta = blogMeta(pathname) || (await productMeta(pathname, distPath)) || (await demoMeta(pathname, distPath))
+        || (await cardSnapshotMeta(pathname)) || metaFor(pathname, distPath);
       // Soft-404 guard: render a product page only when that product exists.
       // Otherwise an unknown slug would come back as a 200 with a full "not
       // found" page — which search engines index as a real, thin page.
       const productOk = !PRODUCT_PATH.test(clean) || meta?.ogType === "product";
-      const ssr = ssrWanted && productOk ? await renderPublic(clean, pathname + reqUrl.search) : null;
+      // Same for articles: an unknown /blog/<slug> is a real 404, not a thin page.
+      const blogOk = !isBlogPost || meta?.ogType === "article";
+      if (!blogOk) status = 404;
+      const ssr = ssrWanted && productOk && blogOk ? await renderPublic(clean, pathname + reqUrl.search) : null;
 
       // With rendered markup the page has its real <h1>; the hidden placeholder
       // heading is only for pages that still arrive empty.
       if (meta) { content = injectCardMeta(content, ssr ? { ...meta, h1: undefined, bodyHtml: undefined } : meta); cacheable = true; }
+      // A URL nothing recognises — not a page, product, article or card — still
+      // gets the app shell (the app shows its own "not found" screen), but it must
+      // not be indexed: a 200 with a generic title is what Google reports as a
+      // soft 404, and every mistyped link would otherwise become a thin page.
+      else content = content.replace("</head>", () => `    <meta name="robots" content="noindex">\n  </head>`);
       // A customer's card saved to a home screen should open that card, not the
       // DigitalCarda dashboard app the manifest describes.
       if (meta?.ogType === "profile") content = content.replace(/<link rel="manifest"[^>]*>\s*/, "");
@@ -285,7 +312,7 @@ export function serveStaticFiles(app: App) {
       // this makes crawler/social TTFB ~edge speed globally; a no-op without it.
       c.header("Cache-Control", EDGE_CACHE);
     }
-    return c.html(content);
+    return c.html(content, status);
   };
 
   // The homepage would otherwise be served as a raw file by serveStatic, so
