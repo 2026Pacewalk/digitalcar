@@ -49,7 +49,7 @@ function premiumSocials(c: PCRecord, cls: string): string {
 
 /* Design names — the count drives the template gallery. Add more here + a branch
    in buildPremiumCardHtml to introduce the ID / Membership cards later. */
-export const PREMIUM_NAMES = ["Corporate Business Card", "Employee ID Card", "Membership Card", "Professional Profile"];
+export const PREMIUM_NAMES = ["Corporate Business Card", "Employee ID Card", "Membership Card", "Professional Profile", "Bloom Profile"];
 export const PREMIUM_COUNT = PREMIUM_NAMES.length;
 
 const HEAD = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -66,6 +66,7 @@ export function buildPremiumCardHtml(c: PCRecord, products: PCProduct[] = [], in
     case 1: return idCard(c);
     case 2: return membershipCard(c);
     case 3: return professionalProfile(c, products, opts);
+    case 4: return bloomProfile(c, products, opts);
     default: return businessCard(c, products, opts);
   }
 }
@@ -925,6 +926,287 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
       <div class="pp-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
       ${chrome}
     </div>
+  </div>
+  ${modal}
+  ${shareUi}
+  ${script}
+  </body></html>`;
+}
+
+/* ── Bloom Profile: soft, service-business profile ─────────────────────────
+   Built for salons, spas, clinics and studios — anyone whose visitors come to
+   BOOK. A curved accent header with drifting petals, the logo on a white tile,
+   four big action tiles, then a menu of rows (services, offers, gallery,
+   reviews…) that each jump to the full section further down.
+
+   Everything is driven by the owner's data: rows appear only for sections that
+   exist and are switched on, so a sparse card never shows empty promises. The
+   accent drives the whole palette; text colours are chosen for contrast (icons
+   and button fills use a darkened accent so a light brand colour stays legible).
+   Motion is gentle and fully disabled under prefers-reduced-motion. */
+const mix = (hex: string, other: string, pct: number) => {
+  const p = (h: string) => { const x = s(h).replace("#", ""); return x.length >= 6 ? [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)) : [0, 0, 0]; };
+  const a = p(hex), b = p(other);
+  return "#" + a.map((v, i) => Math.round(v * (1 - pct) + b[i] * pct).toString(16).padStart(2, "0")).join("");
+};
+/* WCAG contrast ratio between two #rrggbb colours. */
+const contrast = (x: string, y: string) => {
+  const L = (h: string) => { const v = s(h).replace("#", ""); const ch = [0, 2, 4].map((i) => { const c = parseInt(v.slice(i, i + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }); return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]; };
+  const [a, b] = [L(x), L(y)].sort((m, n) => n - m);
+  return (a + 0.05) / (b + 0.05);
+};
+/* Darken a colour only as far as needed to reach `min` contrast against `bg`. */
+const legible = (hex: string, bg: string, min: number) => {
+  for (let k = 0; k <= 0.9; k += 0.04) { const c = mix(hex, "#000000", k); if (contrast(c, bg) >= min) return c; }
+  return "#1b1d29";
+};
+
+function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolean; extras?: PremiumExtras }): string {
+  const on = (v: unknown, def = 1) => Number(v ?? def) === 1;
+  const showQr = on(c.cardqr_on);
+  const showShare = on(c.share_on);
+  const accent = /^#[0-9a-f]{6}$/i.test(s(c.color)) ? s(c.color) : "#F97316";
+  const deep = /^#[0-9a-f]{6}$/i.test(s(c.color2)) ? s(c.color2) : mix(accent, "#000000", 0.55);
+  // Legible variants of the accent, darkened only as far as each use needs:
+  // icons on their tinted circles ≥3:1 (WCAG non-text), the 19px bold button
+  // label ≥3:1 (large text) — so vivid brand colours stay vivid.
+  const tint = mix(accent, "#ffffff", 0.88);
+  const ink = legible(accent, tint, 3);
+  const btnA = legible(accent, "#ffffff", 3);
+  const btnB = mix(btnA, "#000000", 0.16);
+  const btnText = "#ffffff";
+
+  const slug = s(c.slug).replace(/[^a-zA-Z0-9_-]/g, "");
+  const cardUrl = `https://digitalcarda.in/${slug || "card"}`;
+  const company = s(c.company_name);
+  const person = s(c.name);
+  const title = esc(company || person) || "Your Business";
+  const subtitle = esc([company ? person : "", s(c.designation) || s(c.nature)].filter(Boolean).join(" · "));
+  const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean).slice(0, 3);
+  const tagline = esc(specs.length >= 2 ? specs.join(" · ") : s(c.tagline));
+  const phone = s(c.mobile1).replace(/[^\d+]/g, "");
+  const wa = s(c.mobile2 || c.mobile1).replace(/[^\d]/g, "");
+  const email = s(c.email);
+  const mapHref = safeExternalUrl(c.google_map) || (s(c.address) ? `https://maps.google.com/?q=${encodeURIComponent(s(c.address))}` : "");
+  const site = s(c.url);
+  const siteHref = site ? (/^https?:/i.test(site) ? site : "https://" + site) : "";
+  const qrSrc = (n: number) => `https://api.qrserver.com/v1/create-qr-code/?size=${n}x${n}&margin=8&data=${encodeURIComponent(cardUrl)}`;
+  const strip = (v: unknown) => s(v).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+  // What actually exists on this card (mirrors the gates in pwContentSections).
+  const ex = opts.extras || {};
+  // The gallery thumbnail feeds every premium design the same corporate sample
+  // products; this design is for service businesses, so show neutral ones there.
+  const sample = opts.thumb && s(products[0]?.name) === "Fraud Sentinel 360";
+  const prods = sample
+    ? ["Consultation", "Signature Services", "Packages", "Aftercare"].map((name) => ({ name }))
+    : products.filter((p) => s(p.name));
+  const offerEnded = (v: string) => { const d = new Date(v); return !isNaN(d.getTime()) && d.getTime() + 86_400_000 <= Date.now(); };
+  const offers = (ex.offers || []).filter((o) => (s(o.title) || s(o.filename)) && !offerEnded(s(o.valid)));
+  const gallery = (ex.gallery || []).filter((g) => s(g.filename));
+  const videos = (ex.videos || []).filter((v) => s(v.url));
+  const has = {
+    services: on(c.product_on) && prods.length > 0,
+    offers: on(c.offer_on, 0) && offers.length > 0,
+    gallery: on(c.gallery_on) && gallery.length > 0,
+    videos: on(c.video_on) && videos.length > 0,
+    reviews: on(c.review_on) && !!s(c.google_review),
+    payment: on(c.payment_on) && !!(s(c.upi) || s(c.paytm_number) || s(c.phone_pe) || s(c.google_pay) || s(c.account_number) || s(c.bank_name)),
+    about: on(c.about_on) && !!(company || strip(c.about_us)),
+    enquiry: on(c.enquiry_on),
+  };
+  // In the thumbnail there are no sections to jump to, so rows are inert.
+  const jump = (id: string) => opts.thumb ? `href="javascript:void(0)"` : `href="#${id}" onclick="return bmGo('${id}')"`;
+
+  // ── Four action tiles ──
+  const waBook = wa ? `https://wa.me/${wa}?text=${encodeURIComponent(`Hi ${company || person}, I'd like to book an appointment.`)}` : "";
+  const tiles = [
+    phone ? { ic: "fa fa-phone-alt", lb: "Call", attr: `href="tel:${esc(phone)}"` } : null,
+    wa ? { ic: "fab fa-whatsapp", lb: "WhatsApp", attr: `href="https://wa.me/${wa}" target="_blank" rel="noopener"` } : null,
+    has.enquiry ? { ic: "far fa-calendar-check", lb: "Book Now", attr: jump("enquiry-section") }
+      : waBook ? { ic: "far fa-calendar-check", lb: "Book Now", attr: `href="${esc(waBook)}" target="_blank" rel="noopener"` } : null,
+    has.gallery ? { ic: "far fa-images", lb: "Gallery", attr: jump("gallery-section") }
+      : mapHref ? { ic: "fa fa-map-marker-alt", lb: "Directions", attr: `href="${esc(mapHref)}" target="_blank" rel="noopener"` }
+      : email ? { ic: "far fa-envelope", lb: "Email", attr: `href="mailto:${esc(email)}"` } : null,
+  ].filter(Boolean).slice(0, 4) as { ic: string; lb: string; attr: string }[];
+  const tilesHtml = tiles.map((t) => `<a class="bm-tile" ${t.attr}><span class="bm-tile-ic" aria-hidden="true"><i class="${t.ic}"></i></span><span class="bm-tile-lb">${t.lb}</span></a>`).join("");
+
+  // ── Menu rows ──
+  const rating = Number(s(c.google_rating)) || 0;
+  const svcIcon = prods.length ? svcMeta(s(prods[0].name)).icon : "fa-th-large";
+  const vcard = `data:text/vcard;charset=utf-8,${encodeURIComponent(["BEGIN:VCARD", "VERSION:3.0", `FN:${person || company}`, `ORG:${company}`, `TITLE:${s(c.designation)}`, `TEL;TYPE=CELL:${s(c.mobile1)}`, `EMAIL:${email}`, `URL:${site}`, `ADR:;;${s(c.address)};;;;`, "END:VCARD"].join("\n"))}`;
+  const rows = [
+    has.services ? { ic: `fa ${svcIcon}`, t: s(c.product) || "Our Services", d: prods.slice(0, 4).map((p) => s(p.name)).join(" · "), a: jump("products-section") } : null,
+    has.offers ? { ic: "fa fa-tag", t: s(c.offer) || "Packages & Offers", d: offers.length === 1 ? (s(offers[0].title) || "1 offer running now") : `${offers.length} offers running now`, a: jump("offers-section") } : null,
+    has.gallery ? { ic: "far fa-image", t: s(c.gallery) || "Gallery", d: `${gallery.length} photo${gallery.length === 1 ? "" : "s"} of our work`, a: jump("gallery-section") } : null,
+    has.videos ? { ic: "fa fa-play", t: s(c.video) || "Videos", d: `${videos.length} video${videos.length === 1 ? "" : "s"}`, a: jump("video-section") } : null,
+    has.reviews ? { ic: "far fa-star", t: s(c.review) || "Google Reviews", d: rating > 0 ? `${rating.toFixed(1)} ★${s(c.google_review_count) ? ` · ${s(c.google_review_count)} reviews` : ""}` : "See what our clients say", a: jump("review-section") } : null,
+    has.payment ? { ic: "fa fa-wallet", t: "Pay Online", d: "UPI & bank details", a: jump("payment-section") } : null,
+    has.about ? { ic: "far fa-building", t: s(c.about) || "About Us", d: strip(c.about_us).slice(0, 60) || company, a: jump("about-section") } : null,
+    mapHref && s(c.address) ? { ic: "fa fa-map-marker-alt", t: "Visit Us", d: s(c.address), a: `href="${esc(mapHref)}" target="_blank" rel="noopener"` } : null,
+    siteHref ? { ic: "fa fa-globe", t: "Website", d: site.replace(/^https?:\/\//i, "").replace(/\/$/, ""), a: `href="${esc(siteHref)}" target="_blank" rel="noopener"` } : null,
+    (phone || email) ? { ic: "fa fa-user-plus", t: "Save Contact", d: "Add us to your phone", a: `href="${vcard}" download="${slug || "contact"}.vcf"` } : null,
+  ].filter(Boolean) as { ic: string; t: string; d: string; a: string }[];
+  const rowsHtml = rows.map((r) => `<a class="bm-row" ${r.a}><span class="bm-row-ic" aria-hidden="true"><i class="${r.ic}"></i></span><span class="bm-row-tx"><b>${esc(r.t)}</b>${r.d ? `<small>${esc(r.d)}</small>` : ""}</span><i class="fa fa-chevron-right bm-row-ar" aria-hidden="true"></i></a>`).join("");
+
+  // Brand-coloured social circles by default (the reference look); the owner's
+  // "theme colour" icon setting still wins when chosen explicitly.
+  const socials = premiumSocials({ ...c, social_icon_style: s(c.social_icon_style) || "brand" }, "bm-soc");
+
+  const logo = s(c.logo);
+  const logoPct = Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100;
+  const logoRound = s(c.logo_shape) === "round";
+  const initial = esc((company || person || "D")[0].toUpperCase());
+  const logoHtml = logo
+    ? `<img src="${esc(logo)}" alt="${title}" ${IMG} onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="bm-initial" style="display:none">${initial}</span>`
+    : `<span class="bm-initial">${initial}</span>`;
+
+  const petal = (x: number, y: number, r: number, sc: number, o: number) =>
+    `<path transform="translate(${x} ${y}) rotate(${r}) scale(${sc})" d="M0 0C18-26 18-62 0-92C-18-62-18-26 0 0Z" fill="#fff" opacity="${o}"/>`;
+  const petals = `<svg class="bm-petals" viewBox="0 0 430 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g class="bm-pl">${petal(62, 176, -38, 1.35, 0.16)}${petal(70, 172, -8, 1.5, 0.2)}${petal(80, 176, 24, 1.25, 0.13)}</g>
+    <g class="bm-pr">${petal(378, 150, 32, 1.1, 0.12)}${petal(368, 146, 6, 1.25, 0.15)}</g>
+    <circle cx="352" cy="36" r="70" fill="#fff" opacity=".07"/>
+  </svg>`;
+
+  const css = `
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  :root{--ac:${accent};--ink-ac:${ink};--bg:${mix(accent, "#ffffff", 0.955)};--tint:${tint};--tint2:${mix(accent, "#ffffff", 0.8)};--ink:#1b1d29;--muted:#5f6572;--line:${mix(accent, "#e9e5e1", 0.9)};}
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;}
+  body{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;background:${mix(accent, "#eef0f3", 0.93)};color:var(--ink);line-height:1.5;}
+  .bm{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg);box-shadow:0 24px 70px rgba(27,29,41,.12);overflow:hidden;position:relative;}
+  @keyframes bmUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+  @keyframes bmSway{0%,100%{transform:rotate(0);}50%{transform:rotate(3deg);}}
+  .bm-rise{animation:bmUp .5s cubic-bezier(.2,.7,.2,1) both;}
+  .bm-d1{animation-delay:.06s;} .bm-d2{animation-delay:.12s;} .bm-d3{animation-delay:.18s;} .bm-d4{animation-delay:.24s;}
+
+  /* Header — curved accent wash with petals */
+  .bm-head{position:relative;height:178px;overflow:hidden;background:linear-gradient(160deg,${mix(accent, "#ffffff", 0.12)} 0%,var(--ac) 48%,${mix(accent, deep, 0.22)} 100%);}
+  .bm-head::after{content:"";position:absolute;left:-12%;right:-12%;bottom:-58px;height:120px;background:var(--bg);border-radius:50% 50% 0 0 / 100% 100% 0 0;}
+  .bm-petals{position:absolute;inset:0;width:100%;height:100%;}
+  .bm-pl{transform-box:view-box;transform-origin:70px 176px;animation:bmSway 7s ease-in-out infinite;}
+  .bm-pr{transform-box:view-box;transform-origin:370px 150px;animation:bmSway 8s ease-in-out -2s infinite reverse;}
+  .bm-share{position:absolute;top:14px;right:14px;z-index:3;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.45);background:rgba(0,0,0,.14);color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(6px);}
+
+  .bm-in{position:relative;z-index:2;padding:0 18px 26px;margin-top:-104px;}
+  .bm-logo{width:${Math.round(118 * logoPct)}px;height:${Math.round(118 * logoPct)}px;margin:0 auto;background:#fff;border-radius:${logoRound ? "50%" : "28px"};display:flex;align-items:center;justify-content:center;padding:14px;box-shadow:0 2px 4px rgba(27,29,41,.05),0 18px 40px -12px ${mix(accent, "#000000", 0.35)}55;overflow:hidden;}
+  .bm-logo img{max-width:100%;max-height:100%;object-fit:contain;display:block;${logoRound ? "border-radius:50%;" : ""}}
+  .bm-initial{font-family:'Poppins',sans-serif;font-weight:800;font-size:${Math.round(48 * logoPct)}px;color:var(--ink-ac);line-height:1;}
+  .bm-title{font-family:'Poppins',sans-serif;font-weight:700;font-size:27px;line-height:1.15;letter-spacing:-.02em;text-align:center;color:var(--ink);margin-top:16px;text-wrap:balance;}
+  .bm-sub{text-align:center;font-size:14.5px;color:var(--muted);margin-top:5px;}
+  .bm-tag{display:flex;align-items:center;gap:12px;margin:12px 6px 0;font-size:13px;color:var(--muted);text-align:center;}
+  .bm-tag::before,.bm-tag::after{content:"";flex:1;min-width:16px;height:1px;background:linear-gradient(90deg,transparent,var(--line));}
+  .bm-tag::after{background:linear-gradient(90deg,var(--line),transparent);}
+  .bm-tag span{max-width:78%;}
+
+  .bm-tiles{display:grid;grid-template-columns:repeat(${Math.max(1, tiles.length)},1fr);gap:9px;margin-top:20px;}
+  .bm-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:88px;padding:12px 4px;border-radius:18px;background:var(--tint);color:var(--ink);text-decoration:none;font-size:12.5px;font-weight:600;transition:transform .16s ease,background .2s,box-shadow .2s;}
+  .bm-tile-ic{font-size:24px;color:var(--ink-ac);line-height:1;}
+  .bm-tile:hover{background:var(--tint2);transform:translateY(-2px);box-shadow:0 12px 24px -12px ${accent}66;}
+  .bm-tile:active{transform:scale(.96);}
+
+  .bm-rows{display:grid;gap:10px;margin-top:18px;}
+  .bm-row{display:flex;align-items:center;gap:14px;min-height:72px;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:18px;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(27,29,41,.03);transition:transform .16s ease,box-shadow .22s,border-color .22s;}
+  .bm-row:hover{transform:translateY(-2px);border-color:var(--tint2);box-shadow:0 14px 28px -16px ${accent}70;}
+  .bm-row-ic{width:48px;height:48px;border-radius:50%;background:var(--tint);color:var(--ink-ac);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .bm-row-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .bm-row-tx b{font-family:'Poppins',sans-serif;font-weight:600;font-size:15px;color:var(--ink);letter-spacing:-.005em;}
+  .bm-row-tx small{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .bm-row-ar{color:#737985;font-size:13px;transition:transform .2s,color .2s;}
+  .bm-row:hover .bm-row-ar{transform:translateX(3px);color:var(--ink-ac);}
+
+  /* Floating dock (socials + Share). Content gets bottom padding equal to the
+     dock so nothing ends up hidden behind it. */
+  .bm-in{padding-bottom:${(socials ? 96 : 0) + (showShare ? 72 : 0) + 24}px;}
+  .bm-dock{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:430px;z-index:40;padding:14px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,${mix(accent, "#ffffff", 0.955)}00 0%,${mix(accent, "#ffffff", 0.955)}e6 26%,${mix(accent, "#ffffff", 0.955)} 62%);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);animation:bmDock .5s cubic-bezier(.2,.7,.2,1) .3s both;}
+  @keyframes bmDock{from{opacity:0;transform:translate(-50%,24px);}to{opacity:1;transform:translate(-50%,0);}}
+  .bm-dock .bm-follow{margin:0 4px 8px;}
+  .bm-dock .bm-sharebtn{margin-top:10px;min-height:54px;}
+  .bm-follow{display:flex;align-items:center;gap:12px;margin:24px 4px 12px;font-size:11.5px;font-weight:600;letter-spacing:.14em;color:var(--muted);}
+  .bm-follow::before,.bm-follow::after{content:"";flex:1;height:1px;background:var(--line);}
+  .bm-socials{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;}
+  .bm-soc{width:48px;height:48px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:19px;color:#fff;background:var(--ink-ac);text-decoration:none;box-shadow:0 8px 18px -8px rgba(27,29,41,.35);transition:transform .16s;}
+  .bm-soc svg{width:19px;height:19px;fill:currentColor;display:block;}
+  .bm-soc:hover{transform:translateY(-3px);}
+
+  .bm-sharebtn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:58px;margin-top:22px;border:none;border-radius:18px;background:linear-gradient(135deg,${btnA},${btnB});color:${btnText};font-family:'Poppins',sans-serif;font-weight:700;font-size:19px;cursor:pointer;box-shadow:0 16px 30px -14px ${btnB};transition:transform .16s,filter .2s;}
+  .bm-sharebtn:hover{filter:brightness(1.05);transform:translateY(-1px);}
+  .bm-sharebtn:active{transform:scale(.985);}
+  .bm-url{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;min-height:44px;padding:0 12px;border:none;background:none;font-family:inherit;font-size:14px;color:var(--muted);cursor:pointer;border-radius:12px;}
+  .bm-url i{font-size:20px;color:var(--ink);}
+  .bm-url:hover{color:var(--ink);}
+
+  .bm-cx{margin-top:30px;}
+  .bm-powered{text-align:center;font-size:11.5px;color:var(--muted);margin-top:22px;}
+  .bm-powered a{color:var(--ink-ac);font-weight:700;text-decoration:none;}
+  .bm-foot{display:flex;margin-top:12px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;}
+  .bm-foot a{flex:1;text-align:center;font-weight:700;font-size:12.5px;color:var(--ink);text-decoration:none;padding:13px 8px;}
+  .bm-foot a:first-child{border-right:1px solid var(--line);}
+
+  .bm-modal{display:none;position:fixed;inset:0;background:rgba(27,29,41,.6);backdrop-filter:blur(4px);z-index:80;align-items:center;justify-content:center;padding:20px;}
+  .bm-modal-in{background:#fff;border-radius:24px;max-width:320px;width:100%;padding:28px 22px 22px;text-align:center;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.35);}
+  .bm-modal-x{position:absolute;top:8px;right:8px;width:44px;height:44px;border:none;background:none;border-radius:50%;color:var(--muted);font-size:22px;cursor:pointer;}
+  .bm-qr{display:inline-block;padding:8px;border:1px solid var(--line);border-radius:18px;line-height:0;}
+  .bm-qr img{width:200px;height:200px;display:block;}
+  .bm-qr-t{font-family:'Poppins',sans-serif;font-weight:700;font-size:17px;margin-top:14px;}
+  .bm-qr-s{font-size:12.5px;color:var(--muted);}
+  .bm-qr-b{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;margin-top:16px;padding:0 20px;border-radius:14px;background:linear-gradient(135deg,${btnA},${btnB});color:${btnText};font-weight:700;font-size:13.5px;text-decoration:none;}
+
+  .bm a:focus-visible,.bm button:focus-visible,.bm-modal button:focus-visible,.bm-modal a:focus-visible{outline:3px solid var(--ink-ac);outline-offset:3px;}
+  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto;}.bm-rise,.bm-pl,.bm-pr,.bm-dock{animation:none!important;}.bm-tile,.bm-row,.bm-soc,.bm-sharebtn{transition:none!important;}}
+  `;
+
+  const shareName = company || person || "this business";
+  const waShareText = `Hi 👋\n\nTake a look at *${shareName}*'s digital visiting card 📇\n\nEverything in one tap — call, WhatsApp, book and save the contact:\n${cardUrl}`;
+  const shareUi = opts.thumb ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: btnB });
+  const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, ex, slug, { products });
+  const cxCss = cx.css ? `:root{--navy:${mix(deep, "#1b1d29", 0.35)};--gold:${accent};--soft:var(--bg);}${cx.css}` : "";
+  const ref = s(c.referral_code) || slug;
+  // Floating dock: socials + Share stay in reach while the visitor scrolls the
+  // sections below. Fixed rather than sticky, because the card clips overflow.
+  const dock = (socials || showShare) ? `<div class="bm-dock">
+      ${socials ? `<div class="bm-follow">FOLLOW US</div><div class="bm-socials">${socials}</div>` : ""}
+      ${showShare ? `<button class="bm-sharebtn" type="button" ${opts.thumb ? "" : `onclick="pwShare()"`}><i class="fa fa-share-alt" aria-hidden="true"></i> Share My Card</button>` : ""}
+    </div>` : "";
+
+  const modal = (opts.thumb || !showQr) ? "" : `
+  <div id="bmqr" class="bm-modal" role="dialog" aria-modal="true" aria-label="QR code for this card" onclick="if(event.target===this)bmQR(false)">
+    <div class="bm-modal-in">
+      <button class="bm-modal-x" type="button" onclick="bmQR(false)" aria-label="Close">&times;</button>
+      <div class="bm-qr"><img src="${qrSrc(260)}" alt="QR code linking to ${cardUrl}" ${IMG}></div>
+      <div class="bm-qr-t">${title}</div>
+      <div class="bm-qr-s">Scan to open this card</div>
+      <a class="bm-qr-b" href="${qrSrc(600)}" target="_blank" rel="noopener" download="${slug || "card"}-qr.png"><i class="fa fa-download"></i> Download QR</a>
+    </div>
+  </div>`;
+
+  const script = opts.thumb ? "" : `<script>
+  function bmQR(o){var m=document.getElementById('bmqr');if(m)m.style.display=o?'flex':'none';}
+  function bmGo(id){var el=document.getElementById(id);if(!el)return true;
+    if(el.classList.contains('pwx-acc')&&!el.classList.contains('open')){var h=el.querySelector('.pwx-acc-h');if(h)pwxAcc(h);}
+    el.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});return false;}
+  ${shareSheetJs(cardUrl)}
+  ${cx.js}
+  </script>`;
+
+  return `<!doctype html><html lang="en"><head>${HEAD}<style>${css}${cxCss}${shareSheetCss(btnB)}</style></head><body>
+  <div class="bm">
+    <div class="bm-head">${petals}
+      ${showShare && !opts.thumb ? `<button class="bm-share" type="button" onclick="pwShare()" aria-label="Share this card"><i class="fa fa-share-alt"></i></button>` : ""}
+    </div>
+    <div class="bm-in">
+      <div class="bm-logo bm-rise">${logoHtml}</div>
+      <h1 class="bm-title bm-rise bm-d1">${title}</h1>
+      ${subtitle ? `<p class="bm-sub bm-rise bm-d1">${subtitle}</p>` : ""}
+      ${tagline ? `<p class="bm-tag bm-rise bm-d1"><span>${tagline}</span></p>` : ""}
+      ${tilesHtml ? `<nav class="bm-tiles bm-rise bm-d2" aria-label="Quick actions">${tilesHtml}</nav>` : ""}
+      ${rowsHtml ? `<div class="bm-rows bm-rise bm-d3">${rowsHtml}</div>` : ""}
+      ${showQr ? `<button class="bm-url" type="button" ${opts.thumb ? "" : `onclick="bmQR(true)"`} aria-label="Show QR code for ${esc(cardUrl.replace(/^https:\/\//, ""))}"><i class="fa fa-qrcode" aria-hidden="true"></i> ${esc(cardUrl.replace(/^https:\/\//, ""))}</button>` : ""}
+      ${cx.html ? `<div class="bm-cx">${cx.html}</div>` : ""}
+      ${opts.thumb ? "" : `<div class="bm-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
+      <div class="bm-foot"><a href="/login" target="_top">Customer Login</a><a href="/signup${ref ? `?ref=${encodeURIComponent(ref)}` : ""}" target="_top">Create Free Card</a></div>`}
+    </div>
+    ${dock}
   </div>
   ${modal}
   ${shareUi}
