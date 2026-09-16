@@ -72,7 +72,7 @@ export const subscriptionPackages = mysqlTable("subscription_packages", {
   monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull(),
   yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }).notNull(),
   threeYearPrice: decimal("three_year_price", { precision: 10, scale: 2 }).notNull().default("0"),
-  trialDays: int("trial_days").notNull().default(7),
+  trialDays: int("trial_days").notNull().default(30),
   maxCards: int("max_cards").notNull().default(1),
   maxProducts: int("max_products").notNull().default(0),
   maxGalleryImages: int("max_gallery_images").notNull().default(0),
@@ -431,10 +431,11 @@ export const products = mysqlTable("products", {
 export type Product = typeof products.$inferSelect;
 
 // ─── Card Trials (backend-authoritative 30-day trial) ───────────
-// The trial starts on FIRST PUBLISH (not registration) and is the source of
-// truth for a card's live status. Dates come from the server clock — never a
-// frontend timer (Section 5). Keyed by user for now (one card per user);
-// moves to card_id when the card-instance migration runs.
+// A signup publishes the account's starter card, so the trial clock and the
+// live card start together; trial.start on a later publish is idempotent. This
+// row is the source of truth for a card's live status. Dates come from the
+// server clock — never a frontend timer (Section 5). Keyed by user for now (one
+// card per user); moves to card_id when the card-instance migration runs.
 export const cardTrials = mysqlTable("card_trials", {
   id: serial("id").primaryKey(),
   userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().unique(),
@@ -443,6 +444,9 @@ export const cardTrials = mysqlTable("card_trials", {
   startedAt: timestamp("started_at"),
   endsAt: timestamp("ends_at"),
   publishedAt: timestamp("published_at"),
+  // How this trial was started: the voucher (FREE30D) and where it came from.
+  couponCode: varchar("coupon_code", { length: 40 }),
+  activationSource: varchar("activation_source", { length: 40 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
 });

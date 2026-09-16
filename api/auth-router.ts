@@ -12,6 +12,7 @@ import { sendEmail, ownerAddress } from "./lib/mail";
 import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail, verifyEmailAddressEmail } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { verifyGoogleIdToken } from "./lib/google-auth";
+import { TRIAL_COUPON_CODE, evaluateTrialCoupon, recordTrialRedemption } from "./lib/coupons";
 import { randomBytes } from "crypto";
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
@@ -32,6 +33,7 @@ async function provisionStarterCard(
   db: ReturnType<typeof getDb>,
   user: { id: number; email: string; fullName: string; phone: string | null },
   companyName?: string,
+  promo?: string,
 ): Promise<string | null> {
   try {
     // Unique, name-based slug (e.g. "Taniya Xtreme" -> taniya-xtreme, then -2, -3…).
@@ -56,10 +58,28 @@ async function provisionStarterCard(
     const daysRow = await db.select().from(appSettings).where(eq(appSettings.key, "trial_days"));
     const days = Number(daysRow[0]?.value) || 30;
     const now = new Date();
+
+    /* The free-trial voucher (FREE30D). It is validated HERE, on the server —
+       a code from the browser can never change the trial length or the price.
+       A code that doesn't check out is simply not recorded: the 30-day trial
+       still starts, because a promo must never block someone signing up. */
+    let voucher: { couponId: number; code: string } | null = null;
+    try {
+      const check = await evaluateTrialCoupon(db, promo || TRIAL_COUPON_CODE, { userId: user.id, now });
+      if (check.ok) voucher = { couponId: check.couponId, code: check.code };
+      else console.log(`[trial] voucher not applied for user ${user.id}: ${check.reason}`);
+    } catch (e) { console.error("[trial] voucher check failed:", (e as Error).message); }
+
     await db.insert(cardTrials).values({
       userId: user.id, status: "active", startedAt: now, publishedAt: now,
       endsAt: new Date(now.getTime() + days * 86_400_000),
+      couponCode: voucher?.code ?? null,
+      activationSource: voucher ? "signup_voucher" : "signup",
     });
+    if (voucher) {
+      try { await recordTrialRedemption(db, { couponId: voucher.couponId, userId: user.id }); }
+      catch (e) { console.error("[trial] voucher record failed:", (e as Error).message); }
+    }
     return slug;
   } catch { return null; }
 }
@@ -70,7 +90,7 @@ async function provisionStarterCard(
 async function welcomeNewAccount(
   db: ReturnType<typeof getDb>,
   insertedUser: typeof users.$inferSelect,
-  opts: { referralCode?: string; companyName?: string; verifyEmail: boolean },
+  opts: { referralCode?: string; companyName?: string; promo?: string; verifyEmail: boolean },
 ): Promise<void> {
   // Welcome email (+ an email-verification link when the address isn't already
   // verified) to the new user, and a new-signup alert to the owner — all
@@ -129,7 +149,7 @@ async function welcomeNewAccount(
   } catch { /* non-critical */ }
 
   // Give the new account its own live card URL + start the trial.
-  await provisionStarterCard(db, insertedUser, opts.companyName);
+  await provisionStarterCard(db, insertedUser, opts.companyName, opts.promo);
 }
 
 /* Legacy-auth bridge: the old site stored plaintext passwords (some with stray
@@ -261,6 +281,9 @@ export const authRouter = createRouter({
         role: z.literal("customer").default("customer"),
         companyName: z.string().optional(),
         referralCode: z.string().optional(),
+        // Free-trial voucher (FREE30D). Only a record — the server decides the
+        // trial length, and an unknown code is ignored, never an error.
+        promo: z.string().max(40).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -304,7 +327,7 @@ export const authRouter = createRouter({
       }
 
       await welcomeNewAccount(db, insertedUser, {
-        referralCode: input.referralCode, companyName: input.companyName, verifyEmail: true,
+        referralCode: input.referralCode, companyName: input.companyName, promo: input.promo, verifyEmail: true,
       });
 
       const token = await createToken({
@@ -357,6 +380,7 @@ export const authRouter = createRouter({
       credential: z.string().min(20).max(4096),
       referralCode: z.string().max(50).optional(),
       companyName: z.string().max(255).optional(),
+      promo: z.string().max(40).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       enforceRateLimit(`google:${clientIp(ctx.req)}`, 10, 60_000);
@@ -419,7 +443,7 @@ export const authRouter = createRouter({
         if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user" });
         created = true;
         await welcomeNewAccount(db, user, {
-          referralCode: input.referralCode, companyName: input.companyName, verifyEmail: false,
+          referralCode: input.referralCode, companyName: input.companyName, promo: input.promo, verifyEmail: false,
         });
       }
 

@@ -446,8 +446,40 @@ if (process.env.NODE_ENV === "production") {
       )
     `));
     console.log("[schema] coupons, coupon_redemptions, announcements ensured");
+    // The FREE30D free-trial voucher, created once. An admin can then edit or
+    // switch it off in Admin → Coupons; this never overwrites their settings.
+    const { ensureTrialCoupon } = await import("./lib/coupons");
+    await ensureTrialCoupon(db);
   } catch (e) {
     console.error("[schema] ensure coupon/announcement tables failed:", (e as Error).message);
+  }
+})();
+
+// One-time, idempotent add of card_trials.coupon_code / activation_source — how a
+// trial was started (FREE30D, and from where). MySQL has no "ADD COLUMN IF NOT
+// EXISTS", so check information_schema first. Both are nullable: every existing
+// trial stays exactly as it is, with no coupon recorded.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    for (const [column, ddl] of [
+      ["coupon_code", "ADD COLUMN coupon_code varchar(40) NULL AFTER published_at"],
+      ["activation_source", "ADD COLUMN activation_source varchar(40) NULL AFTER coupon_code"],
+    ] as const) {
+      const rows = await db.execute(sql.raw(
+        `SELECT COUNT(*) AS n FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'card_trials' AND column_name = '${column}'`,
+      ));
+      const n = Number((rows as unknown as [{ n?: number }[]])[0]?.[0]?.n ?? (rows as unknown as { n?: number }[])[0]?.n ?? 0);
+      if (!n) {
+        await db.execute(sql.raw(`ALTER TABLE card_trials ${ddl}`));
+        console.log(`[schema] card_trials.${column} column added`);
+      }
+    }
+  } catch (e) {
+    console.error("[schema] ensure card_trials trial-voucher columns failed:", (e as Error).message);
   }
 })();
 

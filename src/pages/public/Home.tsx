@@ -1719,14 +1719,14 @@ function ResellerSection() {
 /* ─── Pricing ─── */
 function PricingSection() {
   const plans = [
-    { name: "Free Trial", price: "₹0", period: "30 Days", popular: false, cta: "Start Free Trial", features: ["Full Gold features", "1 Digital Card", "All 50+ templates", "No credit card needed", "Live in minutes"] },
+    { name: "Free Trial", price: "₹0", period: "30 Days", popular: false, cta: "Start Free for 30 Days", href: "/signup?promo=FREE30D", features: ["Full Gold features", "1 Digital Card", "All 50+ templates", "No payment required", "Live in minutes"] },
     { name: "Gold", price: "₹999", period: "/ year", popular: true, cta: "Get Gold", features: ["1 Digital Card", "Products & Services", "Gallery, Videos & Offers", "QR & UPI Payments", "Enquiry Form + Leads", "Full Analytics", "Custom URL & Colours"] },
     { name: "Platinum", price: "₹1,999", period: "/ year", popular: false, cta: "Go Platinum", features: ["Everything in Gold", "Up to 3 Cards", "Unlimited Products & Offers", "Remove Branding", "Custom Domain + SEO", "AI Content Tools", "Priority Support"] },
   ];
   return (
     <section className="py-20 bg-[#F8FAFC]" id="pricing">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeading eyebrow="Pricing" title="Simple Pricing for Every Business" subtitle="Choose the plan that fits your needs. Start a 30-day free trial that requires no credit card details upfront." />
+        <SectionHeading eyebrow="Pricing" title="Simple Pricing for Every Business" subtitle="Choose the plan that fits your needs. Start a 30-day free trial — ₹0, with no payment required." />
         <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pt-3">
           {plans.map((plan, i) => (
             <div key={i} className={`rounded-2xl p-6 card-hover relative ${plan.popular ? "bg-[#0F172A] shadow-premium-lg ring-2 ring-[#F7B31C]" : "bg-white shadow-premium border border-[#F1F5F9]"}`}>
@@ -1743,7 +1743,7 @@ function PricingSection() {
                   </div>
                 ))}
               </div>
-              <Link to="/signup" className={`w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center transition-all ${plan.popular ? "gradient-gold text-[#0F172A] hover:shadow-gold" : "border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC] hover:border-[#F7B31C]/40"}`}>
+              <Link to={"href" in plan ? plan.href : "/signup"} className={`w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center transition-all ${plan.popular ? "gradient-gold text-[#0F172A] hover:shadow-gold" : "border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC] hover:border-[#F7B31C]/40"}`}>
                 {plan.cta}
               </Link>
             </div>

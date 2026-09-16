@@ -521,7 +521,7 @@ function MobileMenu({
             <span className="flex items-center gap-3 rounded-[15px] bg-[#111A2E] px-4 py-3.5">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F7B31C]/15"><Sparkles size={18} className="text-[#F7B31C]" /></span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold">30 days free · no card details</span>
+                <span className="block text-sm font-bold">30 days free · no payment needed</span>
                 <span className="block text-xs text-[#94A3B8]">Create your digital business card today</span>
               </span>
               <ArrowRight size={17} className="shrink-0 text-[#F7B31C]" />

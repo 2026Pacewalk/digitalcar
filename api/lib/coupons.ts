@@ -1,5 +1,5 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
-import { coupons, couponRedemptions, type Coupon } from "@db/schema";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { coupons, couponRedemptions, subscriptionPackages, type Coupon } from "@db/schema";
 import type { getDb } from "../queries/connection";
 
 /* Discount coupons for PLAN purchases only.
@@ -37,6 +37,8 @@ export async function evaluateCoupon(
 ): Promise<CouponCheck> {
   const code = normalizeCode(rawCode);
   if (!code) return { ok: false, reason: "Enter a coupon code." };
+  // The free-trial voucher is not a discount on a purchase (see below).
+  if (code === TRIAL_COUPON_CODE) return { ok: false, reason: `${TRIAL_COUPON_CODE} starts the free trial — it isn't a discount on a plan.` };
 
   const [c] = await db.select().from(coupons).where(eq(coupons.code, code)).limit(1);
   if (!c || !c.active) return { ok: false, reason: "This coupon code isn't valid." };
@@ -120,6 +122,84 @@ export async function completeRedemptionForOrder(db: Db, paymentOrderId: number)
     await db.update(couponRedemptions).set({ status: "completed" }).where(eq(couponRedemptions.id, r.id));
     await db.update(coupons).set({ usedCount: sql`${coupons.usedCount} + 1` }).where(eq(coupons.id, r.couponId));
   }
+}
+
+/* ── FREE30D: the free-trial voucher ──────────────────────────────────────
+   The 30-day trial is already ₹0 and never touches the payment gateway, so
+   FREE30D is NOT a discount on a purchase (evaluateCoupon rejects it). It is
+   the commercial record of a trial activation: the server validates it at
+   signup, writes a ₹0 redemption, and Admin → Coupons then shows how many
+   trials it started and who converted. Switching it off or capping it in the
+   admin changes nothing for existing trials — only what new signups record. */
+export const TRIAL_COUPON_CODE = "FREE30D";
+
+export type TrialCouponCheck =
+  | { ok: true; couponId: number; code: string }
+  | { ok: false; reason: string };
+
+/** The free plan's package id (Trial), used on the ₹0 redemption row. */
+async function trialPackageId(db: Db): Promise<number> {
+  const [p] = await db.select({ id: subscriptionPackages.id })
+    .from(subscriptionPackages)
+    .where(and(eq(subscriptionPackages.monthlyPrice, "0.00"), eq(subscriptionPackages.yearlyPrice, "0.00")))
+    .orderBy(asc(subscriptionPackages.id)).limit(1);
+  return p?.id ?? 7;
+}
+
+/** Create FREE30D once if an admin hasn't already. Never edits an existing row,
+    so whatever the admin configures in Admin → Coupons wins. */
+export async function ensureTrialCoupon(db: Db): Promise<void> {
+  const [existing] = await db.select({ id: coupons.id }).from(coupons).where(eq(coupons.code, TRIAL_COUPON_CODE)).limit(1);
+  if (existing) return;
+  await db.insert(coupons).values({
+    code: TRIAL_COUPON_CODE,
+    description: "30-day free trial — applied automatically when a new account signs up",
+    discountType: "percent",
+    discountValue: "100.00",
+    perUserLimit: 1,          // one free trial per account
+    planIds: String(await trialPackageId(db)),
+    active: true,
+  });
+}
+
+/** Can this account start a free trial on this code? Checked on the server at
+    signup; a failure never blocks the signup, it only skips the record. */
+export async function evaluateTrialCoupon(
+  db: Db,
+  rawCode: string,
+  ctx: { userId: number; now?: Date },
+): Promise<TrialCouponCheck> {
+  const code = normalizeCode(rawCode);
+  if (!code) return { ok: false, reason: "No code given." };
+
+  const [c] = await db.select().from(coupons).where(eq(coupons.code, code)).limit(1);
+  if (!c) return { ok: false, reason: `${code} is not a known code.` };
+  if (!c.active) return { ok: false, reason: `${code} is switched off.` };
+
+  const now = ctx.now ?? new Date();
+  if (c.validFrom && now < c.validFrom) return { ok: false, reason: `${code} starts on ${day(c.validFrom)}.` };
+  if (c.validUntil && now > c.validUntil) return { ok: false, reason: `${code} expired on ${day(c.validUntil)}.` };
+
+  const [counts] = await db.select({
+    total: sql<number>`count(*)`,
+    mine: sql<number>`coalesce(sum(case when ${couponRedemptions.userId} = ${ctx.userId} then 1 else 0 end), 0)`,
+  }).from(couponRedemptions)
+    .where(and(eq(couponRedemptions.couponId, c.id), inArray(couponRedemptions.status, ["pending", "completed"])));
+  if (c.usageLimit && Number(counts?.total || 0) >= c.usageLimit) return { ok: false, reason: `${code} has reached its usage limit.` };
+  if (c.perUserLimit && Number(counts?.mine || 0) >= c.perUserLimit) return { ok: false, reason: `This account has already used ${code}.` };
+
+  return { ok: true, couponId: c.id, code };
+}
+
+/** Write the ₹0 redemption for a trial that FREE30D started. */
+export async function recordTrialRedemption(db: Db, r: { couponId: number; userId: number }): Promise<void> {
+  await recordRedemption(db, {
+    couponId: r.couponId,
+    userId: r.userId,
+    packageId: await trialPackageId(db),
+    amountBefore: 0, discount: 0, amountPaid: 0,
+    status: "completed",
+  });
 }
 
 /** Admin rejected a manual payment → release the coupon use. */

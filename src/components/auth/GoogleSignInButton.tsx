@@ -49,10 +49,12 @@ export function useGoogleClientId(): string | null {
   return data?.clientId ?? null;
 }
 
-export default function GoogleSignInButton({ clientId, mode, referralCode, onSignedIn }: {
+export default function GoogleSignInButton({ clientId, mode, referralCode, promo, onSignedIn }: {
   clientId: string;
   mode: "signup" | "signin";
   referralCode?: string;
+  /** Free-trial voucher to record for a brand-new account (server-validated). */
+  promo?: string;
   onSignedIn: (result: GoogleSignInResult) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -60,8 +62,8 @@ export default function GoogleSignInButton({ clientId, mode, referralCode, onSig
   const google = trpc.auth.google.useMutation();
 
   // Google keeps the callback from the first render; read current props from here.
-  const latest = useRef({ referralCode, onSignedIn, mutate: google.mutateAsync });
-  latest.current = { referralCode, onSignedIn, mutate: google.mutateAsync };
+  const latest = useRef({ referralCode, promo, onSignedIn, mutate: google.mutateAsync });
+  latest.current = { referralCode, promo, onSignedIn, mutate: google.mutateAsync };
 
   useEffect(() => {
     let cancelled = false;
@@ -76,7 +78,11 @@ export default function GoogleSignInButton({ clientId, mode, referralCode, onSig
           callback: async ({ credential }: { credential?: string }) => {
             if (!credential) return;
             try {
-              const res = await latest.current.mutate({ credential, referralCode: latest.current.referralCode || undefined });
+              const res = await latest.current.mutate({
+                credential,
+                referralCode: latest.current.referralCode || undefined,
+                promo: latest.current.promo || undefined,
+              });
               latest.current.onSignedIn(res);
             } catch (err) {
               const msg = err instanceof Error ? err.message : "";

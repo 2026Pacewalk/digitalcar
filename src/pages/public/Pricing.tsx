@@ -23,18 +23,26 @@ type Plan = {
   features: { icon?: typeof Check; text: string }[];
 };
 
+/* The 30-day trial is ₹0 and needs no payment. FREE30D is the promo code behind
+   it: every "Start Free for 30 Days" link carries it, so nobody has to type it,
+   and the server records the activation against it. */
+const TRIAL_PROMO = "FREE30D";
+const TRIAL_CTA = "Start Free for 30 Days";
+const TRIAL_SIGNUP = `/signup?promo=${TRIAL_PROMO}`;
+
 const PLANS: Plan[] = [
   {
     name: "Free Trial", tagline: "Test-drive the full card", icon: Sparkles, accent: "#14B8A6",
     price: { monthly: 0, yearly: 0, "3year": 0 },
-    cta: "Start Free Trial",
+    cta: TRIAL_CTA,
     headline: "Everything, free for 30 days:",
     features: [
       { icon: Zap, text: "Your live digital card in minutes" },
       { icon: Crown, text: "All premium features unlocked" },
       { icon: QrCode, text: "Custom QR code + shareable link" },
-      { icon: MessageSquare, text: "Call, WhatsApp & Save-Contact buttons" },
-      { icon: Check, text: "No credit card required" },
+      { icon: Check, text: "No payment required — instant activation" },
+      { icon: Check, text: "Your card stays saved after the trial" },
+      { icon: Check, text: "Upgrade anytime" },
     ],
   },
   {
@@ -112,7 +120,7 @@ function buildPlans(pkgs: DbPkg[]): Plan[] {
       accent: ACCENT_BY[p.name] || "#F7B31C",
       popular: p.name === "Gold",
       price: { monthly, yearly, "3year": Math.round(yearly * 2.5) },
-      cta: isFree ? "Start Free Trial" : `Get ${p.name}`,
+      cta: isFree ? TRIAL_CTA : `Get ${p.name}`,
       headline: isFree ? "Everything, free for 30 days:" : `Your ${p.name} plan includes:`,
       // Shared with the dashboard Subscription module so the two never drift.
       features: planFeatures(p as unknown as PlanPkg).map((text) => ({ text })),
@@ -121,7 +129,7 @@ function buildPlans(pkgs: DbPkg[]): Plan[] {
 }
 
 const faqs = [
-  { q: "Is the 30-day trial really free?", a: "Yes — completely free, no credit card. You get the full card with every premium feature unlocked for 30 days. When it ends, pick a plan to keep your card live; nothing is ever charged automatically." },
+  { q: "Is the 30-day trial really free?", a: "Yes — ₹0, and no payment details of any kind. Promo code FREE30D is applied for you when you sign up, so you get the full card with every premium feature unlocked for 30 days. When it ends, pick a plan to keep your card live; nothing is ever charged automatically." },
   { q: "What do I actually get on a paid plan?", a: "Your live digital card on a personal link and QR, with lead capture, Google reviews, payment links, gallery and video, and all 50+ templates. Gold covers one card and up to 25 products; Platinum adds up to 3 cards, unlimited products, a bigger 60-photo gallery, AI content, multi-language and priority support." },
   { q: "Monthly, Yearly or 3-Year — which should I pick?", a: "The same card, cheaper the longer you commit. Yearly saves about 16% (roughly two months free) over monthly, and the 3-Year plan is the best value — and it includes the custom-domain setup free." },
   { q: "Can I upgrade later?", a: "Anytime. Your card, link and QR stay exactly the same — you just unlock more features and higher limits instantly. We never make you rebuild anything." },
@@ -216,7 +224,7 @@ export default function Pricing() {
               </svg>
             </span>
           </h1>
-          <p className="mt-6 text-base text-[#64748B] leading-relaxed">Start free for 30 days — full features, no credit card. Then keep your digital card live from just <span className="font-semibold text-[#0F172A]">₹99/month</span>.</p>
+          <p className="mt-6 text-base text-[#64748B] leading-relaxed">Start free for 30 days — every feature, no payment required. Then keep your digital card live from just <span className="font-semibold text-[#0F172A]">₹99/month</span>.</p>
         </Reveal>
 
         {/* Billing toggle */}
@@ -273,14 +281,19 @@ export default function Pricing() {
                         {sv > 0 && <span className="ml-2 text-[11px] font-bold text-[#166534] bg-[#DCFCE7] px-1.5 py-0.5 rounded-full">Save {sv}%</span>}
                       </p>
                     )}
-                    {isFree && <p className="text-[12px] text-[#64748B]">Then just ₹99/mo. Cancel anytime.</p>}
+                    {isFree && <p className="text-[12px] text-[#64748B]">No payment required. Then ₹99/mo only if you continue.</p>}
                     {!isFree && period === "monthly" && <p className="text-[12px] text-[#94A3B8]">billed monthly</p>}
                   </div>
 
-                  {/* CTA */}
-                  <Link to="/signup" className={`w-full h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all mb-5 ${plan.popular ? "gradient-gold text-[#0F172A] hover:shadow-gold" : "border-2 border-[#0F172A] text-[#0F172A] hover:bg-[#0F172A] hover:text-white"}`}>
+                  {/* CTA — the free plan carries the promo code so it applies itself */}
+                  <Link to={isFree ? TRIAL_SIGNUP : "/signup"} className={`w-full h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${plan.popular ? "gradient-gold text-[#0F172A] hover:shadow-gold" : "border-2 border-[#0F172A] text-[#0F172A] hover:bg-[#0F172A] hover:text-white"}`}>
                     {plan.cta} <ArrowRight size={15} />
                   </Link>
+                  <p className="h-5 mt-2 mb-3 text-center text-[11.5px] text-[#94A3B8]">
+                    {isFree
+                      ? <span className="inline-flex items-center gap-1 font-semibold text-[#0F9488]"><Check size={12} /> {TRIAL_PROMO} — auto applied</span>
+                      : "Secure payment · UPI, card, net banking"}
+                  </p>
 
                   {/* Features */}
                   <p className="text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wide mb-3">{plan.headline}</p>
@@ -461,8 +474,8 @@ export default function Pricing() {
           <div className="absolute top-0 right-0 w-72 h-72 bg-[#F7B31C]/10 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
           <div className="relative">
             <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Your card is ready in minutes</h2>
-            <p className="text-sm text-[#94A3B8] mb-6 max-w-lg mx-auto">Start free for 30 days with every feature unlocked. No credit card, no risk.</p>
-            <Link to="/signup" className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">Start Free Trial <ArrowRight size={16} /></Link>
+            <p className="text-sm text-[#94A3B8] mb-6 max-w-lg mx-auto">₹0 for 30 days with every feature unlocked. No payment required — {TRIAL_PROMO} is applied for you.</p>
+            <Link to={TRIAL_SIGNUP} className="btn-gold h-12 px-8 inline-flex items-center justify-center gap-2">{TRIAL_CTA} <ArrowRight size={16} /></Link>
           </div>
         </Reveal>
       </div>

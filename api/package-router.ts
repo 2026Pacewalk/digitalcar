@@ -94,7 +94,7 @@ export const packageRouter = createRouter({
         monthlyPrice: z.string(),
         yearlyPrice: z.string(),
         threeYearPrice: z.string().optional(),
-        trialDays: z.number().default(7),
+        trialDays: z.number().default(30),
         maxCards: z.number().default(1),
         maxProducts: z.number().default(0),
         maxGalleryImages: z.number().default(0),

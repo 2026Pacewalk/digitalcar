@@ -1043,13 +1043,13 @@ export function abandonedPublishEmail(o: { name?: string; productName?: string; 
   const what = o.productName ? `your <strong>${esc(o.productName)}</strong> card` : "your digital card";
   const bodyHtml =
     hi(o.name) +
-    p(`You're almost there — ${what} is set up but not published yet. Publishing takes one click, and your <strong>30-day free trial only starts when you publish</strong>, so you lose nothing by finishing now.`) +
+    p(`You're almost there — ${what} is set up but not published yet. Publishing takes one click, and your <strong>30-day free trial is already running</strong>, so finish now and start sharing your card.`) +
     button("Finish &amp; publish my card", o.cardUrl || `${SITE}/dashboard/build`);
   return {
     kind: "abandonedPublishEmail",
     subject: "Your DigitalCarda is almost ready 🚀",
-    html: layout({ preheader: "One click to publish — your free trial starts only when you publish.", badge: "Almost done", heading: "You're one click away 🚀", bodyHtml, accent: BRAND.gold }),
-    text: `Hi ${o.name || "there"},\n\nYour digital card is almost ready — publish it to make it live. Your 30-day free trial only starts when you publish: ${o.cardUrl || SITE + "/dashboard/build"}`,
+    html: layout({ preheader: "One click to publish — your free trial is already running.", badge: "Almost done", heading: "You're one click away 🚀", bodyHtml, accent: BRAND.gold }),
+    text: `Hi ${o.name || "there"},\n\nYour digital card is almost ready — publish it to make it live. Your 30-day free trial is already running: ${o.cardUrl || SITE + "/dashboard/build"}`,
   };
 }
 

@@ -6,15 +6,21 @@ import { CONTACT, FOOTER_GROUPS, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicN
 import SiteHeader from "@/components/layout/SiteHeader";
 import AnnouncementPopup from "@/components/AnnouncementPopup";
 
+/** The promo code behind the ₹0 30-day trial — applied for the visitor. */
+const TRIAL_PROMO = "FREE30D";
+
 export default function PublicLayout() {
   const location = useLocation();
 
   const seo = seoForPath(location.pathname) || DEFAULT_SEO;
 
-  // On a product page, carry the product into signup so the trial starts on that
-  // exact card (e.g. /signup?product=ocean-blue-card); otherwise plain /signup.
+  /* Every signup link carries the free-trial promo code (FREE30D), so nobody has
+     to find or type it, and on a product page it also carries the product so the
+     trial starts on that exact card (e.g. /signup?promo=FREE30D&product=ocean-blue-card). */
   const productMatch = location.pathname.match(/^\/digital-business-cards-templates\/([^/]+)\/?$/);
-  const signupHref = productMatch ? `/signup?product=${encodeURIComponent(decodeURIComponent(productMatch[1]))}` : "/signup";
+  const signupHref = productMatch
+    ? `/signup?promo=${TRIAL_PROMO}&product=${encodeURIComponent(decodeURIComponent(productMatch[1]))}`
+    : `/signup?promo=${TRIAL_PROMO}`;
 
   useEffect(() => {
     document.title = seo.title;
@@ -157,7 +163,7 @@ export default function PublicLayout() {
           <div className="flex flex-col justify-between gap-6 rounded-3xl border border-white/10 bg-gradient-to-br from-[#1A2438] via-[#131C2E] to-[#0F172A] p-6 sm:p-10 lg:flex-row lg:items-center">
             <div className="max-w-xl">
               <p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]">
-                <Sparkles size={13} /> 30-day free trial · no card details
+                <Sparkles size={13} /> 30-day free trial · no payment needed
               </p>
               <p className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-white text-balance">
                 Your whole business, one link away.

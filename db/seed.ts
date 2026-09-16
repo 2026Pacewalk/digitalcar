@@ -65,7 +65,7 @@ async function seed() {
     {
       name: "Starter", slug: "starter",
       description: "Perfect for individuals starting out with digital business cards.",
-      monthlyPrice: "9.99", yearlyPrice: "99.99", trialDays: 7,
+      monthlyPrice: "9.99", yearlyPrice: "99.99", trialDays: 30,
       maxCards: 1, maxProducts: 3, maxGalleryImages: 5, maxVideos: 0,
       storageLimitMB: 100,
       featureCustomDomain: false, featureSEO: true, featureAnalytics: false,
@@ -76,7 +76,7 @@ async function seed() {
     {
       name: "Professional", slug: "professional",
       description: "Best for professionals who want full analytics and lead capture.",
-      monthlyPrice: "19.99", yearlyPrice: "199.99", trialDays: 7,
+      monthlyPrice: "19.99", yearlyPrice: "199.99", trialDays: 30,
       maxCards: 3, maxProducts: 10, maxGalleryImages: 20, maxVideos: 3,
       storageLimitMB: 500,
       featureCustomDomain: true, featureSEO: true, featureAnalytics: true,
@@ -87,7 +87,7 @@ async function seed() {
     {
       name: "Business", slug: "business",
       description: "Complete solution for businesses with white-label and CRM.",
-      monthlyPrice: "49.99", yearlyPrice: "499.99", trialDays: 7,
+      monthlyPrice: "49.99", yearlyPrice: "499.99", trialDays: 30,
       maxCards: 10, maxProducts: 50, maxGalleryImages: 100, maxVideos: 10,
       storageLimitMB: 2000,
       featureCustomDomain: true, featureSEO: true, featureAnalytics: true,
@@ -98,7 +98,7 @@ async function seed() {
     {
       name: "Agency", slug: "agency",
       description: "For agencies and resellers managing multiple clients.",
-      monthlyPrice: "99.99", yearlyPrice: "999.99", trialDays: 7,
+      monthlyPrice: "99.99", yearlyPrice: "999.99", trialDays: 30,
       maxCards: 100, maxProducts: 500, maxGalleryImages: 1000, maxVideos: 50,
       storageLimitMB: 10000,
       featureCustomDomain: true, featureSEO: true, featureAnalytics: true,

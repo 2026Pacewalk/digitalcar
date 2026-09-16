@@ -179,7 +179,7 @@ export const SEARCH_PAGES: NavLink[] = [
   { label: "Email signature generator", href: "/email-signature-generator", desc: "Free · 14 signature designs" },
   { label: "WhatsApp message templates", href: "/whatsapp-message-templates", desc: "Free · greeting, away and quick replies" },
   { label: "Contact us", href: "/contact", desc: "Call, WhatsApp or email the team" },
-  { label: "Start free trial", href: "/signup", desc: "30 days free, no card details" },
+  { label: "Start free trial", href: "/signup?promo=FREE30D", desc: "30 days free, no payment needed" },
   { label: "Home", href: "/", desc: "DigitalCarda home page" },
   { label: "Industries", href: "/industries", desc: "Cards for every industry" },
   { label: "Custom domain", href: "/custom-domain", desc: "Your card on your own domain" },

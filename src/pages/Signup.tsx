@@ -23,6 +23,9 @@ const STRENGTH = [
   { label: "Strong", color: "#22C55E" },
 ];
 
+/** The free-trial voucher applied to every new account (see /pricing). */
+const TRIAL_PROMO = "FREE30D";
+
 const inputCls =
   "h-11 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] pl-10 pr-3 text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/15 focus:bg-white transition-all placeholder:text-[#CBD5E1]";
 const iconCls = "absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none";
@@ -32,6 +35,10 @@ export default function Signup() {
   const [searchParams] = useSearchParams();
   const referralCode = searchParams.get("ref") || "";
   const productSlug = searchParams.get("product") || "";
+  /* The free-trial voucher. Nobody has to type it: every signup carries FREE30D
+     unless a campaign link names another code. It is only a record — the server
+     alone decides the trial length, and an unusable code never blocks signup. */
+  const promo = (searchParams.get("promo") || searchParams.get("coupon") || TRIAL_PROMO).toUpperCase();
   const registerMut = trpc.auth.register.useMutation();
   const utils = trpc.useUtils();
   const { data: refInfo } = trpc.referral.validate.useQuery({ code: referralCode }, { enabled: !!referralCode });
@@ -103,12 +110,13 @@ export default function Signup() {
         role: "customer",
         companyName: form.businessName.trim() || undefined,
         referralCode: referralCode || undefined,
+        promo,
       });
       setSession(res.token, res.user, "main");
       logFunnel("registration", productSlug || undefined, res.user?.id);
       // Card handle from the business name (fall back to full name, then email).
       seedNewCard(res.user?.id, form.businessName || form.fullName || form.email.split("@")[0]);
-      // Trial does NOT start here — it begins on first publish (§5, Phase 13).
+      // The server starts the 30-day trial and records the voucher (§5, Phase 13).
       // Land the user straight in customisation when they picked a card (§32).
       if (selectedProduct) {
         toast.success(`Account created! Let's make your ${selectedProduct.name} yours.`);
@@ -198,11 +206,11 @@ export default function Signup() {
     <div className="min-h-screen bg-[#F8FAFC] flex">
       <AuthBrandPanel
         heading="Create your free digital card"
-        subtitle="Join thousands of businesses on DigitalCarda. Start a 30-day free trial that requires no credit card details upfront and publish a professional card in minutes."
+        subtitle="Join thousands of businesses on DigitalCarda. Start a 30-day free trial — ₹0, with no payment required — and publish a professional card in minutes."
         footer={
           <div className="grid grid-cols-2 gap-2.5">
             {[
-              "30-Day Free Trial", "No credit card", "Instant setup", "Share anywhere",
+              "30-Day Free Trial", "No payment required", "Instant activation", "Share anywhere",
             ].map((t, i) => (
               <div key={i} className="flex items-center gap-2 text-[13px] text-[#CBD5E1]">
                 <span className="w-4 h-4 rounded-full bg-[#F7B31C]/20 flex items-center justify-center shrink-0"><Check size={10} className="text-[#F7B31C]" /></span>
@@ -228,11 +236,16 @@ export default function Signup() {
           </div>
 
           <div className="text-center mb-6">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E] mb-3">
-              <ShieldCheck size={12} /> 30-day free trial · no card details
-            </span>
+            <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#92400E]">
+                <ShieldCheck size={12} /> 30-day free trial · no payment
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-semibold text-[#166534]">
+                <Check size={12} /> {promo} applied
+              </span>
+            </div>
             <h1 className="text-2xl sm:text-[1.7rem] font-extrabold text-[#0F172A] tracking-tight">Create Your Account</h1>
-            <p className="text-sm text-[#64748B] mt-1">No credit card required · Cancel anytime</p>
+            <p className="text-sm text-[#64748B] mt-1">₹0 for 30 days · No payment required · Cancel anytime</p>
           </div>
 
           {selectedProduct && (
@@ -262,7 +275,7 @@ export default function Signup() {
           {/* Google sign-up — shown only once GOOGLE_CLIENT_ID is set on the server. */}
           {googleClientId && (
             <>
-              <GoogleSignInButton clientId={googleClientId} mode="signup" referralCode={referralCode} onSignedIn={handleGoogle} />
+              <GoogleSignInButton clientId={googleClientId} mode="signup" referralCode={referralCode} promo={promo} onSignedIn={handleGoogle} />
               <div className="flex items-center gap-3 my-5">
                 <span className="h-px flex-1 bg-[#E2E8F0]" />
                 <span className="text-xs text-[#94A3B8]">or sign up with email</span>
@@ -346,7 +359,7 @@ export default function Signup() {
             </label>
 
             <button type="submit" disabled={loading} className="w-full h-12 gradient-gold text-[#0F172A] rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-60">
-              {loading ? <><Loader2 size={18} className="animate-spin" /> Creating account…</> : <><UserPlus size={18} /> Start 30-Day Free Trial</>}
+              {loading ? <><Loader2 size={18} className="animate-spin" /> Creating account…</> : <><UserPlus size={18} /> Start Free for 30 Days</>}
             </button>
           </form>
 
