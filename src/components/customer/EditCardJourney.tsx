@@ -10,10 +10,62 @@
  * Both render nothing when the current route isn't part of the journey, so
  * ModuleShell can mount them unconditionally.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Check, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { EDIT_CARD_STEPS, currentStepIndex } from "./editCardSteps";
+import { readCustomer, scopedKey } from "@/hooks/useCustomer";
+
+/* Which steps are genuinely finished.
+
+   The strip used to tick every chip BEFORE the current one, so opening
+   "Reviews" ticked Basics through Gallery whether or not the owner had entered
+   anything, and the progress bar measured position rather than work done.
+   Completion is now read from the card itself, using the same checks as the
+   dashboard guide. */
+function listCount(base: string): number {
+  try {
+    const raw = localStorage.getItem(scopedKey(base));
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.length : 0;
+  } catch { return 0; }
+}
+
+function useStepsDone(pathname: string): Record<string, boolean> {
+  // Recheck when content changes anywhere in the app, and on every step change
+  // (the page just left may have added something).
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setVersion((v) => v + 1);
+    window.addEventListener("dc:content-changed", bump);
+    window.addEventListener("storage", bump);
+    return () => {
+      window.removeEventListener("dc:content-changed", bump);
+      window.removeEventListener("storage", bump);
+    };
+  }, []);
+
+  return useMemo(() => {
+    const c = readCustomer() as unknown as Record<string, unknown>;
+    const v = (k: string) => String(c[k] ?? "").trim();
+    const done: Record<string, boolean> = {
+      build: !!(v("name") && v("mobile1")),
+      // A brand-new card carries no template until its owner picks one.
+      templates: !!v("theme"),
+      social: ["facebook", "twitter", "instagram", "youtube", "pinterest", "linkedin"].some((k) => v(k)),
+      about: !!(v("about_us") || v("specialities") || v("nature")),
+      products: listCount("dc_products") > 0,
+      payments: !!(v("upi") || v("bank_name") || v("paytm_number") || v("phone_pe") || v("google_pay"))
+        || listCount("dc_upi") + listCount("dc_banks") + listCount("dc_qrcode") > 0,
+      media: listCount("dc_gallery") + listCount("dc_videos") > 0,
+      reviews: !!v("google_review"),
+      uploads: listCount("dc_uploads") > 0,
+    };
+    // "View Card" is nothing to fill in - it ticks once everything else is done.
+    done.view = EDIT_CARD_STEPS.every((st) => st.key === "view" || done[st.key]);
+    return done;
+  }, [pathname, version]);
+}
 
 export function JourneyStrip() {
   const { pathname } = useLocation();
@@ -22,6 +74,7 @@ export function JourneyStrip() {
   const inEditor = pathname.startsWith("/dashboard/build");
   const navigate = useNavigate();
   const idx = currentStepIndex(pathname);
+  const doneMap = useStepsDone(pathname);
   const scroller = useRef<HTMLDivElement>(null);
   const activeChip = useRef<HTMLButtonElement>(null);
 
@@ -32,18 +85,19 @@ export function JourneyStrip() {
 
   if (idx < 0 || inEditor) return null;
   const total = EDIT_CARD_STEPS.length;
-  const pct = Math.round(((idx + 1) / total) * 100);
+  const doneCount = EDIT_CARD_STEPS.filter((s) => doneMap[s.key]).length;
+  const pct = Math.round((doneCount / total) * 100);
 
   return (
     <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-1 pb-2.5 bg-[#F8FAFC]/85 backdrop-blur-md border-b border-[#EEF2F7]">
       <div className="flex items-center justify-between mb-1.5">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#B45309]"><Sparkles size={13} className="text-[#F7B31C]" /> Build your card</span>
-        <span className="text-[11px] font-medium text-[#94A3B8] tabular-nums">Step {idx + 1} of {total}</span>
+        <span className="text-[11px] font-medium text-[#94A3B8] tabular-nums">{doneCount} of {total} done</span>
       </div>
       <div ref={scroller} className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1 pb-0.5">
         {EDIT_CARD_STEPS.map((s, i) => {
           const active = i === idx;
-          const done = i < idx;
+          const done = !!doneMap[s.key];
           const Icon = s.icon;
           return (
             <button
