@@ -8,8 +8,8 @@ export const googleReviewQrCode: BlogPost = {
   excerpt: "Happy customers rarely leave reviews on their own — it's too many steps. A QR code cuts it to one. Here's how to make it, where to place it, and what to say.",
   category: "grow",
   keywords: ["google review qr code", "google review link", "how to get more google reviews", "qr code for google reviews"],
-  publishedAt: "2026-09-16",
-  updatedAt: "2026-09-16",
+  publishedAt: "2026-08-21",
+  updatedAt: "2026-08-21",
   cover: { motif: "stars", tone: "emerald" },
   takeaways: [
     "Get your review link from your Google Business Profile — look for \"Ask for reviews\" or \"Get more reviews\".",

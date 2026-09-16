@@ -8,8 +8,8 @@ export const linkInBioVsDigitalBusinessCard: BlogPost = {
   excerpt: "Both are a single link with buttons. But one is built for followers and the other for customers. Here's how to tell which your business needs.",
   category: "grow",
   keywords: ["link in bio", "linktree alternative", "link in bio vs digital business card", "digital business card"],
-  publishedAt: "2026-09-16",
-  updatedAt: "2026-09-16",
+  publishedAt: "2026-06-19",
+  updatedAt: "2026-06-19",
   cover: { motif: "links", tone: "violet" },
   takeaways: [
     "A link-in-bio page is built for social followers: a list of links to your content and profiles.",

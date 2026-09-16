@@ -27,8 +27,8 @@ export const BLOG_CATEGORIES: { id: BlogCategoryId; label: string; blurb: string
   { id: "industries", label: "By profession", blurb: "What to put on a card for your line of work" },
 ];
 
-/** Listed in this order on the blog page — the first is the featured article. */
-const POSTS: BlogPost[] = [
+/** Every article. The blog lists them newest first (the newest is featured). */
+const ALL_POSTS: BlogPost[] = [
   howToMakeADigitalVisitingCard,
   nfcBusinessCardIndia,
   googleReviewQrCode,
@@ -38,6 +38,10 @@ const POSTS: BlogPost[] = [
   digitalVisitingCardForDoctors,
   linkInBioVsDigitalBusinessCard,
 ];
+
+// ISO dates sort as text; the slug breaks ties so the order never varies.
+const POSTS: BlogPost[] = [...ALL_POSTS].sort((a, b) =>
+  b.publishedAt.localeCompare(a.publishedAt) || a.slug.localeCompare(b.slug));
 
 export const BLOG_POSTS: readonly BlogPost[] = POSTS;
 

@@ -8,8 +8,8 @@ export const digitalVisitingCardForDoctors: BlogPost = {
   excerpt: "Patients don't need your life story. They need your timings, your location and a way to book. A practical guide for doctors, dentists and clinics.",
   category: "industries",
   keywords: ["visiting card for doctor", "digital visiting card for doctors", "doctor visiting card", "clinic visiting card"],
-  publishedAt: "2026-09-16",
-  updatedAt: "2026-09-16",
+  publishedAt: "2026-07-03",
+  updatedAt: "2026-07-03",
   cover: { motif: "clinic", tone: "teal" },
   takeaways: [
     "Put clinic timings, location and an appointment button at the top. That's what patients look for.",

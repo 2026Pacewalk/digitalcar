@@ -8,8 +8,8 @@ export const whatIsADigitalVisitingCard: BlogPost = {
   excerpt: "Your visiting card, but as a link people can open, save and share. Here's how it works, what belongs on it, and when paper still makes sense.",
   category: "guides",
   keywords: ["digital visiting card", "digital business card", "e visiting card", "electronic business card", "virtual business card"],
-  publishedAt: "2026-09-16",
-  updatedAt: "2026-09-16",
+  publishedAt: "2026-08-10",
+  updatedAt: "2026-08-10",
   cover: { motif: "card", tone: "gold" },
   takeaways: [
     "A digital visiting card is a small web page with your details, opened by a link, a QR code or an NFC tap.",

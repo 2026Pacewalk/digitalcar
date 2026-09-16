@@ -8,8 +8,8 @@ export const visitingCardDesignIdeas: BlogPost = {
   excerpt: "Good design isn't about fancy fonts. It's about a stranger knowing who you are and how to reach you in five seconds. Twelve ideas that make that happen.",
   category: "design",
   keywords: ["visiting card design", "business card design", "visiting card design ideas", "digital visiting card design"],
-  publishedAt: "2026-09-16",
-  updatedAt: "2026-09-16",
+  publishedAt: "2026-07-13",
+  updatedAt: "2026-07-13",
   cover: { motif: "palette", tone: "rose" },
   takeaways: [
     "Decide the one thing people should remember, and make it the biggest thing on the card.",

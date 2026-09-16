@@ -8,8 +8,8 @@ export const qrCodeBusinessCardVcard: BlogPost = {
   excerpt: "There are two kinds of business card QR codes, and they behave very differently once printed. Here's which one to use, and how to make saving your number effortless.",
   category: "nfc-qr",
   keywords: ["qr code business card", "vcard", "business card qr code generator", "vcard qr code", "save contact qr code"],
-  publishedAt: "2026-09-16",
-  updatedAt: "2026-09-16",
+  publishedAt: "2026-07-26",
+  updatedAt: "2026-07-26",
   cover: { motif: "qr", tone: "navy" },
   takeaways: [
     "A vCard is a standard contact file (.vcf) that phones understand, so tapping it offers to save the contact.",

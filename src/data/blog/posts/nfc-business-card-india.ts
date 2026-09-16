@@ -8,8 +8,8 @@ export const nfcBusinessCardIndia: BlogPost = {
   excerpt: "Tap a card on a phone and your details pop up. It feels like magic, but it's simple tech. Here's how NFC cards work, what they cost, and who they're worth it for.",
   category: "nfc-qr",
   keywords: ["nfc business card", "nfc visiting card", "nfc card price", "pvc visiting card", "smart visiting card"],
-  publishedAt: "2026-09-16",
-  updatedAt: "2026-09-16",
+  publishedAt: "2026-09-04",
+  updatedAt: "2026-09-04",
   cover: { motif: "nfc", tone: "violet" },
   takeaways: [
     "An NFC business card has a tiny chip that opens a link when tapped on a phone. It doesn't need a battery or an app.",
