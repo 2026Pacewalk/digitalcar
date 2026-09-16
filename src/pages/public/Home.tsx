@@ -1238,131 +1238,9 @@ function HowItWorksSection() {
 }
 
 /* ─── Analytics ──────────────────────────────────────────────
-   The section that most needed a real visual: a page selling analytics
-   should SHOW analytics. One series (views over 12 months) with a hover
-   crosshair, KPI tiles with sparklines, then the trackable metrics as
-   chips — deliberately NOT another uniform card grid. */
-const VIEW_SERIES = [2100, 2580, 3120, 2870, 3760, 4380, 5210, 4880, 6090, 7020, 7810, 9140];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/* Smooth cubic through points (midpoint control points — stable for any series). */
-function smoothPath(pts: { x: number; y: number }[]) {
-  if (!pts.length) return "";
-  let d = `M ${pts[0].x} ${pts[0].y}`;
-  for (let i = 1; i < pts.length; i++) {
-    const cx = (pts[i - 1].x + pts[i].x) / 2;
-    d += ` C ${cx} ${pts[i - 1].y}, ${cx} ${pts[i].y}, ${pts[i].x} ${pts[i].y}`;
-  }
-  return d;
-}
-
-function Sparkline({ data, color }: { data: number[]; color: string }) {
-  const W = 70, H = 24;
-  const max = Math.max(...data), min = Math.min(...data), span = max - min || 1;
-  const pts = data.map((v, i) => ({ x: (i / (data.length - 1)) * W, y: H - 3 - ((v - min) / span) * (H - 6) }));
-  const last = pts[pts.length - 1];
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true" className="shrink-0">
-      <path d={smoothPath(pts)} fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={last.x} cy={last.y} r="2.5" fill={color} />
-    </svg>
-  );
-}
-
-const KPIS = [
-  { label: "Total Views", value: "91,240", delta: "+18.2%", spark: [12, 18, 15, 22, 26, 24, 33], color: "#D97706" },
-  { label: "WhatsApp Clicks", value: "12,806", delta: "+24.5%", spark: [8, 11, 10, 15, 14, 19, 23], color: "#16A34A" },
-  { label: "QR Scans", value: "7,412", delta: "+11.8%", spark: [6, 8, 12, 10, 14, 16, 18], color: "#8B5CF6" },
-  { label: "Leads Captured", value: "2,318", delta: "+31.4%", spark: [3, 5, 4, 8, 9, 12, 16], color: "#3B82F6" },
-];
-
-function AnalyticsPanel() {
-  const [hover, setHover] = useState<number | null>(null);
-  const W = 760, H = 208, padL = 10, padR = 10, padT = 16, padB = 28;
-  const innerW = W - padL - padR, innerH = H - padT - padB;
-  const max = Math.max(...VIEW_SERIES) * 1.08;            // headroom so the peak is not clipped
-  const pts = VIEW_SERIES.map((v, i) => ({
-    x: padL + (i / (VIEW_SERIES.length - 1)) * innerW,
-    y: padT + (1 - v / max) * innerH,
-  }));
-  const line = smoothPath(pts);
-  const base = padT + innerH;                             // area charts sit on a zero baseline
-  const area = `${line} L ${pts[pts.length - 1].x} ${base} L ${pts[0].x} ${base} Z`;
-  const act = hover != null ? pts[hover] : null;
-
-  return (
-    <div className="rounded-3xl bg-white ring-1 ring-[#E7EBF2] shadow-premium-lg overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-[#F1F5F9]">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="w-9 h-9 rounded-xl bg-[#FEF3C7] flex items-center justify-center shrink-0"><BarChart3 size={17} className="text-[#B45309]" /></span>
-          <div className="min-w-0">
-            <p className="text-[13px] font-bold text-[#0F172A] leading-tight">Card Analytics</p>
-            <p className="text-[11px] text-[#94A3B8]">Views over the last 12 months</p>
-          </div>
-        </div>
-        <span className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[#F8FAFC] ring-1 ring-[#E2E8F0] text-[11px] font-semibold text-[#475569] shrink-0">
-          <Clock size={12} /> Last 12 months
-        </span>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-[#F1F5F9]">
-        {KPIS.map((k) => (
-          <div key={k.label} className="bg-white px-4 sm:px-5 py-4">
-            <p className="text-[11px] font-medium text-[#94A3B8] truncate">{k.label}</p>
-            <div className="mt-1.5 flex items-end justify-between gap-2">
-              <p className="text-xl font-extrabold text-[#0F172A] tabular-nums leading-none">{k.value}</p>
-              <Sparkline data={k.spark} color={k.color} />
-            </div>
-            <span className="mt-2.5 inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-700 bg-emerald-50 ring-1 ring-emerald-100 rounded-full px-2 py-0.5">
-              <TrendingUp size={10} /> {k.delta}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="relative px-2 sm:px-4 pt-5 pb-2">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block" role="img"
-          aria-label="Card views rising from about 2,100 in January to about 9,140 in December">
-          <defs>
-            <linearGradient id="dcAreaFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#F7B31C" stopOpacity="0.32" />
-              <stop offset="100%" stopColor="#F7B31C" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-            <line key={t} x1={padL} x2={W - padR} y1={padT + t * innerH} y2={padT + t * innerH}
-              stroke="#EEF2F7" strokeWidth="1" strokeDasharray={t === 1 ? "0" : "4 5"} />
-          ))}
-          <path d={area} fill="url(#dcAreaFill)" />
-          <path d={line} fill="none" stroke="#D97706" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
-          {pts.map((p, i) => (
-            <text key={i} x={p.x} y={H - 8} textAnchor="middle" fill="#94A3B8" style={{ fontSize: 11, fontWeight: 600 }}>{MONTHS[i]}</text>
-          ))}
-          {act && (
-            <g pointerEvents="none">
-              <line x1={act.x} x2={act.x} y1={padT} y2={base} stroke="#CBD5E1" strokeWidth="1" strokeDasharray="3 4" />
-              <circle cx={act.x} cy={act.y} r="6" fill="#ffffff" stroke="#D97706" strokeWidth="2.5" />
-            </g>
-          )}
-          {pts.map((p, i) => (
-            <rect key={`hit-${i}`} x={p.x - innerW / 24} y={padT} width={innerW / 12} height={innerH} fill="transparent"
-              onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
-          ))}
-        </svg>
-        {act && hover != null && (
-          <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full z-10"
-            style={{ left: `${(act.x / W) * 100}%`, top: `${(act.y / H) * 100}%` }}>
-            <div className="rounded-xl bg-[#0F172A] text-white px-3 py-2 shadow-lg whitespace-nowrap mb-2">
-              <p className="text-[10px] font-medium text-[#94A3B8] leading-none">{MONTHS[hover]}</p>
-              <p className="text-[13px] font-bold tabular-nums leading-tight mt-1">{VIEW_SERIES[hover].toLocaleString("en-US")} views</p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
+   A page selling analytics should SHOW analytics: a real product shot of the
+   card next to its dashboard (views, visitors, actions, enquiries, activity,
+   top sections, devices), then the trackable metrics as chips. */
 function AnalyticsSection() {
   const tracked = [
     { icon: Eye, label: "Total Views" }, { icon: Users, label: "Unique Visitors" },
@@ -1376,7 +1254,20 @@ function AnalyticsSection() {
       <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[720px] h-[360px] bg-[#F7B31C]/[0.07] rounded-full blur-3xl pointer-events-none" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <SectionHeading eyebrow="Analytics" title={<>Track Every <span className="text-gradient-gold">Click and Lead</span></>} subtitle="Know exactly how customers interact with your card — views, WhatsApp and call clicks, QR scans, product views and enquiries." />
-        <Reveal><AnalyticsPanel /></Reveal>
+        <Reveal>
+          <div className="relative rounded-[28px] bg-white ring-1 ring-[#EEF2F7] shadow-premium-lg overflow-hidden p-2 sm:p-4">
+            <picture>
+              <source srcSet="/hero/digital-business-card-analytics-dashboard.webp" type="image/webp" />
+              <img
+                src="/hero/digital-business-card-analytics-dashboard.png"
+                width="1400" height="1075"
+                alt="DigitalCarda analytics dashboard beside a digital business card on a phone — card views, unique visitors, actions taken, enquiries, a 7-day activity chart, top sections and devices"
+                loading="lazy" decoding="async"
+                className="w-full h-auto rounded-[20px]"
+              />
+            </picture>
+          </div>
+        </Reveal>
         <Reveal stagger className="mt-8 flex flex-wrap justify-center gap-2.5">
           {tracked.map((s) => (
             <span key={s.label} className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-white ring-1 ring-[#E2E8F0] shadow-premium text-[13px] font-medium text-[#334155] hover:ring-[#F7B31C]/50 hover:-translate-y-0.5 transition-all">
