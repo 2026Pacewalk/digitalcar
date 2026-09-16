@@ -18,6 +18,8 @@ export type GoogleSignInResult = {
   token: string;
   created: boolean;
   user: { id: number; email: string; fullName: string; role: string; status: string; avatar: string | null };
+  /** The live card link the server created for a brand-new account. */
+  cardSlug?: string | null;
 };
 
 type GsiId = {
@@ -49,12 +51,14 @@ export function useGoogleClientId(): string | null {
   return data?.clientId ?? null;
 }
 
-export default function GoogleSignInButton({ clientId, mode, referralCode, promo, onSignedIn }: {
+export default function GoogleSignInButton({ clientId, mode, referralCode, promo, card, onSignedIn }: {
   clientId: string;
   mode: "signup" | "signin";
   referralCode?: string;
   /** Free-trial voucher to record for a brand-new account (server-validated). */
   promo?: string;
+  /** Design / content chosen before signing up, for a brand-new account's card. */
+  card?: Record<string, unknown>;
   onSignedIn: (result: GoogleSignInResult) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -62,8 +66,8 @@ export default function GoogleSignInButton({ clientId, mode, referralCode, promo
   const google = trpc.auth.google.useMutation();
 
   // Google keeps the callback from the first render; read current props from here.
-  const latest = useRef({ referralCode, promo, onSignedIn, mutate: google.mutateAsync });
-  latest.current = { referralCode, promo, onSignedIn, mutate: google.mutateAsync };
+  const latest = useRef({ referralCode, promo, card, onSignedIn, mutate: google.mutateAsync });
+  latest.current = { referralCode, promo, card, onSignedIn, mutate: google.mutateAsync };
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +86,9 @@ export default function GoogleSignInButton({ clientId, mode, referralCode, promo
                 credential,
                 referralCode: latest.current.referralCode || undefined,
                 promo: latest.current.promo || undefined,
+                // Loosely typed here; the server validates every key and drops
+                // anything invalid rather than failing the sign-in.
+                card: (latest.current.card || undefined) as never,
               });
               latest.current.onSignedIn(res);
             } catch (err) {

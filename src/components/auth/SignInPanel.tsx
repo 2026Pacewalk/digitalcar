@@ -6,9 +6,8 @@ import { AUTH_MOCK_CARD, AUTH_TRUST, SUPPORT } from "./authMockData";
 
 /* The LOGIN left panel (customer portal, desktop only).
 
-   Deliberately a fork of AuthBrandPanel rather than an edit of it: that
-   component is shared with Signup, and "login-only" changes would silently
-   restyle the signup page. See the DO-NOT list in the build spec.
+   Login-only. Signup has its own panel (SignupPanel) built around a live card
+   preview, so the two pages can evolve without restyling each other.
 
    The emotional job of /login is not "log in", it is "prove I haven't lost my
    card" — a shopkeeper who printed 500 QR stickers needs to know his link, his
@@ -21,12 +20,14 @@ const STATUS: { strong: string; rest: string }[] = [
   { strong: "Your enquiries", rest: " — every lead is waiting in your dashboard." },
 ];
 
-export default function SignInPanel() {
+/* `firstName` is only known for a visitor who ticked "Remember me" last time —
+   then the panel greets them by name. Nobody else sees a name here. */
+export default function SignInPanel({ firstName = "" }: { firstName?: string }) {
   const [logoOk, setLogoOk] = useState(true);
 
   return (
     <aside
-      className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center
+      className="hidden lg:flex lg:w-1/2 lg:sticky lg:top-0 lg:h-screen relative overflow-hidden items-center justify-center
                  px-12 py-10 overflow-y-auto
                  bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A]"
     >
@@ -54,8 +55,11 @@ export default function SignInPanel() {
 
         {/* A <p>.font-display renders identically to an <h2> here, while leaving
             the form's <h1> as the document's first heading. */}
+        {firstName && (
+          <p className="dc-enter mt-8 -mb-5 text-[14px] font-semibold text-[#FCD34D]">Welcome back, {firstName} 👋</p>
+        )}
         <p className="dc-enter dc-enter-1 font-display text-[2rem] leading-[1.15] font-extrabold text-white tracking-tight mt-8">
-          Your Card Never Went Offline.
+          Your card never went <span className="text-gradient-gold">offline.</span>
         </p>
         <p className="dc-enter dc-enter-2 mt-3 text-[15px] leading-relaxed text-[#94A3B8]">
           While you were away, your link kept working, your QR kept scanning and your enquiries kept arriving. Sign in and pick up exactly where you left off.

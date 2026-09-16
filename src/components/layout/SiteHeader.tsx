@@ -20,7 +20,7 @@ import {
   Phone, Search, Sparkles, Tag, Wand2, Wrench, X, type LucideIcon,
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
-import { CONTACT, HEADER_LINKS, HEADER_MENUS, SEARCH_PAGES, SOCIAL_LINKS, type HeaderMenu } from "@/lib/publicNav";
+import { CONTACT, HEADER_LINKS, HEADER_MENUS, SEARCH_PAGES, type HeaderMenu } from "@/lib/publicNav";
 
 const ICONS: Record<string, LucideIcon> = {
   "/": Home,
@@ -610,16 +610,6 @@ function MobileMenu({
             <Link to={signupHref} onClick={onClose} className="flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#F7B31C] to-[#FBBF24] text-sm font-bold text-[#0B1120] active:scale-[0.98]">
               Start free <ArrowRight size={16} />
             </Link>
-          </div>
-          <div className="flex items-center justify-between pb-3 text-xs text-[#64748B]">
-            <span>{CONTACT.phone}</span>
-            <span className="flex items-center gap-2">
-              {SOCIAL_LINKS.map((s) => (
-                <a key={s.href} href={s.href} target="_blank" rel="noreferrer me" aria-label={`DigitalCarda on ${s.label}`} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06]">
-                  <img src={s.icon} alt="" width={16} height={16} className="h-4 w-4" loading="lazy" />
-                </a>
-              ))}
-            </span>
           </div>
         </div>
       </div>

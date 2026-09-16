@@ -1,10 +1,15 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { Mail, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState("");
+  // Prefilled when arriving from the sign-in page's "Reset password" shortcut.
+  const [params] = useSearchParams();
+  const [email, setEmail] = useState(() => {
+    const e = (params.get("email") || "").trim();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e) ? e.slice(0, 254) : "";
+  });
   const [sent, setSent] = useState(false);
   const req = trpc.auth.requestPasswordReset.useMutation({ onSuccess: () => setSent(true) });
 

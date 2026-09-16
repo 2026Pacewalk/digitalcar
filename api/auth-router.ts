@@ -27,6 +27,55 @@ const strongPassword = z
   .regex(/\d/, "Password must include a number")
   .regex(/[^A-Za-z0-9]/, "Password must include a special character");
 
+/* The handle a new card's URL is built from: the BUSINESS name first (that is
+   what the signup form tells people, and what they print), then the person's
+   name, then the email's local part. Kept identical to the browser's
+   slugifyUsername() so the link previewed while typing is the link created. */
+export function cardSlugBase(companyName?: string | null, fullName?: string | null, email?: string | null): string {
+  const src = String(companyName || "").trim() || String(fullName || "").trim() || String(email || "").split("@")[0];
+  return src.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "card";
+}
+
+/* First free card URL for a base: base, base-2, base-3… as seen by an account
+   that owns nothing yet (ownerUserId 0 / no email → every existing holder,
+   legacy or new, counts as "someone else"). */
+async function firstFreeCardSlug(
+  db: ReturnType<typeof getDb>, base: string, ownerUserId = 0, ownerEmail?: string, maxTries = 40,
+): Promise<string> {
+  let slug = base;
+  for (let n = 2; await slugTakenByOther(db, slug, ownerUserId, 1, ownerEmail); n++) {
+    if (n > maxTries) return `${base}-${nanoid(4).toLowerCase()}`;
+    slug = `${base}-${n}`;
+  }
+  return slug;
+}
+
+/* What a visitor chose BEFORE signing up — a template/product design, a colour,
+   an AI Card Generator draft — so the starter card is created that way.
+
+   The published snapshot is the card's primary copy (the dashboard re-pulls it
+   on every load), so seeding these only in the browser meant they were wiped on
+   the first refresh: a customer who picked "Coral" or generated a card with AI
+   landed back on the plain gold default. Everything here is optional, strictly
+   typed and length-capped; it only ever shapes the new account's OWN card. */
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const starterCardInput = z.object({
+  theme: z.number().int().min(1).max(500).optional(),
+  color: z.string().regex(HEX).optional(),
+  color2: z.union([z.string().regex(HEX), z.literal("")]).optional(),
+  product_id: z.number().int().positive().optional(),
+  product_slug: z.string().max(191).optional(),
+  designation: z.string().max(191).optional(),
+  about: z.string().max(4000).optional(),
+  specialities: z.string().max(2000).optional(),
+  social_title: z.string().max(300).optional(),
+  seo_title: z.string().max(191).optional(),
+  seo_description: z.string().max(500).optional(),
+  address: z.string().max(500).optional(),
+  city: z.string().max(120).optional(),
+}).strict();
+type StarterCard = z.infer<typeof starterCardInput>;
+
 /* On signup, give every new account its OWN live card URL + start the trial, so
    the card link is never empty and never falls back to a leftover/other slug.
    Best-effort: any failure here must never block registration. */
@@ -35,22 +84,25 @@ async function provisionStarterCard(
   user: { id: number; email: string; fullName: string; phone: string | null },
   companyName?: string,
   promo?: string,
+  card?: StarterCard,
 ): Promise<string | null> {
   try {
-    // Unique, name-based slug (e.g. "Taniya Xtreme" -> taniya-xtreme, then -2, -3…).
-    const base = (user.fullName || user.email.split("@")[0])
-      .toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "card";
-    let slug = base;
-    for (let n = 2; await slugTakenByOther(db, slug, user.id, 1, user.email); n++) {
-      slug = n > 40 ? `${base}-${nanoid(4).toLowerCase()}` : `${base}-${n}`;
-      if (n > 40) break;
-    }
+    // Unique slug from the business name (e.g. "Sharma Sweets" -> sharma-sweets,
+    // then -2, -3…). It used to be built from the PERSON's name while the form
+    // and the dashboard used the business name, so the live link and the link
+    // the owner saw in their dashboard silently disagreed.
+    const base = cardSlugBase(companyName, user.fullName, user.email);
+    const slug = await firstFreeCardSlug(db, base, user.id, user.email);
     // A simple starter card — they fill in the details from the dashboard.
     const starter = {
       customer: {
         id: user.id, name: user.fullName, slug, username: slug,
         email: user.email, mobile1: user.phone || "", company_name: companyName || "",
         designation: "", nature: "", about_us: "", theme: 1, color: "#F7B31C", color2: "",
+        // The design / content chosen before signup. Identity fields above
+        // (id, name, slug, email, phone, company) are never overridden by it.
+        ...(card || {}),
+        ...(card?.about ? { about_on: 1 } : {}),
       },
       products: [], gallery: [], videos: [], offers: [], qrcodes: [], reviews: [],
     };
@@ -91,8 +143,8 @@ async function provisionStarterCard(
 async function welcomeNewAccount(
   db: ReturnType<typeof getDb>,
   insertedUser: typeof users.$inferSelect,
-  opts: { referralCode?: string; companyName?: string; promo?: string; verifyEmail: boolean },
-): Promise<void> {
+  opts: { referralCode?: string; companyName?: string; promo?: string; verifyEmail: boolean; card?: StarterCard },
+): Promise<string | null> {
   // Welcome email (+ an email-verification link when the address isn't already
   // verified) to the new user, and a new-signup alert to the owner — all
   // non-blocking.
@@ -150,8 +202,9 @@ async function welcomeNewAccount(
     });
   } catch { /* non-critical */ }
 
-  // Give the new account its own live card URL + start the trial.
-  await provisionStarterCard(db, insertedUser, opts.companyName, opts.promo);
+  // Give the new account its own live card URL + start the trial. The slug is
+  // returned so the browser seeds the SAME link the server just published.
+  return provisionStarterCard(db, insertedUser, opts.companyName, opts.promo, opts.card);
 }
 
 /* Legacy-auth bridge: the old site stored plaintext passwords (some with stray
@@ -286,6 +339,7 @@ export const authRouter = createRouter({
         // Free-trial voucher (FREE30D). Only a record — the server decides the
         // trial length, and an unknown code is ignored, never an error.
         promo: z.string().max(40).optional(),
+        card: starterCardInput.optional().catch(undefined),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -328,8 +382,8 @@ export const authRouter = createRouter({
         });
       }
 
-      await welcomeNewAccount(db, insertedUser, {
-        referralCode: input.referralCode, companyName: input.companyName, promo: input.promo, verifyEmail: true,
+      const cardSlug = await welcomeNewAccount(db, insertedUser, {
+        referralCode: input.referralCode, companyName: input.companyName, promo: input.promo, verifyEmail: true, card: input.card,
       });
 
       const token = await createToken({
@@ -348,6 +402,7 @@ export const authRouter = createRouter({
           avatar: insertedUser.avatar,
         },
         token,
+        cardSlug,
       };
     }),
 
@@ -360,6 +415,25 @@ export const authRouter = createRouter({
       username: z.string().optional(),
     }))
     .query(async ({ input }) => findTaken(input)),
+
+  /* The card link a signup WOULD get, previewed live as the visitor types their
+     business name. Runs the exact rules provisionStarterCard uses (business name
+     first, then -2, -3… on a clash), so what the form shows is what is created.
+     Nothing is reserved — two people racing for one name both see it free, and
+     registration then hands the second one the next suffix. Card URLs are public
+     by nature, so answering "is this taken" leaks nothing; it is still
+     rate-limited so it can't be used to hammer the database. */
+  previewCardLink: publicQuery
+    .input(z.object({ businessName: z.string().max(120).optional(), fullName: z.string().max(120).optional() }))
+    .query(async ({ ctx, input }) => {
+      enforceRateLimit(`card-link:${clientIp(ctx.req)}`, 60, 60_000);
+      const base = cardSlugBase(input.businessName, input.fullName, "");
+      if (base === "card" && !String(input.businessName || input.fullName || "").trim()) {
+        return { base: "", slug: "", available: true };
+      }
+      const slug = await firstFreeCardSlug(getDb(), base, 0, undefined, 12);
+      return { base, slug, available: slug === base };
+    }),
 
   // Is "Continue with Google" switched on? The Client ID is public by design —
   // Google's button embeds it in every page that shows it — so the browser
@@ -383,6 +457,7 @@ export const authRouter = createRouter({
       referralCode: z.string().max(50).optional(),
       companyName: z.string().max(255).optional(),
       promo: z.string().max(40).optional(),
+      card: starterCardInput.optional().catch(undefined),
     }))
     .mutation(async ({ ctx, input }) => {
       enforceRateLimit(`google:${clientIp(ctx.req)}`, 10, 60_000);
@@ -401,6 +476,7 @@ export const authRouter = createRouter({
       const db = getDb();
       let user = await db.query.users.findFirst({ where: eq(users.email, profile.email) });
       let created = false;
+      let cardSlug: string | null = null;
 
       if (user) {
         if (user.role === "super_admin") {
@@ -444,8 +520,8 @@ export const authRouter = createRouter({
         user = await db.query.users.findFirst({ where: eq(users.id, inserted.insertId) });
         if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user" });
         created = true;
-        await welcomeNewAccount(db, user, {
-          referralCode: input.referralCode, companyName: input.companyName, promo: input.promo, verifyEmail: false,
+        cardSlug = await welcomeNewAccount(db, user, {
+          referralCode: input.referralCode, companyName: input.companyName, promo: input.promo, verifyEmail: false, card: input.card,
         });
       }
 
@@ -461,6 +537,7 @@ export const authRouter = createRouter({
         },
         token,
         created,
+        cardSlug,
       };
     }),
 

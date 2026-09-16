@@ -10,7 +10,7 @@ import { ShieldCheck, ArrowRight } from "lucide-react";
 
 export default function AdminPanel() {
   return (
-    <aside className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center px-12 py-10 overflow-y-auto bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A]">
+    <aside className="hidden lg:flex lg:w-1/2 lg:sticky lg:top-0 lg:h-screen relative overflow-hidden items-center justify-center px-12 py-10 overflow-y-auto bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A]">
       <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-40" />
       <div aria-hidden="true" className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-[#334155] to-transparent" />
 
