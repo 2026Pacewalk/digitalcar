@@ -726,11 +726,11 @@ function WhyDigitalCardaSection() {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <Reveal className="relative flex justify-center">
             <picture>
-              <source srcSet="/hero/digital-business-card-nfc-professional.webp" type="image/webp" />
+              <source srcSet="/hero/digital-business-card-nfc-card-professional.webp" type="image/webp" />
               <img
-                src="/hero/digital-business-card-nfc-professional.png"
-                width="1082" height="993"
-                alt="Businessman holding a smartphone showing a DigitalCarda digital business card and an NFC smart card"
+                src="/hero/digital-business-card-nfc-card-professional.png"
+                width="1100" height="1011"
+                alt="Smiling professional holding a smartphone showing a DigitalCarda digital business card in one hand and a contactless NFC card with a QR code in the other"
                 loading="lazy"
                 className="w-full max-w-md drop-shadow-2xl"
               />
