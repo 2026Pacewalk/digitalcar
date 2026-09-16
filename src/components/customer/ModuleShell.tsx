@@ -1,8 +1,9 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, ChevronUp, ChevronDown } from "lucide-react";
-import { fileToDataUrl, useCustomer } from "@/hooks/useCustomer";
+import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, ChevronUp, ChevronDown, Move } from "lucide-react";
+import { fileToDataUrl, useCustomer, scopedKey } from "@/hooks/useCustomer";
+import ImageAdjuster, { type AdjustOptions } from "@/components/customer/ImageAdjuster";
 import NotificationBell from "@/components/NotificationBell";
 import ProfileMenu from "@/components/ProfileMenu";
 import CardSwitcher from "@/components/customer/CardSwitcher";
@@ -120,8 +121,41 @@ export function Panel({ title, subtitle, children, right, icon: Icon }: { title:
   );
 }
 
-export function ImagePick({ value, onChange, className = "w-24 h-24", label = "Upload", fit = "cover" }: { value?: string; onChange: (dataUrl: string) => void; className?: string; label?: string; fit?: "cover" | "contain" }) {
-  return (
+/* Identity of an image string, without hashing megabytes of base64. */
+const imgId = (s: string) => `${s.length}:${s.slice(0, 48)}:${s.slice(-48)}`;
+
+export function ImagePick({ value, onChange, className = "w-24 h-24", label = "Upload", fit = "cover", adjust }: {
+  value?: string; onChange: (dataUrl: string) => void; className?: string; label?: string; fit?: "cover" | "contain";
+  /** Adds an Adjust button (position / zoom / rotate) under the picker. */
+  adjust?: AdjustOptions;
+}) {
+  const [adjusting, setAdjusting] = useState<string | null>(null);
+  const slot = (part: string) => (adjust ? scopedKey(`dc_img_${adjust.key}_${part}`) : "");
+
+  /* Remember the untouched upload, so adjusting again starts from the FULL image
+     rather than re-cropping the last crop (which could only ever zoom further
+     in). Browser-only and best effort: never published, and a full storage
+     quota just means the next adjustment starts from the current image. */
+  const remember = (original: string, current: string) => {
+    if (!adjust) return;
+    try {
+      if (original.length > 1_500_000) { localStorage.removeItem(slot("orig")); return; }
+      localStorage.setItem(slot("orig"), original);
+      localStorage.setItem(slot("for"), imgId(current));
+    } catch { /* quota - skip */ }
+  };
+  const openAdjust = () => {
+    if (!value) return;
+    let src = value;
+    try {
+      const original = localStorage.getItem(slot("orig"));
+      // Only when that original is what produced the image showing now.
+      if (original && localStorage.getItem(slot("for")) === imgId(value)) src = original;
+    } catch { /* use the current image */ }
+    setAdjusting(src);
+  };
+
+  const picker = (
     <label className={`${className} rounded-xl border-2 border-dashed border-[#E2E8F0] hover:border-[#F7B31C] ${fit === "contain" ? "bg-white p-1.5" : "bg-[#F8FAFC]"} flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-colors shrink-0`}>
       {value ? (
         <img src={value} alt="preview" referrerPolicy="no-referrer" className={`w-full h-full ${fit === "contain" ? "object-contain" : "object-cover"}`} />
@@ -132,9 +166,37 @@ export function ImagePick({ value, onChange, className = "w-24 h-24", label = "U
       )}
       <input
         type="file" accept="image/*" className="hidden"
-        onChange={async (e) => { const f = e.target.files?.[0]; if (f) onChange(await fileToDataUrl(f)); e.currentTarget.value = ""; }}
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.currentTarget.value = "";
+          if (!f) return;
+          const url = await fileToDataUrl(f);
+          onChange(url);
+          remember(url, url);
+        }}
       />
     </label>
+  );
+
+  if (!adjust) return picker;
+  return (
+    <div className="flex flex-col items-center gap-1.5 shrink-0">
+      {picker}
+      {value && (
+        <button type="button" onClick={openAdjust}
+          className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[#E2E8F0] bg-white text-[11px] font-semibold text-[#334155] hover:border-[#F7B31C] hover:text-[#92400E] transition-colors">
+          <Move size={12} /> Adjust
+        </button>
+      )}
+      {adjusting && (
+        <ImageAdjuster
+          src={adjusting}
+          options={adjust}
+          onCancel={() => setAdjusting(null)}
+          onSave={(out) => { const original = adjusting; onChange(out); remember(original, out); setAdjusting(null); }}
+        />
+      )}
+    </div>
   );
 }
 

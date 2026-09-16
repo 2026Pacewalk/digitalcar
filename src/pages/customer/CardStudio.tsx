@@ -217,7 +217,9 @@ export default function CardStudio() {
       {/* Logo card (horizontal) */}
       <div className="rounded-2xl border border-[#EEF2F7] bg-[#F8FAFC] p-4 flex flex-col sm:flex-row gap-4 sm:items-center">
         <div className="flex flex-col items-center gap-2 shrink-0 mx-auto sm:mx-0">
-          <div className="rounded-2xl ring-4 ring-white shadow-sm"><ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-24 h-24 rounded-2xl" label="Add logo" fit="contain" /></div>
+          <ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-24 h-24 rounded-2xl ring-4 ring-white shadow-sm" label="Add logo" fit="contain"
+            adjust={{ key: "logo", title: "Adjust logo", format: "logo", initialFit: "contain",
+              shape: val("logo_shape") === "round" ? "circle" : val("logo_shape") === "plain" ? "square" : "rounded" }} />
           <span className="text-[11px] font-semibold text-[#64748B]">Logo or photo</span>
         </div>
         <div className="flex-1 min-w-0">
@@ -265,7 +267,8 @@ export default function CardStudio() {
         <span className="block text-[12px] font-bold text-[#0F172A] mb-2">Photo &amp; card details</span>
         <div className="mb-3"><Note tone="red">For the premium Business / ID / Membership card designs.</Note></div>
         <div className="flex items-start gap-4">
-          <ImagePick value={val("photo")} onChange={(u) => set("photo", u)} className="w-20 h-20 rounded-xl" label="Photo" fit="cover" />
+          <ImagePick value={val("photo")} onChange={(u) => set("photo", u)} className="w-20 h-20 rounded-xl" label="Photo" fit="cover"
+            adjust={{ key: "photo", title: "Adjust photo", format: "photo", initialFit: "cover", shape: "circle" }} />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] text-[#64748B] pt-0.5 leading-relaxed">A clear headshot shown on the ID, Membership &amp; Business-card designs. Your <b>company logo</b> is set above — both appear together on the card.</p>
             <div className="mt-3 max-w-[240px]">
