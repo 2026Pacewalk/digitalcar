@@ -239,8 +239,8 @@ export default function CardStudio() {
               <span className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wide">Logo size</span>
               <span className="text-[11px] font-bold text-[#0F172A] tabular-nums px-1.5 py-0.5 rounded-md bg-[#FEF3C7]">{val("logo_size") || 100}%</span>
             </div>
-            <input type="range" min={70} max={160} value={Number(val("logo_size") || 100)} onChange={(e) => set("logo_size", e.target.value)} className="w-full accent-[#F7B31C]" aria-label="Logo size" />
-            <p className="text-[10px] text-[#94A3B8] mt-1 leading-snug">Plain shows a transparent PNG; shrink so the full logo fits the shape.</p>
+            <input type="range" min={70} max={250} step={5} value={Number(val("logo_size") || 100)} onChange={(e) => set("logo_size", e.target.value)} className="w-full accent-[#F7B31C]" aria-label="Logo size" />
+            <p className="text-[10px] text-[#94A3B8] mt-1 leading-snug">Plain shows a transparent PNG and can go up to 250%. Inside a round or square shape, shrink it so the full logo fits.</p>
           </div>
         </div>
       </div>

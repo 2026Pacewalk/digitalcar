@@ -595,10 +595,12 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const avatar = `<div class="pw-ava" style="width:${avaPx}px;height:${avaPx}px"><img src="${esc(photo) || initialPh(c, gold)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, gold)}'">${planBadge}</div>`;
   // Logo shape + Logo size (Basics → Shape / Logo size) style the BRAND MARK:
   // default = the raw (transparent) logo; square/round wrap it in a white chip
-  // so the shape reads on the dark hero. Size scales the logo height 70–160%.
-  const logoH = Math.round(34 * (Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100));
+  // so the shape reads on the dark hero. Size scales the logo height 70–250%;
+  // the hero is in normal flow, so it grows to fit, and the width never passes
+  // the card.
+  const logoH = Math.round(34 * (Math.max(70, Math.min(250, Number(s(c.logo_size)) || 100)) / 100));
   const logoShape = s(c.logo_shape);
-  const brandImg = logo ? `<img src="${esc(logo)}" alt="${company || name}" style="max-height:${logoH}px;max-width:${logoH * 5}px" ${IMG}>` : "";
+  const brandImg = logo ? `<img src="${esc(logo)}" alt="${company || name}" style="max-height:${logoH}px;max-width:min(${logoH * 5}px,100%)" ${IMG}>` : "";
   const brand = logo
     ? (logoShape === "square" || logoShape === "round"
         ? `<span class="pw-logo-chip${logoShape === "round" ? " rd" : ""}">${brandImg}</span>`
@@ -622,7 +624,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .pw-hero::after{content:"";position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,var(--gold)33 0%,transparent 70%);pointer-events:none;}
   .pw-hero-in{position:relative;z-index:1;}
   .pw-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px;}
-  .pw-top .pw-logo{margin-bottom:0;}
+  .pw-top .pw-logo{margin-bottom:0;min-width:0;flex:0 1 auto;}
   .pw-logo{min-height:30px;margin-bottom:18px;}
   .pw-logo img{max-height:34px;max-width:170px;object-fit:contain;}
   .pw-logo-txt{font-family:'Sora',sans-serif;font-weight:800;font-size:16px;letter-spacing:.4px;color:var(--gold);}
@@ -821,9 +823,12 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   const ref = s(c.referral_code) || slug;
   // Logo size scales the cover mark; square/round wrap it in a white chip
   // (chip shows the logo's REAL colours — the white-invert only suits raw marks).
-  const ppLogoH = Math.round(30 * (Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100));
+  // 70–250%. The profile photo overlaps the cover's bottom edge, so the cover
+  // grows with the logo (default size keeps the original 132px cover).
+  const ppLogoH = Math.round(30 * (Math.max(70, Math.min(250, Number(s(c.logo_size)) || 100)) / 100));
+  const ppCoverH = Math.max(132, ppLogoH + 100);
   const ppShape = s(c.logo_shape);
-  const ppBrandImg = logo ? `<img src="${esc(logo)}" alt="${company || name}" style="max-height:${ppLogoH}px;max-width:${ppLogoH * 5}px" ${IMG}>` : "";
+  const ppBrandImg = logo ? `<img src="${esc(logo)}" alt="${company || name}" style="max-height:${ppLogoH}px;max-width:min(${ppLogoH * 5}px,100%)" ${IMG}>` : "";
   const brandTxt = logo
     ? (ppShape === "square" || ppShape === "round" ? `<span class="pp-logo-chip${ppShape === "round" ? " rd" : ""}">${ppBrandImg}</span>` : ppBrandImg)
     : (company ? `<span class="pp-cover-txt">${company}</span>` : "");
@@ -838,9 +843,9 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   @keyframes ppUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
   .pp-rise{animation:ppUp .45s cubic-bezier(.2,.7,.2,1) both;}
   @media(prefers-reduced-motion:reduce){.pp-rise{animation:none;}}
-  .pp-cover{position:relative;height:132px;background:linear-gradient(135deg,var(--brand),var(--dark) 130%);overflow:hidden;}
+  .pp-cover{position:relative;height:${ppCoverH}px;background:linear-gradient(135deg,var(--brand),var(--dark) 130%);overflow:hidden;}
   .pp-cover::after{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 80% 10%,rgba(255,255,255,.18),transparent 55%);}
-  .pp-cover-logo{position:absolute;top:14px;left:16px;z-index:2;}
+  .pp-cover-logo{position:absolute;top:14px;left:16px;right:64px;z-index:2;}
   .pp-cover-logo img{max-height:30px;max-width:140px;object-fit:contain;filter:brightness(0) invert(1);opacity:.96;}
   .pp-logo-chip{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:11px;padding:6px 11px;box-shadow:0 6px 16px rgba(16,24,40,.25);}
   .pp-logo-chip.rd{border-radius:999px;padding:7px 14px;}
@@ -1083,7 +1088,7 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const socials = premiumSocials({ ...c, social_icon_style: s(c.social_icon_style) || "brand" }, "bm-soc");
 
   const logo = s(c.logo);
-  const logoPct = Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100)) / 100;
+  const logoPct = Math.max(70, Math.min(180, Number(s(c.logo_size)) || 100)) / 100;
   const logoRound = s(c.logo_shape) === "round";
   const initial = esc((company || person || "D")[0].toUpperCase());
   const logoHtml = logo

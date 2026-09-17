@@ -263,15 +263,17 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
   // scales the logo INSIDE the shape so a wide logo can be shrunk to fit the
   // circle/square without being cropped. Plain shows the PNG on its own (size
   // scales the PNG height directly).
-  const logoSizePct = Math.max(70, Math.min(160, Number(s(c.logo_size)) || 100));
   const hasLogo = !!s(c.logo);
   const isPlainLogo = s(c.logo_shape) === "plain" && hasLogo;
+  const logoSizePct = Math.max(70, Math.min(isPlainLogo ? 250 : 160, Number(s(c.logo_size)) || 100));
   const isSquare = s(c.logo_shape) === "square" && !isPlainLogo;
   // Fit the whole logo inside the shape (contain, on white) when the user has
   // shrunk/grown it or picked the square shape; otherwise fill (cover).
   const fitContain = hasLogo && !isPlainLogo && (logoSizePct !== 100 || isSquare);
   const avatarClass = [isPlainLogo ? "is-plain" : "", isSquare ? "shape-square" : "", fitContain ? "fit-contain" : ""].filter(Boolean).join(" ");
-  const avatarStyle = isPlainLogo ? `height:${Math.round(96 * logoSizePct / 100)}px` : "";
+  // Plain: height scales, and the width cap scales with it (was a fixed 180px,
+  // so a wide wordmark couldn't actually get bigger) — never wider than the card.
+  const avatarStyle = isPlainLogo ? `height:${Math.round(96 * logoSizePct / 100)}px;max-width:min(${Math.round(180 * logoSizePct / 100)}px,92%)` : "";
   const avatarImgStyle = !isPlainLogo && fitContain ? `width:${logoSizePct}%;height:${logoSizePct}%` : "";
 
   const cardUrl = `https://digitalcarda.in/${s(c.slug) || "card"}`;
