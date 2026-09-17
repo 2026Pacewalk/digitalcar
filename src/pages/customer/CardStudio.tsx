@@ -85,6 +85,20 @@ export default function CardStudio() {
   const [realViews, setRealViews] = useState<number | null>(null);
   const timer = useRef<number | null>(null);
   const formRef = useRef(form); formRef.current = form;
+  // A template was applied from the Templates tool: drop this form's own design
+  // edits so they neither override it in the preview nor get autosaved over it.
+  useEffect(() => {
+    const onApplied = () => {
+      const f = formRef.current;
+      if (!("theme" in f) && !("color" in f) && !("color2" in f)) return;
+      const rest = { ...f };
+      delete rest.theme; delete rest.color; delete rest.color2;
+      formRef.current = rest;
+      setForm(rest);
+    };
+    window.addEventListener("dc:design-applied", onApplied);
+    return () => window.removeEventListener("dc:design-applied", onApplied);
+  }, []);
   const previewRef = useRef<HTMLIFrameElement>(null);        // desktop phone
   const mobilePreviewRef = useRef<HTMLIFrameElement>(null);  // phone-size canvas
   const savedScrollRef = useRef(0);
@@ -680,7 +694,7 @@ export default function CardStudio() {
           Mobile-first: the card stays on screen and every section is reached
           from one bottom bar of three plain questions. Desktop shows the same
           grouped list as a permanent side rail. */}
-      <div className="grid lg:grid-cols-[210px_minmax(0,1fr)_400px] gap-5 items-start">
+      <div className="grid lg:grid-cols-[210px_minmax(0,1fr)_360px] gap-5 items-start">
 
         {/* Desktop: grouped section rail */}
         <nav className="hidden lg:block bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-2 sticky top-[100px]">
@@ -707,6 +721,7 @@ export default function CardStudio() {
         <div className="order-2 lg:order-1 min-w-0 space-y-4 lg:space-y-0 pb-24 lg:pb-0">
           {/* Mobile canvas -- always visible while you edit */}
           <div className="lg:hidden">
+            <DraftDesignBar inline className="mx-auto mb-3 max-w-[360px]" />
             <div className="mx-auto w-fit max-w-full">{phoneMock(mobileScreen, mobilePreviewRef)}</div>
             <div className="flex items-center justify-center gap-2 mt-2">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Updates as you edit</span>
@@ -730,8 +745,8 @@ export default function CardStudio() {
 
         {/* Desktop sticky preview */}
         <div className="hidden lg:block order-1 lg:order-2 sticky top-[100px]">
-          <DraftDesignBar className="mx-auto mb-3 max-w-[400px]" />
-          <div className="mx-auto w-full max-w-[400px]">{phoneMock({ height: 700 }, previewRef)}</div>
+          <DraftDesignBar className="mx-auto mb-3 max-w-[360px]" />
+          <div className="mx-auto w-full max-w-[360px]">{phoneMock({ height: 640 }, previewRef)}</div>
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live preview</span>
             <span className="text-[#CBD5E1]">.</span>

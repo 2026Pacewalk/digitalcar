@@ -1,34 +1,46 @@
 /* The bar above the phone preview while a template is being tried:
    "Previewing Indigo" with Cancel and Apply. Renders nothing otherwise.
-   Desktop only. Wherever it isn't on screen, the Templates editor shows its
-   bottom Apply bar instead (see reportDraftBar). */
+
+   Default: desktop only, and it reports whether it is really on screen (not
+   display:none, not scrolled out of view) — wherever it isn't, the Templates
+   editor shows its bottom Apply bar instead (see reportDraftBar).
+   `inline`: always shown, never reported — for the Card Builder's phone-size
+   canvas, which the tool sheet covers while the sheet's own Apply bar is up. */
 import { useLayoutEffect, useRef } from "react";
 import { Check, Eye, X } from "lucide-react";
 import { reportDraftBar, useDesignDraft } from "@/lib/designDraft";
 
-export default function DraftDesignBar({ className = "" }: { className?: string }) {
+export default function DraftDesignBar({ className = "", inline = false }: { className?: string; inline?: boolean }) {
   const draft = useDesignDraft();
   const ref = useRef<HTMLDivElement>(null);
   const self = useRef({}).current;
   const hasDraft = !!draft;
-  // Tell the editor whether this bar is really visible: it has no boxes while it
-  // or a parent is display:none, and the observer fires whenever that flips.
+  // Tell the editor whether this bar is really visible: no boxes while it or a
+  // parent is display:none (the ResizeObserver fires when that flips), and not
+  // while it is scrolled out of the viewport (the IntersectionObserver).
   useLayoutEffect(() => {
+    if (inline) return;
     const el = ref.current;
     if (!el) { reportDraftBar(self, false); return; }
-    const check = () => reportDraftBar(self, el.getClientRects().length > 0);
+    let inView = true; // until the first intersection report, so the bottom bar doesn't flash
+    const check = () => reportDraftBar(self, inView && el.getClientRects().length > 0);
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
-    return () => { ro.disconnect(); reportDraftBar(self, false); };
-  }, [hasDraft, self]);
+    const io = new IntersectionObserver((entries) => {
+      inView = entries[entries.length - 1]?.isIntersecting ?? inView;
+      check();
+    });
+    io.observe(el);
+    return () => { ro.disconnect(); io.disconnect(); reportDraftBar(self, false); };
+  }, [hasDraft, self, inline]);
   if (!draft) return null;
   return (
     <div
       ref={ref}
       role="status"
       aria-live="polite"
-      className={`hidden lg:flex items-center gap-2 rounded-2xl bg-[#0F172A] pl-3 pr-1.5 py-1.5 shadow-premium-lg ring-1 ring-black/5 dc-enter ${className}`}
+      className={`${inline ? "flex" : "hidden lg:flex"} items-center gap-2 rounded-2xl bg-[#0F172A] pl-3 pr-1.5 py-1.5 shadow-premium-lg ring-1 ring-black/5 dc-enter ${className}`}
     >
       <span className="flex items-center gap-1 shrink-0" aria-hidden="true">
         <span className="w-3 h-3 rounded-full ring-1 ring-white/30" style={{ background: draft.color }} />

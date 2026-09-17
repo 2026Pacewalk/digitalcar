@@ -109,12 +109,7 @@ export default function LivePreview({ height = 620, frame = true }: { height?: n
   );
 
   if (!frame) {
-    return (
-      <div>
-        <DraftDesignBar className="mb-2" />
-        <div className="rounded-2xl overflow-hidden border border-[#E2E8F0] shadow-sm bg-white">{iframe}</div>
-      </div>
-    );
+    return <div className="rounded-2xl overflow-hidden border border-[#E2E8F0] shadow-sm bg-white">{iframe}</div>;
   }
 
   return (

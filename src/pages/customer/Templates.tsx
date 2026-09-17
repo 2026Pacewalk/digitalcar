@@ -14,8 +14,6 @@ const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const PRIMARY_SW = ["#F7B31C", "#3B82F6", "#16A34A", "#A21CAF", "#EF4444", "#06B6D4", "#F97316", "#EC4899", "#6366F1", "#0F172A"];
 const SECONDARY_SW = ["#0F172A", "#1E293B", "#0f2b2e", "#3f1d2e", "#1e1b4b", "#422006", "#0c4a6e", "#14532d", "#3b0764", "#414141"];
 
-type Preset = { id: number; name: string; style: number; primary: string; secondary: string; active: boolean };
-
 /* Reusable "any colour" control (swatch → OS picker, hex, presets) */
 function ColorRow({ label, hint, value, placeholder, swatches, allowClear, onChange }: {
   label: string; hint: string; value: string; placeholder?: string; swatches: string[]; allowClear?: boolean; onChange: (v: string) => void;
@@ -90,18 +88,31 @@ export function TemplatesEditor() {
   const [dirty, setDirty] = useState(false);
 
   const chose = !!String(data.theme || "");
+  // The selection while nothing is being tried (set on Apply too), so Cancel can
+  // return to it even when the saved colours match no preset exactly.
+  const settledSel = useRef<number | null>(null);
 
-  // Initial selection: match the user's saved template, else the site default
+  // Selection = the saved template whenever nothing is being tried: on first
+  // load (the card record can arrive after the presets, which used to leave the
+  // site default selected), and after Cancel. No saved template → site default.
   useEffect(() => {
-    if (!presets.length) return;
-    let match: Preset | undefined;
-    if (chose) {
-      match = presets.find((p) => p.style === Number(data.theme) && p.primary.toLowerCase() === String(data.color || "").toLowerCase());
-    }
-    const initial = match ?? presets.find((p) => p.id === defaultId) ?? presets[0];
-    setSelId((cur) => cur ?? initial.id);
+    if (!presets.length || dirty) return;
+    const fallback = (presets.find((p) => p.id === defaultId) ?? presets[0]).id;
+    if (!chose) { setSelId(fallback); return; }
+    const t = Number(data.theme);
+    const col = String(data.color || "").toLowerCase();
+    const exact = presets.find((p) => p.style === t && p.primary.toLowerCase() === col);
+    const sameDesign = presets.find((p) => p.style === t);
+    setSelId(() => {
+      if (exact) return exact.id;
+      // Applied in custom/brand colours: keep the settled preset of that design.
+      const settled = settledSel.current;
+      if (presets.find((p) => p.id === settled)?.style === t) return settled;
+      return sameDesign?.id ?? fallback;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presets.length]);
+  }, [presets.length, dirty, chose, data.theme, data.color, defaultId]);
+  useEffect(() => { if (!dirty) settledSel.current = selId; }, [dirty, selId]);
 
   // Brand colours learned from the logo (set in the Card Builder). When "brand
   // mode" is on, every template is previewed/applied in these colours so the user
@@ -194,6 +205,10 @@ export function TemplatesEditor() {
     if (!selected) return;
     const color = effPrimary;
     const color2 = effSecondary;
+    // The Card Builder holds Design-tool edits (colour…) in its own form, which
+    // would override this in its preview and be autosaved back over it.
+    try { window.dispatchEvent(new CustomEvent("dc:design-applied")); } catch { /* ignore */ }
+    settledSel.current = selected.id;
     update({ theme: String(selected.style), color, color2 });
     setDirty(false);
     // ONE notification per template change: it shows straight away, then updates
@@ -226,10 +241,7 @@ export function TemplatesEditor() {
   const applyRef = useRef(apply); applyRef.current = apply;
   const cancel = () => {
     setDirty(false); setCustomOpen(false); setPrimary("");
-    if (currentId != null) {
-      setSelId(currentId);
-      setSecondary(presets.find((p) => p.id === currentId)?.secondary || "");
-    }
+    if (currentId != null) setSecondary(presets.find((p) => p.id === currentId)?.secondary || "");
   };
   const cancelRef = useRef(cancel); cancelRef.current = cancel;
   const draftOwner = useRef({}).current;
@@ -262,15 +274,27 @@ export function TemplatesEditor() {
     return () => ro.disconnect();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible.length]);
-  // Open on the chosen template (the applied one can sit far along the row), and
-  // start a new category from its chosen card or its beginning.
+  // Open on the chosen template (the applied one can sit far along the row);
+  // a new category starts from its chosen card or its beginning. When the
+  // selection changes by itself (record loaded, Cancel) bring it into view — but
+  // never move the row under the user's own clicks.
+  const SNAP_PAD = 24; // = scroll-pl-6: the left fade (w-5) never covers a snapped card
+  const lastCat = useRef<string | null>(null);
   useEffect(() => {
     const el = stripRef.current; if (!el) return;
+    const catChanged = lastCat.current !== cat;
+    lastCat.current = cat;
     const card = selId != null ? el.querySelector<HTMLElement>(`[data-tpl="${selId}"]`) : null;
-    el.scrollTo({ left: card ? Math.max(0, card.offsetLeft - 6) : 0 });
+    if (!card) {
+      if (catChanged) el.scrollTo({ left: 0 });
+    } else {
+      const left = card.offsetLeft, right = left + card.offsetWidth;
+      const inView = left >= el.scrollLeft && right <= el.scrollLeft + el.clientWidth;
+      if (catChanged || !inView) el.scrollTo({ left: Math.max(0, left - SNAP_PAD) });
+    }
     syncEdge();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cat, presets.length, selId === null]);
+  }, [cat, presets.length, visible.length, dirty ? -1 : selId]);
   // Apply lives in the bar above the phone; the bottom bar covers every layout
   // where that bar isn't on screen.
   const phoneBarShown = useDraftBarShown();
@@ -332,7 +356,7 @@ export function TemplatesEditor() {
         ) : (
           <div className="relative">
           <div ref={stripRef} onScroll={syncEdge} aria-label="Templates"
-            className="relative flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-px-1.5 -mx-1.5 px-1.5 pt-1 pb-2">
+            className="relative isolate flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-pl-6 -mx-1.5 px-1.5 pt-1 pb-2">
             {visible.map((p) => {
               const isSel = selId === p.id;
               const isCurrent = currentId === p.id;
@@ -372,8 +396,8 @@ export function TemplatesEditor() {
               );
             })}
           </div>
-          <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 -left-1.5 w-8 bg-gradient-to-r from-white to-transparent transition-opacity ${edge.start ? "opacity-0" : "opacity-100"}`} />
-          <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 -right-1.5 w-10 bg-gradient-to-l from-white to-transparent transition-opacity ${edge.end ? "opacity-0" : "opacity-100"}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 -left-1.5 z-10 w-5 bg-gradient-to-r from-white to-transparent transition-opacity ${edge.start ? "opacity-0" : "opacity-100"}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 -right-1.5 z-10 w-10 bg-gradient-to-l from-white to-transparent transition-opacity ${edge.end ? "opacity-0" : "opacity-100"}`} />
           </div>
         )}
       </Panel>
