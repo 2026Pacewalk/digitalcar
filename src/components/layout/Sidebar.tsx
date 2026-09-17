@@ -169,15 +169,17 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
 
         {/* Brand */}
         <div className="h-16 flex items-center px-5 border-b border-[#1E293B] shrink-0">
-          <div className={`w-8 h-8 rounded-lg ${theme.brandGrad} flex items-center justify-center shrink-0`}>
-            <BrandIcon size={16} className={theme.iconColor} />
-          </div>
-          {!collapsed && (
-            <div className="ml-3 overflow-hidden flex items-center gap-1.5">
-              <span className="text-sm font-bold text-white whitespace-nowrap">DigitalCarda</span>
+          {collapsed ? (
+            <div className={`w-8 h-8 rounded-lg ${theme.brandGrad} flex items-center justify-center shrink-0`}>
+              <BrandIcon size={16} className={theme.iconColor} />
+            </div>
+          ) : (
+            <div className="overflow-hidden flex items-center gap-2 min-w-0">
+              {/* The real DigitalCarda logo (white artwork — made for this dark sidebar). */}
+              <img src="/logo.png" alt="DigitalCarda" className="h-9 w-auto max-w-[140px] object-contain shrink-0" />
               {theme.badge
                 ? <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wide whitespace-nowrap ${theme.badgeCls}`}>{theme.badge}</span>
-                : <span className="text-[10px] text-[#F7B31C] font-medium">{theme.brandName}</span>}
+                : <span className="text-[10px] text-[#F7B31C] font-medium whitespace-nowrap">{theme.brandName}</span>}
             </div>
           )}
         </div>
