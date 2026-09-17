@@ -50,7 +50,7 @@ export default function Marketplace() {
   const { data: products = [], isLoading } = trpc.product.catalogue.useQuery();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
-  const [sort, setSort] = useState<SortId>("popular");
+  const [sort, setSort] = useState<SortId>("newest");
   const [style, setStyle] = useState<StyleId>("all");
 
   // Design style (Basic / Modern / Bio / Professional / Premium) and "featured"
