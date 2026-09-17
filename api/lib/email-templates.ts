@@ -839,10 +839,15 @@ export function contactReceivedEmail(o: { name?: string | null; requirement?: st
 export function nfcOrderConfirmedEmail(o: {
   name?: string | null; orderId: number; productName: string; quantity: number; amount: number;
   printLines: string[]; address: string; cardUrl: string; deliveryDays: string;
+  /** Several products paid together (e.g. card + standee): one line each. */
+  items?: { name: string; quantity: number }[];
 }): Email {
+  const itemText = o.items && o.items.length > 1
+    ? o.items.map((i) => `${i.quantity} × ${i.name}`).join(" + ")
+    : `${o.quantity} × ${o.productName}`;
   const rows: [string, string][] = [
     ["Order", `#${o.orderId}`],
-    ["Item", `${o.quantity} × ${esc(o.productName)}`],
+    [o.items && o.items.length > 1 ? "Items" : "Item", esc(itemText)],
     ["Paid", esc(inr(o.amount))],
     ["Delivery", `Free · ${esc(o.deliveryDays)}`],
   ];
@@ -859,14 +864,14 @@ export function nfcOrderConfirmedEmail(o: {
     button("View your order", `${SITE}/dashboard/nfc`);
   return {
     kind: "nfcOrderConfirmedEmail",
-    subject: `Order confirmed — ${o.quantity} × ${o.productName} (#${o.orderId})`,
+    subject: `Order confirmed — ${itemText} (#${o.orderId})`,
     html: layout({
-      preheader: `Your ${o.productName} order is confirmed. Free delivery in ${o.deliveryDays}.`,
+      preheader: `Your ${o.items && o.items.length > 1 ? "NFC" : o.productName} order is confirmed. Free delivery in ${o.deliveryDays}.`,
       badge: "Order confirmed", heading: "Your order is confirmed 🎉", bodyHtml,
     }),
     text: [
       `Hi ${o.name || "there"},`, "",
-      `Your order #${o.orderId} is confirmed: ${o.quantity} × ${o.productName}, paid ${inr(o.amount)}.`,
+      `Your order #${o.orderId} is confirmed: ${itemText}, paid ${inr(o.amount)}.`,
       `Delivery: free, ${o.deliveryDays}.`, "",
       "Printed details:", ...o.printLines, "",
       `The NFC chip and QR code open: ${o.cardUrl}`, "",

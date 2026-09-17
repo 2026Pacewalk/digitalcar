@@ -13,7 +13,7 @@ import { Link } from "react-router";
 import { toast } from "sonner";
 import {
   AlertTriangle, Check, CheckCircle2, Loader2, MapPin, Minus, Nfc, PackageCheck, Plus, Printer,
-  ScanLine, ShieldCheck, Truck,
+  ScanLine, ShieldCheck, Sparkles, Truck, X,
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { useCustomer } from "@/hooks/useCustomer";
@@ -90,6 +90,7 @@ function CardPreview({ name, title, company, logo, cardUrl }: { name: string; ti
             <p className="text-[10px] font-bold leading-tight">Tap or scan</p>
             <p className="text-[8.5px] leading-snug text-[#64748B]">to save my contact</p>
             <p className="mt-1 truncate text-[8px] font-semibold text-[#B45309]">{cardUrl ? cardUrl.replace(/^https?:\/\//, "") : "digitalcarda.in/you"}</p>
+            <p className="mt-1 text-[7px] font-bold tracking-wide text-[#94A3B8]">Powered by <span className="text-[#0F172A]">Digital<span className="text-[#D97706]">Carda</span></span></p>
           </div>
         </div>
         <figcaption className="mt-1 text-center text-[10px] font-medium text-[#94A3B8]">Back</figcaption>
@@ -112,6 +113,7 @@ function StandeePreview({ name, company, cardUrl }: { name: string; company: str
             {cardUrl ? <img src={qrFor(cardUrl, 180)} alt="" className="h-20 w-20" /> : <span className="flex h-20 w-20 items-center justify-center bg-[#F1F5F9]"><ScanLine size={18} className="text-[#94A3B8]" /></span>}
           </div>
           <p className="mt-1.5 text-[8px] text-[#64748B]">Save contact · Review · Pay</p>
+          <p className="mt-1 border-t border-[#F1F5F9] pt-1 text-[7.5px] font-bold tracking-wide text-[#94A3B8]">Powered by <span className="text-[#0F172A]">Digital<span className="text-[#D97706]">Carda</span></span></p>
         </div>
       </div>
       <div aria-hidden="true" className="mt-0.5 h-2 w-[176px] rounded-full bg-[#0F172A]/80" />
@@ -132,8 +134,9 @@ export default function CustomerNfcOrder() {
   const checkout = trpc.nfc.checkout.useMutation();
   const verify = trpc.nfc.verify.useMutation();
 
-  const [productId, setProductId] = useState<NfcProductId>("nfc_card");
-  const [qty, setQty] = useState(1);
+  // Quantity per product; 0 means it isn't in this order. Card and standee can
+  // be bought together — one payment, one delivery.
+  const [qtys, setQtys] = useState<Record<NfcProductId, number>>({ nfc_card: 1, nfc_standee: 0 });
   // Print details start from the card and only diverge where the customer edits them.
   const [printEdits, setPrintEdits] = useState<Partial<Record<"name" | "title" | "company" | "phone", string>>>({});
   const [shipEdits, setShipEdits] = useState<Partial<Record<"name" | "phone" | "line1" | "line2" | "city" | "state" | "pincode", string>>>({});
@@ -159,8 +162,18 @@ export default function CustomerNfcOrder() {
   };
   const logo = /^https:\/\//i.test(s(c.logo)) ? s(c.logo) : "";
   const cardUrl = data?.cardUrl ?? null;
-  const product = NFC_PRODUCTS.find((p) => p.id === productId) ?? NFC_PRODUCTS[0];
-  const total = product.price * qty;
+  const lines = NFC_PRODUCTS.filter((p) => qtys[p.id] > 0).map((p) => ({ product: p, qty: qtys[p.id] }));
+  const both = lines.length === NFC_PRODUCTS.length;
+  const total = lines.reduce((sum, l) => sum + l.product.price * l.qty, 0);
+  const setQty = (id: NfcProductId, q: number) => setQtys((m) => ({ ...m, [id]: Math.min(NFC_MAX_QTY, Math.max(0, q)) }));
+  // Tapping a product adds or removes it — but an order always keeps at least one.
+  const toggleProduct = (id: NfcProductId) => {
+    if (qtys[id] > 0) {
+      if (lines.length > 1) setQty(id, 0);
+    } else setQty(id, 1);
+  };
+  const addBoth = () => setQtys((m) => Object.fromEntries(NFC_PRODUCTS.map((p) => [p.id, Math.max(1, m[p.id])])) as Record<NfcProductId, number>);
+  const itemLabel = lines.map((l) => `${l.qty} × ${l.product.name}`).join(" + ");
 
   const window = useMemo(() => {
     const today = new Date();
@@ -199,13 +212,12 @@ export default function CustomerNfcOrder() {
     setPaying(true);
     try {
       const r = await checkout.mutateAsync({
-        product: productId,
-        quantity: qty,
+        items: lines.map((l) => ({ product: l.product.id, quantity: l.qty })),
         print: { ...printVal, logoUrl: logo || undefined },
         shipping: { ...shipVal, phone: shipVal.phone.replace(/[\s-]/g, "") },
       });
       if ("manual" in r) {
-        toast.success(`Order #${r.orderId} received — our team will contact you to arrange payment.`);
+        toast.success(`Order #${r.orderIds.join(" + #")} received — our team will contact you to arrange payment.`);
         setPaying(false);
         await refetch();
         return;
@@ -216,7 +228,7 @@ export default function CustomerNfcOrder() {
         currency: r.currency,
         order_id: r.razorpayOrderId,
         name: "DigitalCarda",
-        description: `${qty} × ${product.name}`,
+        description: itemLabel,
         prefill: r.prefill,
         theme: { color: "#F7B31C" },
         handler: async (resp) => {
@@ -227,7 +239,7 @@ export default function CustomerNfcOrder() {
               razorpaySignature: resp.razorpay_signature,
             });
             toast.success("Payment received — your order is confirmed. Details are on their way to your email.");
-            setQty(1);
+            setQtys({ nfc_card: 1, nfc_standee: 0 });
             await refetch();
           } catch (err) {
             toast.error(`${friendly(err)} Payment ID: ${resp.razorpay_payment_id}`);
@@ -282,15 +294,30 @@ export default function CustomerNfcOrder() {
 
         {/* 1 · Product */}
         <section aria-labelledby="nfc-choose">
-          <h3 id="nfc-choose" className="mb-3 text-[13px] font-bold uppercase tracking-[0.12em] text-[#64748B]">1 · Choose a product</h3>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h3 id="nfc-choose" className="text-[13px] font-bold uppercase tracking-[0.12em] text-[#64748B]">1 · Choose your products</h3>
+              <p className="mt-0.5 text-[12.5px] text-[#64748B]">Pick one, or add both to get them in a single order.</p>
+            </div>
+            {both ? (
+              <span className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#ECFDF5] px-4 text-[12.5px] font-semibold text-[#047857] ring-1 ring-[#A7F3D0]">
+                <CheckCircle2 size={14} /> Both in one order · one payment, one delivery
+              </span>
+            ) : (
+              <button type="button" onClick={addBoth}
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0F172A] px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1E293B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
+                <Sparkles size={14} className="text-[#F7B31C]" /> Get both · {inr(NFC_PRODUCTS.reduce((sum, p) => sum + p.price * Math.max(1, qtys[p.id]), 0))}
+              </button>
+            )}
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             {NFC_PRODUCTS.map((p) => {
-              const on = p.id === productId;
+              const on = qtys[p.id] > 0;
               return (
-                <button key={p.id} type="button" onClick={() => setProductId(p.id)} aria-pressed={on}
+                <button key={p.id} type="button" onClick={() => toggleProduct(p.id)} aria-pressed={on}
                   className={`relative flex flex-col overflow-hidden rounded-2xl bg-white text-left transition-all ${on ? "shadow-premium ring-2 ring-[#F7B31C]" : "ring-1 ring-[#E2E8F0] hover:shadow-premium hover:ring-[#F7B31C]/60"}`}>
-                  <span className={`absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full ${on ? "bg-[#F7B31C]" : "bg-white ring-1 ring-[#E2E8F0]"}`}>
-                    {on && <Check size={14} className="text-[#0F172A]" />}
+                  <span className={`absolute right-3 top-3 z-10 inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-bold ${on ? "bg-[#F7B31C] text-[#0F172A]" : "bg-white text-[#475569] ring-1 ring-[#E2E8F0]"}`}>
+                    {on ? <><Check size={13} /> Added</> : <><Plus size={13} /> Add</>}
                   </span>
                   <span className="flex h-[190px] items-center justify-center bg-gradient-to-br from-[#F8FAFC] to-[#FFF7E6] px-5">
                     {p.id === "nfc_card"
@@ -326,7 +353,7 @@ export default function CustomerNfcOrder() {
           <div className="space-y-5">
             <section className="rounded-2xl border border-[#F1F5F9] bg-white p-5 shadow-premium" aria-labelledby="nfc-print">
               <h3 id="nfc-print" className="flex items-center gap-2 text-[15px] font-bold text-[#0F172A]"><Printer size={16} className="text-[#B45309]" /> 2 · What we print</h3>
-              <p className="mt-1 text-[12.5px] text-[#64748B]">Filled in from your card — change anything that should read differently on the {product.short.toLowerCase()}. Your logo and QR code come from your card.</p>
+              <p className="mt-1 text-[12.5px] text-[#64748B]">Filled in from your card — change anything that should read differently on the {lines.map((l) => l.product.short.toLowerCase()).join(" and ")}. Your logo and QR code come from your card.</p>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Name" required error={errors["print.name"]}>
                   <input className={`${field} ${errors["print.name"] ? "border-[#FCA5A5]" : "border-[#E2E8F0]"}`} value={printVal.name} onChange={setPrint("name")} maxLength={120} />
@@ -379,23 +406,43 @@ export default function CustomerNfcOrder() {
           <aside className="space-y-3 lg:sticky lg:top-6">
             <div className="rounded-2xl border border-[#F1F5F9] bg-white p-5 shadow-premium">
               <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#94A3B8]">Order summary</p>
-              <p className="mt-2 text-[15px] font-bold text-[#0F172A]">{product.name}</p>
-              <p className="text-[12px] text-[#64748B]">{product.print} · {inr(product.price)} per {product.unit}</p>
-
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-[#334155]">Quantity</span>
-                <div className="inline-flex items-center rounded-xl ring-1 ring-[#E2E8F0]">
-                  <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label="One fewer"
-                    className="flex h-9 w-9 items-center justify-center text-[#334155] disabled:opacity-40"><Minus size={15} /></button>
-                  <input value={qty} onChange={(e) => setQty(Math.min(NFC_MAX_QTY, Math.max(1, Number(e.target.value.replace(/\D/g, "")) || 1)))}
-                    inputMode="numeric" aria-label="Quantity" className="h-9 w-12 border-x border-[#E2E8F0] text-center text-[14px] font-bold tabular-nums text-[#0F172A] outline-none" />
-                  <button type="button" onClick={() => setQty((q) => Math.min(NFC_MAX_QTY, q + 1))} disabled={qty >= NFC_MAX_QTY} aria-label="One more"
-                    className="flex h-9 w-9 items-center justify-center text-[#334155] disabled:opacity-40"><Plus size={15} /></button>
-                </div>
-              </div>
+              <ul className="mt-3 space-y-3">
+                {lines.map((l) => (
+                  <li key={l.product.id} className="rounded-xl border border-[#EEF2F6] p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-bold text-[#0F172A]">{l.product.name}</p>
+                        <p className="text-[11.5px] text-[#64748B]">{l.product.print} · {inr(l.product.price)} per {l.product.unit}</p>
+                      </div>
+                      {lines.length > 1 && (
+                        <button type="button" onClick={() => setQty(l.product.id, 0)} aria-label={`Remove ${l.product.name}`}
+                          className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#94A3B8] hover:bg-[#F1F5F9] hover:text-[#0F172A]"><X size={15} /></button>
+                      )}
+                    </div>
+                    <div className="mt-2.5 flex items-center justify-between">
+                      <div className="inline-flex items-center rounded-xl ring-1 ring-[#E2E8F0]">
+                        <button type="button" onClick={() => setQty(l.product.id, l.qty - 1)} disabled={l.qty <= 1} aria-label={`One fewer ${l.product.short}`}
+                          className="flex h-9 w-9 items-center justify-center text-[#334155] disabled:opacity-40"><Minus size={15} /></button>
+                        <input value={l.qty} onChange={(e) => setQty(l.product.id, Math.max(1, Number(e.target.value.replace(/\D/g, "")) || 1))}
+                          inputMode="numeric" aria-label={`${l.product.short} quantity`} className="h-9 w-12 border-x border-[#E2E8F0] text-center text-[14px] font-bold tabular-nums text-[#0F172A] outline-none" />
+                        <button type="button" onClick={() => setQty(l.product.id, l.qty + 1)} disabled={l.qty >= NFC_MAX_QTY} aria-label={`One more ${l.product.short}`}
+                          className="flex h-9 w-9 items-center justify-center text-[#334155] disabled:opacity-40"><Plus size={15} /></button>
+                      </div>
+                      <span className="text-[14px] font-bold tabular-nums text-[#0F172A]">{inr(l.product.price * l.qty)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {!both && (
+                <button type="button" onClick={addBoth} className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#CBD5E1] py-2.5 text-[12.5px] font-semibold text-[#475569] hover:border-[#F7B31C] hover:text-[#0F172A]">
+                  <Plus size={14} /> Add {NFC_PRODUCTS.find((p) => qtys[p.id] === 0)?.name} to this order
+                </button>
+              )}
 
               <dl className="mt-4 space-y-2 border-t border-[#F1F5F9] pt-4 text-[13px]">
-                <div className="flex justify-between"><dt className="text-[#64748B]">{qty} × {inr(product.price)}</dt><dd className="font-semibold tabular-nums text-[#0F172A]">{inr(total)}</dd></div>
+                {lines.map((l) => (
+                  <div key={l.product.id} className="flex justify-between"><dt className="text-[#64748B]">{l.qty} × {l.product.short}</dt><dd className="font-semibold tabular-nums text-[#0F172A]">{inr(l.product.price * l.qty)}</dd></div>
+                ))}
                 <div className="flex justify-between"><dt className="text-[#64748B]">Delivery</dt><dd className="font-semibold text-[#16A34A]">Free</dd></div>
                 <div className="flex justify-between border-t border-[#F1F5F9] pt-2 text-[15px]"><dt className="font-bold text-[#0F172A]">Total</dt><dd className="font-extrabold tabular-nums text-[#0F172A]">{inr(total)}</dd></div>
               </dl>
@@ -424,6 +471,7 @@ export default function CustomerNfcOrder() {
               {orders.map((o) => {
                 const p = NFC_PRODUCTS.find((x) => x.id === o.product);
                 const stepIndex = STEPS.findIndex((st) => st.id === o.status);
+                const mates = o.razorpayOrderId ? orders.filter((x) => x.id !== o.id && x.razorpayOrderId === o.razorpayOrderId) : [];
                 return (
                   <li key={o.id} className="rounded-xl border border-[#EEF2F6] p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
@@ -431,6 +479,7 @@ export default function CustomerNfcOrder() {
                         <p className="text-[14px] font-bold text-[#0F172A]">{o.quantity} × {p?.name ?? o.product}</p>
                         <p className="text-[12px] text-[#64748B]">
                           Order #{o.id} · {new Date(o.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · {inr(Number(o.amount))}
+                          {mates.length > 0 && <> · Ordered together with #{mates.map((m) => m.id).join(", #")}</>}
                         </p>
                       </div>
                       {o.status === "pending_payment" && <span className="rounded-full bg-[#FEF3C7] px-2.5 py-1 text-[11px] font-bold text-[#92400E]">Awaiting payment</span>}

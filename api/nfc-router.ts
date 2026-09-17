@@ -32,26 +32,41 @@ const indianMobile = z.string().trim()
   .transform((s) => s.replace(/[\s-]/g, ""))
   .pipe(z.string().regex(/^(\+?91)?[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"));
 
-const orderInput = z.object({
+const lineInput = z.object({
   product: z.enum(["nfc_card", "nfc_standee"]),
   quantity: z.number().int().min(1).max(NFC_MAX_QTY),
-  print: z.object({
-    name: text(120).min(1, "Add the name to print"),
-    title: text(120).optional(),
-    company: text(160).optional(),
-    phone: text(40).optional(),
-    logoUrl: text(500).optional(),
-  }),
-  shipping: z.object({
-    name: text(120).min(2, "Add the recipient's name"),
-    phone: indianMobile,
-    line1: text(255).min(5, "Add the street address"),
-    line2: text(255).optional(),
-    city: text(100).min(2, "Add the city"),
-    state: text(100).min(2, "Choose the state"),
-    pincode: z.string().trim().regex(/^[1-9]\d{5}$/, "Enter a valid 6-digit PIN code"),
-  }),
 });
+
+const orderInput = z.preprocess(
+  // A dashboard tab opened before combined orders shipped still sends one
+  // { product, quantity } — treat it as a one-item order.
+  (v) => {
+    const o = v as Record<string, unknown> | null;
+    return o && !o.items && o.product ? { ...o, items: [{ product: o.product, quantity: o.quantity }] } : v;
+  },
+  z.object({
+    // One or both products, each once. Each becomes its own order row (so the team
+    // can print and ship them separately), all paid with ONE Razorpay payment.
+    items: z.array(lineInput).min(1).max(NFC_PRODUCTS.length)
+      .refine((l) => new Set(l.map((i) => i.product)).size === l.length, "Each product can only be added once."),
+    print: z.object({
+      name: text(120).min(1, "Add the name to print"),
+      title: text(120).optional(),
+      company: text(160).optional(),
+      phone: text(40).optional(),
+      logoUrl: text(500).optional(),
+    }),
+    shipping: z.object({
+      name: text(120).min(2, "Add the recipient's name"),
+      phone: indianMobile,
+      line1: text(255).min(5, "Add the street address"),
+      line2: text(255).optional(),
+      city: text(100).min(2, "Add the city"),
+      state: text(100).min(2, "Choose the state"),
+      pincode: z.string().trim().regex(/^[1-9]\d{5}$/, "Enter a valid 6-digit PIN code"),
+    }),
+  }),
+);
 
 const STATUSES = ["pending_payment", "paid", "in_production", "shipped", "delivered", "cancelled"] as const;
 
@@ -120,56 +135,70 @@ export const nfcRouter = createRouter({
   checkout: authedQuery.input(orderInput).mutation(async ({ ctx, input }) => {
     enforceRateLimit(`nfc:${clientIp(ctx.req)}`, 10, 10 * 60_000);
     const db = getDb();
-    const product = nfcProduct(input.product);
-    if (!product) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown product." });
+    if (input.items.some((i) => !nfcProduct(i.product))) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown product." });
 
     const cardUrl = await cardUrlFor(db, ctx.user.id);
     if (!cardUrl) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Publish your card first — the NFC chip and QR code open your card link." });
     }
 
-    const amount = product.price * input.quantity;
     const logoUrl = input.print.logoUrl && /^https:\/\//i.test(input.print.logoUrl) ? input.print.logoUrl : null;
-    const [inserted] = await db.insert(nfcOrders).values({
-      userId: ctx.user.id,
-      product: product.id,
-      quantity: input.quantity,
-      unitPrice: product.price.toFixed(2),
-      amount: amount.toFixed(2),
-      printName: input.print.name,
-      printTitle: input.print.title || null,
-      printCompany: input.print.company || null,
-      printPhone: input.print.phone || null,
-      cardUrl,
-      logoUrl,
-      shipName: input.shipping.name,
-      shipPhone: input.shipping.phone,
-      shipLine1: input.shipping.line1,
-      shipLine2: input.shipping.line2 || null,
-      shipCity: input.shipping.city,
-      shipState: input.shipping.state,
-      shipPincode: input.shipping.pincode,
-      status: "pending_payment",
-    });
-    const orderId = Number(inserted.insertId);
+    // One order row per product; they share the print + shipping details and,
+    // when paid online, a single Razorpay order.
+    const lines = input.items.map((i) => ({ product: nfcProduct(i.product)!, quantity: i.quantity }));
+    const amount = lines.reduce((sum, l) => sum + l.product.price * l.quantity, 0);
+    const orderIds: number[] = [];
+    for (const l of lines) {
+      const [inserted] = await db.insert(nfcOrders).values({
+        userId: ctx.user.id,
+        product: l.product.id,
+        quantity: l.quantity,
+        unitPrice: l.product.price.toFixed(2),
+        amount: (l.product.price * l.quantity).toFixed(2),
+        printName: input.print.name,
+        printTitle: input.print.title || null,
+        printCompany: input.print.company || null,
+        printPhone: input.print.phone || null,
+        cardUrl,
+        logoUrl,
+        shipName: input.shipping.name,
+        shipPhone: input.shipping.phone,
+        shipLine1: input.shipping.line1,
+        shipLine2: input.shipping.line2 || null,
+        shipCity: input.shipping.city,
+        shipState: input.shipping.state,
+        shipPincode: input.shipping.pincode,
+        status: "pending_payment",
+      });
+      orderIds.push(Number(inserted.insertId));
+    }
+    const orderId = orderIds[0];
+    const together = orderIds.length > 1 ? ` (ordered together: #${orderIds.join(" + #")})` : "";
 
     const cr = await resolveRazorpay(db);
     if (!cr.enabled) {
-      const [order] = await db.select().from(nfcOrders).where(eq(nfcOrders.id, orderId));
-      if (order) void notifyTeam(order, "Awaiting payment — contact the customer to collect it");
-      return { manual: true as const, orderId };
+      const rows = await db.select().from(nfcOrders).where(inArray(nfcOrders.id, orderIds));
+      for (const r of rows) void notifyTeam(r, `Awaiting payment — contact the customer to collect it${together}`);
+      return { manual: true as const, orderId, orderIds };
     }
 
     const rzp = await createRazorpayOrder({
       amount: amount * 100,
       currency: "INR",
-      receipt: `nfc_${orderId}`,
-      notes: { userId: String(ctx.user.id), nfcOrderId: String(orderId), product: product.id, quantity: String(input.quantity) },
+      receipt: `nfc_${orderIds.join("_")}`.slice(0, 40),
+      notes: {
+        userId: String(ctx.user.id),
+        // Single-item orders keep the original note shape.
+        nfcOrderId: String(orderId),
+        nfcOrderIds: orderIds.join(","),
+        items: lines.map((l) => `${l.quantity}x${l.product.id}`).join(","),
+      },
     }, cr);
-    await db.update(nfcOrders).set({ razorpayOrderId: rzp.id }).where(eq(nfcOrders.id, orderId));
+    await db.update(nfcOrders).set({ razorpayOrderId: rzp.id }).where(inArray(nfcOrders.id, orderIds));
 
     return {
       orderId,
+      orderIds,
       keyId: cr.keyId,
       razorpayOrderId: rzp.id,
       amount: rzp.amount,
@@ -204,38 +233,47 @@ export const nfcRouter = createRouter({
         throw new TRPCError({ code: "FORBIDDEN", message: "This payment belongs to another account." });
       }
 
-      const [order] = await db.select().from(nfcOrders)
-        .where(and(eq(nfcOrders.id, Number(notes.nfcOrderId)), eq(nfcOrders.userId, ctx.user.id)));
-      if (!order || order.razorpayOrderId !== input.razorpayOrderId) {
+      // Every order row this payment covers (one, or card + standee together).
+      // Orders created before combined checkout only carry nfcOrderId.
+      const ids = String(notes.nfcOrderIds || notes.nfcOrderId || "")
+        .split(",").map((x) => Number(x)).filter((n) => Number.isInteger(n) && n > 0);
+      const rows = ids.length
+        ? await db.select().from(nfcOrders).where(and(inArray(nfcOrders.id, ids), eq(nfcOrders.userId, ctx.user.id)))
+        : [];
+      if (!rows.length || rows.length !== ids.length || rows.some((r) => r.razorpayOrderId !== input.razorpayOrderId)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "This payment doesn't match an order. Contact support with your payment ID." });
       }
-      if (Math.round(Number(order.amount) * 100) !== Number(gatewayOrder.amount)) {
+      const totalPaise = rows.reduce((sum, r) => sum + Math.round(Number(r.amount) * 100), 0);
+      if (totalPaise !== Number(gatewayOrder.amount)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "The paid amount doesn't match this order. Contact support with your payment ID." });
       }
 
       // Idempotent: a repeated verify (double click, retry) confirms once.
-      if (order.status === "pending_payment") {
+      if (rows.some((r) => r.status === "pending_payment")) {
         await db.update(nfcOrders)
           .set({ status: "paid", razorpayPaymentId: input.razorpayPaymentId, paidAt: new Date() })
-          .where(and(eq(nfcOrders.id, order.id), eq(nfcOrders.status, "pending_payment")));
-        const [paid] = await db.select().from(nfcOrders).where(eq(nfcOrders.id, order.id));
-        if (paid) {
-          const product = nfcProduct(paid.product);
+          .where(and(inArray(nfcOrders.id, ids), eq(nfcOrders.status, "pending_payment")));
+        const paid = (await db.select().from(nfcOrders).where(inArray(nfcOrders.id, ids))).sort((a, b) => a.id - b.id);
+        const first = paid[0];
+        if (first) {
+          const product = nfcProduct(first.product);
+          const together = paid.length > 1 ? ` (ordered together: #${paid.map((p) => p.id).join(" + #")})` : "";
           void sendEmail(ctx.user.email, nfcOrderConfirmedEmail({
-            name: paid.shipName,
-            orderId: paid.id,
-            productName: product?.name ?? paid.product,
-            quantity: paid.quantity,
-            amount: Number(paid.amount),
-            printLines: printLinesOf(paid),
-            address: `${paid.shipName}, ${addressOf(paid)} · ${paid.shipPhone}`,
-            cardUrl: paid.cardUrl,
+            name: first.shipName,
+            orderId: first.id,
+            productName: product?.name ?? first.product,
+            quantity: first.quantity,
+            items: paid.map((p) => ({ name: nfcProduct(p.product)?.name ?? p.product, quantity: p.quantity })),
+            amount: paid.reduce((sum, p) => sum + Number(p.amount), 0),
+            printLines: printLinesOf(first),
+            address: `${first.shipName}, ${addressOf(first)} · ${first.shipPhone}`,
+            cardUrl: first.cardUrl,
             deliveryDays: NFC_DELIVERY.label,
           }), ownerAddress());
-          void notifyTeam(paid, "Paid online — ready to print");
+          for (const p of paid) void notifyTeam(p, `Paid online — ready to print${together}`);
         }
       }
-      return { ok: true, orderId: order.id };
+      return { ok: true, orderId: ids[0], orderIds: ids };
     }),
 
   // ── Admin ──
