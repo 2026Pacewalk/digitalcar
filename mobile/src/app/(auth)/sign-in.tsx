@@ -14,7 +14,9 @@ import { space, useTheme } from "~/theme";
 export default function SignIn() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const { signIn } = useAuth();
+  const auth = useAuth();
+  const { completeSignIn } = auth;
+  const notice = auth.status === "signedOut" ? auth.notice : undefined;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export default function SignIn() {
         return;
       }
       haptics.success();
-      await signIn(token, { id: user.id, email: user.email, fullName: user.fullName, role: user.role, avatar: user.avatar });
+      await completeSignIn(token, { id: user.id, email: user.email, fullName: user.fullName, role: user.role, avatar: user.avatar });
     },
     onError: (e) => { haptics.warning(); setError(errorMessage(e, "Couldn't sign in. Please try again.")); },
   });
@@ -49,7 +51,7 @@ export default function SignIn() {
         </View>
 
         <View style={{ padding: space.xl, gap: space.lg }}>
-          {error ? <Banner tone="bad" title={error} /> : null}
+          {error ? <Banner tone="bad" title={error} /> : notice ? <Banner tone="info" title={notice} /> : null}
           <Field
             label="Email, card address or mobile"
             value={email}

@@ -13,6 +13,7 @@ import { useAuth } from "~/lib/auth";
 import { shareCard } from "~/lib/share";
 import { totalActions } from "~/lib/insights";
 import * as haptics from "~/lib/haptics";
+import { AlertsPrompt } from "~/components/AlertsPrompt";
 import { radius, space, useTheme } from "~/theme";
 
 export default function HomeScreen() {
@@ -101,6 +102,8 @@ export default function HomeScreen() {
           </View>
 
           {plan.banner ? <Banner tone={plan.banner.tone} title={plan.banner.title} body={plan.banner.body} /> : null}
+
+          <AlertsPrompt />
 
           {/* Last 30 days */}
           <SectionTitle action={<Pressable onPress={() => router.push("/insights")} hitSlop={8}><AppText variant="label" tone="accent">Insights</AppText></Pressable>}>Last 30 days</SectionTitle>

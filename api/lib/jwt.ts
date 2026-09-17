@@ -22,15 +22,16 @@ const SECRET_KEY = new TextEncoder().encode(RAW_SECRET);
 // tokens (verifyToken uses SECRET_KEY and will reject these).
 const RESET_KEY = new TextEncoder().encode(RAW_SECRET + "::pwreset");
 
-export async function createToken(payload: {
-  userId: number;
-  email: string;
-  role: string;
-}): Promise<string> {
-  return new SignJWT({ ...payload })
+export async function createToken(
+  payload: { userId: number; email: string; role: string },
+  // Website sessions: 7 days. Mobile-app sessions pass a short lifetime and
+  // their session id (`sid`) so a signed-out device loses access quickly.
+  opts: { expiresIn?: string; sid?: number } = {},
+): Promise<string> {
+  return new SignJWT({ ...payload, ...(opts.sid ? { sid: opts.sid } : {}) })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime(opts.expiresIn ?? "7d")
     .sign(SECRET_KEY);
 }
 
@@ -38,6 +39,7 @@ export async function verifyToken(token: string): Promise<{
   userId: number;
   email: string;
   role: string;
+  sid?: number;
 } | null> {
   try {
     const { payload } = await jwtVerify(token, SECRET_KEY, {
@@ -47,6 +49,7 @@ export async function verifyToken(token: string): Promise<{
       userId: number;
       email: string;
       role: string;
+      sid?: number;
     };
   } catch {
     return null;

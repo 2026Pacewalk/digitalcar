@@ -912,3 +912,65 @@ export const emailLogs = mysqlTable("email_logs", {
 ]);
 
 export type EmailLog = typeof emailLogs.$inferSelect;
+
+// ─── Mobile app: signed-in devices ──────────────────────────────
+// One row per app sign-in. The refresh token itself is never stored — only a
+// SHA-256 hash of the current one (and the previous one, so a replayed old
+// token can be detected and the session ended). Access tokens issued for a
+// session carry its id (`sid`), and requests are refused once it's revoked.
+export const appSessions = mysqlTable("app_sessions", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+  prevTokenHash: varchar("prev_token_hash", { length: 64 }),
+  platform: varchar("platform", { length: 16 }).notNull().default("unknown"), // ios | android | web
+  deviceName: varchar("device_name", { length: 120 }),
+  appVersion: varchar("app_version", { length: 32 }),
+  lastUsedAt: timestamp("last_used_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("app_sessions_token_hash_unique").on(table.tokenHash),
+  index("app_sessions_user_idx").on(table.userId),
+]);
+
+export type AppSession = typeof appSessions.$inferSelect;
+
+// ─── Mobile app: push notification tokens ───────────────────────
+export const pushTokens = mysqlTable("push_tokens", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  sessionId: bigint("session_id", { mode: "number", unsigned: true }),
+  token: varchar("token", { length: 255 }).notNull(), // Expo push token
+  platform: varchar("platform", { length: 16 }).notNull().default("unknown"),
+  disabledAt: timestamp("disabled_at"),              // set when the device stops accepting pushes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  uniqueIndex("push_tokens_token_unique").on(table.token),
+  index("push_tokens_user_idx").on(table.userId),
+]);
+
+export type PushToken = typeof pushTokens.$inferSelect;
+
+// ─── Account deletion requests (App Store / Play requirement) ───
+// Requesting deletion signs the account out everywhere and pauses its card at
+// once. Nothing is erased automatically: the team completes the deletion after
+// the grace period, and a request can still be cancelled before then.
+export const accountDeletionRequests = mysqlTable("account_deletion_requests", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  reason: varchar("reason", { length: 500 }),
+  source: varchar("source", { length: 16 }).notNull().default("app"),   // app | web
+  status: mysqlEnum("status", ["pending", "cancelled", "completed"]).notNull().default("pending"),
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("adr_user_idx").on(table.userId),
+  index("adr_status_idx").on(table.status),
+]);
+
+export type AccountDeletionRequest = typeof accountDeletionRequests.$inferSelect;

@@ -6,6 +6,7 @@ import { AppText, Button, Card, Chip, EmptyState, Field, Loading, Screen, Sectio
 import { SOURCE_LABELS, STAGES, stageLabel, stageTone, type Stage } from "~/lib/leads";
 import { dateLabel, firstName, telLink, timeAgo, whatsappLink } from "~/lib/format";
 import { useAuth } from "~/lib/auth";
+import { cancelFollowUp, scheduleFollowUp } from "~/lib/push";
 import { errorMessage, trpc } from "~/lib/trpc";
 import * as haptics from "~/lib/haptics";
 import { space, useTheme } from "~/theme";
@@ -32,6 +33,7 @@ export default function LeadDetail() {
   const [notes, setNotes] = useState("");
   const [notesSaved, setNotesSaved] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reminder, setReminder] = useState<string | null>(null);
 
   useEffect(() => { if (lead.data) setNotes(lead.data.notes ?? ""); }, [lead.data?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -91,7 +93,11 @@ export default function LeadDetail() {
       <SectionTitle>Status</SectionTitle>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>
         {STAGES.map((s) => (
-          <Chip key={s} label={stageLabel(s)} selected={l.status === s} onPress={() => update.mutate({ id: l.id, status: s as Stage })} />
+          <Chip key={s} label={stageLabel(s)} selected={l.status === s} onPress={() => {
+            update.mutate({ id: l.id, status: s as Stage });
+            // A won, lost or closed lead needs no more reminders.
+            if (s === "converted" || s === "not_interested" || s === "closed") void cancelFollowUp(l.id);
+          }} />
         ))}
       </View>
 
@@ -105,10 +111,19 @@ export default function LeadDetail() {
         </View>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>
           {FOLLOW_UPS.map((f) => (
-            <Chip key={f.label} label={f.label} onPress={() => update.mutate({ id: l.id, followUpDate: f.at(), status: l.status === "new" ? "follow_up" : undefined })} />
+            <Chip key={f.label} label={f.label} onPress={() => {
+              const at = f.at();
+              update.mutate({ id: l.id, followUpDate: at, status: l.status === "new" ? "follow_up" : undefined }, {
+                onSuccess: async () => {
+                  const ok = await scheduleFollowUp({ id: l.id, fullName: l.fullName, message: l.message }, at);
+                  setReminder(ok ? `We'll remind you on this phone on ${dateLabel(at)} at 10 am.` : null);
+                },
+              });
+            }} />
           ))}
-          {l.followUpDate ? <Chip label="Clear" onPress={() => update.mutate({ id: l.id, followUpDate: null })} /> : null}
+          {l.followUpDate ? <Chip label="Clear" onPress={() => { update.mutate({ id: l.id, followUpDate: null }); void cancelFollowUp(l.id); setReminder(null); }} /> : null}
         </View>
+        {reminder ? <AppText variant="caption" tone="good">{reminder}</AppText> : null}
       </Card>
 
       <SectionTitle>Notes</SectionTitle>

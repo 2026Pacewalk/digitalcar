@@ -3,7 +3,7 @@
     "name": "DigitalCarda",
     "slug": "digitalcarda",
     "scheme": "digitalcarda",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -42,6 +42,22 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 160,
           "backgroundColor": "#0F172A"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F7B31C",
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DigitalCarda uses your photos so you can add your picture and logo to your card.",
+          "cameraPermission": "DigitalCarda uses the camera so you can take a photo for your card.",
+          "microphonePermission": false
         }
       ]
     ],

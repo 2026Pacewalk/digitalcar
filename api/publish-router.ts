@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEvents, users } from "@db/schema";
+import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEvents, users, accountDeletionRequests } from "@db/schema";
 import { legacyPaidPlan } from "./lib/entitlement";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -235,6 +235,11 @@ export const publishRouter = createRouter({
     if (!rows[0]) return { paused: false, mode };
     const uid = rows[0].userId;
     const now = Date.now();
+
+    // The owner asked to delete their account: the card goes offline at once.
+    const deletion = await db.select({ id: accountDeletionRequests.id }).from(accountDeletionRequests)
+      .where(and(eq(accountDeletionRequests.userId, uid), eq(accountDeletionRequests.status, "pending"))).limit(1);
+    if (deletion[0]) return { paused: true, mode };
 
     // An active paid subscription always keeps the card live.
     const subs = await db.select().from(subscriptions).where(eq(subscriptions.userId, uid)).orderBy(desc(subscriptions.createdAt)).limit(1);

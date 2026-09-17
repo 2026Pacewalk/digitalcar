@@ -6,18 +6,9 @@ import superjson from "superjson";
 // any server code.
 import type { AppRouter } from "../../../api/router";
 import { API_URL } from "./config";
+import { currentSession, freshAccessToken, renew } from "./session";
 
 export const trpc = createTRPCReact<AppRouter>();
-
-/* The token lives in memory for request headers; AuthProvider keeps it in
-   sync with secure storage. */
-let authToken: string | null = null;
-export const setAuthToken = (token: string | null) => { authToken = token; };
-export const getAuthToken = () => authToken;
-
-/** Called when the server rejects the session, so the app can sign out. */
-let onUnauthorized: (() => void) | null = null;
-export const setUnauthorizedHandler = (fn: (() => void) | null) => { onUnauthorized = fn; };
 
 export function createQueryClient() {
   return new QueryClient({
@@ -34,20 +25,30 @@ export function createQueryClient() {
   });
 }
 
+/** Sends the request with a current access token; if the server rejects it,
+    renews once and retries — so an expired token never surfaces as an error. */
+async function authorisedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const token = await freshAccessToken();
+  const withToken = (t: string | null): RequestInit => {
+    const headers = new Headers(init?.headers);
+    if (t) headers.set("x-auth-token", t); else headers.delete("x-auth-token");
+    return { ...init, headers };
+  };
+  const res = await globalThis.fetch(input, withToken(token));
+  if (res.status === 401 && currentSession()?.refreshToken) {
+    const renewed = await renew();
+    if (renewed && renewed !== token) return globalThis.fetch(input, withToken(renewed));
+  }
+  return res;
+}
+
 export function createTrpcClient() {
   return trpc.createClient({
     links: [
       httpBatchLink({
         url: `${API_URL}/api/trpc`,
         transformer: superjson,
-        headers() {
-          return authToken ? { "x-auth-token": authToken } : {};
-        },
-        async fetch(input, init) {
-          const res = await globalThis.fetch(input, init);
-          if (res.status === 401 && authToken) onUnauthorized?.();
-          return res;
-        },
+        fetch: authorisedFetch,
       }),
     ],
   });
@@ -55,13 +56,8 @@ export function createTrpcClient() {
 
 /** Plain REST calls for the few endpoints outside tRPC (e.g. the card snapshot). */
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await globalThis.fetch(`${API_URL}${path}`, {
-    headers: authToken ? { "x-auth-token": authToken } : {},
-  });
-  if (res.status === 401) {
-    if (authToken) onUnauthorized?.();
-    throw new Error("Your session has ended. Please sign in again.");
-  }
+  const res = await authorisedFetch(`${API_URL}${path}`);
+  if (res.status === 401) throw new Error("Your session has ended. Please sign in again.");
   if (!res.ok) throw new Error(`Couldn't load (${res.status}). Pull down to try again.`);
   return (await res.json()) as T;
 }
@@ -73,6 +69,12 @@ export function errorMessage(error: unknown, fallback = "Something went wrong. P
   if (/Network request failed|Failed to fetch|NetworkError/i.test(e.message || "")) {
     return "No internet connection. Check your data or Wi-Fi and try again.";
   }
-  if (e.message && !/^[A-Z_]+$/.test(e.message) && e.message.length < 200) return e.message;
+  if (e.message && !/^[A-Z_]+$/.test(e.message) && e.message.length < 200) {
+    // Server messages may carry a machine prefix ("SNAPSHOT_STALE: …").
+    return e.message.replace(/^[A-Z_]+:\s*/, "");
+  }
   return fallback;
 }
+
+/** Machine prefix of a server error message, e.g. "SNAPSHOT_STALE". */
+export const errorTag = (error: unknown) => (String((error as { message?: string })?.message || "").match(/^([A-Z_]+):/)?.[1] ?? null);

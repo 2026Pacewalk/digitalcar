@@ -307,6 +307,7 @@ app.post("/api/enquiry", async (c) => {
     if (!name) return c.json({ ok: false, error: "Name required" }, 400);
 
     // Best-effort DB storage (only if the slug maps to a card).
+    let pushOwnerId: number | null = null;
     try {
       const { getDb } = await import("./queries/connection");
       const { cards, leads, publishedCards, cardEvents } = await import("@db/schema");
@@ -314,6 +315,7 @@ app.post("/api/enquiry", async (c) => {
       const db = getDb();
       const card = await db.query.cards.findFirst({ where: eq(cards.slug, slug) });
       if (card) {
+        pushOwnerId = card.userId;
         await db.insert(leads).values({
           cardId: card.id, userId: card.userId, fullName: name,
           email: body.email || null, phone: body.contact || null,
@@ -325,6 +327,7 @@ app.post("/api/enquiry", async (c) => {
         // (no DB card row, so cardId is null) — it still shows in their CRM.
         const pc = await db.select({ userId: publishedCards.userId }).from(publishedCards).where(eq(publishedCards.slug, slug));
         if (pc[0]) {
+          pushOwnerId = pc[0].userId;
           await db.insert(leads).values({
             userId: pc[0].userId, fullName: name,
             email: body.email || null, phone: body.contact || null,
@@ -338,7 +341,29 @@ app.post("/api/enquiry", async (c) => {
     }
 
     const { sendLeadNotification, sendEmail } = await import("./lib/mail");
-    await sendLeadNotification({ name, email: body.email, contact: body.contact, message: body.description, slug });
+    const verdict = await sendLeadNotification({ name, email: body.email, contact: body.contact, message: body.description, slug });
+
+    /* Tell the card owner on their phone (DigitalCarda app). Enquiries the
+       triage marks as spam don't buzz anyone. Not awaited: the visitor's
+       "sent" confirmation never waits on a push. */
+    if (pushOwnerId && verdict !== "spam") {
+      const ownerId = pushOwnerId;
+      void (async () => {
+        const { getDb } = await import("./queries/connection");
+        const { leads } = await import("@db/schema");
+        const { and, desc, eq } = await import("drizzle-orm");
+        const latest = await getDb().select({ id: leads.id }).from(leads)
+          .where(and(eq(leads.userId, ownerId), eq(leads.fullName, name))).orderBy(desc(leads.id)).limit(1);
+        const { pushToUser } = await import("./lib/push");
+        const snippet = String(body.description || body.contact || body.email || "").replace(/\s+/g, " ").trim();
+        await pushToUser(ownerId, {
+          title: `${verdict === "important" ? "🔥 " : ""}New enquiry from ${name}`,
+          body: snippet ? (snippet.length > 140 ? `${snippet.slice(0, 139)}…` : snippet) : "Open DigitalCarda to reply.",
+          data: { type: "lead", leadId: latest[0]?.id ?? null },
+          channelId: "leads",
+        });
+      })().catch((e) => console.error("[enquiry] push skipped:", (e as Error).message));
+    }
 
     /* Reply to the VISITOR on the card owner's behalf. Until now only the owner
        was emailed, so whoever filled the form heard nothing back and our
@@ -426,6 +451,69 @@ if (process.env.NODE_ENV === "production") {
   setTimeout(runIfDue, 45_000);              // shortly after boot
   setInterval(runIfDue, 6 * 60 * 60 * 1000); // and every 6 hours
 }
+
+// Mobile app tables: device sessions, push tokens, account deletion requests.
+// Idempotent and additive, like the other boot-time ensures below.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS app_sessions (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        user_id bigint unsigned NOT NULL,
+        token_hash varchar(64) NOT NULL,
+        prev_token_hash varchar(64) NULL,
+        platform varchar(16) NOT NULL DEFAULT 'unknown',
+        device_name varchar(120) NULL,
+        app_version varchar(32) NULL,
+        last_used_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expires_at timestamp NOT NULL,
+        revoked_at timestamp NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY app_sessions_token_hash_unique (token_hash),
+        KEY app_sessions_prev_hash_idx (prev_token_hash),
+        KEY app_sessions_user_idx (user_id)
+      )
+    `));
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        user_id bigint unsigned NOT NULL,
+        session_id bigint unsigned NULL,
+        token varchar(255) NOT NULL,
+        platform varchar(16) NOT NULL DEFAULT 'unknown',
+        disabled_at timestamp NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY push_tokens_token_unique (token),
+        KEY push_tokens_user_idx (user_id)
+      )
+    `));
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS account_deletion_requests (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        user_id bigint unsigned NOT NULL,
+        email varchar(255) NOT NULL,
+        reason varchar(500) NULL,
+        source varchar(16) NOT NULL DEFAULT 'app',
+        status enum('pending','cancelled','completed') NOT NULL DEFAULT 'pending',
+        scheduled_for timestamp NOT NULL,
+        completed_at timestamp NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY adr_user_idx (user_id),
+        KEY adr_status_idx (status)
+      )
+    `));
+    console.log("[schema] app_sessions, push_tokens, account_deletion_requests ensured");
+  } catch (e) {
+    console.error("[schema] ensure mobile app tables failed:", (e as Error).message);
+  }
+})();
 
 // One-time, idempotent schema ensure for the custom_domains table — lets the
 // custom-domains module go live without manual SQL access. Runs with the app's

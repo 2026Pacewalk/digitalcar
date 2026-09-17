@@ -26,6 +26,7 @@ import { nfcRouter } from "./nfc-router";
 import { couponRouter } from "./coupon-router";
 import { announcementRouter } from "./announcement-router";
 import { resellerLedgerRouter } from "./reseller-ledger-router";
+import { mobileRouter } from "./mobile-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -58,6 +59,7 @@ export const appRouter = createRouter({
   coupon: couponRouter,
   announcement: announcementRouter,
   resellerLedger: resellerLedgerRouter,
+  mobile: mobileRouter,
 });
 
 export type AppRouter = typeof appRouter;
