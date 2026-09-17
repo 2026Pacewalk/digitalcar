@@ -1,7 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { useState, useSyncExternalStore } from "react";
+import { createContext, useContext, useState, useSyncExternalStore } from "react";
 import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, ChevronUp, ChevronDown, Move, ExternalLink } from "lucide-react";
 import { fileToDataUrl, useCustomer, scopedKey } from "@/hooks/useCustomer";
 import ImageAdjuster, { type AdjustOptions } from "@/components/customer/ImageAdjuster";
@@ -111,7 +111,43 @@ export function LimitBar({ used, limit, unit = "items" }: { used: number; limit:
   );
 }
 
-export function Panel({ title, subtitle, children, right, icon: Icon }: { title: string; subtitle?: string; children: ReactNode; right?: ReactNode; icon?: React.ComponentType<{ size?: number; className?: string }> }) {
+/* Inside a surface that is already a box (the Card Builder's editor panel),
+   Panels drop their own box and become plain sections split by a hairline, so
+   the editor reads as ONE box instead of boxes inside a box. */
+const PanelFlatContext = createContext(false);
+export function PanelFlat({ children }: { children: ReactNode }) {
+  return <PanelFlatContext.Provider value={true}>{children}</PanelFlatContext.Provider>;
+}
+
+export function Panel({ title, subtitle, children, right, icon: Icon, hideTitleWhenFlat }: {
+  title: string; subtitle?: string; children: ReactNode; right?: ReactNode;
+  icon?: React.ComponentType<{ size?: number; className?: string }>;
+  /** When flat, skip the heading (e.g. it repeats the surrounding panel's title). */
+  hideTitleWhenFlat?: boolean;
+}) {
+  const flat = useContext(PanelFlatContext);
+  if (flat) {
+    const showTitle = !hideTitleWhenFlat;
+    return (
+      <section className="border-t border-[#F1F5F9] pt-5 first:border-t-0 first:pt-0">
+        {(showTitle || right) && (
+          <div className={`flex items-center gap-3 mb-3.5 ${showTitle ? "justify-between" : "justify-end"}`}>
+            {showTitle && (
+              <div className="flex items-center gap-2.5 min-w-0">
+                {Icon && <span className="w-8 h-8 rounded-xl bg-[#FEF3C7] flex items-center justify-center shrink-0"><Icon size={15} className="text-[#B45309]" /></span>}
+                <div className="min-w-0">
+                  <h3 className="text-[13px] font-semibold text-[#0F172A] truncate">{title}</h3>
+                  {subtitle && <p className="text-[11px] text-[#94A3B8] mt-0.5 truncate">{subtitle}</p>}
+                </div>
+              </div>
+            )}
+            {right}
+          </div>
+        )}
+        {children}
+      </section>
+    );
+  }
   return (
     <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] overflow-hidden transition-shadow hover:shadow-premium-lg">
       <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#F1F5F9]">

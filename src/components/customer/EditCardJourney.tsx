@@ -149,7 +149,7 @@ export function JourneyContinue() {
           <button type="button" onClick={() => navigate(prev.path)} className="inline-flex items-center gap-1.5 h-11 px-4 rounded-xl border border-[#E2E8F0] bg-white text-[13px] font-semibold text-[#475569] hover:bg-[#F8FAFC] active:scale-[0.98] transition-all">
             <ChevronLeft size={16} /> <span className="hidden sm:inline">{prev.short}</span><span className="sm:hidden">Back</span>
           </button>
-        ) : <span className="hidden sm:block" />}
+        ) : null}
 
         {last ? (
           <button type="button" onClick={() => navigate("/dashboard/view")} className="flex-1 inline-flex items-center justify-center gap-2 h-11 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold hover:shadow-gold active:scale-[0.98] transition-all">

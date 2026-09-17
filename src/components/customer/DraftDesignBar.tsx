@@ -1,15 +1,31 @@
 /* The bar above the phone preview while a template is being tried:
    "Previewing Indigo" with Cancel and Apply. Renders nothing otherwise.
-   Desktop only — on phones the Templates editor keeps its bottom Apply bar,
-   because the preview isn't beside the list there. */
+   Desktop only. Wherever it isn't on screen, the Templates editor shows its
+   bottom Apply bar instead (see reportDraftBar). */
+import { useLayoutEffect, useRef } from "react";
 import { Check, Eye, X } from "lucide-react";
-import { useDesignDraft } from "@/lib/designDraft";
+import { reportDraftBar, useDesignDraft } from "@/lib/designDraft";
 
 export default function DraftDesignBar({ className = "" }: { className?: string }) {
   const draft = useDesignDraft();
+  const ref = useRef<HTMLDivElement>(null);
+  const self = useRef({}).current;
+  const hasDraft = !!draft;
+  // Tell the editor whether this bar is really visible: it has no boxes while it
+  // or a parent is display:none, and the observer fires whenever that flips.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) { reportDraftBar(self, false); return; }
+    const check = () => reportDraftBar(self, el.getClientRects().length > 0);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => { ro.disconnect(); reportDraftBar(self, false); };
+  }, [hasDraft, self]);
   if (!draft) return null;
   return (
     <div
+      ref={ref}
       role="status"
       aria-live="polite"
       className={`hidden lg:flex items-center gap-2 rounded-2xl bg-[#0F172A] pl-3 pr-1.5 py-1.5 shadow-premium-lg ring-1 ring-black/5 dc-enter ${className}`}

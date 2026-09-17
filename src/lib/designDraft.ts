@@ -35,6 +35,29 @@ export function setDesignDraft(owner: object, next: DesignDraft | null) {
   listeners.forEach((l) => l());
 }
 
+/* Whether any Apply / Cancel bar above a phone preview is actually ON SCREEN.
+   Not every layout shows one (below lg, or the Templates page between lg and xl
+   with its preview collapsed), and the editor's own bottom Apply bar fills in
+   exactly then — so there is always one way to apply, never two. */
+const shownBars = new Set<object>();
+let barShown = false;
+
+export function reportDraftBar(bar: object, shown: boolean) {
+  if (shown) shownBars.add(bar); else shownBars.delete(bar);
+  const next = shownBars.size > 0;
+  if (next === barShown) return;
+  barShown = next;
+  listeners.forEach((l) => l());
+}
+
+export function useDraftBarShown(): boolean {
+  return useSyncExternalStore(
+    (cb) => { listeners.add(cb); return () => { listeners.delete(cb); }; },
+    () => barShown,
+    () => false,
+  );
+}
+
 export function useDesignDraft(): DesignDraft | null {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => { listeners.delete(cb); }; },

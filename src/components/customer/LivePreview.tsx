@@ -6,6 +6,7 @@ import { buildCardHtml } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
 import { useDesignDraft } from "@/lib/designDraft";
 import DraftDesignBar from "@/components/customer/DraftDesignBar";
+import PhoneMockup from "@/components/customer/PhoneMockup";
 
 /* Live card preview for every Edit Card module page.
 
@@ -119,13 +120,10 @@ export default function LivePreview({ height = 620, frame = true }: { height?: n
   return (
     <div>
       <DraftDesignBar className="mb-3" />
-      <div className="relative rounded-[42px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-[9px] shadow-premium-lg ring-1 ring-black/5">
-        <div className="absolute top-[9px] left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 h-6 px-4 rounded-b-2xl bg-[#0F172A]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#334155]" />
-          <span className="w-12 h-1 rounded-full bg-[#334155]" />
-        </div>
-        {iframe}
-      </div>
+      <PhoneMockup html={html} screenStyle={{ height }} frameRef={frameRef}
+        onLoad={(e: SyntheticEvent<HTMLIFrameElement>) => {
+          try { e.currentTarget.contentWindow?.scrollTo(0, scrollRef.current); } catch { /* guard */ }
+        }} />
       <div className="flex items-center justify-center gap-3 mt-2.5 text-[11px]">
         <span className="inline-flex items-center gap-1.5 text-emerald-600 font-semibold">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Live preview

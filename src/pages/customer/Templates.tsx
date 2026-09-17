@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router";
-import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil, Lock, ChevronLeft, ChevronRight } from "lucide-react";
+import { useSearchParams, useNavigate } from "react-router";
+import { LayoutGrid, Check, Eye, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil, Lock, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, getActiveCardId, scopedKey } from "@/hooks/useCustomer";
@@ -8,7 +8,7 @@ import { contentSeeder } from "@/lib/cardContent";
 import { brandSecondaryFor } from "@/lib/brandColors";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
-import { setDesignDraft } from "@/lib/designDraft";
+import { setDesignDraft, useDraftBarShown } from "@/lib/designDraft";
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const PRIMARY_SW = ["#F7B31C", "#3B82F6", "#16A34A", "#A21CAF", "#EF4444", "#06B6D4", "#F97316", "#EC4899", "#6366F1", "#0F172A"];
@@ -271,6 +271,9 @@ export function TemplatesEditor() {
     syncEdge();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cat, presets.length, selId === null]);
+  // Apply lives in the bar above the phone; the bottom bar covers every layout
+  // where that bar isn't on screen.
+  const phoneBarShown = useDraftBarShown();
   const page = (dir: 1 | -1) => {
     const el = stripRef.current; if (!el) return;
     el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: "smooth" });
@@ -278,11 +281,8 @@ export function TemplatesEditor() {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <div className="flex items-center justify-end gap-2"><button onClick={apply} disabled={!dirty || !selected} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-50"><Save size={16} /> {dirty ? "Apply" : "Applied"}</button></div>
-
       {/* Gallery of prebuilt templates — each shown in its OWN colours */}
-      <Panel title="Choose a template" subtitle={`${presets.length} ready-made designs, previewed with your details`}
-        right={<Link to="/dashboard/view" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#14243E] hover:bg-[#F8FAFC]"><Eye size={13} /> Preview</Link>}>
+      <Panel title="Choose a template" subtitle={`${presets.length} ready-made designs, previewed with your details`} hideTitleWhenFlat>
         {hasBrand && (
           <div className="mb-4 flex items-center justify-between gap-3 flex-wrap rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-3 py-2.5">
             <div className="flex items-center gap-2 min-w-0">
@@ -394,11 +394,12 @@ export function TemplatesEditor() {
         </Panel>
       )}
 
-      {/* Sticky Preview + Apply bar for phones/tablets — it sits ABOVE the bottom
-          tab-bar (h-16 + safe area). On desktop the picked template shows in the
-          phone preview, with Apply / Cancel above it (DraftDesignBar). */}
-      {dirty && selected && (
-        <div className="lg:hidden fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))]">
+      {/* Sticky Preview + Apply bar — shown whenever there's no Apply / Cancel bar
+          above a phone preview on screen (phones, tablets, and desktop layouts whose
+          preview is collapsed). On mobile it sits ABOVE the bottom tab-bar (h-16 +
+          safe area); on desktop (no bottom nav) it drops to the bottom edge. */}
+      {dirty && selected && !phoneBarShown && (
+        <div className="fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] lg:bottom-4">
           <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 bg-white/95 backdrop-blur rounded-2xl shadow-premium-lg border border-[#E2E8F0] pl-3.5 pr-2 py-2">
             <span className="hidden sm:flex items-center gap-2 pr-1">
               <span className="w-3.5 h-3.5 rounded-full border border-black/10" style={{ background: effPrimary }} />

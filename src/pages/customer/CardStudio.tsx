@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import {
@@ -7,7 +7,7 @@ import {
   Image as ImageIcon, LayoutGrid, Sparkles, Circle, Square, Briefcase,
   Share2, ShoppingBag, Wallet, Star, Upload, ChevronLeft,
 } from "lucide-react";
-import ModuleShell, { Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
+import ModuleShell, { PanelFlat, Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
 import { useCustomer, useLocalList, getActiveCardId, scopedKey } from "@/hooks/useCustomer";
 import { useValidityDays } from "@/hooks/useValidityDays";
@@ -15,6 +15,7 @@ import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml, isLinkBio } from "@/card-template/buildCard";
 import { useDesignDraft } from "@/lib/designDraft";
 import DraftDesignBar from "@/components/customer/DraftDesignBar";
+import PhoneMockup from "@/components/customer/PhoneMockup";
 import { BG_PRESETS } from "@/card-template/cardBackground";
 import SectionArranger from "@/components/customer/SectionArranger";
 import { TemplatesEditor } from "@/pages/customer/Templates";
@@ -84,7 +85,8 @@ export default function CardStudio() {
   const [realViews, setRealViews] = useState<number | null>(null);
   const timer = useRef<number | null>(null);
   const formRef = useRef(form); formRef.current = form;
-  const previewRef = useRef<HTMLIFrameElement>(null);
+  const previewRef = useRef<HTMLIFrameElement>(null);        // desktop phone
+  const mobilePreviewRef = useRef<HTMLIFrameElement>(null);  // phone-size canvas
   const savedScrollRef = useRef(0);
   const previewThemeRef = useRef<string | null>(null);
 
@@ -117,7 +119,9 @@ export default function CardStudio() {
         savedScrollRef.current = 0;
       } else {
         try {
-          const y = previewRef.current?.contentWindow?.scrollY;
+          // Read from whichever phone is on screen (the other one is display:none).
+          const frame = previewRef.current?.getClientRects().length ? previewRef.current : mobilePreviewRef.current;
+          const y = frame?.contentWindow?.scrollY;
           if (typeof y === "number") savedScrollRef.current = y; // 0 (the top) is a real position too
         } catch { /* cross-origin guard */ }
       }
@@ -625,16 +629,14 @@ export default function CardStudio() {
   const openTool = (k: ToolKey) => { setActiveTool(k); setSheetGroup(Math.max(0, groupOf(k))); setSheetView("tool"); setSheetOpen(true); };
   const ActiveIcon = active.icon;
 
-  const phoneMock = (h: number, ref?: RefObject<HTMLIFrameElement | null>) => (
-    <div className="relative rounded-[44px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-[9px] shadow-premium-lg ring-1 ring-black/5">
-      <div className="absolute top-[9px] left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 h-6 px-4 rounded-b-2xl bg-[#0F172A]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#334155]" />
-        <span className="w-12 h-1 rounded-full bg-[#334155]" />
-      </div>
-      <iframe {...(ref ? { ref, onLoad: (e: SyntheticEvent<HTMLIFrameElement>) => { try { (e.currentTarget.contentWindow)?.scrollTo(0, savedScrollRef.current); } catch { /* guard */ } } } : {})}
-        srcDoc={previewHtml} title="Live preview" className="w-full rounded-[34px] bg-white border-0 block" style={{ height: h }} />
-    </div>
+  const phoneMock = (screen: CSSProperties, ref: RefObject<HTMLIFrameElement | null>) => (
+    <PhoneMockup html={previewHtml} screenStyle={screen} frameRef={ref}
+      onLoad={(e: SyntheticEvent<HTMLIFrameElement>) => { try { e.currentTarget.contentWindow?.scrollTo(0, savedScrollRef.current); } catch { /* guard */ } }} />
   );
+  // On phones the mockup takes a real phone's shape and fits the screen between
+  // the header and the two bottom bars, so the whole card screen is visible.
+  const MOBILE_SCREEN_H = "clamp(440px, calc(100dvh - 230px), 700px)";
+  const mobileScreen: CSSProperties = { height: MOBILE_SCREEN_H, width: `min(calc(${MOBILE_SCREEN_H} * 0.513), calc(100vw - 58px))` };
 
   return (
     <ModuleShell title="Card Builder" subtitle="Design your card — updates live" icon={Wand2} preview={false} wide
@@ -702,10 +704,10 @@ export default function CardStudio() {
         </nav>
 
         {/* Editor column */}
-        <div className="order-2 lg:order-1 min-w-0 space-y-4 pb-24 lg:pb-0">
+        <div className="order-2 lg:order-1 min-w-0 space-y-4 lg:space-y-0 pb-24 lg:pb-0">
           {/* Mobile canvas -- always visible while you edit */}
           <div className="lg:hidden">
-            <div className="mx-auto w-full max-w-[360px]">{phoneMock(440)}</div>
+            <div className="mx-auto w-fit max-w-full">{phoneMock(mobileScreen, mobilePreviewRef)}</div>
             <div className="flex items-center justify-center gap-2 mt-2">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Updates as you edit</span>
               <span className="text-[#CBD5E1]">.</span>
@@ -722,14 +724,14 @@ export default function CardStudio() {
                 <p className="text-[11px] text-[#94A3B8] truncate">{TOOL_HINT[active.key]}</p>
               </div>
             </div>
-            {active.render()}
+            <PanelFlat>{active.render()}</PanelFlat>
           </div>
         </div>
 
         {/* Desktop sticky preview */}
         <div className="hidden lg:block order-1 lg:order-2 sticky top-[100px]">
           <DraftDesignBar className="mx-auto mb-3 max-w-[400px]" />
-          <div className="mx-auto w-full max-w-[400px]">{phoneMock(700, previewRef)}</div>
+          <div className="mx-auto w-full max-w-[400px]">{phoneMock({ height: 700 }, previewRef)}</div>
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live preview</span>
             <span className="text-[#CBD5E1]">.</span>
