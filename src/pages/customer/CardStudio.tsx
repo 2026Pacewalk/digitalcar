@@ -12,7 +12,7 @@ import PublishModal from "@/components/customer/PublishModal";
 import { useCustomer, useLocalList, getActiveCardId, scopedKey } from "@/hooks/useCustomer";
 import { useValidityDays } from "@/hooks/useValidityDays";
 import { contentSeeder } from "@/lib/cardContent";
-import { buildCardHtml } from "@/card-template/buildCard";
+import { buildCardHtml, isLinkBio } from "@/card-template/buildCard";
 import { BG_PRESETS } from "@/card-template/cardBackground";
 import SectionArranger from "@/components/customer/SectionArranger";
 import { TemplatesEditor } from "@/pages/customer/Templates";
@@ -390,68 +390,165 @@ export default function CardStudio() {
     </div>
   );
 
+  /* Background — explained up front. Custom backgrounds only render on the
+     link-in-bio templates (full-page and premium designs paint their own), so
+     the panel says whether the CURRENT template supports it before anything
+     else, and offers a one-tap route to templates that do. Choices are cards
+     with a mini preview and a plain-language line, not bare tab labels. */
   const renderBackground = () => {
     const bgType = val("bg_type") || "theme";
-    const TYPES = [["theme", "Template"], ["preset", "Presets"], ["solid", "Solid"], ["gradient", "Gradient"], ["image", "Photo"]] as const;
+    const supported = isLinkBio(Number(val("theme")) || 1);
     const setType = (t: string) => set("bg_type", t === "theme" ? "" : t);
-    const slider = (k: string, label: string, min: number, max: number, def: number, suffix: string) => (
+    const c1 = val("bg_color1"), c2 = val("bg_color2");
+    const preset = BG_PRESETS.find((p) => p.key === val("bg_preset"));
+    const OPTIONS: { t: string; label: string; desc: string; swatch: string; photo?: boolean }[] = [
+      { t: "theme", label: "Template default", desc: "Keep the design's own look", swatch: "linear-gradient(135deg,#F8FAFC 0 50%,#E2E8F0 50% 100%)" },
+      { t: "preset", label: "Ready-made", desc: "Pick a designed gradient", swatch: (preset || BG_PRESETS[1]).bg },
+      { t: "solid", label: "One colour", desc: "A single flat colour", swatch: c1 || "#0F172A" },
+      { t: "gradient", label: "Two-colour blend", desc: "Mix two colours", swatch: `linear-gradient(${Number(val("bg_angle") || 160)}deg, ${c1 || "#6d28d9"}, ${c2 || "#db2777"})` },
+      { t: "image", label: "My photo", desc: "Upload your own image", swatch: val("bg_image") ? `center/cover no-repeat url("${val("bg_image").replace(/["\\]/g, "")}")` : "linear-gradient(135deg,#FDE68A,#F59E0B)", photo: !val("bg_image") },
+    ];
+    const current = OPTIONS.find((o) => o.t === bgType) || OPTIONS[0];
+    const currentDetail = bgType === "preset" ? (preset?.label || "none picked yet") : "";
+    const slider = (k: string, label: string, hint: string, min: number, max: number, def: number, suffix: string) => (
       <div>
-        <div className="flex items-center justify-between mb-1"><span className="text-[11px] font-medium text-[#64748B]">{label}</span><span className="text-[11px] tabular-nums text-[#94A3B8]">{val(k) || def}{suffix}</span></div>
-        <input type="range" min={min} max={max} value={Number(val(k) || def)} onChange={(e) => set(k, e.target.value)} className="w-full accent-[#F7B31C]" />
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[12px] font-semibold text-[#334155]">{label} <span className="font-normal text-[#94A3B8]">— {hint}</span></span>
+          <span className="text-[11px] tabular-nums text-[#64748B] bg-[#F1F5F9] rounded-md px-1.5 py-0.5">{val(k) || def}{suffix}</span>
+        </div>
+        <input type="range" min={min} max={max} value={Number(val(k) || def)} onChange={(e) => set(k, e.target.value)} aria-label={label} className="w-full accent-[#F7B31C]" />
       </div>
     );
+    const Step = ({ n, children }: { n: number; children: ReactNode }) => (
+      <p className="flex items-center gap-2 text-[12px] font-bold text-[#0F172A]">
+        <span className="w-5 h-5 rounded-full bg-[#0F172A] text-white text-[10px] flex items-center justify-center">{n}</span>{children}
+      </p>
+    );
+
     return (
-      <div className="space-y-4">
-        <div className="flex flex-wrap gap-1.5">
-          {TYPES.map(([t, label]) => (
-            <button key={t} type="button" onClick={() => setType(t)} className={`px-3 h-8 rounded-lg text-[12px] font-semibold transition-colors ${bgType === t ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>{label}</button>
-          ))}
+      <div className="space-y-5">
+        {/* 1 — does this template support it? */}
+        {supported ? (
+          <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+            <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><Check size={16} /></span>
+            <div>
+              <p className="text-[13px] font-semibold text-emerald-900">Your template supports custom backgrounds</p>
+              <p className="text-[12px] text-emerald-800/80 mt-0.5">Pick one below — text and buttons adjust automatically so they stay readable.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-[#FFFBEB] border border-[#FDE68A] px-4 py-3.5">
+            <div className="flex items-start gap-3">
+              <span className="w-8 h-8 rounded-xl bg-[#FEF3C7] text-[#B45309] flex items-center justify-center shrink-0"><Info size={16} /></span>
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-[#78350F]">Your current template has its own background</p>
+                <p className="text-[12px] text-[#92400E] mt-0.5 leading-relaxed">
+                  Custom backgrounds show only on <b>Link-in-bio</b> templates. You can still choose one now — it will appear when you switch to a Link-in-bio design.
+                </p>
+                <button type="button" onClick={() => openTool("templates")} className="mt-2.5 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-[#0F172A] text-white text-[12px] font-semibold hover:bg-[#1E293B] transition-colors">
+                  <LayoutGrid size={13} /> See Link-in-bio templates <ChevronRight size={13} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Current choice, always visible */}
+        <div className="flex items-center gap-3 rounded-2xl border border-[#E2E8F0] bg-white px-3.5 py-3">
+          <span className="w-10 h-10 rounded-xl ring-1 ring-black/5 shrink-0" style={{ background: current.swatch, backgroundSize: "cover" }} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] text-[#94A3B8]">Currently using</p>
+            <p className="text-[13px] font-semibold text-[#0F172A] truncate">{current.label}{currentDetail ? ` · ${currentDetail}` : ""}</p>
+          </div>
+          {bgType !== "theme" && (
+            <button type="button" onClick={() => setType("theme")} className="h-9 px-3 rounded-xl text-[12px] font-semibold text-[#64748B] hover:bg-[#F1F5F9] transition-colors">Reset</button>
+          )}
         </div>
-        {bgType === "theme" && <Note>Using the template's built-in background. Pick another option above to customise it.</Note>}
-        {bgType === "preset" && (
-          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
-            {BG_PRESETS.map((p) => {
-              const active = val("bg_preset") === p.key;
+
+        {/* 2 — choose a style */}
+        <div className="space-y-2.5">
+          <Step n={1}>Choose a background style</Step>
+          <div role="radiogroup" aria-label="Background style" className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {OPTIONS.map((o) => {
+              const on = bgType === o.t;
               return (
-                <button key={p.key} type="button" onClick={() => set("bg_preset", p.key)} title={p.label} className={`group relative rounded-xl overflow-hidden aspect-square ring-2 transition-all ${active ? "ring-[#0F172A] scale-[1.03]" : "ring-transparent hover:ring-[#CBD5E1]"}`}>
-                  <span className="absolute inset-0" style={{ background: p.bg, backgroundSize: "cover" }} />
-                  {active && <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center"><Check size={11} className="text-[#0F172A]" /></span>}
+                <button key={o.t} type="button" role="radio" aria-checked={on} onClick={() => setType(o.t)}
+                  className={`relative text-left rounded-2xl p-2.5 border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] ${on ? "border-[#0F172A] bg-white shadow-premium" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}>
+                  <span className="block h-14 rounded-xl ring-1 ring-black/5 relative overflow-hidden" style={{ background: o.swatch, backgroundSize: "cover" }}>
+                    {o.photo && <ImageIcon size={18} className="absolute inset-0 m-auto text-white/90" />}
+                  </span>
+                  <span className="block mt-2 text-[12.5px] font-semibold text-[#0F172A] leading-tight">{o.label}</span>
+                  <span className="block text-[11px] text-[#64748B] leading-snug">{o.desc}</span>
+                  {on && <span className="absolute top-3.5 right-3.5 w-5 h-5 rounded-full bg-[#0F172A] text-white flex items-center justify-center"><Check size={12} /></span>}
                 </button>
               );
             })}
           </div>
-        )}
-        {bgType === "solid" && (
-          <div className="flex items-center gap-3">
-            <input type="color" value={val("bg_color1") || "#0F172A"} onChange={(e) => set("bg_color1", e.target.value)} className="w-12 h-10 rounded-lg border border-[#E2E8F0] bg-white cursor-pointer p-1" />
-            <div className="flex flex-wrap gap-1.5">
-              {COLORS.map((c) => (
-                <button key={c} type="button" onClick={() => set("bg_color1", c)} className={`w-8 h-8 rounded-lg ring-2 transition-all ${(val("bg_color1") || "").toLowerCase() === c.toLowerCase() ? "ring-[#0F172A] scale-110" : "ring-transparent"}`} style={{ background: c }} aria-label={c} />
-              ))}
-            </div>
+        </div>
+
+        {/* 3 — options for the chosen style */}
+        {bgType !== "theme" && (
+          <div className="space-y-3 rounded-2xl bg-[#F8FAFC] border border-[#EEF2F7] p-3.5">
+            <Step n={2}>{bgType === "preset" ? "Pick a design" : bgType === "solid" ? "Pick a colour" : bgType === "gradient" ? "Set the two colours" : "Upload & adjust your photo"}</Step>
+
+            {bgType === "preset" && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                {BG_PRESETS.map((p) => {
+                  const on = val("bg_preset") === p.key;
+                  return (
+                    <button key={p.key} type="button" onClick={() => set("bg_preset", p.key)} aria-pressed={on} className="group text-center focus-visible:outline-none">
+                      <span className={`relative block rounded-xl overflow-hidden aspect-square ring-2 transition-all group-focus-visible:ring-[#F7B31C] ${on ? "ring-[#0F172A] scale-[1.03]" : "ring-transparent group-hover:ring-[#CBD5E1]"}`}>
+                        <span className="absolute inset-0" style={{ background: p.bg, backgroundSize: "cover" }} />
+                        {on && <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-white flex items-center justify-center"><Check size={12} className="text-[#0F172A]" /></span>}
+                      </span>
+                      <span className={`block mt-1 text-[10.5px] leading-tight ${on ? "font-semibold text-[#0F172A]" : "text-[#64748B]"}`}>{p.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {bgType === "solid" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl border border-[#E2E8F0] bg-white text-[12px] font-medium text-[#334155] cursor-pointer">
+                  <input type="color" value={c1 || "#0F172A"} onChange={(e) => set("bg_color1", e.target.value)} className="w-8 h-8 rounded-lg border-0 bg-transparent cursor-pointer p-0" />
+                  Any colour
+                </label>
+                {COLORS.map((c) => (
+                  <button key={c} type="button" onClick={() => set("bg_color1", c)} className={`w-9 h-9 rounded-xl ring-2 ring-offset-2 transition-all ${(c1 || "").toLowerCase() === c.toLowerCase() ? "ring-[#0F172A]" : "ring-transparent hover:ring-[#CBD5E1]"}`} style={{ background: c }} aria-label={`Use colour ${c}`} />
+                ))}
+              </div>
+            )}
+
+            {bgType === "gradient" && (
+              <div className="space-y-3">
+                <div className="h-16 rounded-xl ring-1 ring-black/5" style={{ background: `linear-gradient(${Number(val("bg_angle") || 160)}deg, ${c1 || "#6d28d9"} 0%, ${c2 || "#db2777"} 100%)` }} />
+                <div className="flex flex-wrap items-center gap-2">
+                  {([["bg_color1", "First colour", c1 || "#6d28d9"], ["bg_color2", "Second colour", c2 || "#db2777"]] as const).map(([k, label, v]) => (
+                    <label key={k} className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl border border-[#E2E8F0] bg-white text-[12px] font-medium text-[#334155] cursor-pointer">
+                      <input type="color" value={v} onChange={(e) => set(k, e.target.value)} className="w-8 h-8 rounded-lg border-0 bg-transparent cursor-pointer p-0" />{label}
+                    </label>
+                  ))}
+                  <button type="button" onClick={() => { set("bg_color1", c2 || "#db2777"); set("bg_color2", c1 || "#6d28d9"); }} className="h-10 px-3 rounded-xl text-[12px] font-semibold text-[#475569] border border-[#E2E8F0] bg-white hover:bg-[#F1F5F9]">⇄ Swap</button>
+                </div>
+                {slider("bg_angle", "Direction", "which way the colours blend", 0, 360, 160, "°")}
+              </div>
+            )}
+
+            {bgType === "image" && (
+              <div className="flex flex-col sm:flex-row gap-4">
+                <ImagePick value={val("bg_image")} onChange={(u) => set("bg_image", u)} className="w-24 h-32" label="Upload photo" fit="cover" />
+                <div className="flex-1 space-y-3 min-w-0">
+                  {slider("bg_dim", "Darken", "keeps text readable", 0, 80, 35, "%")}
+                  {slider("bg_blur", "Blur", "softens a busy photo", 0, 24, 0, "px")}
+                  <p className="text-[11px] text-[#64748B]">Tip: a portrait photo works best. Around 30–40% darken keeps your name easy to read.</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
-        {bgType === "gradient" && (
-          <div className="space-y-3">
-            <div className="h-16 rounded-xl border border-[#E2E8F0]" style={{ background: `linear-gradient(${Number(val("bg_angle") || 160)}deg, ${val("bg_color1") || "#6d28d9"} 0%, ${val("bg_color2") || "#db2777"} 100%)` }} />
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-[11px] font-medium text-[#64748B]">Start <input type="color" value={val("bg_color1") || "#6d28d9"} onChange={(e) => set("bg_color1", e.target.value)} className="w-10 h-9 rounded-lg border border-[#E2E8F0] bg-white cursor-pointer p-1" /></label>
-              <label className="flex items-center gap-2 text-[11px] font-medium text-[#64748B]">End <input type="color" value={val("bg_color2") || "#db2777"} onChange={(e) => set("bg_color2", e.target.value)} className="w-10 h-9 rounded-lg border border-[#E2E8F0] bg-white cursor-pointer p-1" /></label>
-            </div>
-            {slider("bg_angle", "Direction", 0, 360, 160, "°")}
-          </div>
-        )}
-        {bgType === "image" && (
-          <div className="flex flex-col sm:flex-row gap-4">
-            <ImagePick value={val("bg_image")} onChange={(u) => set("bg_image", u)} className="w-24 h-32" label="Upload photo" fit="cover" />
-            <div className="flex-1 space-y-3 min-w-0">
-              {slider("bg_dim", "Darken", 0, 80, 35, "%")}
-              {slider("bg_blur", "Blur", 0, 24, 0, "px")}
-              <Note>A little darken keeps your name and buttons readable over the photo.</Note>
-            </div>
-          </div>
-        )}
-        {bgType !== "theme" && <Note>Custom backgrounds apply to the minimal “link-in-bio” templates. Buttons and text auto-adjust to stay readable.</Note>}
+
+        <p className="text-[11px] text-[#94A3B8] flex items-center gap-1.5"><Eye size={12} /> Changes show instantly in the live preview and save automatically.</p>
       </div>
     );
   };
