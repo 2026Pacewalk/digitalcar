@@ -185,7 +185,7 @@ export default function App() {
   if (isCustomHost(host)) {
     return (
       <>
-        <Toaster position="top-center" />
+        <Toaster />
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]"><div className="w-8 h-8 rounded-full border-2 border-[#E2E8F0] border-t-[#F7B31C] animate-spin" /></div>}>
           <CustomDomainCard host={host} />
         </Suspense>
@@ -194,7 +194,7 @@ export default function App() {
   }
   return (
     <>
-      <Toaster position="top-center" />
+      <Toaster />
       <EnquiryToaster />
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]"><div className="w-8 h-8 rounded-full border-2 border-[#E2E8F0] border-t-[#F7B31C] animate-spin" /></div>}>
       <Routes>

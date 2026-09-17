@@ -192,7 +192,10 @@ export function TemplatesEditor() {
     const color2 = effSecondary;
     update({ theme: String(selected.style), color, color2 });
     setDirty(false);
-    toast.success(`"${selected.name}" applied${brandOn ? " in your brand colours" : ""}`);
+    // ONE notification per template change: it shows straight away, then updates
+    // in place once the live card has the design (it used to be two toasts).
+    const label = `"${selected.name}" applied${brandOn ? " in your brand colours" : ""}`;
+    const tid = toast.loading(label, { description: "Updating your live card…" });
     // Push the design to the LIVE published snapshot so the public card + QR
     // reflect it immediately (no need to re-open the builder and Publish again).
     updateDesign.mutate(
@@ -202,7 +205,13 @@ export function TemplatesEditor() {
         // the next dashboard load doesn't pull the snapshot over local edits.
         const ts = (r as { updatedAt?: string | null })?.updatedAt;
         if (ts) { try { localStorage.setItem(scopedKey("dc_snap_ts"), ts); } catch { /* ignore */ } }
-        if (r?.published) toast.success("Your live card & QR now show this design");
+        toast.success(label, {
+          id: tid,
+          description: r?.published ? "Your live card & QR now show this design" : "Publish your card to show it live",
+        });
+      },
+      onError: () => {
+        toast.success(label, { id: tid, description: "Saved here — publish to update your live card" });
       } },
     );
   };
