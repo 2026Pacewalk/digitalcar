@@ -84,6 +84,7 @@ export default function CardStudio() {
   const formRef = useRef(form); formRef.current = form;
   const previewRef = useRef<HTMLIFrameElement>(null);
   const savedScrollRef = useRef(0);
+  const previewThemeRef = useRef<string | null>(null);
 
   const val = (k: string) => (form[k] !== undefined ? form[k] : String(data[k] ?? ""));
   const set = (k: string, v: string) => {
@@ -104,8 +105,18 @@ export default function CardStudio() {
   useEffect(() => {
     const t = setTimeout(() => {
       // Remember where the user scrolled so a rebuild doesn't jump back to the top
-      // (so toggling a bottom section like the QR is visible right where they are).
-      try { savedScrollRef.current = previewRef.current?.contentWindow?.scrollY || savedScrollRef.current; } catch { /* cross-origin guard */ }
+      // (so toggling a bottom section like the QR is visible right where they are) —
+      // except when the TEMPLATE changed: a new design starts from its top.
+      const theme = String((merged as { theme?: unknown }).theme ?? "");
+      if (previewThemeRef.current !== null && previewThemeRef.current !== theme) {
+        savedScrollRef.current = 0;
+      } else {
+        try {
+          const y = previewRef.current?.contentWindow?.scrollY;
+          if (typeof y === "number") savedScrollRef.current = y; // 0 (the top) is a real position too
+        } catch { /* cross-origin guard */ }
+      }
+      previewThemeRef.current = theme;
       setPreviewHtml(buildCardHtml(merged as Parameters<typeof buildCardHtml>[0], products.items, gallery.items, videos.items, offers.items, qrcodes.items, []));
     }, 300);
     return () => clearTimeout(t);

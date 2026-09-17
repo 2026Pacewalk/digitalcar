@@ -33,6 +33,7 @@ export default function LivePreview({ height = 620, frame = true }: { height?: n
   const [tick, setTick] = useState(0);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const scrollRef = useRef(0);
+  const themeRef = useRef<string | null>(null);
 
   // Any edit anywhere in the dashboard re-renders the card.
   useEffect(() => {
@@ -57,10 +58,21 @@ export default function LivePreview({ height = 620, frame = true }: { height?: n
   // Rebuild a beat after the last change so typing stays smooth.
   useEffect(() => {
     const t = setTimeout(() => {
-      // Keep the reader where they were instead of jumping to the top.
-      try { scrollRef.current = frameRef.current?.contentWindow?.scrollY || scrollRef.current; } catch { /* cross-origin guard */ }
+      // Keep the reader where they were instead of jumping to the top — unless the
+      // template changed, in which case the new design starts from its top.
+      const current = readCustomer();
+      const theme = String((current as { theme?: unknown }).theme ?? "");
+      if (themeRef.current !== null && themeRef.current !== theme) {
+        scrollRef.current = 0;
+      } else {
+        try {
+          const y = frameRef.current?.contentWindow?.scrollY;
+          if (typeof y === "number") scrollRef.current = y; // 0 (the top) is a real position too
+        } catch { /* cross-origin guard */ }
+      }
+      themeRef.current = theme;
       const c = {
-        ...readCustomer(),
+        ...current,
         referral_code: program?.code || "",
         ...(views != null ? { views } : {}),
       } as Parameters<typeof buildCardHtml>[0];
