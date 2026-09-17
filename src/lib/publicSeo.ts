@@ -19,6 +19,7 @@
  *                                      see src/data/industries
  *   /email-signature-generator         email signature generator (3.6K), free … (590)
  *   /whatsapp-message-templates        whatsapp business message templates (1K)
+ *   /instagram-bio-templates           instagram bio for business, instagram bio templates
  *   /blog/*                            one article per informational cluster — see src/data/blog
  *
  * Length rules the titles and descriptions are held to: title ≤ 60 characters,
@@ -53,8 +54,16 @@ export const SEO_EMAIL_SIGNATURE: PageSeo = {
 export const SEO_FREE_TOOLS: PageSeo = {
   title: "Free Business Tools — Email Signature & WhatsApp Templates",
   description:
-    "Free tools for small businesses: an email signature generator, WhatsApp Business message templates and an AI card builder. No sign-up needed.",
+    "Free tools for small businesses: an email signature generator, WhatsApp Business templates, Instagram bio templates and an AI card builder.",
   crumb: "Free Tools",
+};
+
+export const SEO_INSTAGRAM_BIO: PageSeo = {
+  title: "Instagram Bio Templates for Business (Free) | DigitalCarda",
+  description:
+    "12 free Instagram bio templates for salons, restaurants, shops, clinics and coaches. Fits the 150-character limit — add your details and copy.",
+  crumb: "Instagram Bio Templates",
+  parent: "/free-tools",
 };
 
 export const SEO_WHATSAPP_TEMPLATES: PageSeo = {
@@ -147,6 +156,7 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
   "/email-signature-templates": { ...SEO_EMAIL_SIGNATURE, canonicalPath: "/email-signature-generator" },
   "/whatsapp-message-templates": SEO_WHATSAPP_TEMPLATES,
   "/whatsapp-business-messages": { ...SEO_WHATSAPP_TEMPLATES, canonicalPath: "/whatsapp-message-templates" },
+  "/instagram-bio-templates": SEO_INSTAGRAM_BIO,
   "/about": {
     title: "About DigitalCarda — Digital Visiting Cards for India",
     description: "Who makes DigitalCarda, what we build for Indian businesses, and how our guides are written, checked against official sources and kept up to date.",

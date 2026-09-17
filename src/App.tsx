@@ -80,9 +80,12 @@ const CustomerProfile = lazy(() => import("./pages/customer/Profile"));
 const CustomerQR = lazy(() => import("./pages/customer/QR"));
 const CustomerSignature = lazy(() => import("./pages/customer/Signature"));
 const CustomerWhatsAppMessage = lazy(() => import("./pages/customer/WhatsAppMessage"));
+const CustomerInstagramBio = lazy(() => import("./pages/customer/InstagramBio"));
+const CustomerFreeTools = lazy(() => import("./pages/customer/FreeTools"));
 const FreeTools = lazy(() => import("./pages/public/FreeTools"));
 const EmailSignatureGenerator = lazy(() => import("./pages/public/EmailSignatureGenerator"));
 const WhatsAppTemplates = lazy(() => import("./pages/public/WhatsAppTemplates"));
+const InstagramBioTemplates = lazy(() => import("./pages/public/InstagramBioTemplates"));
 const PublicSitemap = lazy(() => import("./pages/public/Sitemap"));
 const Blog = lazy(() => import("./pages/public/Blog"));
 const About = lazy(() => import("./pages/public/About"));
@@ -221,6 +224,7 @@ export default function App() {
           <Route path="/email-signature-templates" element={<EmailSignatureGenerator />} />
           <Route path="/whatsapp-message-templates" element={<WhatsAppTemplates />} />
           <Route path="/whatsapp-business-messages" element={<WhatsAppTemplates />} />
+          <Route path="/instagram-bio-templates" element={<InstagramBioTemplates />} />
           <Route path="/resellers" element={<Resellers />} />
           <Route path="/refer-earn" element={<ReferEarnPublic />} />
           <Route path="/custom-domain" element={<CustomDomain />} />
@@ -299,6 +303,8 @@ export default function App() {
         <Route path="/dashboard/qr" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerQR /></RoleRoute>} />
         <Route path="/dashboard/signature" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSignature /></RoleRoute>} />
         <Route path="/dashboard/whatsapp" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerWhatsAppMessage /></RoleRoute>} />
+        <Route path="/dashboard/instagram" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerInstagramBio /></RoleRoute>} />
+        <Route path="/dashboard/tools" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerFreeTools /></RoleRoute>} />
         <Route path="/dashboard/domain" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerCustomDomain /></RoleRoute>} />
         <Route path="/dashboard/nfc" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerNfcOrder /></RoleRoute>} />
         <Route path="/dashboard/ai" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><AITools /></RoleRoute>} />

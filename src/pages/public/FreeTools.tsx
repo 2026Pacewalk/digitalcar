@@ -10,7 +10,7 @@
 import { Link } from "react-router";
 import {
   PenLine, MessageCircle, Sparkles, ArrowRight, ShieldCheck, Zap, Check,
-  LayoutGrid, UserX, Gift,
+  LayoutGrid, UserX, Gift, Instagram,
 } from "lucide-react";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
 import { usePageSeo } from "@/lib/seo";
@@ -18,6 +18,7 @@ import JsonLd from "@/components/seo/JsonLd";
 import { SEO_FREE_TOOLS } from "@/lib/publicSeo";
 import { SIGNATURE_TEMPLATES } from "@/lib/emailSignature";
 import { WA_TEMPLATES } from "@/lib/whatsappMessage";
+import { IG_TEMPLATES, IG_BIO_LIMIT } from "@/lib/instagramBio";
 
 type Tool = {
   href: string;
@@ -52,6 +53,16 @@ const TOOLS: Tool[] = [
     cta: "Get my templates",
   },
   {
+    href: "/instagram-bio-templates",
+    name: "Instagram Bio Templates",
+    pitch: "Business bios for salons, restaurants, shops, clinics and coaches — written to fit Instagram's limit.",
+    points: [`Every bio under ${IG_BIO_LIMIT} characters`, "A searchable profile name to match", "Tips for the one link people can tap"],
+    stat: `${IG_TEMPLATES.length} bios`,
+    icon: Instagram,
+    accent: "#DB2777",
+    cta: "Write my bio",
+  },
+  {
     href: "/ai-card-generator",
     name: "AI Business Card Builder",
     pitch: "Describe your business or paste your website, and AI writes and designs a digital business card to preview.",
@@ -65,7 +76,7 @@ const TOOLS: Tool[] = [
 
 const PROMISES = [
   { icon: UserX, title: "No sign-up", desc: "Open a tool and use it. There is no account wall in front of any of them." },
-  { icon: ShieldCheck, title: "Nothing stored", desc: "The signature and WhatsApp tools run in your browser — your details are not sent to us." },
+  { icon: ShieldCheck, title: "Nothing stored", desc: "The signature, WhatsApp and Instagram tools run in your browser — your details are not sent to us." },
   { icon: Gift, title: "Actually free", desc: "No trial timer, no watermark, no card details. Copy the result and keep it." },
 ];
 
@@ -127,7 +138,7 @@ export default function FreeTools() {
 
       {/* ── The tools ── */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative">
-        <Reveal stagger className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <Reveal stagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {TOOLS.map((t) => (
             <Link
               key={t.href}

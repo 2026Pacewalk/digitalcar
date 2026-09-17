@@ -1074,7 +1074,7 @@ app.get("/sitemap.xml", async (c) => {
     "/ai-card-generator", "/resellers", "/refer-earn", "/custom-domain", "/contact",
     // Free tools — canonical URLs only; each has an alias route that deliberately
     // stays out of the sitemap so the two never compete for the same terms.
-    "/free-tools", "/email-signature-generator", "/whatsapp-message-templates",
+    "/free-tools", "/email-signature-generator", "/whatsapp-message-templates", "/instagram-bio-templates",
     "/privacy", "/refund-policy", "/terms-of-service", "/sitemap", "/blog", "/about"];
   if (sitemapXml && Date.now() - sitemapXml.at < SITEMAP_TTL) {
     return c.body(sitemapXml.body, 200, { "content-type": "application/xml; charset=utf-8" });

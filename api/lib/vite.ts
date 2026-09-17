@@ -163,7 +163,7 @@ const SSR_PATHS = new Set([
   "/", "/features", "/pricing", "/industries", "/bulk-cards", "/ai-card-generator",
   "/resellers", "/refer-earn", "/custom-domain", "/contact",
   "/free-tools", "/email-signature-generator", "/email-signature-templates",
-  "/whatsapp-message-templates", "/whatsapp-business-messages",
+  "/whatsapp-message-templates", "/whatsapp-business-messages", "/instagram-bio-templates",
   "/digital-business-cards-templates",
   "/privacy", "/refund-policy", "/terms-of-service", "/sitemap",
   "/blog", "/about",

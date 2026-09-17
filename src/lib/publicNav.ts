@@ -48,6 +48,7 @@ const FREE_TOOLS: NavGroup = {
     { label: "All free tools", href: "/free-tools" },
     { label: "Email signature generator", href: "/email-signature-generator", badge: "Free" },
     { label: "WhatsApp message templates", href: "/whatsapp-message-templates", badge: "Free" },
+    { label: "Instagram bio templates", href: "/instagram-bio-templates", badge: "Free" },
   ],
 };
 
@@ -151,12 +152,13 @@ export const HEADER_MENUS: HeaderMenu[] = [
     items: [
       { label: "Email signature generator", href: "/email-signature-generator", badge: "Free", desc: "14 designs for Gmail, Outlook and Apple Mail" },
       { label: "WhatsApp message templates", href: "/whatsapp-message-templates", badge: "Free", desc: "12 greeting, away and quick-reply messages to copy" },
+      { label: "Instagram bio templates", href: "/instagram-bio-templates", badge: "Free", desc: "12 business bios that fit the 150-character limit" },
       { label: "All free tools", href: "/free-tools", desc: "Free for every business — no sign-up needed" },
     ],
     feature: {
       eyebrow: "No sign-up",
       title: "Free tools for your business",
-      text: "Make an email signature or a WhatsApp welcome message and copy it in seconds.",
+      text: "Make an email signature, a WhatsApp welcome message or an Instagram bio and copy it in seconds.",
       href: "/free-tools",
       cta: "Open free tools",
     },
@@ -224,6 +226,7 @@ export const SEARCH_PAGES: NavLink[] = [
   { label: "AI card generator", href: "/ai-card-generator", desc: "Let AI write your card" },
   { label: "Email signature generator", href: "/email-signature-generator", desc: "Free · 14 signature designs" },
   { label: "WhatsApp message templates", href: "/whatsapp-message-templates", desc: "Free · greeting, away and quick replies" },
+  { label: "Instagram bio templates", href: "/instagram-bio-templates", desc: "Free · 12 business bios under 150 characters" },
   { label: "Contact us", href: "/contact", desc: "Call, WhatsApp or email the team" },
   { label: "Blog & guides", href: "/blog", desc: "Digital visiting cards, NFC, QR codes and Google reviews" },
   { label: "Start free trial", href: "/signup?promo=FREE30D", desc: "30 days free, no payment needed" },
