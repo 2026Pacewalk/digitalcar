@@ -513,7 +513,7 @@ padding: 0px;
 .grev-btn-wrap{text-align:center;margin-top:4px;}
 .grev-btn{
 	display:inline-flex;align-items:center;gap:9px;
-	background:#4285F4;color:#fff;padding:12px 26px;border-radius:10px;
+	background:#1a73e8;color:#fff;padding:12px 26px;border-radius:10px;
 	font-weight:600;text-decoration:none;font-size:15px;
 	box-shadow:0 4px 14px rgba(66,133,244,.35);
 }
@@ -582,13 +582,13 @@ padding: 0px;
     font-weight:bold;
     border-radius:5px;
     cursor:pointer;
-	background-color: var(--theme-color);
+	background-color: var(--btn-bg, var(--theme-color));
 	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-	color:#fff;
+	color: var(--btn-fg, #fff);
 
 }
 .product-enquiry-btn:hover{
-	color: #fff;
+	color: var(--btn-fg, #fff);
 }
 
 .payment-lable {
@@ -625,17 +625,17 @@ padding: 0px;
 }
 .qrcode-enquiry-btn{
 	padding:7px 15px;
-	color: #fff;
+	color: var(--btn-fg, #fff);
 	font-size: 14px;
 	border:3px solid #fff;
 	display: inline-block;
-	background-color: var(--theme-color);
+	background-color: var(--btn-bg, var(--theme-color));
 	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 	margin-bottom: 10px;
 
 }
 .qrcode-enquiry-btn:hover{
-	color: #fff;
+	color: var(--btn-fg, #fff);
 }
 
 .offer-card{
@@ -666,11 +666,11 @@ padding: 0px;
 }
 .offer-enquiry-btn{
 	padding:7px 15px;
-	color: #fff;
+	color: var(--btn-fg, #fff);
 	font-size: 14px;
 	border:3px solid #fff;
 	display: inline-block;
-	background-color: var(--theme-color);
+	background-color: var(--btn-bg, var(--theme-color));
 	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 
 }

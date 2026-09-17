@@ -6,6 +6,7 @@ import { safeExternalUrl } from "@/lib/url";
 import { buildLinkBioHtml, LINKBIO_START, LINKBIO_COUNT } from "./linkbio";
 import { buildPremiumCardHtml, PREMIUM_COUNT, svcMeta } from "./premiumCards";
 import { SOCIAL_BY_KEY, readSocialLinks } from "@/lib/socialPlatforms";
+import { buttonPalette, CONTRAST_GUARD_SCRIPT } from "./contrast";
 
 /* All 31 legacy templates (style1.css … style31.css) loaded as raw strings. */
 const STYLE_MODULES = import.meta.glob("./styles/style*.css", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
@@ -190,7 +191,7 @@ const PRODUCT_CSS = `
 .dc-prod-save{font-size:11px;font-weight:800;color:#047857;background:#ecfdf5;border:1px solid #a7f3d0;padding:3px 9px;border-radius:999px;}
 .dc-prod-desc{font-size:13.5px;line-height:1.65;color:#475467;margin:0 0 14px;}
 .dc-prod-desc a{color:var(--theme-color);font-weight:600;}
-.product-card.dc-prod .dc-prod-cta{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 18px;border-radius:11px;background:var(--theme-color);background:linear-gradient(135deg,var(--theme-color),color-mix(in srgb,var(--theme-color) 78%,#000));color:#111;font-size:13.5px;font-weight:800;text-decoration:none;box-shadow:0 8px 18px -8px var(--theme-color);transition:transform .16s ease,filter .2s ease;}
+.product-card.dc-prod .dc-prod-cta{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 18px;border-radius:11px;background:var(--btn-bg,var(--theme-color));background:linear-gradient(135deg,var(--btn-bg,var(--theme-color)),var(--btn-bg2,var(--btn-bg,var(--theme-color))));color:var(--btn-fg,#111);font-size:13.5px;font-weight:800;text-decoration:none;box-shadow:0 8px 18px -8px var(--theme-color);transition:transform .16s ease,filter .2s ease;}
 .product-card.dc-prod .dc-prod-cta:hover{transform:translateY(-1px);filter:brightness(1.06);}
 .product-card.dc-prod .dc-prod-cta:active{transform:translateY(0);}
 .dc-prod-cta i{font-size:12px;}
@@ -275,6 +276,8 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
 
   const accent = s(c.color) || "#F7B31C";
   const accentDark = darken(accent, 0.16);
+  // Primary-button colours that stay readable on this card's colour (see contrast.ts).
+  const btn = buttonPalette(accent);
   const secondary = s(c.color2);
   // Compact view: collapse content sections into tap-to-open accordions so a
   // content-heavy card stays short. "long" (default) keeps everything expanded.
@@ -685,7 +688,7 @@ ${styleFor(Number(theme))}
 ${firstPagePadCss(Number(theme))}
 ${ownerHierarchyCss}
 ${desigFontCss(Number(theme))}
-:root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
+:root{--theme-color:${accent};--btn-bg:${buttonPalette(accent).bg};--btn-bg2:${buttonPalette(accent).bg2};--btn-fg:${buttonPalette(accent).fg};${secondary ? `--theme-secondary:${secondary};` : ""}}
 ${textIconOverrideCss(c)}
 ${offersSection ? OFFER_CSS : ""}
 ${servicesSection ? PRODUCT_CSS : ""}
@@ -763,14 +766,14 @@ main{padding-bottom:78px;box-shadow:none;}
 .dc-field{position:relative;margin-bottom:12px;}
 .dc-field > i{position:absolute;left:14px;top:24px;transform:translateY(-50%);color:#9aa0a6;font-size:14px;z-index:1;}
 .dc-field.ta > i{top:18px;transform:none;}
-.dc-input{width:100%;box-sizing:border-box;height:48px;border:1.5px solid #e6e8eb;border-radius:12px;padding:0 14px 0 40px;font-size:14px;outline:none;background:#fafbfc;transition:border-color .2s,box-shadow .2s,background .2s;color:#111;}
+.dc-input{font-family:inherit;width:100%;box-sizing:border-box;height:48px;border:1.5px solid #e6e8eb;border-radius:12px;padding:0 14px 0 40px;font-size:14px;outline:none;background:#fafbfc;transition:border-color .2s,box-shadow .2s,background .2s;color:#111;}
 .dc-input::placeholder{color:#9aa0a6;}
 .dc-input:focus{border-color:${accent};background:#fff;box-shadow:0 0 0 3px ${accent}30;}
 textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;line-height:1.5;}
 .dc-btn{width:100%;box-sizing:border-box;height:50px;border:none;border-radius:12px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px;transition:transform .15s,box-shadow .2s,filter .2s;text-decoration:none;}
 .dc-btn:hover{transform:translateY(-1px);filter:brightness(1.05);}
 .dc-btn:active{transform:translateY(0);}
-.dc-btn-primary{background:linear-gradient(135deg,${accent},${accentDark});box-shadow:0 6px 16px ${accent}66;}
+.dc-btn-primary{background:linear-gradient(135deg,${btn.bg},${btn.bg2});color:${btn.fg};box-shadow:0 6px 16px ${btn.bg}55;}
 .dc-btn-wa{background:linear-gradient(135deg,#2bd576,#1faa55);box-shadow:0 6px 16px rgba(37,211,102,.35);}
 .dc-btn-dark{background:linear-gradient(135deg,#1e2536,#0f1420);box-shadow:0 6px 16px rgba(15,20,32,.3);}
 .dc-phone{display:flex;align-items:stretch;border:1.5px solid #e6e8eb;border-radius:12px;overflow:hidden;background:#fafbfc;transition:border-color .2s,box-shadow .2s;}
@@ -790,7 +793,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-wa-input{flex:1;min-width:0;border:1.5px solid #e6e8eb;border-left:none;border-right:none;outline:none;padding:0 12px;height:46px;font-size:14px;background:#fafbfc;color:#111;}
 .dc-wa-form:focus-within .dc-wa-cc,.dc-wa-form:focus-within .dc-wa-input{border-color:${accent};}
 .dc-wa-input:focus{background:#fff;}
-.dc-wa-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:none;background:linear-gradient(135deg,#2bd576,#1faa55);color:#fff;font-weight:700;font-size:14px;border-radius:0 12px 12px 0;padding:0 18px;height:46px;cursor:pointer;box-shadow:0 4px 12px rgba(37,211,102,.3);transition:filter .15s,transform .1s;}
+.dc-wa-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:none;background:linear-gradient(135deg,#0f7a40,#0a6334);color:#fff;font-weight:700;font-size:14px;border-radius:0 12px 12px 0;padding:0 18px;height:46px;cursor:pointer;box-shadow:0 4px 12px rgba(37,211,102,.3);transition:filter .15s,transform .1s;}
 .dc-wa-btn i{font-size:17px;}
 .dc-wa-btn:hover{filter:brightness(1.06);}
 .dc-wa-btn:active{transform:scale(.98);}
@@ -821,7 +824,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
 .dc-foot-btn:active{transform:scale(.97);}
 .dc-foot-login{background:#fff;color:#0f172a;border:1.5px solid #e2e6ec;}
 .dc-foot-login:hover{border-color:${accent};color:${accentDark};}
-.dc-foot-create{background:linear-gradient(135deg,${accent},${accentDark});color:#0f172a;box-shadow:0 4px 11px ${accent}4d;}
+.dc-foot-create{background:linear-gradient(135deg,${btn.bg},${btn.bg2});color:${btn.fg};box-shadow:0 4px 11px ${btn.bg}4d;}
 .dc-foot-create:hover{filter:brightness(1.05);}
 .dc-foot-powered{text-align:center;margin:8px 0 0;font-size:11px;color:#98a1b0;}
 .dc-foot-powered a{color:#0f172a;font-weight:700;text-decoration:none;}
@@ -1145,6 +1148,7 @@ function saveVCard(){
   var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = '${slug || "card"}.vcf'; a.click();
 }
 </script>
+${CONTRAST_GUARD_SCRIPT}
 </body></html>`;
 }
 
@@ -1204,7 +1208,7 @@ ${styleFor(theme)}
 ${firstPagePadCss(theme)}
 ${ownerHierarchyCss}
 ${desigFontCss(theme)}
-:root{--theme-color:${accent};${secondary ? `--theme-secondary:${secondary};` : ""}}
+:root{--theme-color:${accent};--btn-bg:${buttonPalette(accent).bg};--btn-bg2:${buttonPalette(accent).bg2};--btn-fg:${buttonPalette(accent).fg};${secondary ? `--theme-secondary:${secondary};` : ""}}
 ${textIconOverrideCss(c)}
 html,body{margin:0;background:#fff;overflow:hidden;}
 main{box-shadow:none;padding:0;}

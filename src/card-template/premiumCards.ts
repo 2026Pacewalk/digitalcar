@@ -9,6 +9,7 @@ import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
 import { parseVideo } from "@/lib/video";
 import { safeExternalUrl } from "@/lib/url";
 import { SOCIAL_BY_KEY, readSocialLinks } from "@/lib/socialPlatforms";
+import { buttonPalette, CONTRAST_GUARD_SCRIPT } from "./contrast";
 
 type PCProduct = { name: string; tagline?: string; description?: string; button?: string; button_title?: string; filename?: string; price?: string; offer_price?: string };
 type PCRecord = Record<string, unknown>;
@@ -218,7 +219,11 @@ export function svcMeta(nm: string): { icon: string; desc: string } {
    Reviews / Enquiry) in the premium aesthetic, so a premium card is the same
    complete mini-website as the classic templates — not just a first screen.
    Gated by the owner's per-section flags; empty sections are skipped. ── */
-function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: { skip?: string[]; products?: PCProduct[] } = {}): { css: string; html: string; js: string } {
+function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: { skip?: string[]; products?: PCProduct[]; accent?: string } = {}): { css: string; html: string; js: string } {
+  // Buttons in these sections sit on the template's accent (--gold). Their text
+  // colour and gradient come from buttonPalette, so a blue or navy card gets
+  // white text on a deepened blue, a gold card keeps dark text on gold.
+  const btn = buttonPalette(o.accent ?? s(c.color));
   const on = (v: unknown, def = 1) => Number(v ?? def) === 1;
   const skip = o.skip || [];
   // Who the card belongs to, for image alt text (raw — escaped at each use).
@@ -353,6 +358,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
      one dark navy statement panel (Payments), gold reserved for accents —
      never body text on white (contrast). ── */
   @keyframes pwxUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  :root{--btn-bg:${btn.bg};--btn-bg2:${btn.bg2};--btn-fg:${btn.fg};}
   .pwx-sec{margin-bottom:30px;animation:pwxUp .5s cubic-bezier(.2,.7,.2,1) both;}
   @media(prefers-reduced-motion:reduce){.pwx-sec{animation:none;}.pwx-svc,.pwx-gal img,.pwx-offer{transition:none!important;}}
   .pwx-h2{display:flex;align-items:center;gap:12px;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;letter-spacing:.16em;color:#5b6474;text-transform:uppercase;margin-bottom:16px;}
@@ -412,7 +418,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   .pwx-acc-h{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;padding:16px 17px;cursor:pointer;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;letter-spacing:.16em;color:#3d4655;text-transform:uppercase;-webkit-tap-highlight-color:transparent;}
   .pwx-acc-h::before{content:"";width:26px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--gold),color-mix(in srgb,var(--gold) 45%,#fff));flex-shrink:0;}
   .pwx-acc-h .pwx-acc-c{margin-left:auto;width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--gold) 14%,#fff);color:var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:11px;transition:transform .25s ease,background .2s,color .2s;}
-  .pwx-acc.open .pwx-acc-c{transform:rotate(180deg);background:var(--gold);color:#141414;}
+  .pwx-acc.open .pwx-acc-c{transform:rotate(180deg);background:var(--btn-bg);color:var(--btn-fg);}
   .pwx-acc-h:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;}
   .pwx-acc-b{display:none;padding:2px 15px 17px;}
   .pwx-acc.open .pwx-acc-b{display:block;animation:pwxUp .3s ease both;}
@@ -438,7 +444,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   .pwx-pay{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid rgba(255,255,255,.09);border-radius:13px;margin-bottom:9px;background:rgba(255,255,255,.055);backdrop-filter:blur(4px);}
   .pwx-pay-n{font-family:'Sora',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb,var(--gold) 82%,#fff);flex-shrink:0;}
   .pwx-pay-v{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:#e7ecf5;word-break:break-all;}
-  .pwx-copy{border:none;background:var(--gold);color:#141414;width:32px;height:32px;border-radius:10px;cursor:pointer;flex-shrink:0;font-size:12px;transition:transform .15s,filter .2s;}
+  .pwx-copy{border:none;background:var(--btn-bg);color:var(--btn-fg);width:32px;height:32px;border-radius:10px;cursor:pointer;flex-shrink:0;font-size:12px;transition:transform .15s,filter .2s;}
   .pwx-copy:hover{filter:brightness(1.07);}
   .pwx-copy:active{transform:scale(.92);}
   .pwx-copy.ok{background:#22c55e;color:#08331a;}
@@ -479,7 +485,7 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   .pwx-vid-p{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(7,13,28,.04),rgba(7,13,28,.32));transition:background .25s;}
   .pwx-vid:hover .pwx-vid-p{background:linear-gradient(180deg,rgba(7,13,28,.02),rgba(7,13,28,.44));}
   .pwx-vid-p i{width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.16);backdrop-filter:blur(6px);border:1.5px solid rgba(255,255,255,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;padding-left:4px;box-shadow:0 10px 30px rgba(0,0,0,.45);transition:transform .2s,background .2s,border-color .2s;}
-  .pwx-vid:hover .pwx-vid-p i{transform:scale(1.08);background:var(--gold);border-color:var(--gold);color:#141414;}
+  .pwx-vid:hover .pwx-vid-p i{transform:scale(1.08);background:var(--btn-bg);border-color:var(--btn-bg);color:var(--btn-fg);}
   .pwx-vid-t{position:absolute;left:0;right:0;bottom:0;padding:26px 14px 12px;background:linear-gradient(transparent,rgba(7,13,28,.82));color:#fff;font-family:'Sora',sans-serif;font-size:12.5px;font-weight:600;letter-spacing:.01em;}
 
   /* Google Reviews */
@@ -497,10 +503,10 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   /* Enquiry — soft panel + gold glow CTA */
   #enquiry-section .pwx-form{background:linear-gradient(180deg,#fbfcfe,#f4f6fa);border:1px solid #e8ecf3;border-radius:20px;padding:16px;box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(14,27,52,.05),0 14px 34px -14px rgba(14,27,52,.12);}
   .pwx-form{display:grid;gap:11px;}
-  .pwx-form input,.pwx-form textarea{width:100%;border:1.5px solid #e2e7f0;border-radius:13px;padding:13px 15px;font-size:13.5px;font-family:'Inter',inherit;outline:none;background:#fff;color:var(--ink);transition:border-color .2s,box-shadow .2s;}
+  .pwx-form input,.pwx-form textarea{width:100%;border:1.5px solid #e2e7f0;border-radius:13px;padding:13px 15px;font-size:13.5px;font-family:inherit;outline:none;background:#fff;color:var(--ink);transition:border-color .2s,box-shadow .2s;}
   .pwx-form input::placeholder,.pwx-form textarea::placeholder{color:#98a1b1;}
   .pwx-form input:focus,.pwx-form textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3.5px color-mix(in srgb,var(--gold) 22%,transparent);}
-  .pwx-form button{height:52px;border:none;border-radius:14px;background:linear-gradient(135deg,color-mix(in srgb,var(--gold) 90%,#fff),color-mix(in srgb,var(--gold) 78%,#7a5200));color:#141414;font-family:'Sora',sans-serif;font-weight:800;font-size:14px;letter-spacing:.02em;cursor:pointer;box-shadow:0 2px 4px rgba(14,27,52,.08),0 14px 30px -8px color-mix(in srgb,var(--gold) 55%,transparent);transition:transform .15s,filter .2s,box-shadow .22s;}
+  .pwx-form button{height:52px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--btn-bg),var(--btn-bg2));color:var(--btn-fg);font-family:'Sora',sans-serif;font-weight:800;font-size:14px;letter-spacing:.02em;cursor:pointer;box-shadow:0 2px 4px rgba(14,27,52,.08),0 14px 30px -8px color-mix(in srgb,var(--btn-bg) 55%,transparent);transition:transform .15s,filter .2s,box-shadow .22s;}
   .pwx-form button:hover{filter:brightness(1.05);transform:translateY(-1px);}
   .pwx-form button:active{transform:scale(.985);}
   .pwx-sent{text-align:center;font-weight:700;color:#118a4e;padding:16px 0;}`;
@@ -660,7 +666,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .pw-cta{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .pw-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;border-radius:12px;font-weight:700;font-size:13.5px;text-decoration:none;border:none;cursor:pointer;transition:transform .12s,box-shadow .2s,filter .2s;font-family:inherit;}
   .pw-btn:active{transform:scale(.97);}
-  .pw-btn-gold{background:linear-gradient(135deg,var(--gold),#e0930a);color:var(--navy);box-shadow:0 8px 20px ${gold}44;}
+  .pw-btn-gold{background:linear-gradient(135deg,${buttonPalette(gold).bg},${buttonPalette(gold).bg2});color:${buttonPalette(gold).fg};box-shadow:0 8px 20px ${gold}44;}
   .pw-btn-gold:hover{filter:brightness(1.04);}
   .pw-btn-ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2);}
   .pw-btn-ghost:hover{background:rgba(255,255,255,.14);}
@@ -731,7 +737,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   // products showed the services twice.
   const svcIconsOnly = s(c.product_layout) === "icons";
   const cx = opts.thumb ? { css: "", html: "", js: "" }
-    : pwContentSections(c, opts.extras || {}, slug, { skip: svcIconsOnly ? ["services"] : [], products });
+    : pwContentSections(c, opts.extras || {}, slug, { skip: svcIconsOnly ? ["services"] : [], products, accent: gold });
   // Live view count: the parent page fetches the real total and posts it in
   // (same __dcViews message the classic card uses).
   const viewsJs = showViews ? `window.addEventListener('message',function(e){try{if(e.data&&typeof e.data.__dcViews==='number'){var el=document.getElementById('pw-view-count');if(el)el.textContent=Number(e.data.__dcViews).toLocaleString('en-IN');}}catch(_){}});` : "";
@@ -775,6 +781,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   ${dock}
   ${shareUi}
   ${script}
+  ${opts.thumb ? "" : CONTRAST_GUARD_SCRIPT}
   </body></html>`;
 }
 
@@ -880,7 +887,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   .pp-addr{display:flex;gap:13px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(16,24,40,.04);align-items:center;}
   .pp-addr-map{width:66px;height:66px;border-radius:12px;background:linear-gradient(135deg,${brand}22,${dark}22);display:flex;align-items:center;justify-content:center;color:var(--brand);font-size:22px;flex-shrink:0;}
   .pp-addr-tx{flex:1;min-width:0;} .pp-addr-tx b{font-family:'Sora',sans-serif;font-size:12.5px;color:var(--ink);} .pp-addr-tx p{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45;}
-  .pp-go{display:inline-flex;align-items:center;gap:6px;background:var(--brand);color:#fff;font-size:11.5px;font-weight:700;padding:9px 14px;border-radius:10px;text-decoration:none;flex-shrink:0;align-self:center;}
+  .pp-go{display:inline-flex;align-items:center;gap:6px;background:${buttonPalette(brand).bg};color:${buttonPalette(brand).fg};font-size:11.5px;font-weight:700;padding:9px 14px;border-radius:10px;text-decoration:none;flex-shrink:0;align-self:center;}
   .pp-about{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px;margin-top:12px;box-shadow:0 2px 10px rgba(16,24,40,.04);}
   .pp-about h3{font-family:'Sora',sans-serif;font-size:13px;color:var(--ink);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
   .pp-about h3::before{content:"";width:18px;height:3px;border-radius:3px;background:var(--brand);}
@@ -928,7 +935,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   // Full mini-website sections — same content set as the classic templates. The
   // pwx styles read --navy/--gold, so alias them onto this design's palette.
   const cx = opts.thumb ? { css: "", html: "", js: "" }
-    : pwContentSections(c, opts.extras || {}, slug, { skip: ["about"], products });
+    : pwContentSections(c, opts.extras || {}, slug, { skip: ["about"], products, accent: brand });
   const cxCss = cx.css ? `:root{--navy:${dark};--gold:${brand};}${cx.css}\n.pwx-sec{padding:0 4px;}` : "";
   const script = opts.thumb ? "" : `<script>
   function ppQR(o){var m=document.getElementById('ppqr');if(m)m.style.display=o?'flex':'none';}
@@ -964,6 +971,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
   ${modal}
   ${shareUi}
   ${script}
+  ${opts.thumb ? "" : CONTRAST_GUARD_SCRIPT}
   </body></html>`;
 }
 
@@ -1193,7 +1201,7 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const shareName = company || person || "this business";
   const waShareText = `Hi 👋\n\nTake a look at *${shareName}*'s digital visiting card 📇\n\nEverything in one tap — call, WhatsApp, book and save the contact:\n${cardUrl}`;
   const shareUi = opts.thumb ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: btnB });
-  const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, ex, slug, { products });
+  const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, ex, slug, { products, accent });
   const cxCss = cx.css ? `:root{--navy:${mix(deep, "#1b1d29", 0.35)};--gold:${accent};--soft:var(--bg);}${cx.css}` : "";
   const ref = s(c.referral_code) || slug;
   // Floating dock: socials + Share stay in reach while the visitor scrolls the
@@ -1245,5 +1253,6 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   ${modal}
   ${shareUi}
   ${script}
+  ${opts.thumb ? "" : CONTRAST_GUARD_SCRIPT}
   </body></html>`;
 }

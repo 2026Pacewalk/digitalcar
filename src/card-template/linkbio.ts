@@ -12,6 +12,7 @@
 
 import { resolveCardBg, cardBgOverrideCss } from "./cardBackground";
 import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
+import { CONTRAST_GUARD_SCRIPT } from "./contrast";
 import { safeExternalUrl } from "@/lib/url";
 
 type LBProduct = { name: string; button?: string; button_title?: string };
@@ -359,5 +360,6 @@ ${showShare ? shareSheetCss("#111827") : ""}
   </div>
   ${showShare ? shareSheetHtml({ shareName, cardUrl, waShareText }) : ""}
   ${showShare ? `<script>${shareSheetJs(cardUrl)}</script>` : ""}
+  ${CONTRAST_GUARD_SCRIPT}
 </body></html>`;
 }
