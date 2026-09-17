@@ -6,23 +6,14 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
-import { useCustomer, DEFAULT_CUSTOMER, readAccountCustomer } from "@/hooks/useCustomer";
+import { useCurrentPlan } from "@/hooks/useCurrentPlan";
+import { useCustomer } from "@/hooks/useCustomer";
 import { planFeatures, planRank, isFreePlan, type PlanPkg } from "@/lib/planFeatures";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
 const TERM_LABEL: Record<"monthly" | "yearly" | "triennial", string> = { monthly: "Monthly", yearly: "Yearly", triennial: "3-Year" };
 const inr = (v: number) => "₹" + Math.round(Number(v) || 0).toLocaleString("en-IN");
-/* Milliseconds from a date that may arrive as a Date (tRPC/superjson sends DB
-   timestamps as Date objects) or as a "YYYY-MM-DD HH:MM:SS" string (card
-   records). NaN when missing or unparseable. The old String(v).replace(" ", "T")
-   turned every Date into NaN, which is why the page couldn't tell a member's
-   term and showed "Current Plan" on every tab. */
-const toMs = (v: unknown): number => {
-  if (v instanceof Date) return v.getTime();
-  if (typeof v === "string" && v.trim()) return new Date(v.trim().replace(" ", "T")).getTime();
-  return NaN;
-};
 const fmtDay = (ms: number) => new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
 /* The page body renders INSIDE the dashboard layout, which waits for the card
@@ -50,18 +41,12 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
   payFor: PayFor | null; setPayFor: (p: PayFor | null) => void;
 }) {
   const utils = trpc.useUtils();
-  const subQ = trpc.subscription.mySubscription.useQuery();
-  const subscription = subQ.data;
-  const { data: packages } = trpc.package.list.useQuery();
-  const { data: customer } = useCustomer();
+  // Plan, term and expiry — decided in one shared place (also used by the Dashboard).
+  const {
+    packages, currentPkgId, currentPlan, currentPlanName, currentPaid,
+    expiryMs, planExpired, userCycle, dataReady,
+  } = useCurrentPlan();
   const { data: discount } = trpc.referral.myDiscount.useQuery();
-  // The plan is account-level: read it from the PRIMARY card's record (this body
-  // mounts after hydration, so it's in storage). The active card is still used
-  // for everything card-specific.
-  const [accountRec] = useState(() => readAccountCustomer());
-  const planRec = (accountRec ?? customer) as Record<string, unknown>;
-  // (4) A self-signup trial has no subscriptions row — its clock is the trial record.
-  const { data: trial } = trpc.trial.me.useQuery(undefined, { retry: false });
   const { data: orders } = trpc.payment.myOrders.useQuery();
   const pendingOrder = (orders || []).find((o) => o.status === "pending");
 
@@ -69,52 +54,9 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
   const [offerExp, setOfferExp] = useState<number>(0);
   useEffect(() => { setOfferExp(getOfferExpiry()); const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
-  // Legacy customers (migrated from the old site) have a real plan on their card
-  // record (package_id: 5=Gold, 6=Platinum, 7=Trial — same ids as the packages
-  // table) but no row in the new `subscriptions` table. Fall back to it so the
-  // Subscription page shows the SAME plan as the Profile page instead of "Free".
-  const legacyPkgId = Number(planRec?.package_id) || 0;
-  const currentPkgId = subscription?.package?.id ?? (legacyPkgId || undefined);
-  const currentPlan = (packages || []).find((p) => p.id === currentPkgId);
-  const currentPlanName = subscription?.package?.name || currentPlan?.name || "Free";
-  const currentPaid = Number(subscription?.amount) || 0;
-  // Is the current plan past its validity? An expired member may pick ANY plan
-  // (including a downgrade, e.g. Platinum → Gold) to re-subscribe.
-  // A plan in the subscriptions table: the server has already decided (isActive).
-  // A legacy card with no row: expired when its end date has passed.
-  const onSignupTrial = !subscription && Number(currentPkgId) === 7 && !!trial
-    && trial.status !== "not_started" && trial.status !== "converted";
-  const expiryMs = subscription ? toMs(subscription.currentPeriodEnd)
-    : onSignupTrial ? toMs(trial!.endsAt)
-    : toMs(planRec?.expired_on);
-  const planExpired = subscription
-    // Server's verdict at fetch time, plus the clock — a plan that ends while the
-    // page is open stops showing upgrade credit the server would no longer give.
-    ? !subscription.isActive || !Number.isFinite(expiryMs) || expiryMs <= now
-    : onSignupTrial
-      ? trial!.status === "expired" || trial!.status === "grace" || trial!.status === "cancelled"
-      : !!currentPkgId && Number.isFinite(expiryMs) && expiryMs < now;
-  // Which billing TERM the member is actually on. For a plan in the
-  // subscriptions table the server sends it (`term`: the stored billing cycle —
-  // set by the payment or by the admin's Change Package). Only a legacy card with
-  // no subscriptions row falls back to guessing from its validity span.
-  const userCycle = ((): "monthly" | "yearly" | "triennial" | null => {
-    if (!currentPkgId || planExpired) return null;
-    if (subscription) return subscription.term ?? null;
-    if (Number(currentPkgId) === 7) return "monthly"; // the free trial is a 30-day term
-    const start = toMs(planRec?.activated_on), end = toMs(planRec?.expired_on);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
-    const days = (end - start) / 86_400_000;
-    if (days < 62) return "monthly";
-    if (days < 550) return "yearly"; // up to ~18 months counts as yearly
-    return "triennial";
-  })();
   // Open the page on the member's actual term, so the first thing they see is
-  // the plan they're on. Waits for real data: the subscription must have loaded,
-  // and a member without one needs their real card record (the first render
-  // holds the demo placeholder). Once snapped — or once they click a tab — it
-  // stays put.
-  const dataReady = subQ.isFetchedAfterMount && subQ.isSuccess && (!!subscription || customer !== DEFAULT_CUSTOMER);
+  // the plan they're on — once real data is in. Once snapped, or once they click
+  // a tab or choose a plan, it stays put.
   useEffect(() => {
     if (cyclePinned.current || !dataReady || !userCycle) return;
     setCycle(userCycle);

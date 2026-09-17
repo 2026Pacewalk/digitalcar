@@ -1,5 +1,5 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   CalendarClock, MessageSquare, Eye, Pencil, MessageCircle,
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
 import { readCustomer, scopedKey, getAuthUser, getActiveCardId } from "@/hooks/useCustomer";
 import { useValidityDays } from "@/hooks/useValidityDays";
+import { useCurrentPlan, type Term } from "@/hooks/useCurrentPlan";
 import { fetchMyLeads } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import TrialBanner from "@/components/customer/TrialBanner";
@@ -60,11 +61,12 @@ const PKG: Record<number, { name: string; amount: number; days: number }> = {
   5: { name: "GOLD", amount: 999, days: 365 },
   6: { name: "PLATINUM", amount: 1999, days: 365 },
 };
-const PLAN_LIST = [
-  { id: 7, name: "Trial", amount: "0/-", days: "30 Days" },
-  { id: 5, name: "GOLD", amount: "999/-", days: "365 Days" },
-  { id: 6, name: "PLATINUM", amount: "1999/-", days: "365 Days" },
+const PLAN_TERMS: { id: Term; label: string; span: string }[] = [
+  { id: "monthly", label: "Monthly", span: "30 Days" },
+  { id: "yearly", label: "Yearly", span: "365 Days" },
+  { id: "triennial", label: "3 Years", span: "3 Years" },
 ];
+const PLAN_ORDER = [7, 5, 6]; // Trial, Gold, Platinum
 
 const CARD_BASE = "https://digitalcarda.in/";
 const inr = (v: number) => "₹" + (Number(v) || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
@@ -395,32 +397,83 @@ export default function CustomerDashboard() {
         </div>
 
         {/* ─── Plans ─── */}
-        <div className="bg-white rounded-2xl border border-[#F1F5F9] shadow-premium p-4">
-          <p className="text-xs font-semibold text-[#0F172A] mb-3">Plans <span className="text-[#94A3B8] font-normal">· incl. taxes</span></p>
-          <div className="grid grid-cols-3 gap-2.5">
-            {PLAN_LIST.map((p) => {
-              const isActive = p.id === customer.package_id;
-              return (
-                <div key={p.id} className={`relative rounded-xl border overflow-hidden flex flex-col transition-shadow ${isActive ? "border-[#F7B31C] bg-gradient-to-b from-[#FFFBEB] to-white shadow-[0_4px_16px_-8px_rgba(247,179,28,0.5)]" : "border-[#E2E8F0]"}`}>
-                  <div className="text-center pt-3 pb-2 px-2">
-                    <p className="text-[11px] font-bold text-[#14B8A6] leading-none">{p.name}</p>
-                    <p className="text-lg font-extrabold text-[#0F172A] mt-1.5 leading-none">{p.amount}</p>
-                    <p className="text-[10px] text-[#94A3B8] mt-1">{p.days}</p>
-                  </div>
-                  <div className="p-2 mt-auto">
-                    {isActive
-                      ? <span className="flex items-center justify-center w-full py-1.5 rounded-lg bg-[#FEF3C7] text-[#92400E] text-[10px] font-bold tracking-wide">ACTIVE</span>
-                      : <button onClick={() => navigate("/dashboard/subscription")} className="w-full py-1.5 rounded-lg bg-gradient-to-r from-[#0F172A] to-[#1E293B] text-white text-[10px] font-bold hover:opacity-90 transition-opacity">BUY</button>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <PlansPanel />
 
         {/* ─── Email verify alert (real — server-driven, sends a branded email) ─── */}
         <EmailVerifyBanner />
       </div>
     </ResponsiveDashboardLayout>
+  );
+}
+
+/* Plans box. Shows the real price for each term and marks ACTIVE only on the
+   member's actual plan AND term — it used to list every plan as "365 Days" at
+   the yearly price, so a 3-Year Platinum member saw ₹1,999 / 365 Days "Active".
+   Opens on the member's own term; the switch lets them compare the others.
+   Rendered inside the dashboard layout, so useCurrentPlan reads the loaded card. */
+function PlansPanel() {
+  const navigate = useNavigate();
+  const { packages, currentPkgId, planExpired, userCycle, dataReady, subLoaded } = useCurrentPlan();
+  const [term, setTerm] = useState<Term>("yearly");
+  const pinned = useRef(false);
+  useEffect(() => {
+    if (pinned.current || !dataReady || !userCycle) return;
+    setTerm(userCycle);
+    pinned.current = true;
+  }, [dataReady, userCycle]);
+
+  const ownPkg = Number(currentPkgId);
+  // The free trial is only for people who haven't had a paid plan (or an expired trial).
+  const hideTrial = ownPkg === 5 || ownPkg === 6 || (ownPkg === 7 && planExpired);
+  // No cards until the plan is known, so a wrong ACTIVE badge never flashes.
+  const plans = !subLoaded ? [] : (packages || [])
+    .filter((p) => PLAN_ORDER.includes(p.id) && !(p.id === 7 && hideTrial))
+    .sort((a, b) => PLAN_ORDER.indexOf(a.id) - PLAN_ORDER.indexOf(b.id));
+  const span = PLAN_TERMS.find((t) => t.id === term)?.span ?? "";
+
+  return (
+    <div className="bg-white rounded-2xl border border-[#F1F5F9] shadow-premium p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <p className="text-xs font-semibold text-[#0F172A]">Plans <span className="text-[#94A3B8] font-normal">· incl. taxes</span></p>
+        <div role="radiogroup" aria-label="Billing term" className="inline-flex items-center gap-0.5 rounded-lg bg-[#F1F5F9] p-0.5">
+          {PLAN_TERMS.map((t) => (
+            <button key={t.id} type="button" role="radio" aria-checked={term === t.id}
+              onClick={() => { pinned.current = true; setTerm(t.id); }}
+              className={`h-7 px-2.5 rounded-md text-[10.5px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] ${term === t.id ? "bg-white text-[#0F172A] shadow-sm" : "text-[#64748B] hover:text-[#0F172A]"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className={`grid gap-2.5 ${plans.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+        {plans.map((p) => {
+          const isTrial = p.id === 7;
+          const price = isTrial ? 0 : Number(term === "triennial" ? p.threeYearPrice : term === "yearly" ? p.yearlyPrice : p.monthlyPrice);
+          const isOwn = !planExpired && p.id === ownPkg;
+          // The trial has a single 30-day term, so it's active whichever term is shown.
+          const isActive = isOwn && (isTrial || (userCycle !== null && userCycle === term));
+          const ownOtherTerm = isOwn && !isActive && userCycle !== null;
+          const otherLabel = PLAN_TERMS.find((t) => t.id === userCycle)?.label;
+          return (
+            <div key={p.id} className={`relative rounded-xl border overflow-hidden flex flex-col transition-shadow ${isActive ? "border-[#F7B31C] bg-gradient-to-b from-[#FFFBEB] to-white shadow-[0_4px_16px_-8px_rgba(247,179,28,0.5)]" : "border-[#E2E8F0]"}`}>
+              <div className="text-center pt-3 pb-2 px-2">
+                <p className="text-[11px] font-bold text-[#14B8A6] leading-none uppercase">{p.name}</p>
+                <p className="text-lg font-extrabold text-[#0F172A] mt-1.5 leading-none tabular-nums">{Math.round(price).toLocaleString("en-IN")}/-</p>
+                <p className="text-[10px] text-[#94A3B8] mt-1">{isTrial ? "30 Days" : span}</p>
+              </div>
+              <div className="p-2 mt-auto">
+                {isActive
+                  ? <span className="flex items-center justify-center w-full py-1.5 rounded-lg bg-[#FEF3C7] text-[#92400E] text-[10px] font-bold tracking-wide">ACTIVE</span>
+                  : ownOtherTerm
+                    ? <span className="flex items-center justify-center w-full py-1.5 rounded-lg bg-[#F1F5F9] text-[#64748B] text-[10px] font-bold tracking-wide text-center">ON {otherLabel?.toUpperCase()}</span>
+                    : isOwn
+                      ? <span className="flex items-center justify-center w-full py-1.5 rounded-lg bg-[#F1F5F9] text-[#64748B] text-[10px] font-bold tracking-wide">YOUR PLAN</span>
+                      : <button type="button" onClick={() => navigate("/dashboard/subscription")} className="w-full py-1.5 rounded-lg bg-gradient-to-r from-[#0F172A] to-[#1E293B] text-white text-[10px] font-bold hover:opacity-90 transition-opacity">BUY</button>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
