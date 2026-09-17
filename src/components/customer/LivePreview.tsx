@@ -4,6 +4,8 @@ import { readCustomer, scopedKey } from "@/hooks/useCustomer";
 import { healUploadUrl } from "@/lib/img";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
+import { useDesignDraft } from "@/lib/designDraft";
+import DraftDesignBar from "@/components/customer/DraftDesignBar";
 
 /* Live card preview for every Edit Card module page.
 
@@ -28,6 +30,8 @@ function readList(base: string): Item[] {
 
 export default function LivePreview({ height = 620, frame = true }: { height?: number | string; frame?: boolean }) {
   const { data: program } = trpc.referral.myProgram.useQuery();
+  // A template being tried (picked, not applied) is shown in the preview.
+  const draft = useDesignDraft();
   const [html, setHtml] = useState("");
   const [views, setViews] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
@@ -60,7 +64,8 @@ export default function LivePreview({ height = 620, frame = true }: { height?: n
     const t = setTimeout(() => {
       // Keep the reader where they were instead of jumping to the top — unless the
       // template changed, in which case the new design starts from its top.
-      const current = readCustomer();
+      const saved = readCustomer();
+      const current = draft ? { ...saved, theme: draft.theme, color: draft.color, color2: draft.color2 } : saved;
       const theme = String((current as { theme?: unknown }).theme ?? "");
       if (themeRef.current !== null && themeRef.current !== theme) {
         scrollRef.current = 0;
@@ -85,9 +90,9 @@ export default function LivePreview({ height = 620, frame = true }: { height?: n
         readList("dc_qrcode") as Parameters<typeof buildCardHtml>[5],
         readList("dc_reviews") as Parameters<typeof buildCardHtml>[6],
       ));
-    }, 260);
+    }, draft ? 60 : 260);
     return () => clearTimeout(t);
-  }, [tick, program?.code, views]);
+  }, [tick, program?.code, views, draft]);
 
   const iframe = (
     <iframe
@@ -103,11 +108,17 @@ export default function LivePreview({ height = 620, frame = true }: { height?: n
   );
 
   if (!frame) {
-    return <div className="rounded-2xl overflow-hidden border border-[#E2E8F0] shadow-sm bg-white">{iframe}</div>;
+    return (
+      <div>
+        <DraftDesignBar className="mb-2" />
+        <div className="rounded-2xl overflow-hidden border border-[#E2E8F0] shadow-sm bg-white">{iframe}</div>
+      </div>
+    );
   }
 
   return (
     <div>
+      <DraftDesignBar className="mb-3" />
       <div className="relative rounded-[42px] bg-gradient-to-b from-[#1E293B] to-[#0F172A] p-[9px] shadow-premium-lg ring-1 ring-black/5">
         <div className="absolute top-[9px] left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 h-6 px-4 rounded-b-2xl bg-[#0F172A]">
           <span className="w-1.5 h-1.5 rounded-full bg-[#334155]" />

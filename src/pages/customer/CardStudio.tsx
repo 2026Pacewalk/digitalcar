@@ -13,6 +13,8 @@ import { useCustomer, useLocalList, getActiveCardId, scopedKey } from "@/hooks/u
 import { useValidityDays } from "@/hooks/useValidityDays";
 import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml, isLinkBio } from "@/card-template/buildCard";
+import { useDesignDraft } from "@/lib/designDraft";
+import DraftDesignBar from "@/components/customer/DraftDesignBar";
 import { BG_PRESETS } from "@/card-template/cardBackground";
 import SectionArranger from "@/components/customer/SectionArranger";
 import { TemplatesEditor } from "@/pages/customer/Templates";
@@ -102,12 +104,15 @@ export default function CardStudio() {
   // REAL view count (base + tracked, from /api/views) so the preview matches the
   // public card rather than the raw stored field.
   const merged = useMemo(() => ({ ...data, ...form, referral_code: program?.code || "", ...(realViews != null ? { views: realViews } : {}) }), [data, form, program?.code, realViews]);
+  // A template being tried (picked, not applied) is shown in the preview.
+  const draft = useDesignDraft();
   useEffect(() => {
     const t = setTimeout(() => {
+      const shown = draft ? { ...merged, theme: draft.theme, color: draft.color, color2: draft.color2 } : merged;
       // Remember where the user scrolled so a rebuild doesn't jump back to the top
       // (so toggling a bottom section like the QR is visible right where they are) —
       // except when the TEMPLATE changed: a new design starts from its top.
-      const theme = String((merged as { theme?: unknown }).theme ?? "");
+      const theme = String((shown as { theme?: unknown }).theme ?? "");
       if (previewThemeRef.current !== null && previewThemeRef.current !== theme) {
         savedScrollRef.current = 0;
       } else {
@@ -117,10 +122,10 @@ export default function CardStudio() {
         } catch { /* cross-origin guard */ }
       }
       previewThemeRef.current = theme;
-      setPreviewHtml(buildCardHtml(merged as Parameters<typeof buildCardHtml>[0], products.items, gallery.items, videos.items, offers.items, qrcodes.items, []));
-    }, 300);
+      setPreviewHtml(buildCardHtml(shown as Parameters<typeof buildCardHtml>[0], products.items, gallery.items, videos.items, offers.items, qrcodes.items, []));
+    }, draft ? 60 : 300);
     return () => clearTimeout(t);
-  }, [merged, products.items, gallery.items, videos.items, offers.items, qrcodes.items]);
+  }, [merged, draft, products.items, gallery.items, videos.items, offers.items, qrcodes.items]);
 
   // Learn brand colours from the uploaded logo (client-side).
   const logoVal = val("logo");
@@ -723,6 +728,7 @@ export default function CardStudio() {
 
         {/* Desktop sticky preview */}
         <div className="hidden lg:block order-1 lg:order-2 sticky top-[100px]">
+          <DraftDesignBar className="mx-auto mb-3 max-w-[400px]" />
           <div className="mx-auto w-full max-w-[400px]">{phoneMock(700, previewRef)}</div>
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live preview</span>

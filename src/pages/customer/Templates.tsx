@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router";
-import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil, Lock } from "lucide-react";
+import { LayoutGrid, Check, Eye, Save, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil, Lock, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
 import { useCustomer, useLocalList, getActiveCardId, scopedKey } from "@/hooks/useCustomer";
@@ -8,6 +8,7 @@ import { contentSeeder } from "@/lib/cardContent";
 import { brandSecondaryFor } from "@/lib/brandColors";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { trpc } from "@/providers/trpc";
+import { setDesignDraft } from "@/lib/designDraft";
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const PRIMARY_SW = ["#F7B31C", "#3B82F6", "#16A34A", "#A21CAF", "#EF4444", "#06B6D4", "#F97316", "#EC4899", "#6366F1", "#0F172A"];
@@ -182,7 +183,10 @@ export function TemplatesEditor() {
       navigate("/dashboard/subscription");
       return;
     }
-    setSelId(id); setDirty(true);
+    const alreadyLive = !!p && id === currentId && !brandOn
+      && p.primary.toLowerCase() === String(data.color || "").toLowerCase()
+      && (p.secondary || "").toLowerCase() === String(data.color2 || "").toLowerCase();
+    setSelId(id); setDirty(!alreadyLive);
     if (p) { setPrimary(""); setSecondary(p.secondary); } // reset custom to preset
   };
   const updateDesign = trpc.publish.updateDesign.useMutation();
@@ -216,6 +220,62 @@ export function TemplatesEditor() {
     );
   };
 
+  // Try before applying: while a template is picked but not applied, the phone
+  // preview shows it, with Apply / Cancel above the phone (DraftDesignBar).
+  // Refs keep those buttons calling the latest apply/cancel.
+  const applyRef = useRef(apply); applyRef.current = apply;
+  const cancel = () => {
+    setDirty(false); setCustomOpen(false); setPrimary("");
+    if (currentId != null) {
+      setSelId(currentId);
+      setSecondary(presets.find((p) => p.id === currentId)?.secondary || "");
+    }
+  };
+  const cancelRef = useRef(cancel); cancelRef.current = cancel;
+  const draftOwner = useRef({}).current;
+  useEffect(() => {
+    setDesignDraft(draftOwner, dirty && selected ? {
+      theme: String(selected.style), color: effPrimary, color2: effSecondary, name: selected.name,
+      apply: () => applyRef.current(), cancel: () => cancelRef.current(),
+    } : null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, selected?.id, selected?.style, selected?.name, effPrimary, effSecondary]);
+  useEffect(() => () => setDesignDraft(draftOwner, null), [draftOwner]);
+
+  // ── Template strip: one row that scrolls left to right ──────────────
+  // A tall grid pushed the page far below the phone preview; a single row keeps
+  // the panel compact and level with the phone. Arrows page through it on
+  // desktop, swipe on touch; edge fades show there's more either side.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ start: true, end: true });
+  const syncEdge = () => {
+    const el = stripRef.current; if (!el) return;
+    const start = el.scrollLeft <= 4;
+    const end = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+    setEdge((e) => (e.start === start && e.end === end ? e : { start, end }));
+  };
+  useEffect(() => {
+    const el = stripRef.current; if (!el) return;
+    syncEdge();
+    const ro = new ResizeObserver(syncEdge);
+    ro.observe(el);
+    return () => ro.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible.length]);
+  // Open on the chosen template (the applied one can sit far along the row), and
+  // start a new category from its chosen card or its beginning.
+  useEffect(() => {
+    const el = stripRef.current; if (!el) return;
+    const card = selId != null ? el.querySelector<HTMLElement>(`[data-tpl="${selId}"]`) : null;
+    el.scrollTo({ left: card ? Math.max(0, card.offsetLeft - 6) : 0 });
+    syncEdge();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cat, presets.length, selId === null]);
+  const page = (dir: 1 | -1) => {
+    const el = stripRef.current; if (!el) return;
+    el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: "smooth" });
+  };
+
   return (
     <div className="space-y-4 sm:space-y-5">
       <div className="flex items-center justify-end gap-2"><button onClick={apply} disabled={!dirty || !selected} className="flex items-center gap-2 h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-50"><Save size={16} /> {dirty ? "Apply" : "Applied"}</button></div>
@@ -242,14 +302,26 @@ export function TemplatesEditor() {
         )}
         {/* Category filter */}
         {presets.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap mb-4">
-            {CATS.filter((c) => catCount(c) > 0 || c === "all").map((c) => (
-              <button key={c} onClick={() => setCat(c)}
-                className={`h-8 px-3 rounded-lg text-xs font-semibold capitalize transition-colors inline-flex items-center gap-1.5 ${cat === c ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>
-                {c === "featured" ? "⭐ Featured" : c}
-                <span className={`text-[10px] font-bold ${cat === c ? "text-white/70" : "text-[#94A3B8]"}`}>{catCount(c)}</span>
-              </button>
-            ))}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              {CATS.filter((c) => catCount(c) > 0 || c === "all").map((c) => (
+                <button key={c} onClick={() => setCat(c)}
+                  className={`shrink-0 h-8 px-3 rounded-lg text-xs font-semibold capitalize transition-colors inline-flex items-center gap-1.5 ${cat === c ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>
+                  {c === "featured" ? "⭐ Featured" : c}
+                  <span className={`text-[10px] font-bold ${cat === c ? "text-white/70" : "text-[#94A3B8]"}`}>{catCount(c)}</span>
+                </button>
+              ))}
+            </div>
+            {visible.length > 0 && !(edge.start && edge.end) && (
+              <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+                {([[-1, ChevronLeft, "Previous templates", edge.start], [1, ChevronRight, "More templates", edge.end]] as const).map(([dir, Icon, label, off]) => (
+                  <button key={dir} type="button" onClick={() => page(dir)} disabled={off} aria-label={label}
+                    className="w-8 h-8 rounded-full border border-[#E2E8F0] bg-white text-[#0F172A] flex items-center justify-center shadow-sm transition-colors hover:border-[#F7B31C] hover:bg-[#FFFBEB] disabled:opacity-35 disabled:hover:border-[#E2E8F0] disabled:hover:bg-white disabled:shadow-none">
+                    <Icon size={16} />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -258,13 +330,15 @@ export function TemplatesEditor() {
         ) : visible.length === 0 ? (
           <div className="text-center py-10"><Palette size={26} className="mx-auto text-[#CBD5E1] mb-2" /><p className="text-xs text-[#94A3B8]">No templates in this category yet.</p></div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="relative">
+          <div ref={stripRef} onScroll={syncEdge} aria-label="Templates"
+            className="relative flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-px-1.5 -mx-1.5 px-1.5 pt-1 pb-2">
             {visible.map((p) => {
               const isSel = selId === p.id;
               const isCurrent = currentId === p.id;
               return (
-                <button key={p.id} onClick={() => pick(p.id)}
-                  className={`relative rounded-2xl border-2 overflow-hidden bg-white transition-all group ${isSel ? "border-[#F7B31C] shadow-gold ring-2 ring-[#F7B31C]/20" : isCurrent ? "border-emerald-400 ring-2 ring-emerald-400/15" : "border-[#F1F5F9] hover:border-[#F7B31C]/50 hover:-translate-y-0.5 hover:shadow-premium"}`}>
+                <button key={p.id} data-tpl={p.id} onClick={() => pick(p.id)}
+                  className={`relative shrink-0 snap-start basis-[44%] sm:basis-[30%] xl:basis-[27%] rounded-2xl border-2 overflow-hidden bg-white transition-all group ${isSel ? "border-[#F7B31C] shadow-gold ring-2 ring-[#F7B31C]/20" : isCurrent ? "border-emerald-400 ring-2 ring-emerald-400/15" : "border-[#F1F5F9] hover:border-[#F7B31C]/50 hover:-translate-y-0.5 hover:shadow-premium"}`}>
                   {isSel && !isCurrent && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F7B31C] flex items-center justify-center z-10 shadow"><Check size={13} className="text-[#0F172A]" /></span>}
                   {isCurrent && (
                     <span className="absolute top-2 right-2 z-20 flex gap-1.5">
@@ -298,6 +372,9 @@ export function TemplatesEditor() {
               );
             })}
           </div>
+          <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 -left-1.5 w-8 bg-gradient-to-r from-white to-transparent transition-opacity ${edge.start ? "opacity-0" : "opacity-100"}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 -right-1.5 w-10 bg-gradient-to-l from-white to-transparent transition-opacity ${edge.end ? "opacity-0" : "opacity-100"}`} />
+          </div>
         )}
       </Panel>
 
@@ -317,11 +394,11 @@ export function TemplatesEditor() {
         </Panel>
       )}
 
-      {/* Sticky Preview + Apply bar — appears the moment a template is selected.
-          On mobile it sits ABOVE the bottom tab-bar (h-16 + safe area); on desktop
-          (sidebar layout, no bottom nav) it drops to the bottom edge. */}
+      {/* Sticky Preview + Apply bar for phones/tablets — it sits ABOVE the bottom
+          tab-bar (h-16 + safe area). On desktop the picked template shows in the
+          phone preview, with Apply / Cancel above it (DraftDesignBar). */}
       {dirty && selected && (
-        <div className="fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] lg:bottom-4">
+        <div className="lg:hidden fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))]">
           <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 bg-white/95 backdrop-blur rounded-2xl shadow-premium-lg border border-[#E2E8F0] pl-3.5 pr-2 py-2">
             <span className="hidden sm:flex items-center gap-2 pr-1">
               <span className="w-3.5 h-3.5 rounded-full border border-black/10" style={{ background: effPrimary }} />
