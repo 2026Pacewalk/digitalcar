@@ -53,10 +53,19 @@ export default function Marketplace() {
   const [sort, setSort] = useState<SortId>("popular");
   const [style, setStyle] = useState<StyleId>("all");
 
-  // Design style (Basic / Modern / Bio / Professional / Premium) is the
-  // template category set in the admin, stored on each product.
-  const styleOf = (p: Product): string => String((p as { templateCategory?: string }).templateCategory || "modern");
-  const inStyle = (p: Product, id: StyleId) => id === "all" ? true : id === "featured" ? !!p.isFeatured : styleOf(p) === id;
+  // Design style (Basic / Modern / Bio / Professional / Premium) and "featured"
+  // come from the template presets set in the admin — the same source as the
+  // dashboard template picker. (The copies on product rows aren't always in
+  // step.) A product maps to its preset by style number.
+  const { data: presetData } = trpc.template.presets.useQuery();
+  const presetByStyle = useMemo(() => {
+    const m = new Map<number, { category?: string; featured?: boolean }>();
+    for (const t of presetData?.list ?? []) if (!m.has(t.style)) m.set(t.style, t as { category?: string; featured?: boolean });
+    return m;
+  }, [presetData]);
+  const styleOf = (p: Product): string => presetByStyle.get(p.styleNumber)?.category || "modern";
+  const isFeat = (p: Product): boolean => presetByStyle.has(p.styleNumber) ? !!presetByStyle.get(p.styleNumber)?.featured : !!p.isFeatured;
+  const inStyle = (p: Product, id: StyleId) => id === "all" ? true : id === "featured" ? isFeat(p) : styleOf(p) === id;
   const styleCount = (id: StyleId) => products.filter((p) => inStyle(p, id)).length;
 
 
@@ -74,13 +83,13 @@ export default function Marketplace() {
       sort === "newest" ? b.id - a.id
       : sort === "price_low" ? price(a) - price(b)
       : sort === "price_high" ? price(b) - price(a)
-      : (Number(b.isFeatured) - Number(a.isFeatured)) || (a.displayOrder - b.displayOrder));
+      : (Number(isFeat(b)) - Number(isFeat(a))) || (a.displayOrder - b.displayOrder));
     // The flagship designs always lead, whatever the sort.
     const pinned = PINNED_SLUGS.flatMap((slug) => list.filter((p) => p.slug === slug));
     if (pinned.length) list = [...pinned, ...list.filter((p) => !pinned.includes(p))];
     return list;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, q, cat, sort, style]);
+  }, [products, q, cat, sort, style, presetByStyle]);
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
@@ -192,7 +201,7 @@ export default function Marketplace() {
                   <article key={p.id} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1.5 transition-all duration-300 flex flex-col">
                     <div className="relative">
                       <Link to={`/digital-business-cards-templates/${p.slug}`} className="relative block active:scale-[0.99] transition-transform">
-                        {p.isFeatured && <span role="img" aria-label="Featured design" title="Featured" className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-[#0F172A]/45 backdrop-blur-sm ring-1 ring-white/20 flex items-center justify-center shadow-sm"><Star size={13} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" /></span>}
+                        {isFeat(p) && <span role="img" aria-label="Featured design" title="Featured" className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-[#0F172A]/45 backdrop-blur-sm ring-1 ring-white/20 flex items-center justify-center shadow-sm"><Star size={13} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" /></span>}
                         <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} name={p.name} />
                         <div className="absolute inset-0 hidden md:flex items-center justify-center bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
                           <span className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0F172A] text-[13px] font-bold shadow-lg"><Eye size={14} /> Live Preview</span>
