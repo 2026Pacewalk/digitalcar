@@ -97,7 +97,9 @@ function notifyTeam(o: NfcOrder, headline: string) {
     `${o.quantity} × ${product?.name ?? o.product} (${product?.print ?? ""}) = ${money(Number(o.amount))}`,
     `Print: ${printLinesOf(o).join(" · ")}`,
     `NFC chip + QR open: ${o.cardUrl}`,
-    o.logoUrl ? `Logo: ${o.logoUrl}` : "Logo: none on the card",
+    // Most logos are embedded in the card rather than hosted, so none is sent
+    // with the order — the card itself is the source.
+    o.logoUrl ? `Logo: ${o.logoUrl}` : `Logo: take it from the customer's card (${o.cardUrl}), if it has one`,
     `Ship to: ${o.shipName}, ${o.shipPhone}`,
     `Address: ${addressOf(o)}`,
     `Promised delivery: ${NFC_DELIVERY.label}, free`,

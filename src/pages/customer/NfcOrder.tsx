@@ -104,6 +104,16 @@ function Field({ label, error, required, children, wide }: {
   );
 }
 
+/* The DigitalCarda logo is white artwork, so on the white print areas it sits
+   on a small dark badge. */
+function PoweredLogo() {
+  return (
+    <span className="inline-flex items-center rounded-[3px] bg-[#0F172A] px-1 py-[2px]">
+      <img src="/logo.png" alt="DigitalCarda" className="block h-[9px] w-auto" />
+    </span>
+  );
+}
+
 function CardPreview({ name, title, company, logo, cardUrl }: { name: string; title: string; company: string; logo: string; cardUrl: string | null }) {
   const initial = (company || name || "D").trim().charAt(0).toUpperCase();
   return (
@@ -136,7 +146,7 @@ function CardPreview({ name, title, company, logo, cardUrl }: { name: string; ti
             <p className="text-[10px] font-bold leading-tight">Tap or scan</p>
             <p className="text-[8.5px] leading-snug text-[#64748B]">to save my contact</p>
             <p className="mt-1 truncate text-[8px] font-semibold text-[#B45309]">{cardUrl ? cardUrl.replace(/^https?:\/\//, "") : "digitalcarda.in/you"}</p>
-            <p className="mt-1 text-[7px] font-bold tracking-wide text-[#94A3B8]">Powered by <span className="text-[#0F172A]">Digital<span className="text-[#D97706]">Carda</span></span></p>
+            <p className="mt-1 flex items-center gap-1 text-[7px] font-bold tracking-wide text-[#94A3B8]">Powered by <PoweredLogo /></p>
           </div>
         </div>
         <figcaption className="mt-1 text-center text-[10px] font-medium text-[#94A3B8]">Back</figcaption>
@@ -145,11 +155,12 @@ function CardPreview({ name, title, company, logo, cardUrl }: { name: string; ti
   );
 }
 
-function StandeePreview({ name, company, cardUrl }: { name: string; company: string; cardUrl: string | null }) {
+function StandeePreview({ name, company, logo, cardUrl }: { name: string; company: string; logo: string; cardUrl: string | null }) {
   return (
     <div className="flex flex-col items-center">
       <div className="w-[150px] overflow-hidden rounded-b-md rounded-t-[22px] bg-white shadow-xl ring-1 ring-[#E2E8F0]">
         <div className="bg-gradient-to-br from-[#F7B31C] to-[#D97706] px-3 pb-5 pt-3 text-center">
+          {logo && <img src={logo} alt="" className="mx-auto mb-1 h-7 max-w-[80%] rounded bg-white/95 object-contain p-0.5" />}
           <p className="truncate text-[12px] font-extrabold text-[#0F172A]">{company || name || "Your business"}</p>
           <p className="text-[8px] font-semibold text-[#0F172A]/70">Tap or scan to connect</p>
         </div>
@@ -159,7 +170,7 @@ function StandeePreview({ name, company, cardUrl }: { name: string; company: str
             {cardUrl ? <img src={qrFor(cardUrl, 180)} alt="" className="h-20 w-20" /> : <span className="flex h-20 w-20 items-center justify-center bg-[#F1F5F9]"><ScanLine size={18} className="text-[#94A3B8]" /></span>}
           </div>
           <p className="mt-1.5 text-[8px] text-[#64748B]">Save contact · Review · Pay</p>
-          <p className="mt-1 border-t border-[#F1F5F9] pt-1 text-[7.5px] font-bold tracking-wide text-[#94A3B8]">Powered by <span className="text-[#0F172A]">Digital<span className="text-[#D97706]">Carda</span></span></p>
+          <p className="mt-1 flex items-center justify-center gap-1 border-t border-[#F1F5F9] pt-1 text-[7.5px] font-bold tracking-wide text-[#94A3B8]">Powered by <PoweredLogo /></p>
         </div>
       </div>
       <div aria-hidden="true" className="mt-0.5 h-2 w-[176px] rounded-full bg-[#0F172A]/80" />
@@ -210,7 +221,11 @@ export default function CustomerNfcOrder() {
     pincode: shipEdits.pincode ?? cardAddr.pincode,
   };
   const fromCard = !!(cardAddr.line1 || cardAddr.city || cardAddr.state || cardAddr.pincode);
-  const logo = /^https:\/\//i.test(s(c.logo)) ? s(c.logo) : "";
+  // Most card logos are stored as embedded images (data:image/…), not links —
+  // show those in the preview too. Only a real https link is sent with the
+  // order; otherwise the team takes the logo from the card itself.
+  const logo = /^(https:\/\/|data:image\/)/i.test(s(c.logo)) ? s(c.logo) : "";
+  const logoLink = /^https:\/\//i.test(logo) ? logo : "";
   const cardUrl = data?.cardUrl ?? null;
   const lines = NFC_PRODUCTS.filter((p) => qtys[p.id] > 0).map((p) => ({ product: p, qty: qtys[p.id] }));
   const both = lines.length === NFC_PRODUCTS.length;
@@ -263,7 +278,7 @@ export default function CustomerNfcOrder() {
     try {
       const r = await checkout.mutateAsync({
         items: lines.map((l) => ({ product: l.product.id, quantity: l.qty })),
-        print: { ...printVal, logoUrl: logo || undefined },
+        print: { ...printVal, logoUrl: logoLink || undefined },
         shipping: { ...shipVal, phone: shipVal.phone.replace(/[\s-]/g, "") },
       });
       if ("manual" in r) {
@@ -372,7 +387,7 @@ export default function CustomerNfcOrder() {
                   <span className="flex h-[190px] items-center justify-center bg-gradient-to-br from-[#F8FAFC] to-[#FFF7E6] px-5">
                     {p.id === "nfc_card"
                       ? <CardPreview name={printVal.name} title={printVal.title} company={printVal.company} logo={logo} cardUrl={cardUrl} />
-                      : <StandeePreview name={printVal.name} company={printVal.company} cardUrl={cardUrl} />}
+                      : <StandeePreview name={printVal.name} company={printVal.company} logo={logo} cardUrl={cardUrl} />}
                   </span>
                   <span className="flex flex-1 flex-col p-4">
                     <span className="flex items-start justify-between gap-3">
