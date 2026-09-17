@@ -8,6 +8,8 @@ import { metaFor, injectCardMeta, cardSummaryHtml, type CardMeta } from "./card-
 import { cardSeo } from "../../src/lib/cardSeo";
 import { ogSignature } from "./card-og";
 import { blogMeta, BLOG_POST_PATH } from "./blog-meta";
+import { industryMeta, INDUSTRY_PATH } from "./industry-meta";
+import { getIndustry } from "../../src/data/industries";
 
 type App = Hono<{ Bindings: HttpBindings }>;
 const SITE = "https://digitalcarda.in";
@@ -219,7 +221,10 @@ async function ssrSeeds(clean: string): Promise<SsrSeed[]> {
     jobs.push(run().then((data) => ({ path: procPath, input, data }), () => null));
 
   const product = clean.match(PRODUCT_PATH);
-  if (clean === "/" || clean === "/digital-business-cards-templates" || clean === "/sitemap" || product) {
+  // The industry hub and every industry page show template designs from the
+  // catalogue (the same call, no input), so the tiles are in the server HTML.
+  if (clean === "/" || clean === "/digital-business-cards-templates" || clean === "/sitemap" || product
+    || clean === "/industries" || INDUSTRY_PATH.test(clean)) {
     seed("product.catalogue", undefined, () => caller.product.catalogue());
   }
   if (product) {
@@ -268,10 +273,30 @@ export function serveStaticFiles(app: App) {
     const pathname = reqUrl.pathname;
     const clean = pathname.replace(/\/+$/, "") || "/";
     const isBlogPost = BLOG_POST_PATH.test(clean);
-    const ssrWanted = SSR_ENABLED && (SSR_PATHS.has(clean) || PRODUCT_PATH.test(clean) || isBlogPost);
+    // Any single segment under /industries — decided below: a known page renders,
+    // anything else is a real 404. Not decoded: valid slugs have no escapes, and
+    // decodeURIComponent can throw.
+    const industryMatch = INDUSTRY_PATH.exec(clean);
+    const ssrWanted = SSR_ENABLED && (SSR_PATHS.has(clean) || PRODUCT_PATH.test(clean) || isBlogPost || !!industryMatch);
+    // /industries/Doctors → /industries/doctors: one URL per page, so a pasted
+    // link with a capital never becomes a second, non-indexable copy. Only when
+    // the lowercase form is a real page; other spellings fall through to 404.
+    if (industryMatch) {
+      const lower = industryMatch[1].toLowerCase();
+      if (lower !== industryMatch[1] && getIndustry(lower)) return c.redirect(`/industries/${lower}${reqUrl.search}`, 301);
+    }
     // Rendered markup can depend on the query string, so it's part of the key
-    // for rendered routes; head-only pages ignore it, as before.
-    const cacheKey = ssrWanted ? pathname + reqUrl.search : pathname;
+    // for rendered routes; head-only pages ignore it, as before. The industry
+    // pages read nothing from it and the hub only `group`, so a shared link's
+    // tracking parameters (utm_*, fbclid) are dropped here: they would
+    // otherwise render and cache a ~0.5 MB copy per distinct query string.
+    let search = reqUrl.search;
+    if (industryMatch) search = "";
+    else if (clean === "/industries") {
+      const group = reqUrl.searchParams.get("group");
+      search = group ? `?group=${encodeURIComponent(group)}` : "";
+    }
+    const cacheKey = ssrWanted ? pathname + search : pathname;
 
     const hit = htmlCache.get(cacheKey);
     if (hit && Date.now() - hit.at < HTML_TTL) {
@@ -282,9 +307,11 @@ export function serveStaticFiles(app: App) {
     let cacheable = false;
     let status: 200 | 404 = 200;
     try {
-      // The blog is checked first: its paths are ours, so a customer card that
-      // happened to use the slug "blog" can never take over the blog's meta.
-      const meta = blogMeta(pathname) || (await productMeta(pathname, distPath)) || (await demoMeta(pathname, distPath))
+      // The blog and the industry pages are checked first: their paths are ours,
+      // so a customer card that happened to use the slug "blog" or "industries"
+      // can never take over those pages' <head>. (The hub used to reach
+      // cardSnapshotMeta before metaFor, so a card named "industries" could.)
+      const meta = blogMeta(pathname) || industryMeta(pathname) || (await productMeta(pathname, distPath)) || (await demoMeta(pathname, distPath))
         || (await cardSnapshotMeta(pathname)) || metaFor(pathname, distPath);
       // Soft-404 guard: render a product page only when that product exists.
       // Otherwise an unknown slug would come back as a 200 with a full "not
@@ -292,8 +319,11 @@ export function serveStaticFiles(app: App) {
       const productOk = !PRODUCT_PATH.test(clean) || meta?.ogType === "product";
       // Same for articles: an unknown /blog/<slug> is a real 404, not a thin page.
       const blogOk = !isBlogPost || meta?.ogType === "article";
-      if (!blogOk) status = 404;
-      const ssr = ssrWanted && productOk && blogOk ? await renderPublic(clean, pathname + reqUrl.search) : null;
+      // And for /industries/<slug>: the data decides (exact slug), not og:type,
+      // because industry pages are ordinary "website" pages.
+      const industryOk = !industryMatch || !!getIndustry(industryMatch[1]);
+      if (!blogOk || !industryOk) status = 404;
+      const ssr = ssrWanted && productOk && blogOk && industryOk ? await renderPublic(clean, pathname + search) : null;
 
       // With rendered markup the page has its real <h1>; the hidden placeholder
       // heading is only for pages that still arrive empty.

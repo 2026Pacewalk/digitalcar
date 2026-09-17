@@ -30,6 +30,7 @@ const Marketplace = lazy(() => import("./pages/public/Marketplace"));
 const ProductDetail = lazy(() => import("./pages/public/ProductDetail"));
 const CardDemo = lazy(() => import("./pages/public/CardDemo"));
 const Industries = lazy(() => import("./pages/public/Industries"));
+const IndustryPage = lazy(() => import("./pages/public/IndustryPage"));
 const Pricing = lazy(() => import("./pages/public/Pricing"));
 const BulkCards = lazy(() => import("./pages/public/BulkCards"));
 const AIGenerator = lazy(() => import("./pages/public/AIGenerator"));
@@ -209,6 +210,7 @@ export default function App() {
           <Route path="/digital-business-cards/:slug" element={<LegacyProductRedirect />} />
           <Route path="/demo/:slug" element={<CardDemo />} />
           <Route path="/industries" element={<Industries />} />
+          <Route path="/industries/:slug" element={<IndustryPage />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/bulk-cards" element={<BulkCards />} />
           <Route path="/ai-card-generator" element={<AIGenerator />} />

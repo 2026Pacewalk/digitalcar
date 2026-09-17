@@ -42,7 +42,9 @@ const ICONS: Record<string, LucideIcon> = {
   "/sitemap": MapIcon,
   "/blog": BookOpen,
 };
-const iconFor = (href: string): LucideIcon => ICONS[href] ?? (href.startsWith("/digital-business-cards-templates/") ? CreditCard : FileText);
+const iconFor = (href: string): LucideIcon =>
+  ICONS[href] ??
+  (href.startsWith("/industries/") ? Building2 : href.startsWith("/digital-business-cards-templates/") ? CreditCard : FileText);
 
 const isActive = (pathname: string, href: string) =>
   href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);

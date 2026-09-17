@@ -2,14 +2,14 @@ import type { BlogPost } from "../types";
 
 export const digitalVisitingCardForDoctors: BlogPost = {
   slug: "digital-visiting-card-for-doctors",
-  title: "Digital Visiting Card for Doctors and Clinics: What to Include (and What to Leave Off)",
-  seoTitle: "Digital Visiting Card for Doctors & Clinics: What to Include",
-  description: "What to put on a digital visiting card for doctors and clinics: timings, location, a booking button and registration details, plus what to leave off.",
-  excerpt: "Patients need your timings, your location and a way to book, not your life story. What to put on a digital visiting card for doctors, dentists and clinics.",
+  title: "Doctor Visiting Card Format: What to Include (and What to Leave Off)",
+  seoTitle: "Doctor Visiting Card Format: What to Include & Leave Off",
+  description: "The format for a doctor's or clinic's visiting card: timings, location, a booking button and registration details, plus what NMC rules say to leave off.",
+  excerpt: "Patients need your timings, your location and a way to book, not your life story. The visiting card format that works for doctors, dentists and clinics, and what to leave off.",
   category: "industries",
-  keywords: ["digital visiting card for doctors", "visiting card for doctor", "doctor visiting card format", "clinic visiting card", "digital business card for doctors", "make doctor visiting card online"],
+  keywords: ["doctor visiting card format", "what to write on a doctor visiting card", "clinic visiting card", "NMC rules doctor visiting card"],
   publishedAt: "2026-07-03",
-  updatedAt: "2026-07-03",
+  updatedAt: "2026-09-17",
   cover: { motif: "clinic", tone: "teal" },
   takeaways: [
     "Put clinic timings, location and an appointment button at the top.",
@@ -18,7 +18,7 @@ export const digitalVisitingCardForDoctors: BlogPost = {
     "A QR standee at reception lets patients save your number while they wait, without asking staff.",
   ],
   intro: [
-    "A **digital visiting card for doctors** is a small mobile web page, shared as a link or QR code, that shows your name, qualifications, clinic timings and address, with one-tap Call, WhatsApp and Save Contact buttons. What patients need most from it is simple: when you consult, where the clinic is, and how to book.",
+    "A **doctor's digital visiting card** is a small mobile web page, shared as a link or QR code, that shows your name, qualifications, clinic timings and address, with one-tap Call, WhatsApp and Save Contact buttons. What patients need most from it is simple: when you consult, where the clinic is, and how to book.",
     "Here's the gap it closes. A patient leaves your clinic with a prescription and a vague memory of your name. Three weeks later they need a follow-up, search for \"Dr Sharma\", can't find the right one, and end up somewhere else.",
     "A doctor's card isn't a sales page, though. Here's what belongs on it, what to leave off, and how to set it up.",
   ],
@@ -81,7 +81,7 @@ export const digitalVisitingCardForDoctors: BlogPost = {
     },
     {
       id: "getting-started",
-      heading: "How to make a doctor visiting card online",
+      heading: "Putting the format into a digital card",
       blocks: [
         { type: "steps", items: [
           { title: "Pick a calm, clean design", text: "Whites, blues and teals suit a clinic visiting card design, and our [layout and colour ideas for visiting cards](/blog/visiting-card-design-ideas) help keep it easy to read." },
@@ -89,6 +89,7 @@ export const digitalVisitingCardForDoctors: BlogPost = {
           { title: "Preview on your phone", text: "Tap every button to check the links work." },
           { title: "Share it after every booking", text: "Your front desk can send the link to patients on WhatsApp." },
         ] },
+        { type: "cta", title: "Make your clinic's card", text: "See what a digital visiting card for doctors includes, with sample designs.", href: "/industries/doctors", label: "Digital cards for doctors" },
         { type: "p", text: "You'll find ideas for other professions on our [industries page](/industries)." },
         { type: "cta", title: "A card patients can actually find you with", text: "Timings, location, appointment buttons and Save Contact on one page. Free for 30 days, no payment needed.", href: "/signup?promo=FREE30D", label: "Create a clinic card free" },
       ],

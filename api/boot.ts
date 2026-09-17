@@ -1132,9 +1132,18 @@ app.get("/sitemap.xml", async (c) => {
     images.filter(Boolean).slice(0, 5).map((i) => `<image:image><image:loc>${esc(abs(i))}</image:loc></image:image>`).join("");
   const url = (loc: string, pri: string, lastmod = "", images: string[] = []) =>
     `  <url><loc>${esc(loc)}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<priority>${pri}</priority>${imageTags(images)}</url>`;
+  // Industry pages: one URL per profession, dated by the page's own last edit.
+  // Detail pages carry no image entries: they don't show the persona pictures.
+  const { INDUSTRIES, industryPath, industriesLastmod, PERSONA_IMAGE_DIR } = await import("../src/data/industries");
+  const industryUrls = INDUSTRIES.map((i) => url(`${base}${industryPath(i.slug)}`, "0.7", i.updatedAt));
+  // The hub changes when a profession page is added or edited, not on every deploy.
+  const industryLastmod = industriesLastmod() || deployDay;
   // The pictures each marketing page shows (the page itself is server-rendered).
   const pageImages: Record<string, string[]> = {
     "": ["/hero/digital-business-card-app-mockup.png", "/hero/digital-business-card-nfc-card-professional.png", "/hero/digital-business-card-analytics-dashboard.png"],
+    // The hub's cards show the sample phone screenshots. Several professions
+    // share one picture, so each is listed once (imageTags keeps the first 5).
+    "/industries": [...new Set(INDUSTRIES.flatMap((i) => (i.mockup ? [`${PERSONA_IMAGE_DIR}/${i.mockup.img}.png`] : [])))],
   };
 
   // Cards: legacy customers.json plus cards published from the dashboard. Only
@@ -1175,8 +1184,9 @@ app.get("/sitemap.xml", async (c) => {
   const productImages = (images: unknown) => (Array.isArray(images) ? images : []).map((i) => String(i ?? "").trim()).filter((i) => /^(https?:\/\/|\/)/i.test(i));
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n` +
-    pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", p === "/blog" ? blogLastmod : deployDay, pageImages[p] ?? [])).join("\n") + "\n" +
+    pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", p === "/blog" ? blogLastmod : p === "/industries" ? industryLastmod : deployDay, pageImages[p] ?? [])).join("\n") + "\n" +
     blogUrls.join("\n") + "\n" +
+    industryUrls.join("\n") + "\n" +
     productRows.map((r) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(r.slug)}`, "0.8", day(r.updatedAt), productImages(r.images))).join("\n") + "\n" +
     cardUrls.join("\n") +
     `\n</urlset>`;

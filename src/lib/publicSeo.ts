@@ -14,7 +14,9 @@
  *                                      visiting card maker (8.1K), digital visiting card maker (1K)
  *   /digital-business-cards-templates  visiting card design (90.5K), digital business card templates
  *   /pricing                           digital visiting card price, nfc card price (590)
- *   /industries                        visiting card for doctor (1K)
+ *   /industries                        visiting card for business (1K); each /industries/<slug> owns its
+ *                                      profession's term (e.g. visiting card for doctor → /industries/doctors),
+ *                                      see src/data/industries
  *   /email-signature-generator         email signature generator (3.6K), free … (590)
  *   /whatsapp-message-templates        whatsapp business message templates (1K)
  *   /blog/*                            one article per informational cluster — see src/data/blog
@@ -81,8 +83,8 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
     crumb: "Card Templates",
   },
   "/industries": {
-    title: "Digital Visiting Cards for Doctors, Real Estate & More",
-    description: "Digital visiting cards for doctors, real estate agents, lawyers, consultants, restaurants, salons, coaches and agencies — made for how each finds clients.",
+    title: "Digital Visiting Card for Business, by Profession",
+    description: "Digital visiting cards for doctors, advocates, CAs, property dealers, salons, restaurants and more: what each card needs. Free for 30 days.",
     crumb: "Industries",
   },
   "/pricing": {

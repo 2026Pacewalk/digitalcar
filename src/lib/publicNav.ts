@@ -133,6 +133,9 @@ export const HEADER_MENUS: HeaderMenu[] = [
     items: [
       { label: "Card templates", href: "/digital-business-cards-templates", desc: "Ready-made digital business cards for every profession" },
       { label: "Industries", href: "/industries", desc: "Cards for doctors, real estate, lawyers, salons and more" },
+      { label: "For doctors", href: "/industries/doctors", desc: "Clinic QR, directions and save contact for patients" },
+      { label: "For advocates", href: "/industries/advocates", desc: "A factual card with practice areas and contact details" },
+      { label: "For real estate agents", href: "/industries/real-estate", desc: "Property photos, WhatsApp and an enquiry form" },
     ],
     feature: {
       eyebrow: "Live demos",
@@ -183,8 +186,37 @@ export const HEADER_LINKS: NavLink[] = [
   { label: "Contact", href: "/contact" },
 ];
 
+/** The profession pages under /industries, for the header search. Listed by
+ *  hand (this file can't import src/data/industries); api/lib/public-nav.test.ts
+ *  fails if a slug stops matching a registered page or a page has no entry
+ *  here. Same order as the hub. Each desc names only features the page itself
+ *  claims, so it stays true when the page's wording is checked. */
+export const INDUSTRY_SEARCH: NavLink[] = [
+  { label: "Digital card for advocates & lawyers", href: "/industries/advocates", desc: "Enrolment details, practice areas, call, email and save contact by QR" },
+  { label: "Digital card for doctors & clinics", href: "/industries/doctors", desc: "Call, WhatsApp, directions and save contact for patients, from a clinic QR" },
+  { label: "Digital card for real estate agents", href: "/industries/real-estate", desc: "Property photos, WhatsApp, directions, an enquiry form and a Leads list" },
+  { label: "Digital card for insurance agents", href: "/industries/insurance-agents", desc: "For LIC, insurance and mutual fund advisors: plans, WhatsApp and an enquiry form" },
+  { label: "Digital card for chartered accountants", href: "/industries/chartered-accountants", desc: "ITR, GST and accounting services, WhatsApp, email and save contact" },
+  { label: "Digital card for beauty parlours & salons", href: "/industries/beauty-parlours", desc: "Services with prices, offers, a gallery and a Google review button" },
+  { label: "Digital card for restaurants & cafes", href: "/industries/restaurants", desc: "Menu photos, directions, offers, payment QR and a Google review button" },
+  { label: "Digital card for physiotherapists", href: "/industries/physiotherapists", desc: "Call, WhatsApp, directions and exercise videos for clinic and home visits" },
+  { label: "Digital card for makeup artists", href: "/industries/makeup-artists", desc: "Bridal portfolio, Instagram reels, packages and an enquiry form" },
+  { label: "Digital card for jewellers", href: "/industries/jewellers", desc: "Collections in a photo gallery, offers, directions and WhatsApp" },
+  { label: "Digital card for electricians & plumbers", href: "/industries/home-services", desc: "One-tap call, service prices, payment QR and a Google review button" },
+  { label: "Digital card for photographers", href: "/industries/photographers", desc: "Full-screen gallery, videos, packages and an enquiry form in one link" },
+  { label: "Digital card for boutiques", href: "/industries/boutiques", desc: "New arrivals as photos and reels, offers, WhatsApp and Instagram" },
+  { label: "Digital card for travel agencies", href: "/industries/travel-agencies", desc: "Tour packages with prices, offers with end dates and an enquiry form" },
+  { label: "Digital card for event planners", href: "/industries/event-planners", desc: "Past-event gallery, packages and an enquiry form for planners, decorators and caterers" },
+  { label: "Digital card for car dealers", href: "/industries/automobile", desc: "Car photos with prices, WhatsApp, an enquiry form and a card for each salesperson" },
+  { label: "Digital card for schools & coaching classes", href: "/industries/schools-coaching", desc: "Courses with fees, directions, admission enquiries and a card for each teacher" },
+  { label: "Digital card for interior designers & architects", href: "/industries/interior-designers", desc: "Project gallery, videos, services and an enquiry form" },
+  { label: "Digital card for agencies & freelancers", href: "/industries/digital-agencies", desc: "Services, portfolio, Leads list, analytics and team cards for IT and marketing" },
+  { label: "Digital card for consultants & coaches", href: "/industries/consultants", desc: "Services, session videos, an enquiry form and a Leads list for follow-ups" },
+];
+
 /** What the header search looks through, most-visited first (shown before
- *  anything is typed). Card templates are added live from the catalogue. */
+ *  anything is typed). Card templates are added live from the catalogue.
+ *  Industry pages come last so the first 8 shown before typing stay the same. */
 export const SEARCH_PAGES: NavLink[] = [
   { label: "Card templates", href: "/digital-business-cards-templates", desc: "Ready-made digital business cards" },
   { label: "Pricing", href: "/pricing", desc: "Plans from Rs. 99/month, 30-day free trial" },
@@ -205,4 +237,5 @@ export const SEARCH_PAGES: NavLink[] = [
   { label: "Sign in", href: "/login", desc: "Customer, reseller and admin login" },
   { label: "Sitemap", href: "/sitemap", desc: "Every page on DigitalCarda" },
   ...LEGAL_LINKS.map((l) => ({ ...l, desc: "Policies" })),
+  ...INDUSTRY_SEARCH,
 ];
