@@ -156,6 +156,18 @@ export function accountPackageId(): number {
   return 7;
 }
 
+/** The account's PRIMARY card record, where the account-level plan lives
+    (package_id, activated_on, expired_on) — a non-primary card's copy is frozen
+    at creation and can be stale. Null when signed out or not stored yet. */
+export function readAccountCustomer(): Record<string, unknown> | null {
+  const u = getAuthUser();
+  if (!u) return null;
+  try {
+    const raw = localStorage.getItem(`dc_customer__u${u.id}`);
+    return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+  } catch { return null; }
+}
+
 /** Namespace a base localStorage key to the current user + active card.
     Primary card (id 1) → legacy `base__u{id}` keys (no data migration). */
 export function scopedKey(base: string): string {

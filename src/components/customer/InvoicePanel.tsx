@@ -30,6 +30,8 @@ type Inv = {
 };
 
 const inr = (v: unknown) => "₹" + (Number(v) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/* The billing term as printed on an invoice. 3-Year plans used to show "Monthly". */
+const termLabel = (c?: string | null) => (c === "triennial" ? "3 Years" : c === "yearly" ? "Yearly" : "Monthly");
 const fmtDate = (s: string | Date | null) => {
   if (!s) return "—";
   const d = new Date(typeof s === "string" ? s.replace(" ", "T") : s);
@@ -39,7 +41,7 @@ const fmtDate = (s: string | Date | null) => {
 /* Printable HTML for the browser's Print / Save-as-PDF dialog */
 function invoiceHtml(inv: Inv, buyer: CustomerRecord): string {
   const plan = inv.subscription?.package?.name || "Subscription Plan";
-  const cycle = inv.subscription?.billingCycle === "yearly" ? "Yearly" : "Monthly";
+  const cycle = termLabel(inv.subscription?.billingCycle);
   const cgst = (Number(inv.taxAmount) / 2).toFixed(2);
   const esc = (v: unknown) => String(v ?? "").replace(/</g, "&lt;");
   return `<!doctype html><html><head><meta charset="utf-8"><title>${inv.invoiceNumber}</title>
@@ -192,7 +194,7 @@ export default function InvoicePanel({ buyer }: { buyer: CustomerRecord }) {
                 <div className="px-3.5 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-[12px] font-semibold text-[#0F172A]">{view.subscription?.package?.name || "Subscription Plan"}</p>
-                    <p className="text-[10px] text-[#94A3B8]">{view.subscription?.billingCycle === "yearly" ? "Yearly" : "Monthly"} · {fmtDate(view.paidAt || view.createdAt)}</p>
+                    <p className="text-[10px] text-[#94A3B8]">{termLabel(view.subscription?.billingCycle)} · {fmtDate(view.paidAt || view.createdAt)}</p>
                   </div>
                   <p className="text-[13px] font-bold text-[#0F172A] tabular-nums">{inr(view.amount)}</p>
                 </div>

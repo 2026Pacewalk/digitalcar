@@ -106,6 +106,20 @@ async function computeAmount(
     where: and(eq(subscriptions.userId, user.id), gt(subscriptions.amount, "0")),
     orderBy: [desc(subscriptions.createdAt)],
   });
+  // Upgrade credit (what they already paid comes off the new price) applies only
+  // while that paid plan is still running. Once it has lapsed, a renewal or a
+  // switch is a fresh purchase at full price — otherwise an expired member could
+  // renew for the difference, often ₹0. The referral discount stays first-plan-only.
+  // The credit comes from the member's CURRENT plan — the newest row, the same
+  // one the Subscription page shows — and only while it is paid and running.
+  // (existingPaid, any paid row ever, still decides first-plan referral pricing.)
+  const latest = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.userId, user.id),
+    orderBy: [desc(subscriptions.createdAt)],
+  });
+  const paidPlanActive = !!latest && n(latest.amount) > 0
+    && (latest.status === "active" || latest.status === "trial")
+    && new Date(latest.currentPeriodEnd).getTime() > Date.now();
   let charged: number, discountPct = 0;
   if (!existingPaid) {
     if (user.referredById) {
@@ -113,8 +127,10 @@ async function computeAmount(
       discountPct = row ? n(row.value) : 15;
     }
     charged = round2(base * (1 - discountPct / 100));
+  } else if (paidPlanActive && latest) {
+    charged = Math.max(0, round2(base - n(latest.amount)));
   } else {
-    charged = Math.max(0, round2(base - n(existingPaid.amount)));
+    charged = round2(base);
   }
   // The offer percentage is server-controlled; the client may only request it.
   const offer = wantsOffer ? await getUpgradeOfferPercent(db) : 0;
@@ -128,7 +144,7 @@ async function computeAmount(
     coupon = { id: r.coupon.id, code: r.coupon.code, discount: r.discount, before: charged };
     charged = charged - r.discount;
   }
-  return { pkg, base, charged, isUpgrade: !!existingPaid, coupon };
+  return { pkg, base, charged, isUpgrade: paidPlanActive, coupon };
 }
 
 /* Atomically flip a pending order → verified. The WHERE status='pending' guard

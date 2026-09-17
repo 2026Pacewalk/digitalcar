@@ -6,25 +6,65 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { getOfferExpiry, OFFER_PERCENT } from "@/lib/upgradeOffer";
-import { useCustomer } from "@/hooks/useCustomer";
+import { useCustomer, DEFAULT_CUSTOMER, readAccountCustomer } from "@/hooks/useCustomer";
 import { planFeatures, planRank, isFreePlan, type PlanPkg } from "@/lib/planFeatures";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
 const TERM_LABEL: Record<"monthly" | "yearly" | "triennial", string> = { monthly: "Monthly", yearly: "Yearly", triennial: "3-Year" };
 const inr = (v: number) => "₹" + Math.round(Number(v) || 0).toLocaleString("en-IN");
+/* Milliseconds from a date that may arrive as a Date (tRPC/superjson sends DB
+   timestamps as Date objects) or as a "YYYY-MM-DD HH:MM:SS" string (card
+   records). NaN when missing or unparseable. The old String(v).replace(" ", "T")
+   turned every Date into NaN, which is why the page couldn't tell a member's
+   term and showed "Current Plan" on every tab. */
+const toMs = (v: unknown): number => {
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === "string" && v.trim()) return new Date(v.trim().replace(" ", "T")).getTime();
+  return NaN;
+};
+const fmtDay = (ms: number) => new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+/* The page body renders INSIDE the dashboard layout, which waits for the card
+   record to load before showing its children — so every hook below reads the
+   member's real card, never the first-render placeholder. */
+type Term = "monthly" | "yearly" | "triennial";
+type PayFor = { id: number; name: string; amount: number; cycle: Term };
 
 export default function CustomerSubscription() {
+  // Kept up here, outside the layout: crossing the mobile/desktop breakpoint
+  // swaps layouts and remounts the body, which must not reset the tab or close
+  // an open payment.
+  const [cycle, setCycle] = useState<Term>("yearly");
+  const cyclePinned = useRef(false);
+  const [payFor, setPayFor] = useState<PayFor | null>(null);
+  return (
+    <ResponsiveDashboardLayout>
+      <SubscriptionBody cycle={cycle} setCycle={setCycle} cyclePinned={cyclePinned} payFor={payFor} setPayFor={setPayFor} />
+    </ResponsiveDashboardLayout>
+  );
+}
+
+function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
+  cycle: Term; setCycle: (c: Term) => void; cyclePinned: { current: boolean };
+  payFor: PayFor | null; setPayFor: (p: PayFor | null) => void;
+}) {
   const utils = trpc.useUtils();
-  const { data: subscription } = trpc.subscription.mySubscription.useQuery();
+  const subQ = trpc.subscription.mySubscription.useQuery();
+  const subscription = subQ.data;
   const { data: packages } = trpc.package.list.useQuery();
   const { data: customer } = useCustomer();
   const { data: discount } = trpc.referral.myDiscount.useQuery();
+  // The plan is account-level: read it from the PRIMARY card's record (this body
+  // mounts after hydration, so it's in storage). The active card is still used
+  // for everything card-specific.
+  const [accountRec] = useState(() => readAccountCustomer());
+  const planRec = (accountRec ?? customer) as Record<string, unknown>;
+  // (4) A self-signup trial has no subscriptions row — its clock is the trial record.
+  const { data: trial } = trpc.trial.me.useQuery(undefined, { retry: false });
   const { data: orders } = trpc.payment.myOrders.useQuery();
   const pendingOrder = (orders || []).find((o) => o.status === "pending");
 
-  const [cycle, setCycle] = useState<"monthly" | "yearly" | "triennial">("yearly");
-  const isYearly = cycle !== "monthly"; // "billed yearly+"-style copy for any multi-month term
   const [now, setNow] = useState(() => Date.now());
   const [offerExp, setOfferExp] = useState<number>(0);
   useEffect(() => { setOfferExp(getOfferExpiry()); const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
@@ -33,40 +73,59 @@ export default function CustomerSubscription() {
   // record (package_id: 5=Gold, 6=Platinum, 7=Trial — same ids as the packages
   // table) but no row in the new `subscriptions` table. Fall back to it so the
   // Subscription page shows the SAME plan as the Profile page instead of "Free".
-  const legacyPkgId = Number(customer?.package_id) || 0;
+  const legacyPkgId = Number(planRec?.package_id) || 0;
   const currentPkgId = subscription?.package?.id ?? (legacyPkgId || undefined);
   const currentPlan = (packages || []).find((p) => p.id === currentPkgId);
   const currentPlanName = subscription?.package?.name || currentPlan?.name || "Free";
   const currentPaid = Number(subscription?.amount) || 0;
   // Is the current plan past its validity? An expired member may pick ANY plan
   // (including a downgrade, e.g. Platinum → Gold) to re-subscribe.
-  const expiryRaw = subscription?.currentPeriodEnd || (customer?.expired_on as string | undefined);
-  const planExpired = !!currentPkgId && !!expiryRaw &&
-    new Date(String(expiryRaw).replace(" ", "T")).getTime() < Date.now();
-  // Which billing TERM the member is actually on — derived from their validity
-  // span (subscriptions don't expose it, legacy cards have none). So "Current
-  // Plan" only shows under the matching term (e.g. 3 Years, not also Yearly).
+  // A plan in the subscriptions table: the server has already decided (isActive).
+  // A legacy card with no row: expired when its end date has passed.
+  const onSignupTrial = !subscription && Number(currentPkgId) === 7 && !!trial
+    && trial.status !== "not_started" && trial.status !== "converted";
+  const expiryMs = subscription ? toMs(subscription.currentPeriodEnd)
+    : onSignupTrial ? toMs(trial!.endsAt)
+    : toMs(planRec?.expired_on);
+  const planExpired = subscription
+    // Server's verdict at fetch time, plus the clock — a plan that ends while the
+    // page is open stops showing upgrade credit the server would no longer give.
+    ? !subscription.isActive || !Number.isFinite(expiryMs) || expiryMs <= now
+    : onSignupTrial
+      ? trial!.status === "expired" || trial!.status === "grace" || trial!.status === "cancelled"
+      : !!currentPkgId && Number.isFinite(expiryMs) && expiryMs < now;
+  // Which billing TERM the member is actually on. For a plan in the
+  // subscriptions table the server sends it (`term`: the stored billing cycle —
+  // set by the payment or by the admin's Change Package). Only a legacy card with
+  // no subscriptions row falls back to guessing from its validity span.
   const userCycle = ((): "monthly" | "yearly" | "triennial" | null => {
     if (!currentPkgId || planExpired) return null;
-    const sub = subscription as { currentPeriodStart?: string; currentPeriodEnd?: string } | undefined;
-    const parse = (v?: string | null) => { const t = v ? new Date(String(v).replace(" ", "T")).getTime() : NaN; return Number.isFinite(t) ? t : NaN; };
-    const start = parse(sub?.currentPeriodStart ?? (customer?.activated_on as string | undefined));
-    const end = parse(sub?.currentPeriodEnd ?? (customer?.expired_on as string | undefined));
-    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+    if (subscription) return subscription.term ?? null;
+    if (Number(currentPkgId) === 7) return "monthly"; // the free trial is a 30-day term
+    const start = toMs(planRec?.activated_on), end = toMs(planRec?.expired_on);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
     const days = (end - start) / 86_400_000;
     if (days < 62) return "monthly";
     if (days < 550) return "yearly"; // up to ~18 months counts as yearly
     return "triennial";
   })();
-  // Open the page on the member's actual term (once known, unless they toggled).
-  const cyclePinned = useRef(false);
-  useEffect(() => { if (!cyclePinned.current && userCycle) { setCycle(userCycle); cyclePinned.current = true; } }, [userCycle]);
+  // Open the page on the member's actual term, so the first thing they see is
+  // the plan they're on. Waits for real data: the subscription must have loaded,
+  // and a member without one needs their real card record (the first render
+  // holds the demo placeholder). Once snapped — or once they click a tab — it
+  // stays put.
+  const dataReady = subQ.isFetchedAfterMount && subQ.isSuccess && (!!subscription || customer !== DEFAULT_CUSTOMER);
+  useEffect(() => {
+    if (cyclePinned.current || !dataReady || !userCycle) return;
+    setCycle(userCycle);
+    cyclePinned.current = true;
+  }, [dataReady, userCycle]);
   // Don't offer a downgrade to an ACTIVE member (current + higher tiers only) —
   // but once expired, show every plan so they can renew or switch down.
   const currentRank = currentPlan && !planExpired ? planRank(currentPlan as unknown as PlanPkg) : -1;
   // The free trial is a first-time offer for NEW users only — never re-show it to
   // anyone who has already been on a paid plan (active OR expired).
-  const hasHadPaidPlan = [5, 6].includes(Number(currentPkgId));
+  const hasHadPaidPlan = [5, 6].includes(Number(currentPkgId)) || (Number(currentPkgId) === 7 && planExpired);
   const visiblePackages = (packages || []).filter((p) => {
     const pp = p as unknown as PlanPkg;
     if (planRank(pp) < currentRank) return false; // no downgrade for an active member
@@ -89,12 +148,15 @@ export default function CustomerSubscription() {
   // A coupon link (/dashboard/subscription?coupon=CODE) from an offer popup.
   const [urlCoupon] = useState(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("coupon")));
 
-  // Manual payment: pick a plan → open the pay modal (QR / bank + submit reference)
-  const [payFor, setPayFor] = useState<{ id: number; name: string; amount: number } | null>(null);
-  const choose = (packageId: number, name: string, amount: number) => setPayFor({ id: packageId, name, amount });
+  // Pick a plan → open the pay modal. The term is captured with the price, and
+  // choosing pins the tab, so nothing can switch the term under an open payment.
+  const choose = (packageId: number, name: string, amount: number) => {
+    cyclePinned.current = true;
+    setPayFor({ id: packageId, name, amount, cycle });
+  };
 
   return (
-    <ResponsiveDashboardLayout>
+    <>
       <div className="hidden md:block"><TopBar title="Subscription" subtitle="Manage your plan" /></div>
       <div className="p-6 space-y-6 max-w-6xl mx-auto w-full">
         {/* Current Plan Banner */}
@@ -103,13 +165,13 @@ export default function CustomerSubscription() {
             <div className="w-14 h-14 rounded-2xl gradient-gold flex items-center justify-center"><Zap size={24} className="text-[#0F172A]" /></div>
             <div>
               <p className="text-xs text-[#94A3B8]">Current Plan</p>
-              <p className="text-xl font-bold text-white">{currentPlanName}{planExpired ? " (expired)" : ""}</p>
-              {planExpired ? (
-                <p className="text-xs text-[#FCA5A5] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Expired on {new Date(String(expiryRaw).replace(" ", "T")).toLocaleDateString()} — choose a plan below to reactivate</p>
-              ) : subscription?.currentPeriodEnd ? (
-                <p className="text-xs text-[#94A3B8] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Renews on {new Date(subscription.currentPeriodEnd).toLocaleDateString()}</p>
-              ) : customer?.expired_on ? (
-                <p className="text-xs text-[#94A3B8] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Valid till {new Date(String(customer.expired_on)).toLocaleDateString()}</p>
+              <p className="text-xl font-bold text-white">
+                {currentPlanName}{planExpired ? " (expired)" : userCycle ? <span className="text-[#F7B31C]"> · {TERM_LABEL[userCycle]}</span> : null}
+              </p>
+              {planExpired && Number.isFinite(expiryMs) ? (
+                <p className="text-xs text-[#FCA5A5] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Expired on {fmtDay(expiryMs)} — choose a plan below to reactivate</p>
+              ) : !planExpired && Number.isFinite(expiryMs) ? (
+                <p className="text-xs text-[#94A3B8] mt-0.5 flex items-center gap-1"><Calendar size={10} /> Valid till {fmtDay(expiryMs)}</p>
               ) : null}
             </div>
           </div>
@@ -178,7 +240,7 @@ export default function CustomerSubscription() {
         <div className="flex justify-center">
           <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-white ring-1 ring-[#E2E8F0] shadow-premium">
             {([
-              { id: "monthly", label: "Monthly" },
+              { id: "monthly", label: "Monthly", badge: undefined },
               { id: "yearly", label: "Yearly", badge: "Save more" },
               { id: "triennial", label: "3 Years", badge: "Best value" },
             ] as const).map((c) => (
@@ -194,18 +256,20 @@ export default function CustomerSubscription() {
         {/* Plans Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {visiblePackages.map((plan, idx) => {
-            // Only the member's ACTUAL plan+term is "current" — so Platinum 3-Year
-            // isn't also flagged current under the Yearly tab. Their own plan shown
-            // on a different term is disabled with a note (never a "Choose" that
-            // would sell them a shorter term).
+            // "Current" is the member's plan on the term they're ACTUALLY on —
+            // one card, one tab. Their plan under another term is disabled with a
+            // note (never a "Choose" that would sell them a shorter term). If the
+            // term genuinely can't be known, no tab claims it: the card just says
+            // "Your plan" and the banner above names the plan and its validity.
             const isOwnPlan = currentPkgId === plan.id && !planExpired;
-            const isCurrent = isOwnPlan && (!userCycle || cycle === userCycle);
-            const isOwnOtherTerm = isOwnPlan && !isCurrent;
+            const isCurrent = isOwnPlan && userCycle !== null && cycle === userCycle;
+            const isOwnOtherTerm = isOwnPlan && userCycle !== null && cycle !== userCycle;
+            const ownTermUnknown = isOwnPlan && userCycle === null;
             const Icon = PLAN_ICONS[idx % PLAN_ICONS.length];
             const base = Number(cycle === "triennial" ? plan.threeYearPrice : cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice);
             const isPaid = base > 0;
             // First paid plan → referral discount. Upgrade → credit the old amount.
-            const isUpgrade = hasPaid && !isCurrent && isPaid;
+            const isUpgrade = hasPaid && !planExpired && !isOwnPlan && isPaid;
             const discounted = dPct > 0 && isPaid ? Math.round(base * (1 - dPct / 100) * 100) / 100 : base;
             const payable = isUpgrade ? Math.max(0, Math.round((base - currentPaid) * 100) / 100) : discounted;
             const finalPrice = Math.round(isPaid ? applyOffer(payable) : base); // whole rupees
@@ -241,10 +305,10 @@ export default function CustomerSubscription() {
                 </div>
                 <button
                   onClick={() => choose(plan.id, plan.name, finalPrice)}
-                  disabled={isCurrent || isOwnOtherTerm || !!pendingOrder}
-                  className={`w-full h-11 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isCurrent || isOwnOtherTerm ? "bg-[#F1F5F9] text-[#94A3B8] cursor-default" : "gradient-gold text-[#0F172A] hover:shadow-gold active:scale-[0.98] disabled:opacity-50"}`}
+                  disabled={isOwnPlan || !!pendingOrder}
+                  className={`w-full h-11 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isOwnPlan ? "bg-[#F1F5F9] text-[#94A3B8] cursor-default" : "gradient-gold text-[#0F172A] hover:shadow-gold active:scale-[0.98] disabled:opacity-50"}`}
                 >
-                  {isCurrent ? "Current Plan" : isOwnOtherTerm ? `On your ${TERM_LABEL[userCycle!]} plan` : isPaid ? "Upgrade" : "Choose"}
+                  {isCurrent ? "Current Plan" : isOwnOtherTerm ? `On your ${TERM_LABEL[userCycle!]} plan` : ownTermUnknown ? "Your plan" : isPaid ? "Upgrade" : "Choose"}
                 </button>
               </div>
             );
@@ -256,12 +320,12 @@ export default function CustomerSubscription() {
 
       {payFor && (
         <PayModal
-          plan={payFor} offerPct={offerPct} cycle={cycle}
+          plan={payFor} offerPct={offerPct} cycle={payFor.cycle}
           onClose={() => setPayFor(null)}
-          onDone={() => { setPayFor(null); utils.payment.myOrders.invalidate(); }}
+          onDone={() => { setPayFor(null); utils.payment.myOrders.invalidate(); utils.subscription.mySubscription.invalidate(); }}
         />
       )}
-    </ResponsiveDashboardLayout>
+    </>
   );
 }
 

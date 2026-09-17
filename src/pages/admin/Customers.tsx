@@ -40,6 +40,7 @@ type Customer = {
   activated_on: string | null; expired_on: string | null; status: number;
   password: string; company_name?: string; designation?: string; views?: number;
   isNew?: boolean; dbId?: number; // isNew = new-flow DB account (not in legacy customers.json)
+  billing_cycle?: "monthly" | "yearly" | "triennial" | null; // term of the active DB plan, when known
 };
 
 type ActionItem = { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean };
@@ -153,7 +154,7 @@ export default function AdminCustomers() {
       const legacyCurrent = legacy.map((c) => {
         const live = dbByEmail.get((c.email || "").toLowerCase().trim());
         return live?.subActive
-          ? { ...c, package_id: live.package_id, expired_on: live.expired_on ?? c.expired_on }
+          ? { ...c, package_id: live.package_id, expired_on: live.expired_on ?? c.expired_on, billing_cycle: live.billing_cycle ?? null }
           : c;
       });
       // New-flow ids are offset high, so they naturally sort newest-first with the rest.
@@ -379,18 +380,18 @@ export default function AdminCustomers() {
     const term = pkgValue === "Trial" ? "" : pkgCycle === "triennial" ? " · 3 Years" : pkgCycle === "monthly" ? " · Monthly" : " · Yearly";
     // Optimistic row update, then SAVE IT — this used to change the view only,
     // so the plan silently reverted on refresh.
-    setRows((r) => r.map((x) => (x.id === c.id ? { ...x, package_id: id, expired_on: newExp, status: 1 } : x)));
+    setRows((r) => r.map((x) => (x.id === c.id ? { ...x, package_id: id, expired_on: newExp, status: 1, billing_cycle: id === 7 ? "monthly" : pkgCycle } : x)));
     setPkgModal(null);
     try {
       const res = await pkgMut.mutateAsync({ email: c.email, packageId: id, cycle: pkgCycle });
       if (res.ok) {
         toast.success(`${c.name} set to ${pkgValue}${term} — valid till ${fmtDate(res.expiredOn ?? newExp)}`);
       } else {
-        setRows((r) => r.map((x) => (x.id === c.id ? { ...x, package_id: c.package_id, expired_on: c.expired_on, status: c.status } : x)));
+        setRows((r) => r.map((x) => (x.id === c.id ? { ...x, package_id: c.package_id, expired_on: c.expired_on, status: c.status, billing_cycle: c.billing_cycle } : x)));
         toast.error(`No live account matched ${c.email} — the package was not changed.`);
       }
     } catch {
-      setRows((r) => r.map((x) => (x.id === c.id ? { ...x, package_id: c.package_id, expired_on: c.expired_on, status: c.status } : x)));
+      setRows((r) => r.map((x) => (x.id === c.id ? { ...x, package_id: c.package_id, expired_on: c.expired_on, status: c.status, billing_cycle: c.billing_cycle } : x)));
       toast.error("Could not change the package — the server save failed.");
     }
   };
@@ -501,7 +502,7 @@ export default function AdminCustomers() {
     { icon: <CalendarPlus size={15} className="text-[#15803D]" />, label: "Extend Validity", onClick: () => { setExpModal(c); setExpDays(30); } },
     { icon: <Lock size={15} className="text-[#7C3AED]" />, label: "Change Password", onClick: () => { setPwdModal(c); setPwdValue(c.password || ""); } },
     { icon: <Send size={15} className="text-[#0EA5E9]" />, label: "Share with Customer", onClick: () => { setShareModal(c); setShareKind("welcome"); setSharePwd(c.password || ""); setShareIncludePwd(false); } },
-    { icon: <Database size={15} className="text-[#2563EB]" />, label: "Change Package", onClick: () => { setPkgModal(c); setPkgValue(packageName(c.package_id)); } },
+    { icon: <Database size={15} className="text-[#2563EB]" />, label: "Change Package", onClick: () => { setPkgModal(c); setPkgValue(packageName(c.package_id)); setPkgCycle(c.package_id !== 7 && c.billing_cycle ? c.billing_cycle : "yearly"); } },
     { icon: <Layers size={15} className="text-[#7C3AED]" />, label: "Card Limit", onClick: () => { setLimitModal(c); setLimitValue(3); } },
     { icon: <Trash2 size={15} className="text-[#DC2626]" />, label: "Delete Customer", onClick: () => setDelModal(c), danger: true },
   ];

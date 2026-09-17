@@ -14,7 +14,21 @@ export const subscriptionRouter = createRouter({
       with: { package: true },
       orderBy: [desc(subscriptions.createdAt)],
     });
-    return sub ?? null;
+    if (!sub) return null;
+    // Decided here, once, so the Subscription page never has to guess:
+    //  · isActive — the same rule the entitlement checks use (card-router's
+    //    activeSubPackage): active/trial status AND the period hasn't ended.
+    //    Nothing marks rows "expired", so the end date is what counts.
+    //  · term — the billing term the member is actually on. It is the stored
+    //    billingCycle (written by every payment and by the admin's Change
+    //    Package), except a free plan, which is always a 30-day term. Null when
+    //    the plan isn't active, so an expired plan is never shown as "current".
+    const isActive = (sub.status === "active" || sub.status === "trial")
+      && new Date(sub.currentPeriodEnd).getTime() > Date.now();
+    const pkg = sub.package as { monthlyPrice?: unknown; yearlyPrice?: unknown } | null;
+    const isFree = sub.packageId === 7 || (!!pkg && Number(pkg.monthlyPrice) === 0 && Number(pkg.yearlyPrice) === 0);
+    const term: "monthly" | "yearly" | "triennial" | null = !isActive ? null : isFree ? "monthly" : sub.billingCycle;
+    return { ...sub, isActive, term };
   }),
 
   // NOTE: the former `subscribe` and `upgrade` mutations were removed (Phase 31

@@ -183,12 +183,12 @@ export const userRouter = createRouter({
       });
       if (sub) {
         await db.update(subscriptions).set({
-          packageId: input.packageId, status: "active", billingCycle: input.cycle,
+          packageId: input.packageId, status: "active", billingCycle: isTrial ? "monthly" : input.cycle,
           currentPeriodStart: now, currentPeriodEnd: end,
         }).where(eq(subscriptions.id, sub.id));
       } else {
         await db.insert(subscriptions).values({
-          userId: user.id, packageId: input.packageId, status: "active", billingCycle: input.cycle,
+          userId: user.id, packageId: input.packageId, status: "active", billingCycle: isTrial ? "monthly" : input.cycle,
           amount: "0.00", currency: "INR", currentPeriodStart: now, currentPeriodEnd: end,
           paymentGateway: "manual",
         });

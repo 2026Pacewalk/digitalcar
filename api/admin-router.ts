@@ -98,7 +98,7 @@ export const adminRouter = createRouter({
     const [allUsers, pubs, subs, trials] = await Promise.all([
       db.select({ id: users.id, email: users.email, name: users.fullName, phone: users.phone, status: users.status, role: users.role, createdAt: users.createdAt }).from(users).orderBy(desc(users.createdAt)),
       db.select({ userId: publishedCards.userId, slug: publishedCards.slug }).from(publishedCards),
-      db.select({ userId: subscriptions.userId, packageId: subscriptions.packageId, status: subscriptions.status, currentPeriodEnd: subscriptions.currentPeriodEnd, currentPeriodStart: subscriptions.currentPeriodStart }).from(subscriptions).orderBy(desc(subscriptions.createdAt)),
+      db.select({ userId: subscriptions.userId, packageId: subscriptions.packageId, status: subscriptions.status, currentPeriodEnd: subscriptions.currentPeriodEnd, currentPeriodStart: subscriptions.currentPeriodStart, billingCycle: subscriptions.billingCycle }).from(subscriptions).orderBy(desc(subscriptions.createdAt)),
       db.select({ userId: cardTrials.userId, startedAt: cardTrials.startedAt, endsAt: cardTrials.endsAt }).from(cardTrials),
     ]);
     const slugBy = new Map<number, string>();
@@ -146,6 +146,8 @@ export const adminRouter = createRouter({
             // only when this is true — otherwise it would "downgrade" every legacy
             // customer who simply has no subscriptions row.
             subActive,
+            // The term of the ACTIVE plan (null otherwise), so Change Package opens on it.
+            billing_cycle: subActive && sub ? (sub.packageId === 7 ? "monthly" : sub.billingCycle) : null,
           };
         } catch { return null; }
       })
