@@ -1,0 +1,20 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true,
+    "paths": {
+      "~/*": ["./src/*"],
+      // The API's own aliases, so the server's router types resolve when the
+      // app imports `AppRouter` (a type-only import — nothing server-side is
+      // bundled into the app).
+      "@/*": ["../src/*"],
+      "@db/*": ["../db/*"],
+      "@contracts/*": ["../contracts/*"],
+      // One copy of tRPC's types for both sides of the contract.
+      "@trpc/server": ["./node_modules/@trpc/server"],
+      "@trpc/server/*": ["./node_modules/@trpc/server/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}

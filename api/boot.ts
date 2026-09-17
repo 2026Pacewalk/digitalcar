@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { cors } from "hono/cors";
 import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
@@ -21,6 +22,16 @@ async function requireSuperAdmin(c: { req: { header: (k: string) => string | und
   const { eq } = await import("drizzle-orm");
   const row = await getDb().select({ role: users.role }).from(users).where(eq(users.id, payload.userId));
   return row[0]?.role === "super_admin" ? payload : null;
+}
+
+// Local development only: the mobile app's web preview (Expo on localhost)
+// calls this API from another origin. Production sends no CORS headers — the
+// native app doesn't need them and the website is same-origin.
+if (!env.isProduction) {
+  app.use("/api/*", cors({
+    origin: (origin) => (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null),
+    allowHeaders: ["content-type", "x-auth-token", "authorization", "trpc-accept"],
+  }));
 }
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
