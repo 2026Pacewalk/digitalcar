@@ -32,6 +32,52 @@ const STATES = [
   "Uttar Pradesh", "Uttarakhand", "West Bengal",
 ];
 
+/* Split the card's one-line address into delivery fields, so the form starts
+   filled in. Best effort: the PIN is a 6-digit number, the state is matched
+   against the list above, the city is the part just before them, and the rest is
+   the street. Anything not found stays empty for the customer to add. */
+const STATE_ALIASES: Record<string, string> = {
+  "new delhi": "Delhi", "ncr": "Delhi", "orissa": "Odisha", "pondicherry": "Puducherry", "j&k": "Jammu and Kashmir",
+  "bangalore": "Karnataka", "bengaluru": "Karnataka", "mumbai": "Maharashtra", "pune": "Maharashtra", "chennai": "Tamil Nadu",
+  "hyderabad": "Telangana", "kolkata": "West Bengal", "gurgaon": "Haryana", "gurugram": "Haryana", "noida": "Uttar Pradesh",
+  "mohali": "Punjab", "zirakpur": "Punjab", "panchkula": "Haryana",
+};
+function parseAddress(raw: string): { line1: string; city: string; state: string; pincode: string } {
+  let text = raw.replace(/\s+/g, " ").trim();
+  const pin = text.match(/\b([1-9]\d{2})\s?(\d{3})\b/);
+  const pincode = pin ? pin[1] + pin[2] : "";
+  if (pin) text = text.replace(pin[0], " ");
+  text = text.replace(/\b(india|bharat)\b/gi, " ");
+  const parts = text.split(",").map((p) => p.replace(/^[\s.–-]+|[\s.–-]+$/g, "")).filter(Boolean);
+
+  // State: the last segment that is, or ends with, a state name ("Goa", "Bengaluru Karnataka").
+  let state = "";
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const low = parts[i].toLowerCase();
+    const hit = STATES.find((st) => low === st.toLowerCase() || low.endsWith(" " + st.toLowerCase()));
+    if (hit) {
+      state = hit;
+      const before = parts[i].slice(0, parts[i].length - hit.length).trim();
+      if (hit === "Delhi" && /(^|\s)new$/i.test(before)) {
+        // "New Delhi" is the city; don't leave a stray "New" behind.
+        const street = before.replace(/(^|\s)new$/i, "").trim();
+        parts.splice(i, 1, ...(street ? [street] : []), "New Delhi");
+      } else if (before) parts[i] = before;
+      else parts.splice(i, 1);
+      break;
+    }
+  }
+  // City: the segment just before the state, when there is a street left as well.
+  const city = parts.length > 1 ? (parts.pop() as string) : "";
+  if (!state && city) state = STATE_ALIASES[city.toLowerCase()] || "";
+  return {
+    line1: parts.join(", "),
+    city: city || (state === "Chandigarh" ? "Chandigarh" : state === "Delhi" ? "New Delhi" : ""),
+    state,
+    pincode,
+  };
+}
+
 const field = "h-11 w-full rounded-xl border bg-white px-3.5 text-[13.5px] text-[#0F172A] placeholder:text-[#94A3B8] outline-none transition-shadow focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/30";
 
 /* Working days (Monday–Saturday) from today, for a delivery window people can plan around. */
@@ -151,15 +197,19 @@ export default function CustomerNfcOrder() {
     company: printEdits.company ?? s(c.company_name),
     phone: printEdits.phone ?? s(c.mobile1),
   };
+  // Delivery starts from the card's address, split into fields; anything the
+  // customer types takes over, field by field.
+  const cardAddr = useMemo(() => parseAddress(s(c.address)), [c.address]); // eslint-disable-line react-hooks/exhaustive-deps
   const shipVal = {
     name: shipEdits.name ?? s(c.name),
     phone: shipEdits.phone ?? s(c.mobile1),
-    line1: shipEdits.line1 ?? "",
+    line1: shipEdits.line1 ?? cardAddr.line1,
     line2: shipEdits.line2 ?? "",
-    city: shipEdits.city ?? "",
-    state: shipEdits.state ?? "",
-    pincode: shipEdits.pincode ?? "",
+    city: shipEdits.city ?? cardAddr.city,
+    state: shipEdits.state ?? cardAddr.state,
+    pincode: shipEdits.pincode ?? cardAddr.pincode,
   };
+  const fromCard = !!(cardAddr.line1 || cardAddr.city || cardAddr.state || cardAddr.pincode);
   const logo = /^https:\/\//i.test(s(c.logo)) ? s(c.logo) : "";
   const cardUrl = data?.cardUrl ?? null;
   const lines = NFC_PRODUCTS.filter((p) => qtys[p.id] > 0).map((p) => ({ product: p, qty: qtys[p.id] }));
@@ -372,7 +422,11 @@ export default function CustomerNfcOrder() {
 
             <section className="rounded-2xl border border-[#F1F5F9] bg-white p-5 shadow-premium" aria-labelledby="nfc-ship">
               <h3 id="nfc-ship" className="flex items-center gap-2 text-[15px] font-bold text-[#0F172A]"><MapPin size={16} className="text-[#B45309]" /> 3 · Delivery address</h3>
-              <p className="mt-1 text-[12.5px] text-[#64748B]">Free delivery anywhere in India. Our courier will call this number if they need to.</p>
+              <p className="mt-1 text-[12.5px] text-[#64748B]">
+                {fromCard
+                  ? "Filled in from the address on your card — check it, add anything missing, and change it if it should go somewhere else."
+                  : "Free delivery anywhere in India. Our courier will call this number if they need to."}
+              </p>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Recipient name" required error={errors["ship.name"]}>
                   <input className={`${field} ${errors["ship.name"] ? "border-[#FCA5A5]" : "border-[#E2E8F0]"}`} value={shipVal.name} onChange={setShip("name")} autoComplete="name" />
