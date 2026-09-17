@@ -104,13 +104,12 @@ function Field({ label, error, required, children, wide }: {
   );
 }
 
-/* The DigitalCarda logo is white artwork, so on the white print areas it sits
-   on a small dark badge. */
-function PoweredLogo() {
+/* Printed credit line, as plain text: "Powered by DigitalCarda.in". */
+function PoweredBy({ className = "" }: { className?: string }) {
   return (
-    <span className="inline-flex items-center rounded-[3px] bg-[#0F172A] px-1 py-[2px]">
-      <img src="/logo.png" alt="DigitalCarda" className="block h-[9px] w-auto" />
-    </span>
+    <p className={`font-semibold tracking-wide text-[#94A3B8] ${className}`}>
+      Powered by <span className="font-bold text-[#0F172A]">DigitalCarda.in</span>
+    </p>
   );
 }
 
@@ -146,7 +145,7 @@ function CardPreview({ name, title, company, logo, cardUrl }: { name: string; ti
             <p className="text-[10px] font-bold leading-tight">Tap or scan</p>
             <p className="text-[8.5px] leading-snug text-[#64748B]">to save my contact</p>
             <p className="mt-1 truncate text-[8px] font-semibold text-[#B45309]">{cardUrl ? cardUrl.replace(/^https?:\/\//, "") : "digitalcarda.in/you"}</p>
-            <p className="mt-1 flex items-center gap-1 text-[7px] font-bold tracking-wide text-[#94A3B8]">Powered by <PoweredLogo /></p>
+            <PoweredBy className="mt-1 text-[7px]" />
           </div>
         </div>
         <figcaption className="mt-1 text-center text-[10px] font-medium text-[#94A3B8]">Back</figcaption>
@@ -170,7 +169,7 @@ function StandeePreview({ name, company, logo, cardUrl }: { name: string; compan
             {cardUrl ? <img src={qrFor(cardUrl, 180)} alt="" className="h-20 w-20" /> : <span className="flex h-20 w-20 items-center justify-center bg-[#F1F5F9]"><ScanLine size={18} className="text-[#94A3B8]" /></span>}
           </div>
           <p className="mt-1.5 text-[8px] text-[#64748B]">Save contact · Review · Pay</p>
-          <p className="mt-1 flex items-center justify-center gap-1 border-t border-[#F1F5F9] pt-1 text-[7.5px] font-bold tracking-wide text-[#94A3B8]">Powered by <PoweredLogo /></p>
+          <PoweredBy className="mt-1 border-t border-[#F1F5F9] pt-1 text-[7.5px]" />
         </div>
       </div>
       <div aria-hidden="true" className="mt-0.5 h-2 w-[176px] rounded-full bg-[#0F172A]/80" />
