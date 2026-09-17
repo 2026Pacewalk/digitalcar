@@ -872,7 +872,7 @@ textarea.dc-input{height:auto;min-height:104px;padding-top:13px;resize:vertical;
       <div class="home-section-content">
         ${Number(c.views_on ?? 1) !== 0 ? `<div class="view"><div class="view-icon"><i class="fa fa-eye"></i></div><div class="view-number"><p id="dc-view-count">${Number(c.views ?? 0).toLocaleString("en-IN")}</p></div></div>` : ""}
         <div class="home-brand"><div class="home-brand-img"><img src="${esc(c.logo) || logoPlaceholder}" alt="${esc(c.name)}" style="border-radius:${s(c.logo_shape) === "round" ? "50%" : s(c.logo_shape) === "plain" ? "0" : "10px"}" ${IMG} onerror="this.onerror=null;this.src='${logoPlaceholder}'">${planBadge}</div></div>
-        <div class="home-social"><p>${esc(s(c.social_title) || "Follow Us")}</p><ul class="social-icons">${social}</ul></div>
+        <div class="home-social">${social ? `<p>${esc(s(c.social_title) || "Follow Us")}</p>` : ""}<ul class="social-icons">${social}</ul></div>
         <div class="owner-details"><h4 class="owner-name">${esc(c.name) || "Your Name"}</h4><p class="owner-designation">${esc(c.designation)}</p></div>
         <div class="home-details">${homeDetails}</div>
         <div class="home-call-whatsapp">
