@@ -754,7 +754,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
       </div>
     </header>
     <main class="pw-body">
-      ${socials ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">Connect With Me</h2><div class="pw-socials">${socials}</div></section>` : ""}
+      ${socials ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">${esc(s(c.social_title) || "Connect With Me")}</h2><div class="pw-socials">${socials}</div></section>` : ""}
       ${svcIconsOnly && services && Number(c.product_on ?? 1) === 1 ? `<section class="pw-sec pw-rise"><h2 class="pw-h2">${esc(s(c.product) || "Our Solutions")}</h2><div class="pw-svcs">${services}</div></section>` : ""}
       ${cx.html}
       <div class="pw-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
@@ -1142,7 +1142,7 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   @keyframes bmDock{from{opacity:0;transform:translate(-50%,24px);}to{opacity:1;transform:translate(-50%,0);}}
   .bm-dock .bm-follow{margin:0 4px 8px;}
   .bm-dock .bm-sharebtn{margin-top:10px;min-height:54px;}
-  .bm-follow{display:flex;align-items:center;gap:12px;margin:24px 4px 12px;font-size:11.5px;font-weight:600;letter-spacing:.14em;color:var(--muted);}
+  .bm-follow{display:flex;align-items:center;gap:12px;margin:24px 4px 12px;font-size:11.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
   .bm-follow::before,.bm-follow::after{content:"";flex:1;height:1px;background:var(--line);}
   .bm-socials{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;}
   .bm-soc{width:48px;height:48px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:19px;color:#fff;background:var(--ink-ac);text-decoration:none;box-shadow:0 8px 18px -8px rgba(27,29,41,.35);transition:transform .16s;}
@@ -1185,7 +1185,7 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   // Floating dock: socials + Share stay in reach while the visitor scrolls the
   // sections below. Fixed rather than sticky, because the card clips overflow.
   const dock = (socials || showShare) ? `<div class="bm-dock">
-      ${socials ? `<div class="bm-follow">FOLLOW US</div><div class="bm-socials">${socials}</div>` : ""}
+      ${socials ? `<div class="bm-follow">${esc(s(c.social_title) || "Follow Us")}</div><div class="bm-socials">${socials}</div>` : ""}
       ${showShare ? `<button class="bm-sharebtn" type="button" ${opts.thumb ? "" : `onclick="pwShare()"`}><i class="fa fa-share-alt" aria-hidden="true"></i> Share My Card</button>` : ""}
     </div>` : "";
 
