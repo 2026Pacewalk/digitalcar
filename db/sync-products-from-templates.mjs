@@ -14,6 +14,24 @@ import mysql from "mysql2/promise";
 import "dotenv/config";
 
 const K_PRESETS = "template_presets";
+/* Presets saved before category/featured existed (as on production) have
+   neither field — the app fills them in at read time (normalizePreset in
+   api/template-router.ts). Mirror that here, otherwise every product gets
+   "modern" and loses its featured flag. Keep these in step with the router. */
+const SEED_CATEGORY = {
+  1: "professional", 9: "professional", 10: "professional", 13: "professional", 19: "professional", 22: "professional", 28: "professional", 30: "professional",
+  4: "premium", 14: "premium", 15: "premium", 18: "premium", 24: "premium", 29: "premium", 31: "premium",
+  3: "basic", 8: "basic", 11: "basic", 20: "basic", 23: "basic", 26: "basic",
+};
+const SEED_FEATURED = new Set([1, 4, 21, 34, 48]);
+export function presetCategory(pre) {
+  const style = Number(pre.style);
+  return pre.category ?? (style >= 48 ? "premium" : style >= 32 ? "bio" : (SEED_CATEGORY[pre.id] || "modern"));
+}
+export function presetFeatured(pre) {
+  return pre.featured ?? SEED_FEATURED.has(pre.id);
+}
+
 const slugify = (s) => String(s).toLowerCase().replace(/\(|\)/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 export async function syncProductsFromTemplates(conn, log = (s) => console.log(s)) {
@@ -31,8 +49,8 @@ export async function syncProductsFromTemplates(conn, log = (s) => console.log(s
   for (const pre of presets) {
     const style = Number(pre.style);
     if (!style) continue;
-    const category = pre.category || "modern";
-    const featured = pre.featured ? 1 : 0;
+    const category = presetCategory(pre);
+    const featured = presetFeatured(pre) ? 1 : 0;
     const existing = byStyle.get(style);
 
     if (existing) {
