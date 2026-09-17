@@ -123,6 +123,13 @@ export function fromAlignment(): { aligned: boolean; from: string; via: string |
 export async function sendEmail(to: string | undefined | null, email: Email, replyTo?: string | null): Promise<{ ok: boolean; error?: string }> {
   try {
     if (!to) return { ok: false, error: "No recipient" };
+    // Accounts created for a client whose email we didn't have get a stand-in
+    // login on this domain. It has no mailbox, so mail to it would only bounce
+    // and hurt the sender reputation of every real email.
+    if (/@clients\.digitalcarda\.in$/i.test(to.trim())) {
+      void logEmail(to, email, replyTo, "skipped", "Placeholder login — no mailbox; add the client's real email");
+      return { ok: false, error: "Placeholder address" };
+    }
     // Real SMTP when it is configured; outside production, a capture mailbox
     // rather than silently dropping the mail.
     const t = transport() ?? (process.env.NODE_ENV === "production" ? null : await previewTransport());
