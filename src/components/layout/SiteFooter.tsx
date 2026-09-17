@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
-  ArrowRight, BarChart3, BookOpen, Check, Globe, IndianRupee, Inbox, LayoutGrid, Mail, MessageCircle, Nfc,
+  ArrowRight, BarChart3, BookOpen, Check, Globe, IndianRupee, Inbox, LayoutGrid, MessageCircle, Nfc,
   PenLine, Phone, QrCode, Rocket, ShieldCheck, Sparkles, Star, Truck, UserPlus, Wand2, Zap, type LucideIcon,
 } from "lucide-react";
 import { CONTACT, FOOTER_GROUPS, FOOTER_GUIDES, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicNav";
@@ -83,9 +83,9 @@ const BRAND_COLORS: Record<string, string> = {
 function FollowUs() {
   if (!SOCIAL_LINKS.length) return null;
   return (
-    <div className="mt-7">
+    <div className="mt-6">
       <p className="text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80">Follow us</p>
-      <ul className="mt-3 flex flex-wrap items-center gap-3">
+      <ul className="mt-2.5 flex flex-wrap items-center gap-2">
         {SOCIAL_LINKS.map((s) => {
           const color = BRAND_COLORS[s.label] ?? "#F7B31C";
           return (
@@ -96,11 +96,11 @@ function FollowUs() {
                 rel="noopener noreferrer me"
                 aria-label={`Follow DigitalCarda on ${s.label}`}
                 style={{ ["--brand" as string]: color }}
-                className="group relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04] ring-1 ring-white/10 transition duration-300 hover:-translate-y-1 hover:bg-white/[0.07] hover:shadow-[0_14px_30px_-12px_var(--brand)] hover:ring-[var(--brand)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
+                className="group relative flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-white/10 transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.07] hover:shadow-[0_10px_22px_-10px_var(--brand)] hover:ring-[var(--brand)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
               >
                 {/* Soft glow in the network's colour */}
-                <span aria-hidden="true" className="absolute inset-1 rounded-xl bg-[var(--brand)] opacity-0 blur-md transition duration-300 group-hover:opacity-40" />
-                <img src={s.icon} alt="" width={26} height={26} className="relative h-[26px] w-[26px] transition duration-300 group-hover:scale-110" loading="lazy" />
+                <span aria-hidden="true" className="absolute inset-1 rounded-lg bg-[var(--brand)] opacity-0 blur-md transition duration-300 group-hover:opacity-40" />
+                <img src={s.icon} alt="" width={18} height={18} className="relative h-[18px] w-[18px] transition duration-300 group-hover:scale-110" loading="lazy" />
                 {/* Name tooltip */}
                 <span aria-hidden="true" className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg bg-white px-2 py-1 text-[11px] font-bold text-[#0B1120] opacity-0 shadow-lg transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
                   {s.label}
@@ -321,26 +321,6 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
             <p className="mt-4 max-w-sm text-[14px] leading-relaxed text-[#94A3B8]">
               Digital visiting cards for businesses and professionals across India — with QR and NFC sharing, AI writing, payments and lead capture built in.
             </p>
-
-            <div className="mt-6 grid max-w-sm gap-2.5">
-              <a href={CONTACT.whatsappHref} target="_blank" rel="noopener noreferrer"
-                className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 transition hover:border-[#25D366]/50 hover:bg-[#25D366]/[0.07]">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#25D366]/15 text-[#25D366]"><MessageCircle size={18} aria-hidden="true" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">WhatsApp · fastest reply</span>
-                  <span className="block truncate text-[14px] font-semibold text-white">{CONTACT.phone}</span>
-                </span>
-                <ArrowRight size={16} className="text-[#64748B] transition group-hover:translate-x-0.5 group-hover:text-[#25D366]" aria-hidden="true" />
-              </a>
-              <div className="grid grid-cols-2 gap-2.5">
-                <a href={CONTACT.phoneHref} className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[13px] font-semibold text-[#CBD5E1] transition hover:border-[#F7B31C]/40 hover:text-white">
-                  <Phone size={15} className="text-[#F7B31C]" aria-hidden="true" /> Call us
-                </a>
-                <a href={`mailto:${CONTACT.email}`} className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[13px] font-semibold text-[#CBD5E1] transition hover:border-[#F7B31C]/40 hover:text-white">
-                  <Mail size={15} className="text-[#F7B31C]" aria-hidden="true" /> Email us
-                </a>
-              </div>
-            </div>
 
             <FollowUs />
 
