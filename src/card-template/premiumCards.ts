@@ -530,6 +530,15 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   return { css, html: html + `<div id="pwxLb" onclick="pwxLbClose()"><button type="button" class="x" aria-label="Close image">&times;</button><img alt="Enlarged gallery image"></div>`, js };
 }
 
+/* The line under the name. A business card whose name IS the company would
+   repeat itself ("Belvoir Hills / Belvoir Hills"), so it shows what the business
+   does instead. */
+const orgLine = (c: PCRecord): string => {
+  const company = s(c.company_name);
+  if (company && company.toLowerCase() !== s(c.name).toLowerCase()) return esc(company);
+  return company ? esc(s(c.nature)) : "";
+};
+
 function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolean; extras?: PremiumExtras }): string {
   const gold = s(c.color) || "#F7B31C";
   const navy = s(c.color2) || "#0e1b34";
@@ -739,7 +748,7 @@ function businessCard(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
           <div class="pw-idtx">
             <h1 class="pw-name">${name}</h1>
             ${desig ? `<p class="pw-role">${desig}</p>` : ""}
-            ${company ? `<p class="pw-org">${company}</p>` : ""}
+            ${orgLine(c) ? `<p class="pw-org">${orgLine(c)}</p>` : ""}
           </div>
         </div>
         <div class="pw-contacts pw-rise d2">${contacts}</div>
@@ -933,7 +942,7 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
         <div class="pp-photo" style="transform:translateX(-50%) scale(${Math.max(70, Math.min(160, Number(s(c.photo_size)) || 100)) / 100});transform-origin:50% 100%"><img src="${esc(photo) || initialPh(c, brand)}" alt="${name}" ${IMG} onerror="this.onerror=null;this.src='${initialPh(c, brand)}'"></div>
         <h1 class="pp-name">${name}</h1>
         ${desig ? `<p class="pp-role">${desig}</p>` : ""}
-        ${company ? `<p class="pp-org">${company}</p>` : ""}
+        ${orgLine(c) ? `<p class="pp-org">${orgLine(c)}</p>` : ""}
         ${tag ? `<p class="pp-tag">${tag}</p>` : ""}
         ${primary ? `<div class="pp-acts">${primary}</div>` : ""}
         ${socials ? `<div class="pp-socials">${socials}</div>` : ""}
