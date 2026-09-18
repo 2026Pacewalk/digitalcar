@@ -5,7 +5,7 @@
  *   2. A scrolling strip of every feature, each linking to where it's explained.
  *   3. Brand, contact, install-the-app, and the link columns.
  *   4. Popular guides from the blog, and the NFC card.
- *   5. A large wordmark, then the legal bar with back-to-top.
+ *   5. The legal bar with back-to-top.
  *
  * Link lists come from src/lib/publicNav.ts — the same source as the header and
  * the /sitemap page — so they can never list different pages. Every feature named
@@ -344,18 +344,10 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
           </ul>
         </div>
 
-        <Separator />
-
-        {/* ── 5. Wordmark + legal ────────────────────────────────── */}
-        <div aria-hidden="true" className="pointer-events-none select-none overflow-hidden">
-          <p className="whitespace-nowrap text-center font-display font-extrabold leading-[0.8] tracking-[-0.04em] text-[length:clamp(3.5rem,15vw,13rem)] bg-gradient-to-b from-[#F7B31C]/30 via-[#F7B31C]/[0.08] to-transparent bg-clip-text text-transparent">
-            DigitalCarda
-          </p>
-        </div>
-
-        {/* Phones: a centred stack — back to top, the legal links in a tidy 2×2
+        {/* ── 5. Legal bar ─────────────────────────────────────────
+            Phones: a centred stack — back to top, the legal links in a tidy 2×2
             grid, then the badges and copyright. From md up: one row. */}
-        <div className="flex flex-col items-center gap-6 border-t border-[#F7B31C]/20 pt-8 pb-28 text-center md:flex-row md:items-center md:justify-between md:gap-4 md:py-6 md:text-left lg:pb-6">
+        <div className="mt-10 flex flex-col items-center gap-6 border-t border-[#F7B31C]/20 pt-8 pb-28 text-center md:flex-row md:items-center md:justify-between md:gap-4 md:py-6 md:text-left lg:pb-6">
           <div className="order-3 flex flex-col items-center gap-2.5 md:order-1 md:flex-row md:flex-wrap md:gap-x-4 md:gap-y-1">
             <p className="order-2 text-[12.5px] text-[#64748B] md:order-1">© {year} DigitalCarda. All rights reserved.</p>
             <p className="order-1 flex items-center justify-center gap-x-4 text-[12.5px] text-[#94A3B8] md:order-2 md:gap-x-3 md:text-[#64748B]">
