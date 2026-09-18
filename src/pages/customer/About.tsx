@@ -89,7 +89,7 @@ export function AboutEditor() {
 
       <Panel title="Photo & Card Details" subtitle="For the premium Business / ID / Membership card designs">
         <div className="flex items-start gap-4">
-          <ImagePick value={photoV} onChange={(u) => setPhoto(u)} className="w-24 h-24" label="Photo" />
+          <ImagePick value={photoV} onChange={(u) => setPhoto(u)} className="w-24 h-24" label="Photo" removable what="photo" />
           <div className="flex-1 text-[12px] text-[#64748B] pt-1 min-w-0">
             <p className="font-semibold text-[#334155] mb-1">Profile photo</p>
             <p>A clear headshot shown on the ID, Membership and Business-card designs. Your <b>company logo</b> is set separately on the <b>Edit Card</b> page — both appear together on the card.</p>

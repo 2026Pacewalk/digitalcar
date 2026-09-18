@@ -100,7 +100,7 @@ export default function CustomerHome() {
       <Panel title="Account Information" subtitle="Your identity & primary contact">
         <div className="flex flex-col sm:flex-row gap-5">
           <div className="shrink-0">
-            <ImagePick value={val("logo")} onChange={(u) => set("logo", u)} className="w-28 h-28 mx-auto" label="Logo / Photo" fit="contain" />
+            <ImagePick value={val("logo")} onChange={(u) => { set("logo", u); if (!u) set("brand_colors", ""); }} className="w-28 h-28 mx-auto" label="Logo / Photo" fit="contain" removable what="logo" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
             <Field label="Name"><div className="relative"><User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={val("name")} onChange={(e) => set("name", e.target.value)} className={`${fieldCls} pl-9`} placeholder="Full name" /></div></Field>

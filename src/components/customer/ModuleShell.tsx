@@ -2,7 +2,8 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { createContext, useContext, useState, useSyncExternalStore } from "react";
-import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, ChevronUp, ChevronDown, Move, ExternalLink } from "lucide-react";
+import { ImagePlus, Lightbulb, Eye, EyeOff, Smartphone, ChevronUp, ChevronDown, Move, ExternalLink, X } from "lucide-react";
+import { toast } from "sonner";
 import { fileToDataUrl, useCustomer, scopedKey } from "@/hooks/useCustomer";
 import ImageAdjuster, { type AdjustOptions } from "@/components/customer/ImageAdjuster";
 import NotificationBell from "@/components/NotificationBell";
@@ -168,10 +169,14 @@ export function Panel({ title, subtitle, children, right, icon: Icon, hideTitleW
 /* Identity of an image string, without hashing megabytes of base64. */
 const imgId = (s: string) => `${s.length}:${s.slice(0, 48)}:${s.slice(-48)}`;
 
-export function ImagePick({ value, onChange, className = "w-24 h-24", label = "Upload", fit = "cover", adjust }: {
+export function ImagePick({ value, onChange, className = "w-24 h-24", label = "Upload", fit = "cover", adjust, removable, what = "image" }: {
   value?: string; onChange: (dataUrl: string) => void; className?: string; label?: string; fit?: "cover" | "contain";
   /** Adds an Adjust button (position / zoom / rotate) under the picker. */
   adjust?: AdjustOptions;
+  /** Adds a × on the image to remove it (with Undo), for images that are optional. */
+  removable?: boolean;
+  /** What the image is, for the remove button and its notice: "logo", "photo"… */
+  what?: string;
 }) {
   const [adjusting, setAdjusting] = useState<string | null>(null);
   const slot = (part: string) => (adjust ? scopedKey(`dc_img_${adjust.key}_${part}`) : "");
@@ -198,6 +203,13 @@ export function ImagePick({ value, onChange, className = "w-24 h-24", label = "U
     } catch { /* use the current image */ }
     setAdjusting(src);
   };
+  const remove = () => {
+    const prev = value;
+    if (!prev) return;
+    onChange("");
+    if (adjust) { try { localStorage.removeItem(slot("orig")); localStorage.removeItem(slot("for")); } catch { /* ignore */ } }
+    toast(`${what.charAt(0).toUpperCase()}${what.slice(1)} removed`, { action: { label: "Undo", onClick: () => onChange(prev) } });
+  };
 
   const picker = (
     <label className={`${className} rounded-xl border-2 border-dashed border-[#E2E8F0] hover:border-[#F7B31C] ${fit === "contain" ? "bg-white p-1.5" : "bg-[#F8FAFC]"} flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-colors shrink-0`}>
@@ -222,10 +234,21 @@ export function ImagePick({ value, onChange, className = "w-24 h-24", label = "U
     </label>
   );
 
-  if (!adjust) return picker;
+  // The × sits on the image's corner, outside the <label> so it doesn't open the file picker.
+  const framed = removable && value ? (
+    <div className={`relative w-fit shrink-0 ${/(^|\s)mx-auto(\s|$)/.test(className) ? "mx-auto" : ""}`}>
+      {picker}
+      <button type="button" onClick={remove} aria-label={`Remove ${what}`} title={`Remove ${what}`}
+        className="absolute -top-2 -right-2 z-10 w-6 h-6 rounded-full bg-white border border-[#E2E8F0] shadow-sm flex items-center justify-center text-[#64748B] hover:text-red-600 hover:border-red-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
+        <X size={13} strokeWidth={2.5} />
+      </button>
+    </div>
+  ) : picker;
+
+  if (!adjust) return framed;
   return (
     <div className="flex flex-col items-center gap-1.5 shrink-0">
-      {picker}
+      {framed}
       {value && (
         <button type="button" onClick={openAdjust}
           className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[#E2E8F0] bg-white text-[11px] font-semibold text-[#334155] hover:border-[#F7B31C] hover:text-[#92400E] transition-colors">
