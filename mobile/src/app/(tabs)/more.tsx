@@ -1,24 +1,27 @@
-import { Alert, Linking, Platform, Share, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, Share, View } from "react-native";
 import { router } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import Constants from "expo-constants";
 import { useEffect, useState } from "react";
-import { BarChart3, Bell, BellRing, ChevronRight, CreditCard, Gift, Globe, LogOut, MessageCircle, Nfc, PenLine, Smartphone, UserX } from "lucide-react-native";
-import { AppText, Avatar, Card, Chip, Row, Screen, SectionTitle } from "~/components/ui";
+import { BarChart3, Bell, BellRing, ChevronRight, CreditCard, ExternalLink, Gift, Globe, LogOut, MessageCircle, Moon, Nfc, PenLine, Smartphone, UserRound, UserX } from "lucide-react-native";
+import { AppText, Avatar, Card, Chip, Row, Screen, SectionTitle, Segmented } from "~/components/ui";
 import { imageOf, useSnapshot } from "~/lib/card";
 import { SITE_URL, SUPPORT_WHATSAPP } from "~/lib/config";
+import { useOpenDashboard } from "~/lib/web";
 import { dateLabel } from "~/lib/format";
 import { useAuth } from "~/lib/auth";
 import { trpc } from "~/lib/trpc";
 import { enablePush, pushState, type PushState } from "~/lib/push";
-import { space, useTheme } from "~/theme";
+import { space, useAppearance, useTheme, type Appearance } from "~/theme";
 
 export default function MoreScreen() {
   const { c } = useTheme();
+  const { appearance, setAppearance } = useAppearance();
+  const openDashboard = useOpenDashboard();
   const { user, signOut } = useAuth();
   const snapshot = useSnapshot();
   const mine = trpc.publish.mine.useQuery();
   const sub = trpc.subscription.mySubscription.useQuery();
+  const trial = trpc.trial.me.useQuery();
   const unread = trpc.notification.unreadCount.useQuery();
   const customer = snapshot.data?.data.customer;
   const slug = mine.data?.slug;
@@ -33,12 +36,18 @@ export default function MoreScreen() {
   };
 
   const chevron = <ChevronRight color={c.muted} size={18} />;
-  const web = (path: string) => void WebBrowser.openBrowserAsync(`${SITE_URL}${path}`);
+  const external = <ExternalLink color={c.muted} size={16} />;
+  // Website pages open already signed in (see lib/web.ts).
+  const web = (path: `/dashboard${string}`) => void openDashboard(path);
 
   const planName = sub.data?.package && typeof sub.data.package === "object" && "name" in sub.data.package ? String(sub.data.package.name) : "";
-  const planLine = sub.data
-    ? `${planName || "Plan"} · ${sub.data.isActive ? `valid till ${dateLabel(sub.data.currentPeriodEnd)}` : "expired"}`
-    : "No active plan";
+  // A trial started at sign-up has no subscription row, so it's read from the trial itself.
+  const trialLive = trial.data?.status === "active" || trial.data?.status === "expiring_soon";
+  const planLine = sub.data?.isActive && sub.data.packageId !== 7
+    ? `${planName || "Plan"} · valid till ${dateLabel(sub.data.currentPeriodEnd)}`
+    : trialLive
+      ? `Free trial · ${trial.data?.daysLeft ?? 0} day${trial.data?.daysLeft === 1 ? "" : "s"} left`
+      : sub.data ? `${planName || "Plan"} · expired` : "No active plan";
 
   const confirmSignOut = () => {
     if (Platform.OS === "web") { if (globalThis.confirm?.("Sign out of DigitalCarda on this device?")) void signOut(); return; }
@@ -59,13 +68,16 @@ export default function MoreScreen() {
     <Screen edgesTop>
       <AppText variant="title">More</AppText>
 
-      <Card style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
-        <Avatar uri={imageOf(customer?.photo) || imageOf(customer?.logo)} name={user?.fullName} size={52} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <AppText variant="heading" numberOfLines={1}>{user?.fullName || "My account"}</AppText>
-          <AppText variant="caption" tone="muted" numberOfLines={1}>{user?.email}</AppText>
-        </View>
-      </Card>
+      <Pressable accessibilityRole="button" accessibilityLabel="Account and password" onPress={() => router.push("/account")}>
+        <Card style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+          <Avatar uri={imageOf(customer?.photo) || imageOf(customer?.logo)} name={user?.fullName} size={52} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <AppText variant="heading" numberOfLines={1}>{user?.fullName || "My account"}</AppText>
+            <AppText variant="caption" tone="muted" numberOfLines={1}>{user?.email}</AppText>
+          </View>
+          {chevron}
+        </Card>
+      </Pressable>
 
       <SectionTitle>Grow</SectionTitle>
       <Card padded={false}>
@@ -79,11 +91,27 @@ export default function MoreScreen() {
 
       <SectionTitle>Account</SectionTitle>
       <Card padded={false}>
-        <Row first icon={<CreditCard color={c.accentText} size={18} />} title="Plan" subtitle={planLine} right={chevron} onPress={() => web("/dashboard/subscription")} />
-        <Row icon={<PenLine color={c.accentText} size={18} />} title="Email signature" subtitle="On digitalcarda.in" right={chevron} onPress={() => web("/dashboard/signature")} />
-        <Row icon={<Nfc color={c.accentText} size={18} />} title="NFC card & standee" subtitle="On digitalcarda.in" right={chevron} onPress={() => web("/dashboard/nfc")} />
-        <Row icon={<Globe color={c.accentText} size={18} />} title="Open full dashboard" subtitle="Every setting, on the website" right={chevron} onPress={() => web("/dashboard")} />
+        <Row first icon={<CreditCard color={c.accentText} size={18} />} title="Plan" subtitle={planLine} right={chevron} onPress={() => router.push("/plan")} />
+        <Row icon={<UserRound color={c.accentText} size={18} />} title="Account & password" subtitle="Your details, password and card link" right={chevron} onPress={() => router.push("/account")} />
         <Row icon={<Smartphone color={c.accentText} size={18} />} title="Signed-in devices" subtitle="See and sign out phones" right={chevron} onPress={() => router.push("/devices")} />
+      </Card>
+
+      <SectionTitle>Appearance</SectionTitle>
+      <Card style={{ gap: space.md }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+          <Moon color={c.accentText} size={18} />
+          <AppText variant="label" style={{ flex: 1 }}>Light or dark</AppText>
+        </View>
+        <Segmented<Appearance> value={appearance} onChange={setAppearance} options={[
+          { value: "system", label: "Phone setting" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" },
+        ]} />
+      </Card>
+
+      <SectionTitle>On the website</SectionTitle>
+      <Card padded={false}>
+        <Row first icon={<Nfc color={c.accentText} size={18} />} title="NFC card & standee" subtitle="Order a tap-to-share card" right={external} onPress={() => web("/dashboard/nfc")} />
+        <Row icon={<PenLine color={c.accentText} size={18} />} title="Email signature" subtitle="Your card in every email" right={external} onPress={() => web("/dashboard/signature")} />
+        <Row icon={<Globe color={c.accentText} size={18} />} title="Full dashboard" subtitle="Every setting — opens signed in" right={external} onPress={() => web("/dashboard")} />
       </Card>
 
       <SectionTitle>Help</SectionTitle>

@@ -7,20 +7,26 @@ import { AppText, EmptyState, Loading } from "~/components/ui";
 import { SITE_URL } from "~/lib/config";
 import { timeAgo } from "~/lib/format";
 import { trpc } from "~/lib/trpc";
+import { useOpenDashboard } from "~/lib/web";
 import * as haptics from "~/lib/haptics";
 import { radius, space, useTheme } from "~/theme";
 
-/* Web dashboard links that have a screen in the app. */
-function openLink(link: string | null) {
+/* Web dashboard links that have a screen in the app; the rest open the
+   website already signed in. */
+function openLink(link: string | null, openDashboard: (path: `/dashboard${string}`) => Promise<void>) {
   if (!link) return;
   if (link.startsWith("/dashboard/leads") || link.startsWith("/dashboard/enquiry")) { router.push("/leads"); return; }
   if (link.startsWith("/dashboard/analytics")) { router.push("/insights"); return; }
+  if (link.startsWith("/dashboard/subscription") || link.startsWith("/dashboard/billing")) { router.push("/plan"); return; }
+  if (link.startsWith("/dashboard/build")) { router.push("/edit"); return; }
   if (link === "/dashboard" || link.startsWith("/dashboard?")) { router.push("/"); return; }
+  if (link.startsWith("/dashboard")) { void openDashboard(link as `/dashboard${string}`); return; }
   void WebBrowser.openBrowserAsync(link.startsWith("http") ? link : `${SITE_URL}${link}`);
 }
 
 export default function Notifications() {
   const { c } = useTheme();
+  const openDashboard = useOpenDashboard();
   const utils = trpc.useUtils();
   const list = trpc.notification.list.useQuery({ limit: 50 });
   const markRead = trpc.notification.markRead.useMutation({ onSuccess: () => void utils.notification.invalidate() });
@@ -50,7 +56,7 @@ export default function Notifications() {
         renderItem={({ item: n }) => (
           <Pressable
             accessibilityRole="button"
-            onPress={() => { haptics.tap(); if (!n.isRead) markRead.mutate({ id: n.id }); openLink(n.link); }}
+            onPress={() => { haptics.tap(); if (!n.isRead) markRead.mutate({ id: n.id }); openLink(n.link, openDashboard); }}
             style={({ pressed }) => ({
               flexDirection: "row", gap: space.md, padding: space.lg, borderRadius: radius.lg,
               backgroundColor: pressed ? c.surfaceAlt : c.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: c.rule,

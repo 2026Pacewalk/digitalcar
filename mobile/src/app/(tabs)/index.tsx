@@ -6,7 +6,7 @@ import * as WebBrowser from "expo-web-browser";
 import { Bell, ChevronRight, Copy, Eye, PenLine, QrCode, Share2, Sparkles } from "lucide-react-native";
 import { ActionTile, AppText, Avatar, Banner, Button, Card, Chip, EmptyState, Loading, Row, Screen, SectionTitle } from "~/components/ui";
 import { completeness, imageOf, useRefreshCard, useSnapshot } from "~/lib/card";
-import { cardUrl, SITE_URL } from "~/lib/config";
+import { cardUrl } from "~/lib/config";
 import { compact, dateLabel, displayUrl, firstName, timeAgo } from "~/lib/format";
 import { trpc } from "~/lib/trpc";
 import { useAuth } from "~/lib/auth";
@@ -15,6 +15,7 @@ import { totalActions } from "~/lib/insights";
 import * as haptics from "~/lib/haptics";
 import { AlertsPrompt } from "~/components/AlertsPrompt";
 import { takeWelcomePending } from "~/lib/welcome";
+import { useOpenDashboard } from "~/lib/web";
 import { radius, space, useTheme } from "~/theme";
 
 export default function HomeScreen() {
@@ -22,6 +23,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const refresh = useRefreshCard();
+  const openDashboard = useOpenDashboard();
 
   const snapshot = useSnapshot();
   const mine = trpc.publish.mine.useQuery();
@@ -77,7 +79,7 @@ export default function HomeScreen() {
             icon={<Sparkles color={c.accentText} size={32} />}
             title="Let's publish your card"
             body="Your account doesn't have a published card yet. Create it on the website in about five minutes — it appears here as soon as it's live."
-            action={<Button title="Create my card" onPress={() => void WebBrowser.openBrowserAsync(`${SITE_URL}/dashboard/build`)} />}
+            action={<Button title="Create my card" onPress={() => void openDashboard("/dashboard/build")} />}
           />
         </Card>
       ) : (
@@ -107,7 +109,10 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {plan.banner ? <Banner tone={plan.banner.tone} title={plan.banner.title} body={plan.banner.body} /> : null}
+          {plan.banner ? (
+            <Banner tone={plan.banner.tone} title={plan.banner.title} body={plan.banner.body}
+              action={<Button size="md" kind="secondary" style={{ marginTop: 6, alignSelf: "flex-start" }} title="See plans" onPress={() => router.push("/plan")} />} />
+          ) : null}
 
           <AlertsPrompt />
 

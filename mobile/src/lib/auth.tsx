@@ -28,6 +28,8 @@ type AuthContextValue = AuthState & {
   /** Finishes sign-in: turns the login token into a long-lived device session. */
   completeSignIn: (loginToken: string, user: SessionUser) => Promise<void>;
   signOut: (notice?: string) => Promise<void>;
+  /** Keeps the saved account details in step after a profile change. */
+  updateUser: (patch: Partial<SessionUser>) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,7 +97,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Signed out elsewhere, or the account was deactivated: back to sign-in.
   useEffect(() => onSessionEnded(() => { void signOut("You've been signed out. Please sign in again."); }), [signOut]);
 
-  const value = useMemo(() => ({ ...state, completeSignIn, signOut }), [state, completeSignIn, signOut]);
+  const updateUser = useCallback(async (patch: Partial<SessionUser>) => {
+    if (state.status !== "signedIn") return;
+    const user = { ...state.user, ...patch };
+    await setItem(USER_KEY, JSON.stringify(user));
+    setState({ status: "signedIn", user });
+  }, [state]);
+
+  const value = useMemo(() => ({ ...state, completeSignIn, signOut, updateUser }), [state, completeSignIn, signOut, updateUser]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

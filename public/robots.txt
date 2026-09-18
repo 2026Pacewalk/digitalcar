@@ -10,5 +10,6 @@ Disallow: /dashboard
 Disallow: /reseller$
 Disallow: /reseller/
 Disallow: /api/
+Disallow: /auth/
 
 Sitemap: https://digitalcarda.in/sitemap.xml

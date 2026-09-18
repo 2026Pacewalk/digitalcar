@@ -9,6 +9,7 @@ import { AppText, Banner, Button, Chip, EmptyState, Loading } from "~/components
 import { SNAPSHOT_KEY, useSnapshot } from "~/lib/card";
 import { cardUrl, SITE_URL } from "~/lib/config";
 import { errorMessage, trpc } from "~/lib/trpc";
+import { useOpenDashboard } from "~/lib/web";
 import * as haptics from "~/lib/haptics";
 import { radius, space, useTheme } from "~/theme";
 
@@ -43,6 +44,7 @@ export default function DesignsScreen() {
   const catalogue = trpc.product.catalogue.useQuery(undefined, { staleTime: 60 * 60 * 1000 });
   const addons = trpc.addon.mine.useQuery(undefined, { retry: false });
   const apply = trpc.publish.updateDesign.useMutation();
+  const openDashboard = useOpenDashboard();
 
   const [cat, setCat] = useState<Cat>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -104,7 +106,7 @@ export default function DesignsScreen() {
   const choose = (d: Design) => {
     setError(null);
     if (locked(d)) {
-      const open = () => void WebBrowser.openBrowserAsync(`${SITE_URL}/dashboard/subscription`);
+      const open = () => void openDashboard("/dashboard/subscription");
       const body = `${d.name} is an add-on. Add it to your plan on digitalcarda.in to use this design.`;
       if (Platform.OS === "web") { if (globalThis.confirm?.(`${body}\n\nOpen your plan?`)) open(); return; }
       Alert.alert("Add-on design", body, [{ text: "Not now", style: "cancel" }, { text: "See plans", onPress: open }]);

@@ -22,6 +22,7 @@ const Signup = lazy(() => import("./pages/Signup"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const AppLink = lazy(() => import("./pages/AppLink"));
 const BecomeReseller = lazy(() => import("./pages/BecomeReseller"));
 const AdminResellerApplications = lazy(() => import("./pages/admin/ResellerApplications"));
 const Home = lazy(() => import("./pages/public/Home"));
@@ -247,6 +248,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/auth/app-link" element={<AppLink />} />
         <Route path="/become-reseller" element={<BecomeReseller />} />
 
         {/* Public card */}

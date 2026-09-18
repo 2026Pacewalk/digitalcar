@@ -13,7 +13,7 @@ import { AuthProvider, useAuth } from "~/lib/auth";
 import { refreshPushRegistration, useNotificationRouting } from "~/lib/push";
 import { SITE_URL } from "~/lib/config";
 import { AppText, Button } from "~/components/ui";
-import { fonts, space, useTheme } from "~/theme";
+import { AppearanceProvider, fonts, space, useTheme } from "~/theme";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -26,13 +26,15 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <RootNavigator ready={fontsLoaded || !!fontError} />
-          </AuthProvider>
-        </QueryClientProvider>
-      </trpc.Provider>
+      <AppearanceProvider>
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <RootNavigator ready={fontsLoaded || !!fontError} />
+            </AuthProvider>
+          </QueryClientProvider>
+        </trpc.Provider>
+      </AppearanceProvider>
     </SafeAreaProvider>
   );
 }
@@ -97,6 +99,9 @@ function RootNavigator({ ready }: { ready: boolean }) {
           <Stack.Screen name="card/social" options={{ title: "Social links & reviews" }} />
           <Stack.Screen name="card/sections" options={{ title: "Sections on your card" }} />
           <Stack.Screen name="preview" options={{ title: "Preview" }} />
+          <Stack.Screen name="card/link" options={{ title: "Card link" }} />
+          <Stack.Screen name="account" options={{ title: "Account & password" }} />
+          <Stack.Screen name="plan" options={{ title: "Your plan" }} />
           <Stack.Screen name="welcome" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
           <Stack.Screen name="devices" options={{ title: "Signed-in devices" }} />

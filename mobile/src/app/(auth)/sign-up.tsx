@@ -9,6 +9,8 @@ import { errorMessage, trpc } from "~/lib/trpc";
 import { useAuth } from "~/lib/auth";
 import { SITE_URL } from "~/lib/config";
 import { markWelcomePending } from "~/lib/welcome";
+import { passwordProblem } from "~/lib/password";
+import { PasswordChecklist } from "~/components/PasswordChecklist";
 import * as haptics from "~/lib/haptics";
 import { fonts, radius, space, useTheme } from "~/theme";
 
@@ -19,13 +21,6 @@ import { fonts, radius, space, useTheme } from "~/theme";
 // Every signup carries the free-trial voucher; the server decides what it grants.
 const TRIAL_PROMO = "FREE30D";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-const PASSWORD_RULES = [
-  { label: "8+ characters", ok: (p: string) => p.length >= 8 },
-  { label: "a capital letter", ok: (p: string) => /[A-Z]/.test(p) },
-  { label: "a number", ok: (p: string) => /\d/.test(p) },
-  { label: "a symbol", ok: (p: string) => /[^A-Za-z0-9]/.test(p) },
-];
 
 const mobileDigits = (v: string) => {
   const d = v.replace(/\D/g, "");
@@ -80,8 +75,8 @@ export default function SignUp() {
     if (!EMAIL_RE.test(email.trim())) e.email = "Enter a valid email address.";
     const md = mobileDigits(mobile);
     if (md && !/^[6-9]\d{9}$/.test(md)) e.mobile = "Enter a 10-digit Indian mobile number.";
-    const missing = PASSWORD_RULES.filter((r) => !r.ok(password)).map((r) => r.label);
-    if (missing.length) e.password = `Add ${missing.join(", ")}.`;
+    const pw = passwordProblem(password);
+    if (pw) e.password = pw;
     if (!agreed) e.agreed = "Accept the Terms and Privacy Policy to continue.";
     return e;
   };
@@ -231,17 +226,7 @@ export default function SignUp() {
                 </Pressable>
               }
             />
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-              {PASSWORD_RULES.map((r) => {
-                const ok = r.ok(password);
-                return (
-                  <View key={r.label} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: ok ? c.goodWash : c.surfaceAlt }}>
-                    {ok ? <Check color={c.good} size={12} /> : null}
-                    <AppText variant="caption" tone={ok ? "good" : "muted"} style={{ fontSize: 12, lineHeight: 16 }}>{r.label}</AppText>
-                  </View>
-                );
-              })}
-            </View>
+            <PasswordChecklist password={password} />
           </View>
 
           {referralOpen ? (

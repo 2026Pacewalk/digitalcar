@@ -151,6 +151,15 @@ export const publishRouter = createRouter({
           }
         }
         await db.update(publishedCards).set({ slug, data }).where(owner);
+        // The card moved to a new address. Visit stats are kept by address, so
+        // its history moves with it — except an address a legacy card also
+        // uses, whose events may belong to that card's owner.
+        const oldSlug = String(existing[0].slug || "").toLowerCase();
+        const newSlug = slug.toLowerCase();
+        if (oldSlug && oldSlug !== newSlug && !legacySlugSet().has(oldSlug)) {
+          try { await db.update(cardEvents).set({ slug: newSlug }).where(eq(cardEvents.slug, oldSlug)); }
+          catch (e) { console.error("[publish] moving visit history to the new address failed:", (e as Error).message); }
+        }
         const fresh = await db.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner);
         return { ok: true, publicId: existing[0].publicId, updatedAt: fresh[0]?.updatedAt ? new Date(fresh[0].updatedAt).toISOString() : null };
       }

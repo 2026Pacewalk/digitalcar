@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
 import { Image } from "expo-image";
-import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
 import { Camera, ChevronRight, Eye, ImagePlus, Images, LayoutList, Palette, Share2, ShoppingBag, Trash2, Wallet } from "lucide-react-native";
 import { AppText, Avatar, Banner, Button, Card, Field, Loading, Row, Screen, SectionTitle } from "~/components/ui";
@@ -9,7 +8,7 @@ import { SaveBadge } from "~/components/SaveBadge";
 import { imageOf } from "~/lib/card";
 import { setFields, useCardUpdate } from "~/lib/cardStore";
 import { useCardFields } from "~/lib/useCardFields";
-import { SITE_URL } from "~/lib/config";
+import { useOpenDashboard } from "~/lib/web";
 import { pickCardImage, type ImageKind, type PickSource } from "~/lib/images";
 import * as haptics from "~/lib/haptics";
 import { radius, space, useTheme } from "~/theme";
@@ -23,6 +22,7 @@ export default function EditScreen() {
   const { c } = useTheme();
   const { snapshot, draft, set: change, flush, state, error } = useCardFields(FIELDS, 1500);
   const update = useCardUpdate();
+  const openDashboard = useOpenDashboard();
   const [imageBusy, setImageBusy] = useState<ImageKind | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -64,7 +64,7 @@ export default function EditScreen() {
         <AppText variant="title">Edit card</AppText>
         <Card style={{ gap: space.md }}>
           <AppText tone="muted">Your card isn't published yet. Create it on the website first — then edit it here any time.</AppText>
-          <Button title="Create my card" onPress={() => void WebBrowser.openBrowserAsync(`${SITE_URL}/dashboard/build`)} />
+          <Button title="Create my card" onPress={() => void openDashboard("/dashboard/build")} />
         </Card>
       </Screen>
     );

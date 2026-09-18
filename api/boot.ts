@@ -509,6 +509,20 @@ if (process.env.NODE_ENV === "production") {
         KEY adr_status_idx (status)
       )
     `));
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS app_web_links (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        user_id bigint unsigned NOT NULL,
+        code_hash varchar(64) NOT NULL,
+        next varchar(200) NOT NULL,
+        expires_at timestamp NOT NULL,
+        used_at timestamp NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY app_web_links_code_unique (code_hash),
+        KEY app_web_links_user_idx (user_id)
+      )
+    `));
     console.log("[schema] app_sessions, push_tokens, account_deletion_requests ensured");
   } catch (e) {
     console.error("[schema] ensure mobile app tables failed:", (e as Error).message);

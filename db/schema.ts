@@ -973,4 +973,21 @@ export const accountDeletionRequests = mysqlTable("account_deletion_requests", {
   index("adr_status_idx").on(table.status),
 ]);
 
+// ─── Mobile app: one-time links that open the website already signed in ──
+// The app asks for a link to a dashboard page (plan checkout, NFC orders…);
+// only a hash of the code is stored, the page it opens is fixed server-side,
+// and a code works once, within two minutes.
+export const appWebLinks = mysqlTable("app_web_links", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  codeHash: varchar("code_hash", { length: 64 }).notNull(),
+  next: varchar("next", { length: 200 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("app_web_links_code_unique").on(table.codeHash),
+  index("app_web_links_user_idx").on(table.userId),
+]);
+
 export type AccountDeletionRequest = typeof accountDeletionRequests.$inferSelect;

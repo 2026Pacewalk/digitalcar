@@ -10,7 +10,7 @@ The iPhone and Android app for card owners, built with Expo (SDK 57) and React N
 | Edit | Photo and logo (gallery or camera), name, role, business, contact details, address, map link and About — autosaved to the live card. From here: services & offers, photos & videos, payments, social links & reviews, sections on/off, design, and a live preview |
 | Share | QR code (full screen, screen brightened), copy link, send on WhatsApp, system share sheet |
 | Leads | Enquiry inbox with search and status filters; detail with one-tap WhatsApp / call / email, status, follow-up reminders and private notes |
-| More | Insights, enquiry alerts, notifications, refer & earn, plan status, signed-in devices, support, sign out, delete account |
+| More | Insights, enquiry alerts, notifications, refer & earn, plan, account & password, signed-in devices, appearance (phone setting / light / dark), website pages, support, sign out, delete account |
 
 Also: create an account in the app (the starter card goes live on the 30-day trial, then a four-step welcome guide), a design picker (catalogue thumbnails, category filter, live sample, one-tap apply; the ID and Membership designs stay locked unless the add-on is owned), device sessions that renew themselves, and push alerts for new enquiries.
 
@@ -18,7 +18,11 @@ Also: create an account in the app (the starter card goes live on the 30-day tri
 
 The content editors follow the website's rules exactly (`src/lib/cardContent.ts`): plan limits (Gold/trial 50 services, 15 offers, 20 photos, 8 videos, 5 payment QRs; Platinum more), the website's formatted service descriptions are kept unless edited, social links are stored as the website stores them. The preview opens the live card with `?preview=app`, which the card page doesn't count as a visit.
 
-Sign-in uses email (or card address / mobile) and password. Plan purchase, NFC orders, custom domains and the email signature still open the website. Account-deletion requests land in the website admin under Account Deletions.
+**Account & plan.** Account: name and mobile (a mobile already used by another account is refused), the sign-in email and its verification (changing the sign-in email goes through support), a password change that can sign out the owner's other phones, and the card link (moving the card keeps its permanent QR link and its visit history). Plan: trial or plan status, usage against the plan's limits, Gold and Platinum by term with savings, payment history.
+
+**Website pages open signed in.** Paying for a plan, NFC orders, the email signature and the full dashboard open on digitalcarda.in through a one-time link (`mobile.webLink` → `/auth/app-link`): the code works once, for two minutes, and the page is fixed by the server. The plan page opens on the plan and term picked in the app (`?cycle=&plan=`).
+
+Sign-in uses email (or card address / mobile) and password. Account-deletion requests land in the website admin under Account Deletions.
 
 ## Run it on your phone
 
@@ -61,6 +65,6 @@ npm run typecheck   # includes the server's API types — a wrong input or a rem
 ## Next up (from the PRD)
 
 - Server: photo uploads to file storage (photos live inside the card today), Sign in with Apple and Google.
-- App: NFC tag writing, in-app plan purchase, changing the card address, AI writing help, notification settings.
+- App: NFC tag writing, in-app plan purchase (store rules — see the PRD), AI writing help, notification settings, several cards per account.
 - Push: needs an EAS project id (`npx eas init` with the company Expo account) and a development or store build — Expo Go can't receive remote push.
 - Store: EAS builds, bundle id `in.digitalcarda.app`, Apple Developer and Google Play organisation accounts.

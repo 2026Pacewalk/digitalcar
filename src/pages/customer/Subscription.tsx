@@ -26,8 +26,13 @@ export default function CustomerSubscription() {
   // Kept up here, outside the layout: crossing the mobile/desktop breakpoint
   // swaps layouts and remounts the body, which must not reset the tab or close
   // an open payment.
-  const [cycle, setCycle] = useState<Term>("yearly");
-  const cyclePinned = useRef(false);
+  // Chosen in the mobile app (?cycle=yearly): open on that term and keep it.
+  const [urlTerm] = useState<Term | null>(() => {
+    const c = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("cycle");
+    return c === "monthly" || c === "yearly" || c === "triennial" ? c : null;
+  });
+  const [cycle, setCycle] = useState<Term>(urlTerm ?? "yearly");
+  const cyclePinned = useRef(urlTerm !== null);
   const [payFor, setPayFor] = useState<PayFor | null>(null);
   return (
     <ResponsiveDashboardLayout>
@@ -57,6 +62,11 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
   // Open the page on the member's actual term, so the first thing they see is
   // the plan they're on — once real data is in. Once snapped, or once they click
   // a tab or choose a plan, it stays put.
+  // Chosen in the mobile app (?plan=6): point at that plan once plans show.
+  const [urlPlan] = useState(() => (typeof window === "undefined" ? 0 : Number(new URLSearchParams(window.location.search).get("plan")) || 0));
+  useEffect(() => {
+    if (urlPlan && dataReady) document.getElementById(`plan-${urlPlan}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [urlPlan, dataReady]);
   useEffect(() => {
     if (cyclePinned.current || !dataReady || !userCycle) return;
     setCycle(userCycle);
@@ -218,7 +228,7 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
             const popular = plan.name === "Gold";
 
             return (
-              <div key={plan.id} className={`bg-white rounded-2xl p-6 shadow-premium border-2 transition-all ${isCurrent ? "border-[#F7B31C]" : popular ? "border-[#F7B31C]/50" : "border-[#F1F5F9]"} card-hover relative`}>
+              <div key={plan.id} id={`plan-${plan.id}`} className={`bg-white rounded-2xl p-6 shadow-premium border-2 transition-all ${isCurrent ? "border-[#F7B31C]" : popular ? "border-[#F7B31C]/50" : "border-[#F1F5F9]"} ${urlPlan === plan.id && !isOwnPlan ? "ring-4 ring-[#F7B31C]/40" : ""} card-hover relative`}>
                 {popular && !isCurrent && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 gradient-gold text-[#0F172A] text-[10px] font-bold rounded-full whitespace-nowrap">MOST POPULAR</span>}
                 {isCurrent && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 gradient-gold text-[#0F172A] text-[10px] font-bold rounded-full whitespace-nowrap">CURRENT PLAN</span>}
                 <div className="flex items-center gap-3 mb-4">

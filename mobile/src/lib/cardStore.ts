@@ -24,7 +24,8 @@ export function useCardUpdate() {
   const qc = useQueryClient();
   const utils = trpc.useUtils();
 
-  return useCallback((change: CardChange): Promise<UpdateResult> => {
+  /** `slug` moves the card to a new address (checked by the server). */
+  return useCallback((change: CardChange, opts: { slug?: string } = {}): Promise<UpdateResult> => {
     const latest = async () => {
       const fresh = await apiGet<CardSnapshot | null>("/api/my/snapshot");
       qc.setQueryData(SNAPSHOT_KEY, fresh);
@@ -40,12 +41,12 @@ export function useCardUpdate() {
           if (!next) return { ok: true };
           try {
             const res = await utils.client.publish.saveSnapshot.mutate({
-              slug: base.slug, cardId: base.cardId || 1, data: next,
+              slug: opts.slug ?? base.slug, cardId: base.cardId || 1, data: next,
               // The version this change was applied to; the server refuses the
               // save if the card changed since, and we apply it again below.
               baseTs: base.updatedAt ?? undefined,
             });
-            qc.setQueryData<CardSnapshot>(SNAPSHOT_KEY, { ...base, data: next, updatedAt: res.updatedAt ?? base.updatedAt });
+            qc.setQueryData<CardSnapshot>(SNAPSHOT_KEY, { ...base, slug: opts.slug ?? base.slug, data: next, updatedAt: res.updatedAt ?? base.updatedAt });
             return { ok: true };
           } catch (e) {
             if (errorTag(e) !== "SNAPSHOT_STALE") return { ok: false, message: errorMessage(e, "Couldn't save. Check your connection and try again.") };

@@ -7,6 +7,8 @@
  *    ends its access within a minute.
  *  · Push tokens — where to send "New enquiry" alerts.
  *  · Account deletion — required by both app stores.
+ *  · Web links — one-time links that open a dashboard page on the website
+ *    already signed in (plan checkout, NFC orders, email signature).
  *  · Config — the minimum supported app version.
  *
  * All additive: nothing the website uses changes behaviour. */
@@ -17,7 +19,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { accountDeletionRequests, appSessions, appSettings, pushTokens, users } from "@db/schema";
+import { accountDeletionRequests, appSessions, appSettings, appWebLinks, pushTokens, users } from "@db/schema";
 import { createToken, verifyToken } from "./lib/jwt";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { isExpoPushToken } from "./lib/push";
@@ -28,6 +30,10 @@ const SESSION_DAYS = 90;
 const ACCESS_TTL = "1h";
 const ACCESS_TTL_MS = 60 * 60 * 1000;
 const DELETION_GRACE_DAYS = 30;
+const WEB_LINK_TTL_MS = 2 * 60_000;
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
+/** Dashboard pages the app may open signed in: /dashboard/<words>, optional simple query. */
+const SAFE_WEB_PATH = /^\/dashboard(\/[a-z0-9-]+)*\/?(\?[A-Za-z0-9=&_.%-]{0,120})?$/;
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 const newRefreshToken = () => randomBytes(32).toString("base64url");
@@ -239,6 +245,64 @@ export const mobileRouter = createRouter({
       }
 
       return { ok: true as const, scheduledFor };
+    }),
+
+  /** Signs out every phone except this one — offered after a password change. */
+  revokeOtherSessions: authedQuery.mutation(async ({ ctx }) => {
+    const db = getDb();
+    const current = await callerSessionId(ctx.req);
+    const live = await db.select({ id: appSessions.id }).from(appSessions)
+      .where(and(eq(appSessions.userId, ctx.user.id), isNull(appSessions.revokedAt)));
+    let signedOut = 0;
+    for (const s of live) {
+      if (s.id === current) continue;
+      await revokeSessionRow(db, s.id);
+      signedOut++;
+    }
+    return { ok: true as const, signedOut };
+  }),
+
+  /** A one-time link that opens a dashboard page on the website already signed
+      in, so the owner isn't asked for their password again in the browser.
+      The page is fixed here (never read from the link), the code works once,
+      for two minutes, and only its hash is stored. */
+  webLink: authedQuery
+    .input(z.object({ next: z.string().max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`app-weblink:${ctx.user.id}`, 30, 10 * 60_000);
+      if (!SAFE_WEB_PATH.test(input.next)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "That page can't be opened from the app." });
+      }
+      const code = randomBytes(24).toString("base64url");
+      await getDb().insert(appWebLinks).values({
+        userId: ctx.user.id, codeHash: sha256(code), next: input.next, expiresAt: new Date(Date.now() + WEB_LINK_TTL_MS),
+      });
+      return { url: `${PUBLIC_BASE_URL}/auth/app-link?code=${encodeURIComponent(code)}` };
+    }),
+
+  /** The website's side of webLink: swaps the code for a normal website session. */
+  redeemWebLink: publicQuery
+    .input(z.object({ code: z.string().min(20).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`app-weblink-redeem:${clientIp(ctx.req)}`, 30, 10 * 60_000);
+      const expired = () => new TRPCError({ code: "UNAUTHORIZED", message: "This link has expired. Open the page again from the DigitalCarda app." });
+      const db = getDb();
+      const [row] = await db.select().from(appWebLinks).where(eq(appWebLinks.codeHash, sha256(input.code))).limit(1);
+      if (!row || row.usedAt || new Date(row.expiresAt).getTime() < Date.now()) throw expired();
+      // Claim it atomically, so two tabs racing for one code can't both succeed.
+      const claim = await db.update(appWebLinks).set({ usedAt: new Date() })
+        .where(and(eq(appWebLinks.id, row.id), isNull(appWebLinks.usedAt)));
+      const affected = (claim as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+        ?? (claim as unknown as { affectedRows?: number })?.affectedRows ?? 0;
+      if (affected !== 1) throw expired();
+      const user = await db.query.users.findFirst({ where: eq(users.id, row.userId) });
+      if (!user || user.status !== "active") throw expired();
+      const token = await createToken({ userId: user.id, email: user.email, role: user.role });
+      return {
+        token,
+        next: row.next,
+        user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role, status: user.status, avatar: user.avatar },
+      };
     }),
 
   /** Lets the app ask for an update when an old build can no longer work. */
