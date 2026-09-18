@@ -98,6 +98,10 @@ try {
       "retro-groove-bio-card", "editorial-bio-card", "mint-fresh-bio-card", "lavender-dream-bio-card",
       // Added later: Teal Breeze (style 6) launched without a gallery.
       "teal-breeze-card",
+      // Added later: the 11 templates launched without a gallery.
+      "indigo-card", "amber-card", "sky-card", "corporate-navy-card", "emerald-prestige-card",
+      "executive-card", "corporate-business-card", "employee-id-card", "membership-card",
+      "professional-profile-card", "bloom-profile-card",
     ];
     const [pn] = await conn.query("SELECT slug, name FROM products WHERE slug IN (?)", [BATCH]);
     const nameBySlug = Object.fromEntries(pn.map((r) => [r.slug, r.name]));
