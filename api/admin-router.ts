@@ -4,9 +4,10 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLogs } from "@db/schema";
-import { eq, and, desc, like, or, sql, gte } from "drizzle-orm";
+import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLogs, accountDeletionRequests, leads } from "@db/schema";
+import { eq, and, desc, like, or, sql, gte, inArray } from "drizzle-orm";
 import { legacySlugSet, legacySlugOwners, slugTakenByOther } from "./publish-router";
+import { cancelAccountDeletion, completeAccountDeletion } from "./lib/account-deletion";
 
 /* Emails that belong to a LEGACY customers.json card — used to flag which DB
    accounts are genuinely "new-flow" (i.e. NOT already in the legacy list, which
@@ -324,4 +325,59 @@ export const adminRouter = createRouter({
       const left = await db.select({ n: sql<number>`count(*)` }).from(emailLogs);
       return { ok: true as const, remaining: Number(left[0]?.n) || 0 };
     }),
+
+  /* Account-deletion requests made in the mobile app. The account is already
+     signed out and its card paused; after the 30-day window the admin
+     completes the erasure here (api/lib/account-deletion.ts), or cancels it
+     when the owner changes their mind. */
+  deletionRequests: adminQuery.query(async () => {
+    const db = getDb();
+    const rows = await db.select().from(accountDeletionRequests).orderBy(desc(accountDeletionRequests.createdAt)).limit(500);
+    const ids = [...new Set(rows.map((r) => r.userId))];
+    const [people, cardRows, leadCounts, subs] = ids.length ? await Promise.all([
+      db.select({ id: users.id, fullName: users.fullName, email: users.email, phone: users.phone, role: users.role, status: users.status, createdAt: users.createdAt })
+        .from(users).where(inArray(users.id, ids)),
+      db.select({ userId: publishedCards.userId, slug: publishedCards.slug }).from(publishedCards).where(inArray(publishedCards.userId, ids)),
+      db.select({ userId: leads.userId, n: sql<number>`count(*)` }).from(leads).where(inArray(leads.userId, ids)).groupBy(leads.userId),
+      db.select({ userId: subscriptions.userId, status: subscriptions.status, packageId: subscriptions.packageId, end: subscriptions.currentPeriodEnd, autoRenew: subscriptions.autoRenew })
+        .from(subscriptions).where(inArray(subscriptions.userId, ids)),
+    ]) : [[], [], [], []];
+    const now = Date.now();
+    const list = rows.map((r) => {
+      const u = people.find((p) => Number(p.id) === Number(r.userId));
+      return {
+        id: Number(r.id), userId: Number(r.userId), status: r.status, source: r.source, reason: r.reason,
+        email: r.email, requestedAt: r.createdAt, scheduledFor: r.scheduledFor, completedAt: r.completedAt,
+        due: r.status === "pending" && new Date(r.scheduledFor).getTime() <= now,
+        name: u?.fullName ?? null, phone: u?.phone ?? null, role: u?.role ?? null, accountStatus: u?.status ?? null,
+        joinedAt: u?.createdAt ?? null,
+        slugs: cardRows.filter((c) => Number(c.userId) === Number(r.userId)).map((c) => c.slug),
+        leads: Number(leadCounts.find((l) => Number(l.userId) === Number(r.userId))?.n) || 0,
+        // A paid plan still running (package 7 is the free trial) — worth a look before erasing.
+        paidUntil: subs
+          .filter((s) => Number(s.userId) === Number(r.userId) && s.status === "active" && Number(s.packageId) !== 7 && new Date(s.end).getTime() > now)
+          .map((s) => new Date(s.end).toISOString()).sort().pop() ?? null,
+        autoRenew: subs.some((s) => Number(s.userId) === Number(r.userId) && s.status === "active" && s.autoRenew && Number(s.packageId) !== 7),
+      };
+    });
+    return {
+      list,
+      counts: {
+        pending: list.filter((r) => r.status === "pending").length,
+        due: list.filter((r) => r.due).length,
+        completed: list.filter((r) => r.status === "completed").length,
+        cancelled: list.filter((r) => r.status === "cancelled").length,
+      },
+    };
+  }),
+
+  completeDeletion: adminQuery
+    .input(z.object({ id: z.number().int().positive(), early: z.boolean().default(false) }))
+    .mutation(async ({ input }) => completeAccountDeletion(getDb(), input.id, {
+      early: input.early, legacyCustomers, legacySlugs: legacySlugSet,
+    })),
+
+  cancelDeletion: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => cancelAccountDeletion(getDb(), input.id)),
 });

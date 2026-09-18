@@ -170,12 +170,13 @@ export function Chip({ label, tone = "neutral", selected, onPress }: {
 
 /* ── Inputs ───────────────────────────────────────────────────────────── */
 
-export const Field = forwardRef<TextInput, TextInputProps & { label: string; hint?: string; error?: string }>(
-  function Field({ label, hint, error, style, multiline, ...rest }, ref) {
+export const Field = forwardRef<TextInput, TextInputProps & { label: string; hint?: ReactNode; error?: string; right?: ReactNode }>(
+  function Field({ label, hint, error, style, multiline, right, ...rest }, ref) {
     const { c } = useTheme();
     return (
       <View style={{ gap: 6 }}>
         <AppText variant="label" tone="ink2">{label}</AppText>
+        <View>
         <TextInput
           ref={ref}
           placeholderTextColor={c.muted}
@@ -184,10 +185,12 @@ export const Field = forwardRef<TextInput, TextInputProps & { label: string; hin
             minHeight: multiline ? 96 : 50, borderRadius: radius.md, borderWidth: 1, borderColor: error ? c.bad : c.rule,
             backgroundColor: c.surface, color: c.ink, paddingHorizontal: 14, paddingVertical: multiline ? 12 : 0,
             fontFamily: fonts.body, fontSize: 16, textAlignVertical: multiline ? "top" : "center",
-          }, style]}
+          }, right ? { paddingRight: 64 } : null, style]}
           {...rest}
         />
-        {error ? <AppText variant="caption" tone="bad">{error}</AppText> : hint ? <AppText variant="caption" tone="muted">{hint}</AppText> : null}
+        {right ? <View style={{ position: "absolute", right: 4, top: 0, bottom: 0, justifyContent: "center" }}>{right}</View> : null}
+        </View>
+        {error ? <AppText variant="caption" tone="bad">{error}</AppText> : hint ? (typeof hint === "string" ? <AppText variant="caption" tone="muted">{hint}</AppText> : hint) : null}
       </View>
     );
   },

@@ -61,7 +61,7 @@ export function completeness(snap: CardSnapshot | null | undefined) {
   const c = snap?.data?.customer ?? {};
   const socials = ["facebook", "instagram", "linkedin", "youtube", "twitter"].some((k) => str(c[k]));
   const steps: Step[] = [
-    { key: "photo", label: "Add your photo or logo", hint: "Faces and logos make cards easy to recognise.", done: !!(imageOf(c.photo) || imageOf(c.logo)), inApp: false },
+    { key: "photo", label: "Add your photo or logo", hint: "Faces and logos make cards easy to recognise.", done: !!(imageOf(c.photo) || imageOf(c.logo)), inApp: true },
     { key: "role", label: "Add your role and business", hint: "Tell people what you do in one line.", done: !!(str(c.designation) || str(c.company_name)), inApp: true },
     { key: "contact", label: "Add phone and WhatsApp", hint: "One tap to call or message you.", done: !!str(c.mobile1), inApp: true },
     { key: "email", label: "Add your email", hint: "For people who prefer email.", done: !!str(c.email), inApp: true },

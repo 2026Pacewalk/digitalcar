@@ -89,6 +89,8 @@ function RootNavigator({ ready }: { ready: boolean }) {
           <Stack.Screen name="qr" options={{ presentation: "fullScreenModal", headerShown: false, animation: "fade" }} />
           <Stack.Screen name="lead/[id]" options={{ title: "Enquiry" }} />
           <Stack.Screen name="insights" options={{ title: "Insights" }} />
+          <Stack.Screen name="designs" options={{ title: "Designs" }} />
+          <Stack.Screen name="welcome" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
           <Stack.Screen name="devices" options={{ title: "Signed-in devices" }} />
           <Stack.Screen name="delete-account" options={{ title: "Delete account" }} />

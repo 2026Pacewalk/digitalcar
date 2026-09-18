@@ -130,6 +130,11 @@ export async function sendEmail(to: string | undefined | null, email: Email, rep
       void logEmail(to, email, replyTo, "skipped", "Placeholder login — no mailbox; add the client's real email");
       return { ok: false, error: "Placeholder address" };
     }
+    // An erased account's login is rewritten to this domain (api/lib/account-deletion.ts).
+    if (/@deleted\.digitalcarda\.in$/i.test(to.trim())) {
+      void logEmail(to, email, replyTo, "skipped", "Deleted account — no mailbox");
+      return { ok: false, error: "Deleted account" };
+    }
     // Real SMTP when it is configured; outside production, a capture mailbox
     // rather than silently dropping the mail.
     const t = transport() ?? (process.env.NODE_ENV === "production" ? null : await previewTransport());

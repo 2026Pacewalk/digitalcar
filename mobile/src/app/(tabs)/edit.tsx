@@ -3,7 +3,8 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Vi
 import { Image } from "expo-image";
 import { useQueryClient } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
-import { Camera, Check, CloudOff, ExternalLink, ImagePlus, Images, Palette, ShoppingBag, Trash2, Wallet } from "lucide-react-native";
+import { router } from "expo-router";
+import { Camera, Check, ChevronRight, CloudOff, ExternalLink, ImagePlus, Images, Palette, ShoppingBag, Trash2, Wallet } from "lucide-react-native";
 import { AppText, Avatar, Banner, Button, Card, Field, Loading, Row, Screen, SectionTitle } from "~/components/ui";
 import { imageOf, SNAPSHOT_KEY, useSnapshot, type CardCustomer, type CardSnapshot } from "~/lib/card";
 import { SITE_URL } from "~/lib/config";
@@ -220,7 +221,7 @@ export default function EditScreen() {
 
         <SectionTitle>More on your card</SectionTitle>
         <Card padded={false}>
-          <Row first icon={<Palette color={c.accentText} size={18} />} title="Design & colours" subtitle="Edit on digitalcarda.in" right={<ExternalLink color={c.muted} size={16} />} onPress={() => openWeb("/dashboard/templates")} />
+          <Row first icon={<Palette color={c.accentText} size={18} />} title="Design" subtitle="Pick a new look for your card" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/designs")} />
           <Row icon={<ShoppingBag color={c.accentText} size={18} />} title="Services & products" subtitle="Edit on digitalcarda.in" right={<ExternalLink color={c.muted} size={16} />} onPress={() => openWeb("/dashboard/products")} />
           <Row icon={<Images color={c.accentText} size={18} />} title="Gallery & videos" subtitle="Edit on digitalcarda.in" right={<ExternalLink color={c.muted} size={16} />} onPress={() => openWeb("/dashboard/media")} />
           <Row icon={<Wallet color={c.accentText} size={18} />} title="Payments & social links" subtitle="Edit on digitalcarda.in" right={<ExternalLink color={c.muted} size={16} />} onPress={() => openWeb("/dashboard/payments")} />

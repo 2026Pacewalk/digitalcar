@@ -7,12 +7,14 @@ The iPhone and Android app for card owners, built with Expo (SDK 57) and React N
 | Tab | What it does |
 |---|---|
 | Home | Card at a glance (live/paused, link, plan), last-30-day views and visitor actions, next step to finish the card, latest enquiries |
-| Edit | Name, role, business, contact details, address and About — autosaved to the live card, with a guard against overwriting newer edits made on the website or another phone |
+| Edit | Photo and logo (gallery or camera), name, role, business, contact details, address and About — autosaved to the live card, with a guard against overwriting newer edits made on the website or another phone. Design opens the design picker |
 | Share | QR code (full screen, screen brightened), copy link, send on WhatsApp, system share sheet |
 | Leads | Enquiry inbox with search and status filters; detail with one-tap WhatsApp / call / email, status, follow-up reminders and private notes |
-| More | Insights, notifications, refer & earn, plan status, support, sign out |
+| More | Insights, enquiry alerts, notifications, refer & earn, plan status, signed-in devices, support, sign out, delete account |
 
-Sign-in uses email (or card address / mobile) and password. Sections not yet in the app — design, services, gallery, payments, subscription — open the website.
+Also: create an account in the app (the starter card goes live on the 30-day trial, then a four-step welcome guide), a design picker (catalogue thumbnails, category filter, live sample, one-tap apply; the ID and Membership designs stay locked unless the add-on is owned), device sessions that renew themselves, and push alerts for new enquiries.
+
+Sign-in uses email (or card address / mobile) and password. Sections not yet in the app — services, gallery, payments, subscription — open the website. Account-deletion requests land in the website admin under Account Deletions.
 
 ## Run it on your phone
 
@@ -54,6 +56,7 @@ npm run typecheck   # includes the server's API types — a wrong input or a rem
 
 ## Next up (from the PRD)
 
-- Server: refresh tokens and device sessions, push notifications for new enquiries, photo uploads to file storage, account deletion, Sign in with Apple.
-- App: push for new enquiries, photo & logo with crop, designs, NFC tag writing, in-app plan purchase, account deletion, first-card guide for new sign-ups.
+- Server: photo uploads to file storage (photos live inside the card today), Sign in with Apple and Google.
+- App: NFC tag writing, in-app plan purchase, services and gallery editing.
+- Push: needs an EAS project id (`npx eas init` with the company Expo account) and a development or store build — Expo Go can't receive remote push.
 - Store: EAS builds, bundle id `in.digitalcarda.app`, Apple Developer and Google Play organisation accounts.

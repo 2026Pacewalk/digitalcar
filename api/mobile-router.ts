@@ -231,8 +231,8 @@ export const mobileRouter = createRouter({
         await sendEmail(ownerAddress(), {
           kind: "accountDeletionRequestAdmin",
           subject: `Account deletion requested — ${ctx.user.email}`,
-          text: `${ctx.user.fullName} (${ctx.user.email}, user #${ctx.user.id}) asked to delete their account from the mobile app.\n\nThe account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after ${when}.${reason}`,
-          html: `<p><b>${escapeHtml(ctx.user.fullName)}</b> (${escapeHtml(ctx.user.email)}, user #${ctx.user.id}) asked to delete their account from the mobile app.</p><p>The account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after <b>${when}</b>.</p>${input.reason ? `<p>Reason given: ${escapeHtml(input.reason)}</p>` : ""}`,
+          text: `${ctx.user.fullName} (${ctx.user.email}, user #${ctx.user.id}) asked to delete their account from the mobile app.\n\nThe account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after ${when}, or cancel it if they change their mind: https://digitalcarda.in/admin/deletion-requests${reason}`,
+          html: `<p><b>${escapeHtml(ctx.user.fullName)}</b> (${escapeHtml(ctx.user.email)}, user #${ctx.user.id}) asked to delete their account from the mobile app.</p><p>The account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after <b>${when}</b>, or cancel it if they change their mind, in <a href="https://digitalcarda.in/admin/deletion-requests">Admin → Account Deletions</a>.</p>${input.reason ? `<p>Reason given: ${escapeHtml(input.reason)}</p>` : ""}`,
         });
       } catch (e) {
         console.error("[mobile] deletion notice email failed:", (e as Error).message);

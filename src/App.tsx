@@ -49,6 +49,7 @@ const AdminTemplates = lazy(() => import("./pages/admin/Templates"));
 const AdminProducts = lazy(() => import("./pages/admin/Products"));
 const AdminMigration = lazy(() => import("./pages/admin/Migration"));
 const AdminUrlConflicts = lazy(() => import("./pages/admin/UrlConflicts"));
+const AdminDeletionRequests = lazy(() => import("./pages/admin/DeletionRequests"));
 const AdminEmailLog = lazy(() => import("./pages/admin/EmailLog"));
 const AdminDomains = lazy(() => import("./pages/admin/Domains"));
 const AdminLeads = lazy(() => import("./pages/admin/Leads"));
@@ -261,6 +262,7 @@ export default function App() {
         <Route path="/admin/templates" element={<RoleRoute allowedRoles={["super_admin"]}><AdminTemplates /></RoleRoute>} />
         <Route path="/admin/migration" element={<RoleRoute allowedRoles={["super_admin"]}><AdminMigration /></RoleRoute>} />
         <Route path="/admin/url-conflicts" element={<RoleRoute allowedRoles={["super_admin"]}><AdminUrlConflicts /></RoleRoute>} />
+        <Route path="/admin/deletion-requests" element={<RoleRoute allowedRoles={["super_admin"]}><AdminDeletionRequests /></RoleRoute>} />
         <Route path="/admin/domains" element={<RoleRoute allowedRoles={["super_admin"]}><AdminDomains /></RoleRoute>} />
         <Route path="/admin/email-log" element={<RoleRoute allowedRoles={["super_admin"]}><AdminEmailLog /></RoleRoute>} />
         {/* Analytics is now merged into the Dashboard — keep the path as a redirect for old links */}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
@@ -14,6 +14,7 @@ import { shareCard } from "~/lib/share";
 import { totalActions } from "~/lib/insights";
 import * as haptics from "~/lib/haptics";
 import { AlertsPrompt } from "~/components/AlertsPrompt";
+import { takeWelcomePending } from "~/lib/welcome";
 import { radius, space, useTheme } from "~/theme";
 
 export default function HomeScreen() {
@@ -30,6 +31,11 @@ export default function HomeScreen() {
   const leadStats = trpc.lead.stats.useQuery();
   const recent = trpc.lead.list.useQuery({ limit: 3 });
   const unread = trpc.notification.unreadCount.useQuery(undefined, { refetchInterval: 60_000 });
+
+  // Straight after creating an account in the app: open the welcome guide once.
+  useEffect(() => {
+    void takeWelcomePending().then((pending) => { if (pending) router.push("/welcome"); });
+  }, []);
 
   const onRefresh = async () => { setRefreshing(true); try { await refresh(); } finally { setRefreshing(false); } };
 

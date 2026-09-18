@@ -1,13 +1,11 @@
 import { useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { Image } from "expo-image";
-import { Link } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
+import { Link, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText, Banner, Button, Field } from "~/components/ui";
 import { errorMessage, trpc } from "~/lib/trpc";
 import { useAuth } from "~/lib/auth";
-import { SITE_URL } from "~/lib/config";
 import * as haptics from "~/lib/haptics";
 import { space, useTheme } from "~/theme";
 
@@ -90,7 +88,7 @@ export default function SignIn() {
           <Button
             kind="secondary"
             title="Create your free card"
-            onPress={() => void WebBrowser.openBrowserAsync(`${SITE_URL}/signup?promo=FREE30D`)}
+            onPress={() => router.push("/sign-up")}
             style={{ alignSelf: "stretch" }}
           />
           <AppText variant="caption" tone="muted" style={{ textAlign: "center" }}>30 days free · no payment needed</AppText>
