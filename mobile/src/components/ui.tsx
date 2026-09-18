@@ -1,6 +1,6 @@
 import { forwardRef, type ReactNode } from "react";
 import {
-  ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View,
   type PressableProps, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle,
 } from "react-native";
 import { Image } from "expo-image";
@@ -144,6 +144,56 @@ export function Row({ icon, title, subtitle, right, onPress, first, tint }: {
       </View>
       {right}
     </Pressable>
+  );
+}
+
+/** A row with an on/off switch — e.g. whether a section shows on the card. */
+export function SwitchRow({ title, subtitle, value, onChange, first, disabled }: {
+  title: string; subtitle?: string; value: boolean; onChange: (next: boolean) => void; first?: boolean; disabled?: boolean;
+}) {
+  const { c } = useTheme();
+  return (
+    <View style={{
+      flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.lg, paddingVertical: 12,
+      borderTopWidth: first ? 0 : StyleSheet.hairlineWidth, borderTopColor: c.rule,
+    }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <AppText variant="label">{title}</AppText>
+        {subtitle ? <AppText variant="caption" tone="muted">{subtitle}</AppText> : null}
+      </View>
+      <Switch
+        accessibilityLabel={title}
+        value={value}
+        disabled={disabled}
+        onValueChange={(v) => { haptics.tap(); onChange(v); }}
+        trackColor={{ false: c.surfaceAlt, true: c.accent }}
+        thumbColor="#FFFFFF"
+        ios_backgroundColor={c.surfaceAlt}
+        // react-native-web colours the "on" knob separately.
+        {...(Platform.OS === "web" ? { activeThumbColor: "#FFFFFF" } : {})}
+      />
+    </View>
+  );
+}
+
+/** Two or three mutually exclusive choices, e.g. Services | Offers. */
+export function Segmented<T extends string>({ options, value, onChange }: {
+  options: { value: T; label: string }[]; value: T; onChange: (next: T) => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <View accessibilityRole="tablist" style={{ flexDirection: "row", backgroundColor: c.surfaceAlt, borderRadius: radius.md, padding: 3 }}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{ selected: on }}
+            onPress={() => { if (!on) { haptics.tap(); onChange(o.value); } }}
+            style={{ flex: 1, height: 38, borderRadius: radius.sm + 2, alignItems: "center", justifyContent: "center", backgroundColor: on ? c.surface : "transparent" }}>
+            <Text style={{ fontFamily: fonts.semibold, fontSize: 13.5, color: on ? c.ink : c.muted }}>{o.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 

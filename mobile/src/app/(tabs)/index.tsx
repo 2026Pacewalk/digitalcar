@@ -54,7 +54,7 @@ export default function HomeScreen() {
   const daily = stats.data && "daily" in stats.data ? stats.data.daily ?? [] : [];
   const peak = Math.max(1, ...daily.map((d) => d.views));
 
-  const plan = planStatus(sub.data, trial.data);
+  const plan = planStatus(sub.data, trial.data, sub.isLoading || trial.isLoading);
 
   return (
     <Screen edgesTop refreshing={refreshing} onRefresh={onRefresh}>
@@ -142,7 +142,7 @@ export default function HomeScreen() {
                   title={score.next.label}
                   subtitle={score.next.hint}
                   right={<ChevronRight color={c.muted} size={18} />}
-                  onPress={() => score.next!.inApp ? router.push("/edit") : void WebBrowser.openBrowserAsync(`${SITE_URL}/dashboard/build`)}
+                  onPress={() => router.push(score.next!.route)}
                 />
               </Card>
             </>
@@ -190,15 +190,18 @@ type Sub = { isActive: boolean; currentPeriodEnd: Date | string; packageId: numb
 type Trial = { status: string; daysLeft: number } | null | undefined;
 
 /** One place that turns plan + trial into what the owner needs to know. */
-function planStatus(sub: Sub, trial: Trial) {
+function planStatus(sub: Sub, trial: Trial, loading = false) {
   const label = sub?.package?.name ? `${sub.package.name} plan` : "Your plan";
   const end = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
-  const daysLeft = end ? Math.ceil((end.getTime() - Date.now()) / 86_400_000) : 0;
   const onTrial = sub?.packageId === 7 || trial?.status === "active" || trial?.status === "expiring_soon";
+  // A trial started at sign-up has no subscription row yet; its clock is the trial's own.
+  const daysLeft = end ? Math.ceil((end.getTime() - Date.now()) / 86_400_000) : onTrial ? Math.max(0, trial?.daysLeft ?? 0) : 0;
   const live = !!sub?.isActive || trial?.status === "active" || trial?.status === "expiring_soon" || trial?.status === "grace";
 
   let banner: { tone: "warn" | "bad"; title: string; body: string } | null = null;
-  if (!live) {
+  if (loading) {
+    // Say nothing until both answers are in — never flash "paused" at a live card.
+  } else if (!live) {
     banner = { tone: "bad", title: "Your card is paused", body: "Renew your plan to bring it back online. Visitors currently see a paused notice." };
   } else if (onTrial && daysLeft <= 7) {
     banner = { tone: "warn", title: `Free trial ends in ${Math.max(daysLeft, 0)} day${daysLeft === 1 ? "" : "s"}`, body: "Choose Gold or Platinum so your card stays live." };

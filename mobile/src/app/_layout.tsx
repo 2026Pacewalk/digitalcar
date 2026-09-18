@@ -90,6 +90,13 @@ function RootNavigator({ ready }: { ready: boolean }) {
           <Stack.Screen name="lead/[id]" options={{ title: "Enquiry" }} />
           <Stack.Screen name="insights" options={{ title: "Insights" }} />
           <Stack.Screen name="designs" options={{ title: "Designs" }} />
+          <Stack.Screen name="card/services" options={{ title: "Services & offers" }} />
+          <Stack.Screen name="card/service/[id]" options={{ title: "Service" }} />
+          <Stack.Screen name="card/media" options={{ title: "Photos & videos" }} />
+          <Stack.Screen name="card/payments" options={{ title: "Payments" }} />
+          <Stack.Screen name="card/social" options={{ title: "Social links & reviews" }} />
+          <Stack.Screen name="card/sections" options={{ title: "Sections on your card" }} />
+          <Stack.Screen name="preview" options={{ title: "Preview" }} />
           <Stack.Screen name="welcome" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
           <Stack.Screen name="devices" options={{ title: "Signed-in devices" }} />

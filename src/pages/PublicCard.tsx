@@ -114,7 +114,8 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
   const [videoPlay, setVideoPlay] = useState<{ src: string; vertical: boolean } | null>(null);
 
   useEffect(() => {
-    if (slug) trackView.mutate({ slug, visitorId: getVisitorId() });
+    // Not for the owner's own preview in the mobile app (?preview=app).
+    if (slug && new URLSearchParams(window.location.search).get("preview") !== "app") trackView.mutate({ slug, visitorId: getVisitorId() });
   }, [slug]);
 
   // Listen for play requests from the sandboxed card. We reconstruct the embed
@@ -153,7 +154,9 @@ export default function PublicCard({ slugOverride }: { slugOverride?: string } =
       // whitelist and length-caps every field, so untrusted values are safe.
       // We enrich here, in the parent, because only this context can read the
       // first-party visitor id and the real referrer.
-      if (data && data.__dcTrack) {
+      // The owner previewing their own card in the mobile app (?preview=app)
+      // isn't a visitor — like the dashboard preview, it isn't counted.
+      if (data && data.__dcTrack && new URLSearchParams(window.location.search).get("preview") !== "app") {
         try {
           const raw = data.__dcTrack;
           const payload = typeof raw === "string" ? { type: raw } : { ...raw };

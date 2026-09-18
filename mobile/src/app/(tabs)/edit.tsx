@@ -1,120 +1,42 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
 import { Image } from "expo-image";
-import { useQueryClient } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
-import { Camera, Check, ChevronRight, CloudOff, ExternalLink, ImagePlus, Images, Palette, ShoppingBag, Trash2, Wallet } from "lucide-react-native";
+import { Camera, ChevronRight, Eye, ImagePlus, Images, LayoutList, Palette, Share2, ShoppingBag, Trash2, Wallet } from "lucide-react-native";
 import { AppText, Avatar, Banner, Button, Card, Field, Loading, Row, Screen, SectionTitle } from "~/components/ui";
-import { imageOf, SNAPSHOT_KEY, useSnapshot, type CardCustomer, type CardSnapshot } from "~/lib/card";
+import { SaveBadge } from "~/components/SaveBadge";
+import { imageOf } from "~/lib/card";
+import { setFields, useCardUpdate } from "~/lib/cardStore";
+import { useCardFields } from "~/lib/useCardFields";
 import { SITE_URL } from "~/lib/config";
 import { pickCardImage, type ImageKind, type PickSource } from "~/lib/images";
-import { errorMessage, errorTag, trpc } from "~/lib/trpc";
 import * as haptics from "~/lib/haptics";
 import { radius, space, useTheme } from "~/theme";
 
-/* The fields this build edits natively. Everything else on the card is left
-   exactly as it is — the whole snapshot is sent back, only these change. */
-const FIELDS = ["name", "designation", "company_name", "nature", "mobile1", "mobile2", "email", "url", "address", "about_us"] as const;
-type FieldKey = (typeof FIELDS)[number];
-type Draft = Record<FieldKey, string>;
-type Patch = Partial<Draft> & { photo?: string; logo?: string };
-
-const pick = (c: CardCustomer | undefined): Draft =>
-  Object.fromEntries(FIELDS.map((k) => [k, String(c?.[k] ?? "")])) as Draft;
-
-type SaveState = "idle" | "pending" | "saving" | "saved" | "error" | "conflict";
+/* The card fields this screen edits. Each is saved on its own, a moment after
+   the last keystroke, onto the latest copy of the card — so a change made on
+   the website in the meantime is kept. */
+const FIELDS = ["name", "designation", "company_name", "nature", "mobile1", "mobile2", "email", "url", "address", "google_map", "about_us"] as const;
 
 export default function EditScreen() {
   const { c } = useTheme();
-  const qc = useQueryClient();
-  const snapshot = useSnapshot();
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [state, setState] = useState<SaveState>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const { snapshot, draft, set: change, flush, state, error } = useCardFields(FIELDS, 1500);
+  const update = useCardUpdate();
   const [imageBusy, setImageBusy] = useState<ImageKind | null>(null);
-  const baseRef = useRef<CardSnapshot | null>(null);
-  const draftRef = useRef<Draft | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Start from the server copy; don't clobber in-progress typing on refetch.
-  useEffect(() => {
-    if (snapshot.data && (!draftRef.current || state === "idle" || state === "saved")) {
-      baseRef.current = snapshot.data;
-      const next = pick(snapshot.data.data.customer);
-      draftRef.current = next;
-      setDraft(next);
-    }
-  }, [snapshot.data]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const save = trpc.publish.saveSnapshot.useMutation();
-
-  /** Saves the current text fields plus any image change, from the version this edit started on. */
-  const persist = useCallback(async (extra: Patch = {}, force = false): Promise<boolean> => {
-    const base = baseRef.current;
-    if (!base) return false;
-    setState("saving");
-    const data = { ...base.data, customer: { ...base.data.customer, ...(draftRef.current ?? {}), ...extra } };
-    try {
-      const res = await save.mutateAsync({
-        slug: base.slug, cardId: base.cardId || 1, data,
-        // The version this edit started from; the server refuses the save if
-        // the card was changed elsewhere since (e.g. on the website).
-        baseTs: force ? undefined : base.updatedAt ?? undefined,
-      });
-      const fresh: CardSnapshot = { ...base, data, updatedAt: res.updatedAt ?? base.updatedAt };
-      baseRef.current = fresh;
-      qc.setQueryData(SNAPSHOT_KEY, fresh);
-      setState("saved");
-      setError(null);
-      return true;
-    } catch (e) {
-      if (errorTag(e) === "SNAPSHOT_STALE") {
-        setState("conflict");
-        haptics.warning();
-        const useLatest = async () => { setState("idle"); draftRef.current = null; await snapshot.refetch(); };
-        if (Platform.OS === "web") {
-          // The web preview has no native alert; confirm() gives the same choice.
-          if (globalThis.confirm?.("Your card was changed elsewhere after you started editing. OK keeps your changes; Cancel loads the latest.")) return persist(extra, true);
-          await useLatest();
-          return false;
-        }
-        Alert.alert(
-          "Your card was changed elsewhere",
-          "Someone updated this card on another device or the website after you started editing.",
-          [
-            { text: "Use the latest", onPress: () => void useLatest() },
-            { text: "Keep my changes", style: "destructive", onPress: () => void persist(extra, true) },
-          ],
-        );
-      } else {
-        setState("error");
-        setError(errorMessage(e));
-      }
-      return false;
-    }
-  }, [qc, save, snapshot]);
-
-  const change = (key: FieldKey, value: string) => {
-    if (!draftRef.current) return;
-    const next = { ...draftRef.current, [key]: value };
-    draftRef.current = next;
-    setDraft(next);
-    setState("pending");
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => void persist(), 1500);
-  };
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const changeImage = async (kind: ImageKind, source: PickSource) => {
     setImageBusy(kind);
+    setImageError(null);
     try {
       const picked = await pickCardImage(kind, source);
       if (!picked.ok) {
-        if (picked.reason !== "cancelled") { setState("error"); setError(picked.message ?? "Couldn't use that image."); }
+        if (picked.reason !== "cancelled") setImageError(picked.message ?? "Couldn't use that image.");
         return;
       }
-      if (timer.current) clearTimeout(timer.current);
-      if (await persist({ [kind]: picked.dataUrl })) haptics.success();
+      const r = await update(setFields({ [kind]: picked.dataUrl }));
+      if (r.ok) haptics.success(); else setImageError(r.message);
     } finally {
       setImageBusy(null);
     }
@@ -122,15 +44,18 @@ export default function EditScreen() {
 
   const removeImage = (kind: ImageKind) => {
     const label = kind === "photo" ? "photo" : "logo";
-    const go = () => { void persist({ [kind]: "" }); };
-    if (Platform.OS === "web") { if (globalThis.confirm?.(`Remove your ${label} from the card?`)) go(); return; }
+    const go = async () => {
+      setImageBusy(kind);
+      const r = await update(setFields({ [kind]: "" }));
+      setImageBusy(null);
+      if (!r.ok) setImageError(r.message);
+    };
+    if (Platform.OS === "web") { if (globalThis.confirm?.(`Remove your ${label} from the card?`)) void go(); return; }
     Alert.alert(`Remove your ${label}?`, "It disappears from your card. You can add a new one any time.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: go },
+      { text: "Remove", style: "destructive", onPress: () => void go() },
     ]);
   };
-
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   if (snapshot.isLoading) return <Loading />;
   if (!snapshot.data || !draft) {
@@ -145,12 +70,11 @@ export default function EditScreen() {
     );
   }
 
-  const customer = baseRef.current?.data.customer ?? snapshot.data.data.customer;
+  const customer = snapshot.data.data.customer;
   const photo = imageOf(customer.photo);
   const logo = imageOf(customer.logo);
   const phoneOk = !draft.mobile1 || draft.mobile1.replace(/\D/g, "").length >= 10;
   const emailOk = !draft.email || /^\S+@\S+\.\S+$/.test(draft.email);
-  const openWeb = (path: string) => void WebBrowser.openBrowserAsync(`${SITE_URL}${path}`);
   const canUseCamera = Platform.OS !== "web";
 
   return (
@@ -162,9 +86,10 @@ export default function EditScreen() {
         </View>
         <AppText variant="caption" tone="muted">Changes save automatically and go live on your card.</AppText>
 
-        {(state === "error") && error ? (
-          <Banner tone="bad" title="Not saved yet" body={error} action={<Button size="md" kind="secondary" title="Try again" onPress={() => void persist()} />} />
+        {state === "error" && error ? (
+          <Banner tone="bad" title="Not saved yet" body={error} action={<Button size="md" kind="secondary" title="Try again" onPress={() => void flush()} />} />
         ) : null}
+        {imageError ? <Banner tone="bad" title={imageError} /> : null}
 
         <SectionTitle>Photo & logo</SectionTitle>
         <Card style={{ gap: space.lg }}>
@@ -212,6 +137,7 @@ export default function EditScreen() {
           <Field label="Email" value={draft.email} onChangeText={(t) => change("email", t)} keyboardType="email-address" autoCapitalize="none" placeholder="you@business.com" error={emailOk ? undefined : "This doesn't look like an email address"} />
           <Field label="Website" value={draft.url} onChangeText={(t) => change("url", t)} keyboardType="url" autoCapitalize="none" placeholder="https://" />
           <Field label="Address" value={draft.address} onChangeText={(t) => change("address", t)} multiline placeholder="Shop / office address" />
+          <Field label="Google Maps link" value={draft.google_map} onChangeText={(t) => change("google_map", t)} keyboardType="url" autoCapitalize="none" autoCorrect={false} placeholder="https://maps.app.goo.gl/…" hint="The Directions button on your card opens this" />
         </Card>
 
         <SectionTitle>About</SectionTitle>
@@ -221,11 +147,14 @@ export default function EditScreen() {
 
         <SectionTitle>More on your card</SectionTitle>
         <Card padded={false}>
-          <Row first icon={<Palette color={c.accentText} size={18} />} title="Design" subtitle="Pick a new look for your card" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/designs")} />
-          <Row icon={<ShoppingBag color={c.accentText} size={18} />} title="Services & products" subtitle="Edit on digitalcarda.in" right={<ExternalLink color={c.muted} size={16} />} onPress={() => openWeb("/dashboard/products")} />
-          <Row icon={<Images color={c.accentText} size={18} />} title="Gallery & videos" subtitle="Edit on digitalcarda.in" right={<ExternalLink color={c.muted} size={16} />} onPress={() => openWeb("/dashboard/media")} />
-          <Row icon={<Wallet color={c.accentText} size={18} />} title="Payments & social links" subtitle="Edit on digitalcarda.in" right={<ExternalLink color={c.muted} size={16} />} onPress={() => openWeb("/dashboard/payments")} />
+          <Row first icon={<ShoppingBag color={c.accentText} size={18} />} title="Services & offers" subtitle="What you sell, with photos and prices" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/services")} />
+          <Row icon={<Images color={c.accentText} size={18} />} title="Photos & videos" subtitle="Your work, shop and video links" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/media")} />
+          <Row icon={<Wallet color={c.accentText} size={18} />} title="Payments" subtitle="UPI, bank details and payment QR" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/payments")} />
+          <Row icon={<Share2 color={c.accentText} size={18} />} title="Social links & reviews" subtitle="Instagram, Facebook, Google reviews…" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/social")} />
+          <Row icon={<LayoutList color={c.accentText} size={18} />} title="Sections on your card" subtitle="Show or hide each section" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/sections")} />
+          <Row icon={<Palette color={c.accentText} size={18} />} title="Design" subtitle="Pick a new look for your card" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/designs")} />
         </Card>
+        <Button kind="secondary" title="Preview my card" icon={<Eye color={c.ink} size={18} />} onPress={() => router.push("/preview")} />
       </Screen>
     </KeyboardAvoidingView>
   );
@@ -278,14 +207,4 @@ function SmallAction({ icon, label, onPress, disabled, tone }: { icon: React.Rea
       <AppText variant="label" tone={tone === "bad" ? "bad" : "ink"} style={{ fontSize: 13 }}>{label}</AppText>
     </Pressable>
   );
-}
-
-function SaveBadge({ state }: { state: SaveState }) {
-  const { c } = useTheme();
-  if (state === "saving" || state === "pending") {
-    return <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><ActivityIndicator size="small" color={c.muted} /><AppText variant="caption" tone="muted">Saving…</AppText></View>;
-  }
-  if (state === "saved") return <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><Check color={c.good} size={16} /><AppText variant="caption" tone="good">Saved</AppText></View>;
-  if (state === "error" || state === "conflict") return <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><CloudOff color={c.bad} size={16} /><AppText variant="caption" tone="bad">Not saved</AppText></View>;
-  return null;
 }
