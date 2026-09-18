@@ -1,5 +1,5 @@
 /* "Share it everywhere": the ways a card gets handed over, as one compact grid
-   of six equal tiles (icon beside the text) on a dark panel. The NFC standee
+   of six equal tiles (icon beside the text) on a light, warm panel. The NFC standee
    leads when the profession works from a counter (ind.nfcFit), otherwise the
    short link. The last tile is team cards for bulkFit pages and WhatsApp
    message templates for the rest.
@@ -63,18 +63,18 @@ function tilesFor(ind: IndustryPage): Tile[] {
 export default function ShareEverywhere({ ind }: { ind: IndustryPage }) {
   const tiles = tilesFor(ind);
   return (
-    <div className="relative overflow-hidden rounded-[28px] bg-[#0B1120] px-5 py-8 ring-1 ring-white/10 sm:px-8 sm:py-10">
-      <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-30" />
-      {/* Two static glows: one in the page accent, one gold. Nothing animates here. */}
-      <div aria-hidden="true" className="pointer-events-none absolute -top-32 right-[-10%] h-72 w-72 rounded-full opacity-60 blur-3xl" style={{ background: `${ind.theme.accent}33` }} />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 left-[-10%] h-64 w-64 rounded-full bg-[#F7B31C]/10 blur-3xl" />
+    <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-b from-[#FFFBEB] via-white to-[#F8FAFC] px-5 py-8 ring-1 ring-[#F3E6C4] sm:px-8 sm:py-10">
+      <div aria-hidden="true" className="absolute inset-0 bg-grid opacity-70 [mask-image:radial-gradient(ellipse_at_top,black_35%,transparent_80%)]" />
+      {/* Two soft static glows: one in the page accent, one gold. Nothing animates here. */}
+      <div aria-hidden="true" className="pointer-events-none absolute -top-32 right-[-10%] h-72 w-72 rounded-full opacity-70 blur-3xl" style={{ background: `${ind.theme.accent}1f` }} />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 left-[-10%] h-64 w-64 rounded-full bg-[#F7B31C]/15 blur-3xl" />
       <div className="relative">
         <Reveal className="mx-auto mb-7 max-w-2xl text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-[#F7B31C] ring-1 ring-white/10">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FEF3C7] px-3 py-1 text-xs font-semibold text-[#92400E] ring-1 ring-[#FDE68A]">
             <Sparkles size={12} aria-hidden="true" /> Share it everywhere
           </span>
-          <h2 className="mt-3 font-display text-[1.6rem] font-extrabold leading-tight tracking-tight text-white sm:text-[2rem]">One link, handed over any way you like</h2>
-          <p className="mt-2 text-[14.5px] leading-relaxed text-[#94A3B8]">A QR code, an NFC tap, a WhatsApp message or your email signature — change your details once and every copy is up to date.</p>
+          <h2 className="mt-3 font-display text-[1.6rem] font-extrabold leading-tight tracking-tight text-[#0F172A] sm:text-[2rem]">One link, handed over any way you like</h2>
+          <p className="mt-2 text-[14.5px] leading-relaxed text-[#64748B]">A QR code, an NFC tap, a WhatsApp message or your email signature — change your details once and every copy is up to date.</p>
         </Reveal>
         <Reveal stagger className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto no-scrollbar scroll-px-5 px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3">
           {tiles.map((t) => <ShareTile key={t.id} tile={t} />)}
@@ -88,22 +88,22 @@ function ShareTile({ tile }: { tile: Tile }) {
   return (
     <Link
       to={tile.href}
-      className={`group relative flex w-[80%] shrink-0 snap-start gap-3.5 overflow-hidden rounded-2xl sm:w-auto bg-white/[0.04] p-4 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/[0.07] hover:ring-[#F7B31C]/40 active:scale-[0.995] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none ${FOCUS}`}
+      className={`group relative flex w-[80%] shrink-0 snap-start gap-3.5 overflow-hidden rounded-2xl sm:w-auto bg-white p-4 ring-1 ring-[#E9EDF3] shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-300 hover:shadow-[0_18px_40px_-24px_rgba(15,23,42,0.3)] hover:ring-[#F7B31C]/60 active:scale-[0.995] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none ${FOCUS}`}
     >
       <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F7B31C]/15 text-[#F7B31C] ring-1 ring-[#F7B31C]/20 transition-all duration-300 group-hover:bg-[#F7B31C] group-hover:text-[#0F172A] motion-safe:group-hover:-rotate-6 motion-reduce:transition-none"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FEF3C7] text-[#B45309] ring-1 ring-[#FDE68A] transition-all duration-300 group-hover:bg-[#F7B31C] group-hover:text-[#0F172A] motion-safe:group-hover:-rotate-6 motion-reduce:transition-none"
         aria-hidden="true"
       >
         {tile.icon}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h3 className="font-display text-[15px] font-extrabold leading-tight text-white">{tile.title}</h3>
-          {tile.price && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold tabular-nums text-[#FCD34D] ring-1 ring-white/10">{tile.price}</span>}
-          <span className="rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.1em] text-[#94A3B8] ring-1 ring-white/10">{tile.meta}</span>
+          <h3 className="font-display text-[15px] font-extrabold leading-tight text-[#0F172A]">{tile.title}</h3>
+          {tile.price && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[#92400E] ring-1 ring-[#FDE68A]">{tile.price}</span>}
+          <span className="rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.1em] text-[#64748B] ring-1 ring-[#E2E8F0]">{tile.meta}</span>
         </div>
-        <p className="mt-1 text-[13px] leading-relaxed text-[#94A3B8]">{tile.text}</p>
-        <span className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#F7B31C]">
+        <p className="mt-1 text-[13px] leading-relaxed text-[#475569]">{tile.text}</p>
+        <span className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#B45309]">
           {tile.cta}
           <ArrowUpRight size={13} className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
         </span>
