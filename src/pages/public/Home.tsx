@@ -1760,39 +1760,39 @@ function WhereToUseSection() {
    Testimonials
    ───────────────────────────────────────────────────────────── */
 
-/* Dark or white initial on the accent, whichever reads (gold needs dark ink). */
+/* Navy or white initial on the accent, whichever has the higher WCAG contrast. */
 const inkOn = (hex: string) => {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#0F172A" : "#fff";
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255));
+  const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return (L + 0.05) / 0.062 >= 1.05 / (L + 0.05) ? "#0F172A" : "#fff";
 };
 
-function TestimonialCard({ t, dark = false, copy = false }: { t: (typeof TESTIMONIALS)[number]; dark?: boolean; copy?: boolean }) {
+function TestimonialCard({ t, copy = false }: { t: (typeof TESTIMONIALS)[number]; copy?: boolean }) {
   return (
-    <figure aria-hidden={copy || undefined} className={`relative w-[360px] shrink-0 overflow-hidden rounded-3xl p-6 transition-transform duration-300 hover:-translate-y-1 motion-reduce:transition-none ${dark ? "bg-[#0F172A] text-white shadow-premium-lg ring-1 ring-white/5" : "bg-white shadow-premium ring-1 ring-[#EEF2F7]"}`}>
+    <figure aria-hidden={copy || undefined} className="relative flex w-[300px] shrink-0 flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-premium ring-1 ring-[#EEF2F7] transition-transform duration-300 hover:-translate-y-0.5 motion-reduce:transition-none">
       {/* A soft glow in the business's own colour */}
-      <span aria-hidden="true" className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full blur-2xl" style={{ background: t.accent, opacity: dark ? 0.32 : 0.14 }} />
+      <span aria-hidden="true" className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full opacity-[0.14] blur-2xl" style={{ background: t.accent }} />
       <div className="relative flex items-center justify-between">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl" style={{ background: `${t.accent}${dark ? "33" : "1f"}` }}>
-          <Quote size={18} style={{ color: t.accent }} aria-hidden="true" />
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: `${t.accent}1f` }}>
+          <Quote size={15} style={{ color: t.accent }} aria-hidden="true" />
         </span>
         <span className="flex gap-0.5" role="img" aria-label="Rated 5 out of 5">
-          {[...Array(5)].map((_, i) => <Star key={i} size={13} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" />)}
+          {[...Array(5)].map((_, i) => <Star key={i} size={12} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" />)}
         </span>
       </div>
-      <blockquote className={`relative mt-4 leading-relaxed ${dark ? "font-display text-[16.5px] font-medium text-white" : "text-[15px] text-[#334155]"}`}>
-        &ldquo;{t.quote}&rdquo;
-      </blockquote>
-      <figcaption className="relative mt-5 flex items-center gap-3">
+      <blockquote className="relative mt-3 text-[14px] leading-relaxed text-[#334155]">&ldquo;{t.quote}&rdquo;</blockquote>
+      <figcaption className="relative mt-auto flex items-center gap-2.5 pt-4">
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-extrabold"
-          style={{ background: t.accent, color: inkOn(t.accent), boxShadow: `0 0 0 3px ${dark ? "#0F172A" : "#fff"}, 0 0 0 5px ${t.accent}66` }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold"
+          style={{ background: t.accent, color: inkOn(t.accent), boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${t.accent}55` }}
           aria-hidden="true"
         >
           {t.name.charAt(0)}
         </span>
         <span className="min-w-0">
-          <span className={`block text-[14px] font-bold ${dark ? "text-white" : "text-[#0F172A]"}`}>{t.name}</span>
-          <span className={`block text-[12px] ${dark ? "text-[#94A3B8]" : "text-[#64748B]"}`}>{t.role}</span>
+          <span className="block text-[13.5px] font-bold leading-tight text-[#0F172A]">{t.name}</span>
+          <span className="block text-[11.5px] text-[#64748B]">{t.role}</span>
         </span>
       </figcaption>
     </figure>
@@ -1999,15 +1999,13 @@ function TestimonialStories() {
 }
 
 function TestimonialsSection() {
-  // Two rows drifting in opposite directions. Each row is its reviews four
-  // times over: two identical halves, each wider than the screen, so the -50%
-  // loop never shows a gap. Slow enough to read; hovering a row pauses it.
-  const rowA = TESTIMONIALS.filter((_, i) => i % 2 === 0);
-  const rowB = TESTIMONIALS.filter((_, i) => i % 2 === 1);
-  const loop = (xs: typeof TESTIMONIALS) => [...xs, ...xs, ...xs, ...xs];
+  // One row of compact white cards. The track is the reviews four times over:
+  // two identical halves, each wider than a 1920px screen, so the -50% loop
+  // never shows a gap. Hovering pauses it.
+  const loop = [...TESTIMONIALS, ...TESTIMONIALS, ...TESTIMONIALS, ...TESTIMONIALS];
   return (
-    <section className="relative py-14 sm:py-20 overflow-hidden bg-gradient-to-b from-white via-[#FFFBEB]/70 to-white">
-      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-24 h-72 w-[46rem] -translate-x-1/2 rounded-full bg-[#F7B31C]/10 blur-3xl" />
+    <section className="relative py-12 sm:py-16 overflow-hidden bg-gradient-to-b from-white via-[#FFFBEB]/70 to-white">
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-20 h-64 w-[46rem] -translate-x-1/2 rounded-full bg-[#F7B31C]/10 blur-3xl" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Testimonials" title="They Say We Did a Great Job" subtitle="Businesses across India have replaced paper cards with DigitalCarda — here's what they think." />
       </div>
@@ -2016,18 +2014,11 @@ function TestimonialsSection() {
         <TestimonialStories />
       </div>
 
-      <div className="relative hidden md:block mask-fade-x space-y-5">
-        {/* Only the first pass of each row is read out; the copies just loop the scroll.
-            pr-5 matches the gap so the -50% loop point lands exactly on a card. */}
-        <div className="marquee-track gap-5 py-2 pr-5" style={{ animationDuration: "75s" }}>
-          {loop(rowA).map((t, i) => (
-            <TestimonialCard key={i} t={t} dark={i % 2 === 0} copy={i >= rowA.length} />
-          ))}
-        </div>
-        <div className="marquee-track marquee-track--rev gap-5 py-2 pr-5" style={{ animationDuration: "85s" }}>
-          {loop(rowB).map((t, i) => (
-            <TestimonialCard key={i} t={t} dark={i % 2 === 1} copy={i >= rowB.length} />
-          ))}
+      <div className="relative hidden md:block mask-fade-x">
+        {/* Only the first pass is read out; the copies just loop the scroll.
+            pr-4 matches the gap so the -50% loop point lands exactly on a card. */}
+        <div className="marquee-track gap-4 py-2 pr-4" style={{ animationDuration: "110s" }}>
+          {loop.map((t, i) => <TestimonialCard key={i} t={t} copy={i >= TESTIMONIALS.length} />)}
         </div>
       </div>
     </section>
