@@ -1,8 +1,7 @@
 /*
  * The public site footer.
  *
- *   1. A closing call to action beside an illustrated card that shows what the
- *      product does (QR, NFC tap, WhatsApp, Save Contact, a UPI payment, a lead).
+ *   1. A compact gold call-to-action band (the one bright block in the footer).
  *   2. A scrolling strip of every feature, each linking to where it's explained.
  *   3. Brand, contact, install-the-app, and the link columns.
  *   4. Popular guides from the blog, and the NFC card.
@@ -16,7 +15,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   ArrowRight, BarChart3, BookOpen, Check, Globe, IndianRupee, Inbox, LayoutGrid, MessageCircle, Nfc,
-  PenLine, Phone, QrCode, Rocket, ShieldCheck, Sparkles, Star, Truck, UserPlus, Wand2, Zap, type LucideIcon,
+  PenLine, QrCode, Rocket, ShieldCheck, Sparkles, Star, Truck, UserPlus, Wand2, Zap, type LucideIcon,
 } from "lucide-react";
 import { CONTACT, FOOTER_GROUPS, FOOTER_GUIDES, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicNav";
 import { InstallAppRow } from "@/components/mobile/InstallApp";
@@ -204,47 +203,13 @@ function FeaturePill({ icon: Icon, label, href, hidden = false }: { icon: Lucide
   );
 }
 
-/** The illustrated card beside the call to action — decorative. */
-function CardShowcase() {
+/** A hairline that fades in from both sides around a small gold diamond. */
+function Separator() {
   return (
-    <div aria-hidden="true" className="relative mx-auto h-[300px] w-[270px] select-none">
-      {/* NFC waves behind the card */}
-      {/* (The wrapper centres; the inner ring animates — one transform each, so they don't fight.) */}
-      <span className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2">
-        <span className="dc-footer-ping block h-40 w-40 rounded-full border-2 border-[#F7B31C]/40" />
-      </span>
-      <span className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2">
-        <span className="dc-footer-ping block h-40 w-40 rounded-full border-2 border-[#F7B31C]/30 [animation-delay:1.2s]" />
-      </span>
-
-      {/* The card */}
-      <div className="absolute left-1/2 top-3 w-[200px] -translate-x-1/2 rotate-[-6deg] overflow-hidden rounded-[1.6rem] bg-white shadow-[0_40px_80px_-30px_rgba(0,0,0,0.7)] ring-1 ring-white/10">
-        <div className="h-16 bg-gradient-to-br from-[#FBBF24] to-[#F59E0B]" />
-        <div className="-mt-8 flex flex-col items-center px-4 pb-4">
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0F172A] font-display text-lg font-extrabold text-[#F7B31C] ring-4 ring-white">AM</span>
-          <span className="mt-2 h-2.5 w-24 rounded-full bg-[#0F172A]" />
-          <span className="mt-1.5 h-2 w-16 rounded-full bg-[#CBD5E1]" />
-          <div className="mt-3 grid w-full grid-cols-2 gap-2">
-            <span className="flex h-7 items-center justify-center gap-1 rounded-full bg-[#0F172A] text-[10px] font-bold text-white"><Phone size={10} /> Call</span>
-            <span className="flex h-7 items-center justify-center gap-1 rounded-full bg-[#22C55E] text-[10px] font-bold text-white"><MessageCircle size={10} /> WhatsApp</span>
-          </div>
-          <div className="mt-3 flex w-full items-center gap-2 rounded-xl bg-[#F8FAFC] p-2">
-            <QrCode size={30} className="shrink-0 text-[#0F172A]" />
-            <span className="flex-1 space-y-1"><span className="block h-1.5 w-full rounded-full bg-[#E2E8F0]" /><span className="block h-1.5 w-2/3 rounded-full bg-[#E2E8F0]" /></span>
-          </div>
-        </div>
-      </div>
-
-      {/* Floating notifications */}
-      <div className="absolute -left-6 top-24 flex items-center gap-2 rounded-2xl bg-[#0F172A]/95 px-3 py-2 text-[11px] font-semibold text-white shadow-xl ring-1 ring-white/10 backdrop-blur">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#22C55E]"><UserPlus size={12} /></span> Saved to contacts
-      </div>
-      <div className="absolute -right-8 top-44 flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-[11px] font-semibold text-[#0F172A] shadow-xl">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#F7B31C]"><IndianRupee size={12} /></span> Paid via UPI
-      </div>
-      <div className="absolute -left-2 bottom-2 flex items-center gap-2 rounded-2xl bg-[#0F172A]/95 px-3 py-2 text-[11px] font-semibold text-white shadow-xl ring-1 ring-white/10 backdrop-blur">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#3B82F6]"><Inbox size={12} /></span> New enquiry
-      </div>
+    <div aria-hidden="true" className="my-10 flex items-center gap-4 sm:my-12">
+      <span className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-[#F7B31C]/50" />
+      <span className="h-2 w-2 rotate-45 rounded-[2px] bg-[#F7B31C] shadow-[0_0_12px_rgba(247,179,28,0.7)]" />
+      <span className="h-px flex-1 bg-gradient-to-l from-transparent via-white/10 to-[#F7B31C]/50" />
     </div>
   );
 }
@@ -256,48 +221,46 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
     <footer className="relative overflow-hidden bg-[#070B16] text-white">
       <style>{MARQUEE_CSS}</style>
       <FloatingBackToTop />
+      {/* A gold hairline marks where the page ends and the footer begins. */}
+      <div aria-hidden="true" className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#F7B31C] to-transparent opacity-80" />
       {/* Ambient light and a faint grid */}
       <div aria-hidden="true" className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[#F7B31C]/[0.09] blur-[130px]" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_70%)]" />
 
-      <div className="relative mx-auto max-w-7xl px-4 pt-14 sm:px-6 sm:pt-20 lg:px-8">
-        {/* ── 1. Call to action ─────────────────────────────────── */}
-        <section aria-labelledby="footer-cta" className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#16213A] via-[#0F172A] to-[#0B1120] p-7 sm:p-10 lg:p-12">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#F7B31C]/20 blur-3xl" />
-          <div className="relative grid items-center gap-10 lg:grid-cols-[1.15fr_1fr]">
-            <div>
-              <p className="inline-flex items-center gap-2 rounded-full border border-[#F7B31C]/30 bg-[#F7B31C]/10 px-3 py-1 text-[11.5px] font-bold uppercase tracking-[0.14em] text-[#F7B31C]">
-                <Sparkles size={13} aria-hidden="true" /> ₹0 for 30 days · no payment needed
+      <div className="relative mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14 lg:px-8">
+        {/* ── 1. Call to action: one compact gold band ────────────── */}
+        <section aria-labelledby="footer-cta" className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#FCD34D] via-[#F7B31C] to-[#F59E0B] px-6 py-6 text-[#0B1120] shadow-[0_24px_60px_-30px_rgba(247,179,28,0.7)] sm:px-9 sm:py-7">
+          <span aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full border-[22px] border-white/20" />
+          <span aria-hidden="true" className="pointer-events-none absolute -bottom-16 right-40 h-32 w-32 rounded-full border-[16px] border-white/10" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+            <div className="min-w-0">
+              <p className="inline-flex items-center gap-2 rounded-full bg-[#0B1120] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#F7B31C]">
+                <Sparkles size={12} aria-hidden="true" /> ₹0 for 30 days · no payment needed
               </p>
-              <h2 id="footer-cta" className="mt-5 font-display text-[2.1rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl [text-wrap:balance]">
-                Your whole business,{" "}
-                <span className="bg-gradient-to-r from-[#FDE68A] via-[#F7B31C] to-[#F59E0B] bg-clip-text text-transparent">one tap away.</span>
+              <h2 id="footer-cta" className="mt-3 font-display text-[1.55rem] font-extrabold leading-tight tracking-tight sm:text-[1.9rem] [text-wrap:balance]">
+                Your whole business, one tap away.
               </h2>
-              <p className="mt-4 max-w-lg text-[15.5px] leading-relaxed text-[#94A3B8]">
-                Contact details, services, payments and enquiries on a digital visiting card people open instantly — shared by link, QR code or an NFC tap. No app to install.
-              </p>
-              <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-[13.5px] text-[#CBD5E1]">
-                {["Live in minutes", "50+ designs", "Cancel anytime"].map((t) => (
-                  <li key={t} className="inline-flex items-center gap-1.5"><Check size={15} className="text-[#22C55E]" aria-hidden="true" /> {t}</li>
+              <ul className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] font-semibold text-[#422006]">
+                {["Live in minutes", "50+ designs", "No app to install", "Cancel anytime"].map((t) => (
+                  <li key={t} className="inline-flex items-center gap-1.5"><Check size={15} strokeWidth={3} aria-hidden="true" /> {t}</li>
                 ))}
               </ul>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link to={signupHref} className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-[#F7B31C] px-7 py-3.5 text-[15px] font-bold text-[#0B1120] shadow-[0_18px_40px_-18px_rgba(247,179,28,0.9)] transition hover:bg-[#FBBF24]">
-                  Create my free card <ArrowRight size={17} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
-                </Link>
-                <a href={CONTACT.whatsappHref} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 px-7 py-3.5 text-[15px] font-semibold text-white transition hover:border-[#25D366]/60 hover:bg-[#25D366]/10">
-                  <MessageCircle size={17} className="text-[#25D366]" aria-hidden="true" /> Chat on WhatsApp
-                </a>
-              </div>
             </div>
-            <div className="hidden sm:block"><CardShowcase /></div>
+            <div className="flex shrink-0 flex-col gap-2.5 sm:flex-row">
+              <Link to={signupHref} className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0B1120] px-6 py-3 text-[14.5px] font-bold text-white shadow-[0_14px_30px_-14px_rgba(11,17,32,0.8)] transition hover:bg-[#16213A]">
+                Create my free card <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
+              </Link>
+              <a href={CONTACT.whatsappHref} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-[#0B1120]/80 px-6 py-3 text-[14.5px] font-bold text-[#0B1120] transition hover:bg-[#0B1120]/10">
+                <MessageCircle size={16} aria-hidden="true" /> Chat on WhatsApp
+              </a>
+            </div>
           </div>
         </section>
       </div>
 
       {/* ── 2. Feature strip ─────────────────────────────────────── */}
-      <nav aria-label="Features" className="relative mt-12 border-y border-white/[0.06] bg-white/[0.015] py-4">
+      <nav aria-label="Features" className="relative mt-10 border-y border-[#F7B31C]/20 bg-[#F7B31C]/[0.03] py-4">
         <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-[#070B16] to-transparent sm:w-32" aria-hidden="true" />
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[#070B16] to-transparent sm:w-32" aria-hidden="true" />
         <div className="overflow-hidden motion-reduce:overflow-x-auto">
@@ -313,7 +276,7 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* ── 3. Brand + links ───────────────────────────────────── */}
-        <div className="grid gap-12 pt-14 lg:grid-cols-12 lg:gap-8">
+        <div className="grid gap-12 pt-12 lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-4">
             <Link to="/" className="inline-flex items-center" aria-label="DigitalCarda home">
               <img src="/logo.png" alt="DigitalCarda" className="h-10 w-auto object-contain" loading="lazy" />
@@ -348,8 +311,10 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
           </div>
         </div>
 
+        <Separator />
+
         {/* ── 4. Guides + NFC ────────────────────────────────────── */}
-        <div className="mt-14">
+        <div>
           <div className="mb-4 flex items-center justify-between">
             <p className="inline-flex items-center gap-2 text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80"><BookOpen size={14} aria-hidden="true" /> Popular guides</p>
             <Link to="/blog" className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#CBD5E1] hover:text-white">All guides <ArrowRight size={14} aria-hidden="true" /></Link>
@@ -379,16 +344,18 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
           </ul>
         </div>
 
+        <Separator />
+
         {/* ── 5. Wordmark + legal ────────────────────────────────── */}
-        <div aria-hidden="true" className="pointer-events-none mt-14 select-none overflow-hidden">
-          <p className="whitespace-nowrap text-center font-display font-extrabold leading-[0.8] tracking-[-0.04em] text-[length:clamp(3.5rem,15vw,13rem)] bg-gradient-to-b from-white/[0.14] via-white/[0.05] to-transparent bg-clip-text text-transparent">
+        <div aria-hidden="true" className="pointer-events-none select-none overflow-hidden">
+          <p className="whitespace-nowrap text-center font-display font-extrabold leading-[0.8] tracking-[-0.04em] text-[length:clamp(3.5rem,15vw,13rem)] bg-gradient-to-b from-[#F7B31C]/30 via-[#F7B31C]/[0.08] to-transparent bg-clip-text text-transparent">
             DigitalCarda
           </p>
         </div>
 
         {/* Phones: a centred stack — back to top, the legal links in a tidy 2×2
             grid, then the badges and copyright. From md up: one row. */}
-        <div className="flex flex-col items-center gap-6 border-t border-white/10 pt-8 pb-28 text-center md:flex-row md:items-center md:justify-between md:gap-4 md:py-6 md:text-left lg:pb-6">
+        <div className="flex flex-col items-center gap-6 border-t border-[#F7B31C]/20 pt-8 pb-28 text-center md:flex-row md:items-center md:justify-between md:gap-4 md:py-6 md:text-left lg:pb-6">
           <div className="order-3 flex flex-col items-center gap-2.5 md:order-1 md:flex-row md:flex-wrap md:gap-x-4 md:gap-y-1">
             <p className="order-2 text-[12.5px] text-[#64748B] md:order-1">© {year} DigitalCarda. All rights reserved.</p>
             <p className="order-1 flex items-center justify-center gap-x-4 text-[12.5px] text-[#94A3B8] md:order-2 md:gap-x-3 md:text-[#64748B]">

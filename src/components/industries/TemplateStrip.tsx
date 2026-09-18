@@ -82,8 +82,11 @@ function useNear<T extends HTMLElement>() {
   return { ref, near };
 }
 
-const ITEM = "w-[72%] shrink-0 snap-start sm:w-auto";
-const STRIP = "flex snap-x snap-mandatory gap-4 overflow-x-auto no-scrollbar -mx-4 px-4 scroll-px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3";
+// Compact: a swipeable row of small tiles on phones, 3 across on tablets and
+// all six in one row on desktop, so the section stays about one screen tall.
+// Rows wrap and centre, so an industry with 3 matching designs isn't left-aligned.
+const ITEM = "w-[44%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-5rem)/6)]";
+const STRIP = "flex snap-x snap-mandatory gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 scroll-px-4 pb-2 sm:mx-0 sm:flex-wrap sm:justify-center sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0";
 
 export default function TemplateStrip({ ind, limit }: { ind?: IndustryPage; limit?: number }) {
   // No input, so the key matches the server's SSR seed and Marketplace's own
@@ -107,7 +110,7 @@ export default function TemplateStrip({ ind, limit }: { ind?: IndustryPage; limi
       <ul className={STRIP}>
         {tiles.map(({ p, filled }) => <li key={p.slug} className={ITEM}><DesignTile p={p} filled={filled} /></li>)}
       </ul>
-      <div className="mt-8 text-center">
+      <div className="mt-6 text-center">
         <Link
           to={TEMPLATES_PATH}
           className="group inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 text-[15px] font-semibold text-[#0F172A] transition-colors hover:text-[#B45309] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
@@ -123,7 +126,7 @@ export default function TemplateStrip({ ind, limit }: { ind?: IndustryPage; limi
 function DesignTile({ p, filled }: { p: Product; filled: boolean }) {
   const { ref, near } = useNear<HTMLDivElement>();
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-3xl bg-white ring-1 ring-[#E9EDF3] transition-all duration-300 hover:shadow-[0_24px_60px_-28px_rgba(15,23,42,0.35)] hover:ring-[#F7B31C]/60 motion-safe:hover:-translate-y-1">
+    <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-[#E9EDF3] transition-all duration-300 hover:shadow-[0_20px_44px_-24px_rgba(15,23,42,0.35)] hover:ring-[#F7B31C]/60 motion-safe:hover:-translate-y-1">
       <Link
         to={`${TEMPLATES_PATH}/${p.slug}`}
         aria-label={`${p.name}: see this design`}
@@ -136,35 +139,34 @@ function DesignTile({ p, filled }: { p: Product; filled: boolean }) {
             : <div className="h-full w-full animate-pulse bg-[#F1F5F9]" style={{ aspectRatio: FRAME_RATIO }} />}
         </div>
         {/* Top edge fades the phone into the tile; the bottom edge lifts the caption. */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
         {filled && (
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-bold text-[#0F172A] shadow-sm ring-1 ring-[#E2E8F0]">
-            <Sparkles size={11} className="text-[#B45309]" aria-hidden="true" /> Works for any business
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold text-[#0F172A] shadow-sm ring-1 ring-[#E2E8F0]">
+            <Sparkles size={10} className="text-[#B45309]" aria-hidden="true" /> Any business
           </span>
         )}
         {p.isFeatured && !filled && (
-          <span role="img" aria-label="Featured design" title="Featured" className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#0F172A]/55 ring-1 ring-white/20">
-            <Star size={13} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" />
+          <span role="img" aria-label="Featured design" title="Featured" className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#0F172A]/55 ring-1 ring-white/20">
+            <Star size={11} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" />
           </span>
         )}
-        <span aria-hidden="true" className="pointer-events-none absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 translate-y-2 items-center gap-1.5 rounded-full bg-[#0F172A] px-3 py-1.5 text-[12px] font-semibold text-white opacity-0 shadow-lg transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 motion-reduce:transition-none">
-          <Eye size={13} /> See this design
-        </span>
       </Link>
-      <div className="flex flex-1 flex-col p-4 pt-3 sm:p-5 sm:pt-3">
-        <h3 className="font-display text-[15.5px] font-extrabold leading-snug tracking-tight text-[#0F172A]">{p.name}</h3>
-        <div className="mt-3 flex items-center gap-2">
+      <div className="flex flex-1 flex-col p-2.5 pt-2">
+        <h3 className="line-clamp-2 min-h-[2.5em] font-display text-[12.5px] font-bold leading-[1.25] tracking-tight text-[#0F172A]">{p.name}</h3>
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
           <Link
             to={`/demo/${p.slug}`}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#F8FAFC] px-3 text-[13.5px] font-semibold text-[#0F172A] ring-1 ring-[#E2E8F0] transition-all duration-200 hover:bg-white hover:ring-[#CBD5E1] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] motion-reduce:transition-none"
+            aria-label={`Live demo of ${p.name}`}
+            className="inline-flex h-9 items-center justify-center gap-1 rounded-lg bg-[#F8FAFC] px-2 text-[12px] font-semibold text-[#0F172A] ring-1 ring-[#E2E8F0] transition-all duration-200 hover:bg-white hover:ring-[#CBD5E1] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] motion-reduce:transition-none"
           >
-            <Eye size={15} aria-hidden="true" /> Live demo
+            <Eye size={13} aria-hidden="true" /> Demo
           </Link>
           <Link
             to={signupForProduct(p.slug)}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-1 rounded-xl bg-[#0F172A] px-3 text-[13.5px] font-semibold text-white transition-all duration-200 hover:bg-[#1E293B] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] focus-visible:ring-offset-2 motion-reduce:transition-none"
+            aria-label={`Use ${p.name}`}
+            className="inline-flex h-9 items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2 text-[12px] font-semibold text-white transition-all duration-200 hover:bg-[#1E293B] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] focus-visible:ring-offset-2 motion-reduce:transition-none"
           >
-            Use this design
+            Use <ArrowRight size={12} aria-hidden="true" />
           </Link>
         </div>
       </div>
@@ -174,13 +176,13 @@ function DesignTile({ p, filled }: { p: Product; filled: boolean }) {
 
 function Skeleton() {
   return (
-    <div className={`${ITEM} overflow-hidden rounded-3xl bg-white ring-1 ring-[#E9EDF3]`} aria-hidden="true">
+    <div className={`${ITEM} overflow-hidden rounded-2xl bg-white ring-1 ring-[#E9EDF3]`} aria-hidden="true">
       <div className="animate-pulse bg-[#F1F5F9]" style={{ aspectRatio: FRAME_RATIO }} />
-      <div className="p-4 sm:p-5">
-        <div className="h-4 w-2/3 animate-pulse rounded bg-[#F1F5F9]" />
-        <div className="mt-3 flex gap-2">
-          <div className="h-11 flex-1 animate-pulse rounded-xl bg-[#F1F5F9]" />
-          <div className="h-11 flex-1 animate-pulse rounded-xl bg-[#F1F5F9]" />
+      <div className="p-2.5 pt-2">
+        <div className="h-3.5 w-2/3 animate-pulse rounded bg-[#F1F5F9]" />
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
+          <div className="h-9 animate-pulse rounded-lg bg-[#F1F5F9]" />
+          <div className="h-9 animate-pulse rounded-lg bg-[#F1F5F9]" />
         </div>
       </div>
     </div>
