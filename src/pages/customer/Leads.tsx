@@ -3,7 +3,7 @@ import TopBar from "@/components/layout/TopBar";
 import { useState, useEffect } from "react";
 import {
   Search, Mail, Phone, MessageSquare, PhoneCall, Trash2,
-  ChevronDown, StickyNote, Clock, Share2, Users, CheckCircle2, Loader2, AlarmClock,
+  ChevronDown, StickyNote, Clock, Share2, Users, CheckCircle2, Loader2, AlarmClock, CalendarCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
@@ -87,6 +87,7 @@ function LeadItem({ lead, onChanged }: { lead: Lead; onChanged: () => void }) {
               <h3 className="text-sm font-semibold text-[#0F172A] truncate">{lead.fullName}</h3>
               <span className={`text-[9px] px-2 py-0.5 rounded-full font-semibold ${st.chip}`}>{st.label}</span>
               {overdue && <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold bg-[#FEE2E2] text-[#991B1B] inline-flex items-center gap-1"><AlarmClock size={9} /> Due {fmtDate(lead.followUpDate)}</span>}
+              {/^Booking request/.test(lead.message || "") && <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold bg-[#FFEDD5] text-[#9A3412] inline-flex items-center gap-1"><CalendarCheck size={9} /> Booking</span>}
             </div>
             {lead.company && <p className="text-[11px] text-[#64748B] mt-0.5 truncate">{lead.company}</p>}
             <p className="text-[11px] text-[#94A3B8] mt-0.5 capitalize">{lead.source} · {fmtDate(lead.createdAt)}</p>
@@ -128,7 +129,7 @@ function LeadItem({ lead, onChanged }: { lead: Lead; onChanged: () => void }) {
           {lead.message && (
             <div>
               <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wide mb-1">Message</p>
-              <p className="text-[12px] text-[#475569] bg-white rounded-lg p-2.5 border border-[#F1F5F9]">{lead.message}</p>
+              <p className="text-[12px] text-[#475569] bg-white rounded-lg p-2.5 border border-[#F1F5F9] whitespace-pre-line">{lead.message}</p>
             </div>
           )}
 

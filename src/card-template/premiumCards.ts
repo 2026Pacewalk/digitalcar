@@ -219,7 +219,7 @@ export function svcMeta(nm: string): { icon: string; desc: string } {
    Reviews / Enquiry) in the premium aesthetic, so a premium card is the same
    complete mini-website as the classic templates — not just a first screen.
    Gated by the owner's per-section flags; empty sections are skipped. ── */
-function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: { skip?: string[]; products?: PCProduct[]; accent?: string } = {}): { css: string; html: string; js: string } {
+function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: { skip?: string[]; products?: PCProduct[]; accent?: string; booking?: boolean } = {}): { css: string; html: string; js: string } {
   // Buttons in these sections sit on the template's accent (--gold). Their text
   // colour and gradient come from buttonPalette, so a blue or navy card gets
   // white text on a deepened blue, a gold card keeps dark text on gold.
@@ -340,14 +340,36 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
 
   // Enquiry form — posts to the same /api/enquiry endpoint as the classic card
   // (with the sandboxed-iframe postMessage fallback so no lead is ever lost).
-  const enquiryHtml = on(c.enquiry_on) ? sec("enquiry-section", s(c.enquiry) || "Enquiry Form", `
+  // Booking designs (o.booking) show an appointment request instead: service,
+  // date and time slot. It goes through the same endpoint as a lead whose
+  // message starts "Booking request", so it lands in Leads with the usual alert.
+  const enqTitle = s(c.enquiry);
+  const bookTitle = !enqTitle || /^enquiry( form)?$/i.test(enqTitle) ? "Book an Appointment" : enqTitle;
+  const bookingForm = `
+    <form class="pwx-form pwx-book" onsubmit="return pwxBook(this)">
+      <p class="pwx-book-lead"><i class="far fa-calendar-check" aria-hidden="true"></i><span>Pick a service and a time that suits you — we'll confirm your appointment.</span></p>
+      ${on(c.product_on) && prods.length ? `<label class="pwx-f"><span>Service</span><select name="service"><option value="">Not sure yet</option>${prods.slice(0, 20).map((p) => `<option>${esc(p.name)}</option>`).join("")}</select></label>` : ""}
+      <label class="pwx-f"><span>Date</span><input name="date" type="date" required></label>
+      <fieldset class="pwx-slots"><legend>Time</legend>
+        <label><input type="radio" name="slot" value="Any time" checked><span>Any time<small>Flexible</small></span></label>
+        <label><input type="radio" name="slot" value="Morning (9 AM – 12 PM)"><span>Morning<small>9 AM – 12</small></span></label>
+        <label><input type="radio" name="slot" value="Afternoon (12 – 4 PM)"><span>Afternoon<small>12 – 4 PM</small></span></label>
+        <label><input type="radio" name="slot" value="Evening (4 – 8 PM)"><span>Evening<small>4 – 8 PM</small></span></label>
+      </fieldset>
+      <input name="name" placeholder="Your Name" aria-label="Your name" autocomplete="name" required>
+      <input name="contact" type="tel" inputmode="tel" placeholder="Phone / WhatsApp number" aria-label="Phone or WhatsApp number" autocomplete="tel" required>
+      <textarea name="description" placeholder="Anything we should know? (optional)" aria-label="Notes" rows="2"></textarea>
+      <button type="submit"><i class="far fa-calendar-check"></i> Request Booking</button>
+      <p class="pwx-book-note"><i class="fa fa-lock" aria-hidden="true"></i> No payment now · We'll confirm on call or WhatsApp</p>
+    </form>`;
+  const enquiryHtml = !on(c.enquiry_on) ? "" : o.booking ? sec("enquiry-section", bookTitle, bookingForm) : sec("enquiry-section", s(c.enquiry) || "Enquiry Form", `
     <form class="pwx-form" onsubmit="return pwxEnq(this)">
       <input name="name" placeholder="Your Name" required>
       <input name="contact" placeholder="Contact Number" required>
       <input name="email" type="email" placeholder="Email">
       <textarea name="description" placeholder="Your requirement" rows="3"></textarea>
       <button type="submit"><i class="fa fa-paper-plane"></i> Send Enquiry</button>
-    </form>`) : "";
+    </form>`);
 
   const html = about + servicesHtml + offersHtml + payment + galleryHtml + videosHtml + reviewsHtml + enquiryHtml;
   if (!html) return { css: "", html: "", js: "" };
@@ -509,7 +531,32 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
   .pwx-form button{height:52px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--btn-bg),var(--btn-bg2));color:var(--btn-fg);font-family:'Sora',sans-serif;font-weight:800;font-size:14px;letter-spacing:.02em;cursor:pointer;box-shadow:0 2px 4px rgba(14,27,52,.08),0 14px 30px -8px color-mix(in srgb,var(--btn-bg) 55%,transparent);transition:transform .15s,filter .2s,box-shadow .22s;}
   .pwx-form button:hover{filter:brightness(1.05);transform:translateY(-1px);}
   .pwx-form button:active{transform:scale(.985);}
-  .pwx-sent{text-align:center;font-weight:700;color:#118a4e;padding:16px 0;}`;
+  .pwx-sent{text-align:center;font-weight:700;color:#118a4e;padding:16px 0;}
+  ${o.booking ? `.pwx-form select{width:100%;min-height:48px;border:1.5px solid #e2e7f0;border-radius:13px;padding:12px 38px 12px 14px;font-size:13.5px;font-family:inherit;outline:none;color:var(--ink);-webkit-appearance:none;appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center/12px;transition:border-color .2s,box-shadow .2s;}
+  .pwx-form select:focus{border-color:var(--gold);box-shadow:0 0 0 3.5px color-mix(in srgb,var(--gold) 22%,transparent);}
+  .pwx-form input[type=date]{min-height:48px;-webkit-appearance:none;appearance:none;text-align:left;}
+  .pwx-form input[type=date]::-webkit-date-and-time-value{text-align:left;}
+  .pwx-f{display:grid;gap:5px;min-width:0;}
+  .pwx-f>input,.pwx-f>select{min-width:0;max-width:100%;}
+  .pwx-f>span{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em;}
+  .pwx-slots{border:0;padding:0;margin:0;min-width:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(74px,1fr));gap:8px;}
+  .pwx-slots legend{padding:0;margin-bottom:5px;font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em;}
+  .pwx-slots label{position:relative;display:block;cursor:pointer;}
+  .pwx-slots input{position:absolute;opacity:0;width:1px;height:1px;}
+  .pwx-slots span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:50px;padding:6px 4px;border:1.5px solid #e2e7f0;border-radius:13px;background:#fff;font-size:13px;font-weight:600;color:var(--ink);text-align:center;line-height:1.2;transition:border-color .2s,background .2s,box-shadow .2s;}
+  .pwx-slots small{font-size:10.5px;font-weight:500;color:var(--muted);}
+  .pwx-slots input:checked+span{border-color:var(--btn-bg);background:color-mix(in srgb,var(--btn-bg) 9%,#fff);box-shadow:0 0 0 1px var(--btn-bg) inset;}
+  .pwx-slots input:focus-visible+span{outline:3px solid color-mix(in srgb,var(--btn-bg) 45%,transparent);outline-offset:2px;}
+  .pwx-book-lead{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.45;color:var(--muted);margin-bottom:2px;}
+  .pwx-book-lead i{color:var(--btn-bg);font-size:18px;margin-top:1px;}
+  .pwx-book-note{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;color:var(--muted);}
+  .pwx-booked{display:grid;justify-items:center;gap:7px;text-align:center;padding:14px 4px;}
+  .pwx-booked-ic{width:54px;height:54px;border-radius:50%;background:#e7f6ee;color:#0f7a40;display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:800;}
+  .pwx-booked b{font-size:16.5px;color:var(--ink);}
+  .pwx-booked p{font-size:13px;line-height:1.5;color:var(--muted);max-width:290px;}
+  .pwx-booked-svc{display:inline-block;max-width:100%;padding:5px 12px;border-radius:999px;background:#f1f3f7;color:var(--ink);font-size:12.5px;font-weight:600;}
+  .pwx-book-wa{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;margin-top:6px;padding:0 18px;border-radius:14px;background:#0f7a40;color:#fff;font-weight:700;font-size:13.5px;text-decoration:none;}` : ""}
+  @media(max-width:480px){.pwx-form input,.pwx-form select,.pwx-form textarea{font-size:16px;}}`;
 
   const galUrls = gallery.map((g) => s(g.filename));
   // Alt text for the enlarged image, set by pwxLb (a DOM property, not HTML, so
@@ -531,7 +578,23 @@ function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: 
     var sb=false;try{sb=(window.origin==='null');}catch(_){sb=true;}
     if(sb){try{if(window.parent&&window.parent!==window)window.parent.postMessage({__dcEnquiry:d},'*');}catch(_){}}
     else{try{fetch('/api/enquiry',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(d),keepalive:true}).catch(function(){});}catch(_){}}
-  }catch(_){}form.innerHTML='<p class="pwx-sent">✓ Thank you! We will get back to you shortly.</p>';return false;}`;
+  }catch(_){}form.innerHTML='<p class="pwx-sent">✓ Thank you! We will get back to you shortly.</p>';return false;}${o.booking ? `
+  var PWX_BIZ=${JSON.stringify(s(c.company_name) || s(c.name) || "us").replace(/</g, "\\u003c")},PWX_WA=${JSON.stringify(s(c.mobile2 || c.mobile1).replace(/[^\d]/g, ""))};
+  function pwxE(v){return String(v).replace(/[&<>"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch];});}
+  function pwxBook(form){var g=function(n){var el=form.elements[n];return el?String(el.value||'').trim():'';};
+    var dt=g('date'),nice=dt;try{var x=new Date(dt+'T00:00:00');if(!isNaN(x.getTime()))nice=x.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});}catch(_){}
+    var svc=g('service'),slot=g('slot'),note=g('description'),nm=g('name');
+    var ln=['Booking request'];if(svc)ln.push('Service: '+svc);ln.push('Date: '+nice);if(slot)ln.push('Time: '+slot);if(note)ln.push('Notes: '+note);
+    try{var d={slug:${JSON.stringify(slug)},name:nm,contact:g('contact'),email:'',description:ln.join('\\n')};
+      var sb=false;try{sb=(window.origin==='null');}catch(_){sb=true;}
+      if(sb){try{if(window.parent&&window.parent!==window)window.parent.postMessage({__dcEnquiry:d},'*');}catch(_){}}
+      else{try{fetch('/api/enquiry',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(d),keepalive:true}).catch(function(){});}catch(_){}}
+    }catch(_){}
+    var when=nice+(slot&&slot!=='Any time'?', '+slot:'');
+    var msg='Hi '+PWX_BIZ+', I just requested a booking on '+when+(svc?' ('+svc+')':'')+'. My name is '+nm+'.';
+    form.innerHTML='<div class="pwx-booked"><span class="pwx-booked-ic" aria-hidden="true">✓</span><b>Booking request sent</b><p>'+pwxE(PWX_BIZ)+' will confirm your booking for '+pwxE(when)+'.</p>'+(svc?'<span class="pwx-booked-svc">'+pwxE(svc)+'</span>':'')+(PWX_WA?'<a class="pwx-book-wa" href="https://wa.me/'+PWX_WA+'?text='+encodeURIComponent(msg)+'" target="_blank" rel="noopener"><i class="fab fa-whatsapp" aria-hidden="true"></i> Confirm faster on WhatsApp</a>':'')+'</div>';
+    return false;}
+  (function(){var t=new Date(),v=t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)+'-'+('0'+t.getDate()).slice(-2);var els=document.querySelectorAll('.pwx-book input[type=date]');for(var i=0;i<els.length;i++){els[i].min=v;if(!els[i].value)els[i].value=v;}})();` : ""}`;
 
   return { css, html: html + `<div id="pwxLb" onclick="pwxLbClose()"><button type="button" class="x" aria-label="Close image">&times;</button><img alt="Enlarged gallery image"></div>`, js };
 }
@@ -1017,15 +1080,20 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   const btnA = legible(accent, "#ffffff", 3);
   const btnB = mix(btnA, "#000000", 0.16);
   const btnText = "#ffffff";
+  const dockA = legible(accent, "#ffffff", 4.5);
+  const dockB = mix(dockA, "#000000", 0.16);
 
   const slug = s(c.slug).replace(/[^a-zA-Z0-9_-]/g, "");
   const cardUrl = `https://digitalcarda.in/${slug || "card"}`;
   const company = s(c.company_name);
   const person = s(c.name);
   const title = esc(company || person) || "Your Business";
-  const subtitle = esc([company ? person : "", s(c.designation) || s(c.nature)].filter(Boolean).join(" · "));
+  // The person is shown under the company name only when it is a different name.
+  const subtitle = esc([company && person.toLowerCase() !== company.toLowerCase() ? person : "", s(c.designation) || s(c.nature)].filter(Boolean).join(" · "));
   const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean).slice(0, 3);
-  const tagline = esc(specs.length >= 2 ? specs.join(" · ") : s(c.tagline));
+  const tagRaw = specs.length >= 2 ? specs.join(" · ") : s(c.tagline);
+  const tagline = esc(tagRaw);
+  const tagLong = tagRaw.length > 30;
   const phone = s(c.mobile1).replace(/[^\d+]/g, "");
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d]/g, "");
   const email = s(c.email);
@@ -1094,6 +1162,18 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   // Brand-coloured social circles by default (the reference look); the owner's
   // "theme colour" icon setting still wins when chosen explicitly.
   const socials = premiumSocials({ ...c, social_icon_style: s(c.social_icon_style) || "brand" }, "bm-soc");
+  // Dock icons get smaller as more networks are added, so the row always fits
+  // beside the Book Now button (and they shrink a little more on narrow phones).
+  const socCount = (socials.match(/class="bm-soc"/g) || []).length;
+  const socPx = socCount <= 3 ? 36 : socCount === 4 ? 34 : socCount === 5 ? 31 : 29;
+  const socIc = Math.round(socPx * 0.44);
+  // The dock's button: Book Now (the booking form, else a WhatsApp booking
+  // message); Share only when there's no way to book. Share stays in the header.
+  const dockAct: { attr: string; ic: string; lb: string; button?: boolean } | null = has.enquiry
+    ? { attr: jump("enquiry-section"), ic: "far fa-calendar-check", lb: "Book Now" }
+    : waBook ? { attr: `href="${esc(waBook)}" target="_blank" rel="noopener"`, ic: "far fa-calendar-check", lb: "Book Now" }
+    : showShare ? { attr: opts.thumb ? "" : `onclick="pwShare()"`, ic: "fa fa-share-alt", lb: "Share", button: true }
+    : null;
 
   const logo = s(c.logo);
   const logoPct = Math.max(70, Math.min(180, Number(s(c.logo_size)) || 100)) / 100;
@@ -1139,15 +1219,19 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .bm-tag{display:flex;align-items:center;gap:12px;margin:12px 6px 0;font-size:13px;color:var(--muted);text-align:center;}
   .bm-tag::before,.bm-tag::after{content:"";flex:1;min-width:16px;height:1px;background:linear-gradient(90deg,transparent,var(--line));}
   .bm-tag::after{background:linear-gradient(90deg,var(--line),transparent);}
-  .bm-tag span{max-width:78%;}
+  .bm-tag span{max-width:78%;text-wrap:balance;}
+  .bm-tag--long{justify-content:center;}
+  .bm-tag--long::before,.bm-tag--long::after{display:none;}
+  .bm-tag--long span{max-width:100%;}
 
-  .bm-tiles{display:grid;grid-template-columns:repeat(${Math.max(1, tiles.length)},1fr);gap:9px;margin-top:20px;}
-  .bm-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:88px;padding:12px 4px;border-radius:18px;background:var(--tint);color:var(--ink);text-decoration:none;font-size:12.5px;font-weight:600;transition:transform .16s ease,background .2s,box-shadow .2s;}
+  .bm-tiles{display:grid;grid-template-columns:repeat(${Math.max(1, tiles.length)},minmax(0,1fr));gap:8px;margin-top:20px;}
+  .bm-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:88px;padding:12px 2px;border-radius:18px;background:var(--tint);color:var(--ink);text-decoration:none;font-size:clamp(11px,3.1vw,12.5px);font-weight:600;transition:transform .16s ease,background .2s,box-shadow .2s;}
+  .bm-tile-lb{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .bm-tile-ic{font-size:24px;color:var(--ink-ac);line-height:1;}
   .bm-tile:hover{background:var(--tint2);transform:translateY(-2px);box-shadow:0 12px 24px -12px ${accent}66;}
   .bm-tile:active{transform:scale(.96);}
 
-  .bm-rows{display:grid;gap:10px;margin-top:18px;}
+  .bm-rows{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:18px;}
   .bm-row{display:flex;align-items:center;gap:14px;min-height:72px;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:18px;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(27,29,41,.03);transition:transform .16s ease,box-shadow .22s,border-color .22s;}
   .bm-row:hover{transform:translateY(-2px);border-color:var(--tint2);box-shadow:0 14px 28px -16px ${accent}70;}
   .bm-row-ic{width:48px;height:48px;border-radius:50%;background:var(--tint);color:var(--ink-ac);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
@@ -1159,11 +1243,31 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
 
   /* Floating dock (socials + Share). Content gets bottom padding equal to the
      dock so nothing ends up hidden behind it. */
-  .bm-in{padding-bottom:${(socials ? 96 : 0) + (showShare ? 72 : 0) + 24}px;}
-  .bm-dock{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:430px;z-index:40;padding:14px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,${mix(accent, "#ffffff", 0.955)}00 0%,${mix(accent, "#ffffff", 0.955)}e6 26%,${mix(accent, "#ffffff", 0.955)} 62%);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);animation:bmDock .5s cubic-bezier(.2,.7,.2,1) .3s both;}
+  .bm-in{padding-bottom:${socials || dockAct ? 104 : 24}px;}
+  .bm-dock{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:430px;z-index:40;padding:14px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,${mix(accent, "#ffffff", 0.955)}00 0%,${mix(accent, "#ffffff", 0.955)}e6 26%,${mix(accent, "#ffffff", 0.955)} 62%);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);animation:bmDock .5s cubic-bezier(.2,.7,.2,1) .3s backwards;transition:transform .32s cubic-bezier(.2,.7,.2,1),opacity .25s;}
+  .bm-dock.bm-dock--hid{transform:translate(-50%,115%);opacity:0;pointer-events:none;}
+  .bm-dock.bm-dock--hid:focus-within{transform:translateX(-50%);opacity:1;pointer-events:auto;}
   @keyframes bmDock{from{opacity:0;transform:translate(-50%,24px);}to{opacity:1;transform:translate(-50%,0);}}
-  .bm-dock .bm-follow{margin:0 4px 8px;}
-  .bm-dock .bm-sharebtn{margin-top:10px;min-height:54px;}
+  .bm-dock{display:flex;align-items:flex-end;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));}
+  .bm-dock-soc{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:6px;}
+  .bm-dock .bm-follow{margin:0 2px;font-size:10px;letter-spacing:.16em;}
+  .bm-dock .bm-socials{flex-wrap:nowrap;align-items:center;gap:${socCount >= 4 ? 6 : 8}px;overflow-x:auto;scrollbar-width:none;padding:2px;}
+  .bm-dock .bm-socials::-webkit-scrollbar{display:none;}
+  .bm-dock .bm-socials.bm-more{-webkit-mask-image:linear-gradient(90deg,#000 78%,transparent);mask-image:linear-gradient(90deg,#000 78%,transparent);}
+  .bm-dock .bm-soc{flex:0 1 ${socPx}px;width:auto;height:auto;aspect-ratio:1/1;min-width:${Math.max(25, socPx - 5)}px;max-width:${socPx}px;font-size:${socIc}px;box-shadow:0 6px 14px -8px rgba(27,29,41,.4);}
+  .bm-dock .bm-soc svg{width:${socIc}px;height:${socIc}px;}
+  .bm-dockbtn{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;height:42px;padding:0 15px;border:none;border-radius:13px;background:linear-gradient(135deg,${dockA},${dockB});color:${btnText};font-family:'Poppins',sans-serif;font-weight:700;font-size:13.5px;white-space:nowrap;text-decoration:none;cursor:pointer;box-shadow:0 12px 24px -12px ${dockB};transition:transform .16s,filter .2s;}
+  .bm-dockbtn i{font-size:14px;}
+  .bm-dockbtn:hover{filter:brightness(1.05);transform:translateY(-1px);}
+  .bm-dockbtn:active{transform:scale(.97);}
+  .bm-dock--both .bm-follow{justify-content:flex-start;}
+  .bm-dock--both .bm-follow::before,.bm-dock--both .bm-follow::after{display:none;}
+  .bm-dock--both .bm-socials{justify-content:flex-start;}
+  .bm-dock--solo{justify-content:center;}
+  .bm-dock:not(.bm-dock--both) .bm-socials{justify-content:flex-start;}
+  .bm-dock:not(.bm-dock--both) .bm-soc:first-child{margin-left:auto;}
+  .bm-dock:not(.bm-dock--both) .bm-soc:last-child{margin-right:auto;}
+  .bm-dock--solo .bm-dockbtn{flex:1 1 auto;max-width:300px;height:48px;}
   .bm-follow{display:flex;align-items:center;gap:12px;margin:24px 4px 12px;font-size:11.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
   .bm-follow::before,.bm-follow::after{content:"";flex:1;height:1px;background:var(--line);}
   .bm-socials{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;}
@@ -1171,9 +1275,6 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .bm-soc svg{width:19px;height:19px;fill:currentColor;display:block;}
   .bm-soc:hover{transform:translateY(-3px);}
 
-  .bm-sharebtn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:58px;margin-top:22px;border:none;border-radius:18px;background:linear-gradient(135deg,${btnA},${btnB});color:${btnText};font-family:'Poppins',sans-serif;font-weight:700;font-size:19px;cursor:pointer;box-shadow:0 16px 30px -14px ${btnB};transition:transform .16s,filter .2s;}
-  .bm-sharebtn:hover{filter:brightness(1.05);transform:translateY(-1px);}
-  .bm-sharebtn:active{transform:scale(.985);}
   .bm-url{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;min-height:44px;padding:0 12px;border:none;background:none;font-family:inherit;font-size:14px;color:var(--muted);cursor:pointer;border-radius:12px;}
   .bm-url i{font-size:20px;color:var(--ink);}
   .bm-url:hover{color:var(--ink);}
@@ -1195,20 +1296,25 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
   .bm-qr-b{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;margin-top:16px;padding:0 20px;border-radius:14px;background:linear-gradient(135deg,${btnA},${btnB});color:${btnText};font-weight:700;font-size:13.5px;text-decoration:none;}
 
   .bm a:focus-visible,.bm button:focus-visible,.bm-modal button:focus-visible,.bm-modal a:focus-visible{outline:3px solid var(--ink-ac);outline-offset:3px;}
-  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto;}.bm-rise,.bm-pl,.bm-pr,.bm-dock{animation:none!important;}.bm-tile,.bm-row,.bm-soc,.bm-sharebtn{transition:none!important;}}
+  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto;}.bm-rise,.bm-pl,.bm-pr,.bm-dock{animation:none!important;transition:none!important;}.bm-tile,.bm-row,.bm-soc,.bm-dockbtn{transition:none!important;}}
   `;
 
   const shareName = company || person || "this business";
   const waShareText = `Hi 👋\n\nTake a look at *${shareName}*'s digital visiting card 📇\n\nEverything in one tap — call, WhatsApp, book and save the contact:\n${cardUrl}`;
   const shareUi = opts.thumb ? "" : shareSheetHtml({ shareName, cardUrl, waShareText, accent: btnB });
-  const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, ex, slug, { products, accent });
+  const cx = opts.thumb ? { css: "", html: "", js: "" } : pwContentSections(c, ex, slug, { products, accent, booking: true });
   const cxCss = cx.css ? `:root{--navy:${mix(deep, "#1b1d29", 0.35)};--gold:${accent};--soft:var(--bg);}${cx.css}` : "";
   const ref = s(c.referral_code) || slug;
-  // Floating dock: socials + Share stay in reach while the visitor scrolls the
-  // sections below. Fixed rather than sticky, because the card clips overflow.
-  const dock = (socials || showShare) ? `<div class="bm-dock">
-      ${socials ? `<div class="bm-follow">${esc(s(c.social_title) || "Follow Us")}</div><div class="bm-socials">${socials}</div>` : ""}
-      ${showShare ? `<button class="bm-sharebtn" type="button" ${opts.thumb ? "" : `onclick="pwShare()"`}><i class="fa fa-share-alt" aria-hidden="true"></i> Share My Card</button>` : ""}
+  // Floating dock: socials + Book Now stay in reach while the visitor scrolls
+  // the sections below. Fixed rather than sticky, because the card clips overflow.
+  const dockCls = ["bm-dock", socials && dockAct ? "bm-dock--both" : "", !socials && dockAct ? "bm-dock--solo" : ""].filter(Boolean).join(" ");
+  const dockInner = dockAct ? `<i class="${dockAct.ic}" aria-hidden="true"></i><span>${dockAct.lb}</span>` : "";
+  const dockBtn = !dockAct ? "" : dockAct.button
+    ? `<button class="bm-dockbtn" type="button" ${dockAct.attr}>${dockInner}</button>`
+    : `<a class="bm-dockbtn" ${dockAct.attr}>${dockInner}</a>`;
+  const dock = (socials || dockAct) ? `<div class="${dockCls}">
+      ${socials ? `<div class="bm-dock-soc"><div class="bm-follow">${esc(s(c.social_title) || "Follow Us")}</div><div class="bm-socials">${socials}</div></div>` : ""}
+      ${dockBtn}
     </div>` : "";
 
   const modal = (opts.thumb || !showQr) ? "" : `
@@ -1224,9 +1330,18 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
 
   const script = opts.thumb ? "" : `<script>
   function bmQR(o){var m=document.getElementById('bmqr');if(m)m.style.display=o?'flex':'none';}
+  (function(){var d=document.querySelector('.bm-dock');if(!d)return;var last=window.pageYOffset||0,busy=false;
+    function upd(){busy=false;var y=window.pageYOffset||0,h=document.documentElement.scrollHeight,v=window.innerHeight;
+      if(y<80||y+v>=h-40||d.contains(document.activeElement)){d.classList.remove('bm-dock--hid');last=y;return;}
+      if(Math.abs(y-last)<8)return;
+      d.classList.toggle('bm-dock--hid',y>last);last=y;}
+    window.addEventListener('scroll',function(){if(!busy){busy=true;requestAnimationFrame(upd);}},{passive:true});})();
+  (function(){var w=document.querySelector('.bm-dock .bm-socials');if(!w)return;function f(){w.classList.toggle('bm-more',w.scrollLeft+w.clientWidth<w.scrollWidth-2);}f();w.addEventListener('scroll',f,{passive:true});window.addEventListener('resize',f);})();
   function bmGo(id){var el=document.getElementById(id);if(!el)return true;
     if(el.classList.contains('pwx-acc')&&!el.classList.contains('open')){var h=el.querySelector('.pwx-acc-h');if(h)pwxAcc(h);}
-    el.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});return false;}
+    var y=el.getBoundingClientRect().top+(window.pageYOffset||document.documentElement.scrollTop||0)-8;
+    window.scrollTo({top:Math.max(0,y),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+    if(!el.hasAttribute('tabindex'))el.setAttribute('tabindex','-1');try{el.focus({preventScroll:true});}catch(_){}return false;}
   ${shareSheetJs(cardUrl)}
   ${cx.js}
   </script>`;
@@ -1240,7 +1355,7 @@ function bloomProfile(c: PCRecord, products: PCProduct[], opts: { thumb?: boolea
       <div class="bm-logo bm-rise">${logoHtml}</div>
       <h1 class="bm-title bm-rise bm-d1">${title}</h1>
       ${subtitle ? `<p class="bm-sub bm-rise bm-d1">${subtitle}</p>` : ""}
-      ${tagline ? `<p class="bm-tag bm-rise bm-d1"><span>${tagline}</span></p>` : ""}
+      ${tagline ? `<p class="bm-tag${tagLong ? " bm-tag--long" : ""} bm-rise bm-d1"><span>${tagline}</span></p>` : ""}
       ${tilesHtml ? `<nav class="bm-tiles bm-rise bm-d2" aria-label="Quick actions">${tilesHtml}</nav>` : ""}
       ${rowsHtml ? `<div class="bm-rows bm-rise bm-d3">${rowsHtml}</div>` : ""}
       ${showQr ? `<button class="bm-url" type="button" ${opts.thumb ? "" : `onclick="bmQR(true)"`} aria-label="Show QR code for ${esc(cardUrl.replace(/^https:\/\//, ""))}"><i class="fa fa-qrcode" aria-hidden="true"></i> ${esc(cardUrl.replace(/^https:\/\//, ""))}</button>` : ""}

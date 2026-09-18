@@ -509,7 +509,7 @@ export function leadNotificationEmail(o: { name: string; email?: string | null; 
       ["Name", esc(o.name || "—")],
       ["Email", o.email ? `<a href="mailto:${esc(o.email)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.email)}</a>` : "—"],
       ["Phone", o.contact ? `<a href="tel:${esc(o.contact)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.contact)}</a>` : "—"],
-      ["Message", esc(o.message || "—")],
+      ["Message", esc(o.message || "—").replace(/\n/g, "<br>")],
     ]) +
     (o.slug ? button("View card", `${SITE}/${esc(o.slug)}`) : "");
   return {
@@ -528,7 +528,7 @@ export function hotLeadEmail(o: { name: string; email?: string | null; contact?:
       ["Name", esc(o.name || "—")],
       ["Email", o.email ? `<a href="mailto:${esc(o.email)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.email)}</a>` : "—"],
       ["Phone", o.contact ? `<a href="tel:${esc(o.contact)}" style="color:${BRAND.goldDark};text-decoration:none">${esc(o.contact)}</a>` : "—"],
-      ["Message", esc(o.message || "—")],
+      ["Message", esc(o.message || "—").replace(/\n/g, "<br>")],
     ]) +
     (o.contact ? button("Call now", `tel:${esc(o.contact)}`) : o.slug ? button("View card", `${SITE}/${esc(o.slug)}`) : "");
   return {

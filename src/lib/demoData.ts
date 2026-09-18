@@ -52,10 +52,17 @@ const DEFAULT: DemoBundle = {
   products: [svc(1, "Enquire Now", "Interested in working together? Send us a message.", "WhatsApp"), svc(2, "Get a Free Quote", "Tell us what you need and we'll send a quick estimate.", "Get Quote"), svc(3, "Call Us", "Prefer to talk? We're just a call away.", "Call Now")],
 };
 
+/* Does a category name a persona key? Whole words only, so "education" doesn't
+   match the "ca" (chartered accountant) key; a longer category word may still
+   name a key ("doctor" → "doctors"). */
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const keyMatches = (c: string, k: string) =>
+  new RegExp(`(^|[^a-z])${escapeRe(k)}([^a-z]|$)`).test(c) || (c.length >= 4 && k.includes(c));
+
 /* Pick a persona from a product's category (case-insensitive), else default. */
 export function demoFor(category?: string | null): DemoBundle {
   const c = (category || "").toLowerCase().trim();
-  if (c) for (const p of PERSONAS) if (p.keys?.some((k) => c.includes(k) || k.includes(c))) return p.bundle;
+  if (c) for (const p of PERSONAS) if (p.keys?.some((k) => keyMatches(c, k))) return p.bundle;
   return DEFAULT;
 }
 
@@ -67,7 +74,7 @@ export function demoFor(category?: string | null): DemoBundle {
  */
 export function demoForProduct(p?: { category?: string | null; styleNumber?: number; id?: number } | null): DemoBundle {
   const c = (p?.category || "").toLowerCase().trim();
-  if (c) for (const per of PERSONAS) if (per.keys?.some((k) => c.includes(k) || k.includes(c))) return per.bundle;
+  if (c) for (const per of PERSONAS) if (per.keys?.some((k) => keyMatches(c, k))) return per.bundle;
   const seed = Number(p?.styleNumber ?? p?.id ?? 0);
   return PERSONAS[((seed % PERSONAS.length) + PERSONAS.length) % PERSONAS.length].bundle;
 }

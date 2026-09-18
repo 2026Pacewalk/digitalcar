@@ -119,6 +119,36 @@ try {
       n2 += r.affectedRows || 0;
     }
     console.log(n2 ? `✓ Seeded marketing media for ${n2} more product(s).` : "• Batch product media already set — skipped.");
+
+    // Galleries that list a photo twice — its PNG and the WebP copy made for
+    // faster loading (the deploy backfill once scanned folders that already had
+    // WebP copies). Pages serve the WebP from the PNG path by themselves, so drop
+    // a .webp entry whenever its PNG/JPG is listed too, and exact repeats. Batch
+    // galleries left with exactly their four photos get their intended order back.
+    // Galleries without such pairs (e.g. hand-picked by an admin) are untouched.
+    const canonical = Object.fromEntries(BATCH.map((slug) => {
+      const folder = slug.replace(/-card$/, "");
+      const base = `${folder}-digital-business-card`;
+      return [slug, media(folder, [`${base}.png`, `${base}-features.png`, `${base}-preview.png`, `${base}-services.png`])];
+    }));
+    const [gals] = await conn.query("SELECT id, slug, images FROM products WHERE images IS NOT NULL AND JSON_LENGTH(images) > 1");
+    let n3 = 0;
+    for (const g of gals) {
+      const imgs = typeof g.images === "string" ? JSON.parse(g.images) : g.images;
+      if (!Array.isArray(imgs)) continue;
+      const listed = new Set(imgs);
+      let clean = imgs.filter((u, i) => typeof u !== "string" || (
+        imgs.indexOf(u) === i &&
+        !(/\.webp$/i.test(u) && (listed.has(u.replace(/\.webp$/i, ".png")) || listed.has(u.replace(/\.webp$/i, ".jpg"))))
+      ));
+      const want = canonical[g.slug];
+      if (want && clean.length === want.length && want.every((u) => clean.includes(u))) clean = want;
+      if (JSON.stringify(clean) !== JSON.stringify(imgs)) {
+        await conn.query("UPDATE products SET images = CAST(? AS JSON) WHERE id = ?", [JSON.stringify(clean), g.id]);
+        n3++;
+      }
+    }
+    if (n3) console.log(`✓ Removed duplicate gallery images for ${n3} product(s).`);
   } catch (e) {
     console.log("• Product media seed skipped: " + (e.code || e.message));
   }

@@ -20,7 +20,12 @@ const IMG_RE = /\.(png|jpe?g|webp)$/i;
 async function mockupsFor(base, publicDir) {
   try {
     const dir = path.join(publicDir, "products", base);
-    const files = (await readdir(dir)).filter((f) => IMG_RE.test(f) && f.toLowerCase() !== "og.jpg");
+    const all = await readdir(dir);
+    const has = new Set(all.map((f) => f.toLowerCase()));
+    // A .webp beside a .png/.jpg of the same name is only the faster copy of that
+    // photo (pages pick it from the PNG path), so list the photo once.
+    const files = all.filter((f) => IMG_RE.test(f) && f.toLowerCase() !== "og.jpg"
+      && !(/\.webp$/i.test(f) && (has.has(f.toLowerCase().replace(/\.webp$/, ".png")) || has.has(f.toLowerCase().replace(/\.webp$/, ".jpg")))));
     const rank = (f) => {
       const n = f.toLowerCase();
       if (n === `${base}-digital-business-card.png`) return 0; // hero/main

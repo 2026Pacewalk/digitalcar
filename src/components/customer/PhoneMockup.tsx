@@ -11,7 +11,7 @@ const PHONE_W = 390;
 
 // Phones scroll with overlay scrollbars; hide the desktop ones inside the preview.
 const NO_SCROLLBARS = "<style>*{scrollbar-width:none}*::-webkit-scrollbar{display:none}</style>";
-function withoutScrollbars(html: string) {
+export function withoutScrollbars(html: string) {
   if (!html) return html;
   const i = html.lastIndexOf("</head>");
   return i >= 0 ? html.slice(0, i) + NO_SCROLLBARS + html.slice(i) : NO_SCROLLBARS + html;
