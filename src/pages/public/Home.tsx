@@ -1760,24 +1760,42 @@ function WhereToUseSection() {
    Testimonials
    ───────────────────────────────────────────────────────────── */
 
-function TestimonialCard({ t }: { t: (typeof TESTIMONIALS)[number] }) {
+/* Dark or white initial on the accent, whichever reads (gold needs dark ink). */
+const inkOn = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#0F172A" : "#fff";
+};
+
+function TestimonialCard({ t, dark = false, copy = false }: { t: (typeof TESTIMONIALS)[number]; dark?: boolean; copy?: boolean }) {
   return (
-    <div className="w-[340px] shrink-0 bg-white rounded-2xl p-6 shadow-premium border border-[#F1F5F9]">
-      <Quote size={26} className="text-[#F7B31C]/30 mb-3" />
-      <p className="text-sm text-[#475569] leading-relaxed mb-5">{t.quote}</p>
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{ background: t.accent }}>
-          {t.name.charAt(0)}
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-[#0F172A]">{t.name}</p>
-          <p className="text-xs text-[#94A3B8]">{t.role}</p>
-        </div>
-        <div className="ml-auto flex gap-0.5">
-          {[...Array(5)].map((_, i) => <Star key={i} size={12} className="fill-[#F7B31C] text-[#F7B31C]" />)}
-        </div>
+    <figure aria-hidden={copy || undefined} className={`relative w-[360px] shrink-0 overflow-hidden rounded-3xl p-6 transition-transform duration-300 hover:-translate-y-1 motion-reduce:transition-none ${dark ? "bg-[#0F172A] text-white shadow-premium-lg ring-1 ring-white/5" : "bg-white shadow-premium ring-1 ring-[#EEF2F7]"}`}>
+      {/* A soft glow in the business's own colour */}
+      <span aria-hidden="true" className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full blur-2xl" style={{ background: t.accent, opacity: dark ? 0.32 : 0.14 }} />
+      <div className="relative flex items-center justify-between">
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl" style={{ background: `${t.accent}${dark ? "33" : "1f"}` }}>
+          <Quote size={18} style={{ color: t.accent }} aria-hidden="true" />
+        </span>
+        <span className="flex gap-0.5" role="img" aria-label="Rated 5 out of 5">
+          {[...Array(5)].map((_, i) => <Star key={i} size={13} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" />)}
+        </span>
       </div>
-    </div>
+      <blockquote className={`relative mt-4 leading-relaxed ${dark ? "font-display text-[16.5px] font-medium text-white" : "text-[15px] text-[#334155]"}`}>
+        &ldquo;{t.quote}&rdquo;
+      </blockquote>
+      <figcaption className="relative mt-5 flex items-center gap-3">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-extrabold"
+          style={{ background: t.accent, color: inkOn(t.accent), boxShadow: `0 0 0 3px ${dark ? "#0F172A" : "#fff"}, 0 0 0 5px ${t.accent}66` }}
+          aria-hidden="true"
+        >
+          {t.name.charAt(0)}
+        </span>
+        <span className="min-w-0">
+          <span className={`block text-[14px] font-bold ${dark ? "text-white" : "text-[#0F172A]"}`}>{t.name}</span>
+          <span className={`block text-[12px] ${dark ? "text-[#94A3B8]" : "text-[#64748B]"}`}>{t.role}</span>
+        </span>
+      </figcaption>
+    </figure>
   );
 }
 
@@ -1932,7 +1950,7 @@ function TestimonialStories() {
               <span className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${t.accent}26` }}>
                 <Quote size={24} style={{ color: t.accent }} />
               </span>
-              <span className="flex gap-0.5" aria-label="Rated 5 out of 5">
+              <span className="flex gap-0.5" role="img" aria-label="Rated 5 out of 5">
                 {[...Array(5)].map((_, k) => <Star key={k} size={15} className="fill-[#F7B31C] text-[#F7B31C]" />)}
               </span>
             </div>
@@ -1981,10 +1999,16 @@ function TestimonialStories() {
 }
 
 function TestimonialsSection() {
-  const row = [...TESTIMONIALS, ...TESTIMONIALS];
+  // Two rows drifting in opposite directions. Each row is its reviews four
+  // times over: two identical halves, each wider than the screen, so the -50%
+  // loop never shows a gap. Slow enough to read; hovering a row pauses it.
+  const rowA = TESTIMONIALS.filter((_, i) => i % 2 === 0);
+  const rowB = TESTIMONIALS.filter((_, i) => i % 2 === 1);
+  const loop = (xs: typeof TESTIMONIALS) => [...xs, ...xs, ...xs, ...xs];
   return (
-    <section className="py-14 sm:py-20 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="relative py-14 sm:py-20 overflow-hidden bg-gradient-to-b from-white via-[#FFFBEB]/70 to-white">
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-24 h-72 w-[46rem] -translate-x-1/2 rounded-full bg-[#F7B31C]/10 blur-3xl" />
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Testimonials" title="They Say We Did a Great Job" subtitle="Businesses across India have replaced paper cards with DigitalCarda — here's what they think." />
       </div>
 
@@ -1992,11 +2016,17 @@ function TestimonialsSection() {
         <TestimonialStories />
       </div>
 
-      <div className="hidden md:block relative mask-fade-x">
-        <div className="marquee-track gap-5 py-2">
-          {/* The second pass only exists to loop the scroll — hidden from screen readers. */}
-          {row.map((t, i) => (
-            <div key={i} className="contents" aria-hidden={i >= TESTIMONIALS.length || undefined}><TestimonialCard t={t} /></div>
+      <div className="relative hidden md:block mask-fade-x space-y-5">
+        {/* Only the first pass of each row is read out; the copies just loop the scroll.
+            pr-5 matches the gap so the -50% loop point lands exactly on a card. */}
+        <div className="marquee-track gap-5 py-2 pr-5" style={{ animationDuration: "75s" }}>
+          {loop(rowA).map((t, i) => (
+            <TestimonialCard key={i} t={t} dark={i % 2 === 0} copy={i >= rowA.length} />
+          ))}
+        </div>
+        <div className="marquee-track marquee-track--rev gap-5 py-2 pr-5" style={{ animationDuration: "85s" }}>
+          {loop(rowB).map((t, i) => (
+            <TestimonialCard key={i} t={t} dark={i % 2 === 1} copy={i >= rowB.length} />
           ))}
         </div>
       </div>
@@ -2173,14 +2203,16 @@ function FaqSection() {
                   aria-expanded={on}
                   className="w-full flex items-center gap-4 text-left px-5 sm:px-6 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C] rounded-2xl"
                 >
-                  <h3 className="flex-1 text-[14.5px] sm:text-[15px] font-bold text-[#0F172A] leading-snug">{f.q}</h3>
+                  <h3 className="flex-1"><span className="dc-faq-q">{f.q}</span></h3>
                   <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${on ? "bg-[#F7B31C] text-[#0F172A] rotate-90" : "bg-[#F1F5F9] text-[#64748B]"}`}>
                     <ChevronRight size={15} />
                   </span>
                 </button>
                 <div className="grid transition-all duration-300 ease-out" style={{ gridTemplateRows: on ? "1fr" : "0fr" }}>
                   <div className="overflow-hidden">
-                    <p className="px-5 sm:px-6 pb-5 text-[13.5px] text-[#64748B] leading-relaxed">{f.a}</p>
+                    <div className="px-5 sm:px-6 pb-5">
+                      <p className="dc-faq-a">{f.a}</p>
+                    </div>
                   </div>
                 </div>
               </div>

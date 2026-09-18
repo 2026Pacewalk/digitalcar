@@ -311,11 +311,11 @@ export default function ProductDetail() {
           <div className="max-w-3xl space-y-2.5">
             {FAQS.map((f, i) => (
               <div key={i} className="rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium">
-                <button onClick={() => setFaqOpen(faqOpen === i ? null : i)} className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left">
-                  <span className="text-[14.5px] font-semibold text-[#0F172A]">{f.q}</span>
+                <button onClick={() => setFaqOpen(faqOpen === i ? null : i)} aria-expanded={faqOpen === i} className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left">
+                  <span className="min-w-0"><span className="dc-faq-q">{f.q}</span></span>
                   <ChevronDown size={18} className={`text-[#94A3B8] shrink-0 transition-transform ${faqOpen === i ? "rotate-180" : ""}`} />
                 </button>
-                {faqOpen === i && <p className="px-5 pb-4 -mt-1 text-[14px] text-[#64748B] leading-relaxed">{f.a}</p>}
+                {faqOpen === i && <div className="px-5 pb-4 -mt-1"><p className="dc-faq-a">{f.a}</p></div>}
               </div>
             ))}
           </div>

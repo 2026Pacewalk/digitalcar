@@ -246,7 +246,13 @@
      to every route. */
 }
 
-/* Marquee row (duplicate children for seamless loop) */
+/* Marquee row (duplicate children for seamless loop). The keyframes live here:
+   Tailwind only emits its config keyframes when an animate-marquee class is
+   used somewhere, so rows relying on the config never moved. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
 .marquee-track {
   display: flex;
   width: max-content;
@@ -254,6 +260,9 @@
 }
 .marquee-track:hover {
   animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
 }
 
 /* Scrollbar hide utility. `.scrollbar-none` is an alias: components were written
@@ -686,3 +695,46 @@ button.fab:active {
   .dc-feat-swap-in { animation: none; opacity: 1; }
   .dc-feat-swap-out { opacity: 0; }
 }
+
+/* ===== FAQ typography (site-wide) =====
+   Every FAQ on the site uses these two classes. Questions are set in the body
+   face at medium weight (calmer than the display bold), and a gold underline
+   draws in under the text on hover and stays while the answer is open, when
+   the question turns warm amber. Answers hang off a soft gold rule.
+   .dc-faq-q goes on an inline <span> around the question text (so the
+   underline follows the words across lines); --light variants are for FAQs on
+   dark backgrounds. */
+.dc-faq-q {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  color: #0F172A;
+  text-wrap: pretty;
+  background-image: linear-gradient(90deg, #F7B31C, #FBBF24);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding-bottom: 1px;
+  transition: background-size 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), color 0.2s ease;
+}
+@media (min-width: 640px) { .dc-faq-q { font-size: 17px; } }
+:is(summary, button):hover .dc-faq-q,
+:is(summary, button):focus-visible .dc-faq-q { background-size: 100% 2px; }
+details[open] > summary .dc-faq-q,
+[aria-expanded="true"] .dc-faq-q { color: #92400E; background-size: 100% 2px; }
+.dc-faq-q--light { color: #F1F5F9; }
+details[open] > summary .dc-faq-q--light,
+[aria-expanded="true"] .dc-faq-q--light { color: #FCD34D; }
+.dc-faq-a {
+  font-size: 15px;
+  line-height: 1.75;
+  color: #475569;
+  border-left: 2px solid #FDE68A;
+  padding-left: 14px;
+}
+.dc-faq-a--light { color: #94A3B8; border-left-color: rgba(247, 179, 28, 0.35); }
+@media (prefers-reduced-motion: reduce) { .dc-faq-q { transition: none; } }

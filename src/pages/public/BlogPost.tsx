@@ -310,11 +310,13 @@ export default function BlogPost() {
                 <div className="mt-6 divide-y divide-[#EEE9DD] overflow-hidden rounded-2xl bg-white ring-1 ring-[#EEE9DD]">
                   {post.faqs.map((f, i) => (
                     <details key={i} className="group" open={i === 0}>
-                      <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-5 py-4 font-display text-[16px] font-bold leading-snug text-[#0F172A] sm:px-6">
-                        {f.q}
+                      <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-5 py-4 sm:px-6">
+                        <span className="min-w-0"><span className="dc-faq-q">{f.q}</span></span>
                         <ChevronDown size={18} className="mt-0.5 shrink-0 text-[#A8A29E] transition-transform group-open:rotate-180" aria-hidden="true" />
                       </summary>
-                      <p className="px-5 pb-5 text-[16px] leading-relaxed text-[#57534E] sm:px-6"><RichText text={f.a} /></p>
+                      <div className="px-5 pb-5 sm:px-6">
+                        <p className="dc-faq-a"><RichText text={f.a} /></p>
+                      </div>
                     </details>
                   ))}
                 </div>

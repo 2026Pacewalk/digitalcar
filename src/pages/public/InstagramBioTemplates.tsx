@@ -272,8 +272,8 @@ export default function InstagramBioTemplates() {
           <div className="mt-6 space-y-3">
             {FAQ.map((q) => (
               <details key={q.q} className="group rounded-2xl border border-[#F1F5F9] bg-white px-5 py-4 open:shadow-premium">
-                <summary className="cursor-pointer list-none text-[14px] font-semibold text-[#0F172A] marker:hidden">{q.q}</summary>
-                <p className="mt-2 text-[13px] leading-relaxed text-[#64748B]">{q.a}</p>
+                <summary className="cursor-pointer list-none marker:hidden"><span className="dc-faq-q">{q.q}</span></summary>
+                <p className="dc-faq-a mt-2">{q.a}</p>
               </details>
             ))}
           </div>

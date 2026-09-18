@@ -363,14 +363,16 @@ export default function CustomDomain() {
                     aria-expanded={on}
                     className="w-full flex items-center gap-4 text-left px-5 sm:px-6 py-4 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]"
                   >
-                    <h3 className="flex-1 text-[14.5px] font-bold text-[#0F172A] leading-snug">{f.q}</h3>
+                    <h3 className="flex-1"><span className="dc-faq-q">{f.q}</span></h3>
                     <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${on ? "bg-[#F7B31C] text-[#0F172A] rotate-90" : "bg-[#F1F5F9] text-[#64748B]"}`}>
                       <ChevronRight size={15} />
                     </span>
                   </button>
                   <div className="grid transition-all duration-300 ease-out" style={{ gridTemplateRows: on ? "1fr" : "0fr" }}>
                     <div className="overflow-hidden">
-                      <p className="px-5 sm:px-6 pb-5 text-[13.5px] text-[#64748B] leading-relaxed">{f.a}</p>
+                      <div className="px-5 sm:px-6 pb-5">
+                        <p className="dc-faq-a">{f.a}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
