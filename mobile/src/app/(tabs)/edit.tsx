@@ -2,13 +2,13 @@ import { useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { Camera, ChevronRight, Eye, ImagePlus, Images, LayoutList, Palette, Share2, ShoppingBag, Trash2, Wallet } from "lucide-react-native";
+import { Camera, ChevronRight, Eye, ImagePlus, Images, LayoutList, Palette, Share2, ShoppingBag, Sparkles, Trash2, Wallet } from "lucide-react-native";
 import { AppText, Avatar, Banner, Button, Card, Field, Loading, Row, Screen, SectionTitle } from "~/components/ui";
 import { SaveBadge } from "~/components/SaveBadge";
+import { NoCardYet } from "~/components/NoCardYet";
 import { imageOf } from "~/lib/card";
 import { setFields, useCardUpdate } from "~/lib/cardStore";
 import { useCardFields } from "~/lib/useCardFields";
-import { useOpenDashboard } from "~/lib/web";
 import { pickCardImage, type ImageKind, type PickSource } from "~/lib/images";
 import * as haptics from "~/lib/haptics";
 import { radius, space, useTheme } from "~/theme";
@@ -22,7 +22,6 @@ export default function EditScreen() {
   const { c } = useTheme();
   const { snapshot, draft, set: change, flush, state, error } = useCardFields(FIELDS, 1500);
   const update = useCardUpdate();
-  const openDashboard = useOpenDashboard();
   const [imageBusy, setImageBusy] = useState<ImageKind | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -62,10 +61,7 @@ export default function EditScreen() {
     return (
       <Screen edgesTop>
         <AppText variant="title">Edit card</AppText>
-        <Card style={{ gap: space.md }}>
-          <AppText tone="muted">Your card isn't published yet. Create it on the website first — then edit it here any time.</AppText>
-          <Button title="Create my card" onPress={() => void openDashboard("/dashboard/build")} />
-        </Card>
+        <NoCardYet />
       </Screen>
     );
   }
@@ -143,11 +139,17 @@ export default function EditScreen() {
         <SectionTitle>About</SectionTitle>
         <Card>
           <Field label="About your business" value={draft.about_us} onChangeText={(t) => change("about_us", t)} multiline placeholder="Two or three lines on what you do and why customers choose you." />
+          <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push({ pathname: "/card/ai", params: { mode: "details" } })}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: space.sm }}>
+            <Sparkles color={c.accentText} size={16} />
+            <AppText variant="label" tone="accent">Write it with AI</AppText>
+          </Pressable>
         </Card>
 
         <SectionTitle>More on your card</SectionTitle>
         <Card padded={false}>
-          <Row first icon={<ShoppingBag color={c.accentText} size={18} />} title="Services & offers" subtitle="What you sell, with photos and prices" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/services")} />
+          <Row first icon={<Sparkles color={c.accentText} size={18} />} title="Write with AI" subtitle="From your website or a few details" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/ai")} />
+          <Row icon={<ShoppingBag color={c.accentText} size={18} />} title="Services & offers" subtitle="What you sell, with photos and prices" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/services")} />
           <Row icon={<Images color={c.accentText} size={18} />} title="Photos & videos" subtitle="Your work, shop and video links" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/media")} />
           <Row icon={<Wallet color={c.accentText} size={18} />} title="Payments" subtitle="UPI, bank details and payment QR" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/payments")} />
           <Row icon={<Share2 color={c.accentText} size={18} />} title="Social links & reviews" subtitle="Instagram, Facebook, Google reviews…" right={<ChevronRight color={c.muted} size={18} />} onPress={() => router.push("/card/social")} />

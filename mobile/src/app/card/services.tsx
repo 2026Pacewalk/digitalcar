@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
-import { ChevronRight, ImageOff, Plus, ShoppingBag, Tag } from "lucide-react-native";
+import { ChevronRight, ImageOff, Plus, ShoppingBag, Sparkles, Tag } from "lucide-react-native";
 import { AppText, Banner, Button, Card, Chip, EmptyState, Loading, Screen, Segmented, SwitchRow } from "~/components/ui";
 import { imageOf, useSnapshot } from "~/lib/card";
 import { planLimit, sectionOn, setFields, useCardUpdate } from "~/lib/cardStore";
@@ -93,7 +93,12 @@ export default function ServicesScreen() {
             body={isOffers
               ? "Promote a deal with its offer price and the date it runs until."
               : "List what you sell with a photo and price. Visitors enquire about what they can see."}
-            action={<Button title={isOffers ? "Add an offer" : "Add a service"} icon={<Plus color={c.accentInk} size={18} />} onPress={add} />}
+            action={
+              <View style={{ gap: space.sm, alignSelf: "stretch" }}>
+                <Button title={isOffers ? "Add an offer" : "Add a service"} icon={<Plus color={c.accentInk} size={18} />} onPress={add} />
+                {!isOffers ? <Button kind="secondary" title="Suggest services with AI" icon={<Sparkles color={c.ink} size={18} />} onPress={() => router.push("/card/ai")} /> : null}
+              </View>
+            }
           />
         </Card>
       ) : (

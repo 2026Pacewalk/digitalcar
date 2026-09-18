@@ -12,7 +12,7 @@ import { markWelcomePending } from "~/lib/welcome";
 import { passwordProblem } from "~/lib/password";
 import { PasswordChecklist } from "~/components/PasswordChecklist";
 import * as haptics from "~/lib/haptics";
-import { fonts, radius, space, useTheme } from "~/theme";
+import { fonts, space, useTheme } from "~/theme";
 
 /* Create an account without leaving the app. Same rules and the same server
    call as the website's signup: a starter card goes live straight away on the

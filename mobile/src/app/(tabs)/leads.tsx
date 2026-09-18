@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Inbox, Search } from "lucide-react-native";
+import { Download, Inbox, Search } from "lucide-react-native";
 import { AppText, Chip, EmptyState, Loading } from "~/components/ui";
 import { stageLabel, stageTone } from "~/lib/leads";
 import { timeAgo } from "~/lib/format";
-import { trpc } from "~/lib/trpc";
+import { errorMessage, trpc } from "~/lib/trpc";
+import { shareLeadsCsv } from "~/lib/leadExport";
 import * as haptics from "~/lib/haptics";
 import { fonts, radius, space, useTheme } from "~/theme";
 
@@ -26,10 +27,29 @@ export default function LeadsScreen() {
   const [search, setSearch] = useState("");
   useEffect(() => { const t = setTimeout(() => setSearch(query.trim()), 300); return () => clearTimeout(t); }, [query]);
 
+  const utils = trpc.useUtils();
+  const [exporting, setExporting] = useState(false);
+  const [exportNote, setExportNote] = useState<string | null>(null);
   const stats = trpc.lead.stats.useQuery();
   const list = trpc.lead.list.useQuery({ status: filter, search: search || undefined, limit: 100 });
   const [refreshing, setRefreshing] = useState(false);
   const refresh = async () => { setRefreshing(true); try { await Promise.all([list.refetch(), stats.refetch()]); } finally { setRefreshing(false); } };
+
+  // The enquiries on screen (this filter and search), as a spreadsheet.
+  const exportLeads = async () => {
+    setExporting(true);
+    setExportNote(null);
+    try {
+      const all = await utils.lead.list.fetch({ status: filter, search: search || undefined, limit: 1000 });
+      if (!all.leads.length) { setExportNote("No enquiries to export here."); return; }
+      const r = await shareLeadsCsv(all.leads);
+      if (!r.ok) setExportNote(r.message); else haptics.success();
+    } catch (e) {
+      setExportNote(errorMessage(e, "Couldn't export. Try again."));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const counts: Record<string, number | undefined> = { all: stats.data?.total, new: stats.data?.new, follow_up: stats.data?.followUp, converted: stats.data?.converted };
 
@@ -38,8 +58,14 @@ export default function LeadsScreen() {
       <View style={{ paddingHorizontal: space.lg, paddingTop: space.md, gap: space.md }}>
         <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
           <AppText variant="title">Leads</AppText>
-          {stats.data?.followUpsDue ? <AppText variant="label" tone="accent">{stats.data.followUpsDue} follow-up{stats.data.followUpsDue === 1 ? "" : "s"} due</AppText> : null}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: space.lg }}>
+            {stats.data?.followUpsDue ? <AppText variant="label" tone="accent">{stats.data.followUpsDue} follow-up{stats.data.followUpsDue === 1 ? "" : "s"} due</AppText> : null}
+            <Pressable accessibilityRole="button" accessibilityLabel="Export these enquiries as a spreadsheet" hitSlop={10} disabled={exporting} onPress={() => void exportLeads()}>
+              {exporting ? <ActivityIndicator size="small" color={c.muted} /> : <Download color={c.ink} size={20} />}
+            </Pressable>
+          </View>
         </View>
+        {exportNote ? <AppText variant="caption" tone="bad">{exportNote}</AppText> : null}
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, backgroundColor: c.surface, borderRadius: radius.md, borderWidth: 1, borderColor: c.rule, paddingHorizontal: space.md, height: 46 }}>
           <Search color={c.muted} size={18} />
           <TextInput

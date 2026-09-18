@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Linking, View } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { CalendarClock, Mail, MessageCircle, Phone } from "lucide-react-native";
+import { CalendarClock, Mail, MessageCircle, Phone, UserPlus } from "lucide-react-native";
 import { AppText, Button, Card, Chip, EmptyState, Field, Loading, Screen, SectionTitle } from "~/components/ui";
 import { SOURCE_LABELS, STAGES, stageLabel, stageTone, type Stage } from "~/lib/leads";
 import { dateLabel, firstName, telLink, timeAgo, whatsappLink } from "~/lib/format";
 import { useAuth } from "~/lib/auth";
 import { cancelFollowUp, scheduleFollowUp } from "~/lib/push";
+import { saveLeadToContacts } from "~/lib/leadExport";
 import { errorMessage, trpc } from "~/lib/trpc";
 import * as haptics from "~/lib/haptics";
 import { space, useTheme } from "~/theme";
@@ -85,6 +86,14 @@ export default function LeadDetail() {
         {l.email ? (
           <Button kind="secondary" title={`Email ${l.email}`} icon={<Mail color={c.ink} size={19} />}
             onPress={() => reply(`mailto:${l.email}?subject=${encodeURIComponent("Re: your enquiry")}&body=${encodeURIComponent(greeting)}`)} />
+        ) : null}
+        {l.phone || l.email ? (
+          <Button kind="ghost" title="Save to contacts" icon={<UserPlus color={c.accentText} size={19} />}
+            onPress={async () => {
+              const r = await saveLeadToContacts(l);
+              if (!r.ok) setError(r.message);
+              else if (r.saved) haptics.success();
+            }} />
         ) : null}
       </View>
 

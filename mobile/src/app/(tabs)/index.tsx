@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
 import { Bell, ChevronRight, Copy, Eye, PenLine, QrCode, Share2, Sparkles } from "lucide-react-native";
-import { ActionTile, AppText, Avatar, Banner, Button, Card, Chip, EmptyState, Loading, Row, Screen, SectionTitle } from "~/components/ui";
+import { ActionTile, AppText, Avatar, Banner, Button, Card, Chip, Loading, Row, Screen, SectionTitle } from "~/components/ui";
 import { completeness, imageOf, useRefreshCard, useSnapshot } from "~/lib/card";
 import { cardUrl } from "~/lib/config";
 import { compact, dateLabel, displayUrl, firstName, timeAgo } from "~/lib/format";
@@ -14,8 +14,8 @@ import { shareCard } from "~/lib/share";
 import { totalActions } from "~/lib/insights";
 import * as haptics from "~/lib/haptics";
 import { AlertsPrompt } from "~/components/AlertsPrompt";
+import { NoCardYet } from "~/components/NoCardYet";
 import { takeWelcomePending } from "~/lib/welcome";
-import { useOpenDashboard } from "~/lib/web";
 import { radius, space, useTheme } from "~/theme";
 
 export default function HomeScreen() {
@@ -23,7 +23,6 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const refresh = useRefreshCard();
-  const openDashboard = useOpenDashboard();
 
   const snapshot = useSnapshot();
   const mine = trpc.publish.mine.useQuery();
@@ -74,14 +73,7 @@ export default function HomeScreen() {
       </View>
 
       {!slug ? (
-        <Card>
-          <EmptyState
-            icon={<Sparkles color={c.accentText} size={32} />}
-            title="Let's publish your card"
-            body="Your account doesn't have a published card yet. Create it on the website in about five minutes — it appears here as soon as it's live."
-            action={<Button title="Create my card" onPress={() => void openDashboard("/dashboard/build")} />}
-          />
-        </Card>
+        <NoCardYet />
       ) : (
         <>
           {/* Card at a glance */}

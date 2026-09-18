@@ -100,6 +100,7 @@ function RootNavigator({ ready }: { ready: boolean }) {
           <Stack.Screen name="card/sections" options={{ title: "Sections on your card" }} />
           <Stack.Screen name="preview" options={{ title: "Preview" }} />
           <Stack.Screen name="card/link" options={{ title: "Card link" }} />
+          <Stack.Screen name="card/ai" options={{ title: "Write with AI" }} />
           <Stack.Screen name="account" options={{ title: "Account & password" }} />
           <Stack.Screen name="plan" options={{ title: "Your plan" }} />
           <Stack.Screen name="welcome" options={{ headerShown: false, gestureEnabled: false }} />

@@ -3,7 +3,7 @@
     "name": "DigitalCarda",
     "slug": "digitalcarda",
     "scheme": "digitalcarda",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -58,6 +58,13 @@
           "photosPermission": "DigitalCarda uses your photos so you can add your picture and logo to your card.",
           "cameraPermission": "DigitalCarda uses the camera so you can take a photo for your card.",
           "microphonePermission": false
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "DigitalCarda adds people who enquire to your contacts when you choose to."
         }
       ]
     ],

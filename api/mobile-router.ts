@@ -12,6 +12,8 @@
  *  · Config — the minimum supported app version.
  *
  * All additive: nothing the website uses changes behaviour. */
+import fs from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "crypto";
@@ -19,7 +21,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { accountDeletionRequests, appSessions, appSettings, appWebLinks, pushTokens, users } from "@db/schema";
+import { accountDeletionRequests, appSessions, appSettings, appWebLinks, publishedCards, pushTokens, users } from "@db/schema";
 import { createToken, verifyToken } from "./lib/jwt";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { isExpoPushToken } from "./lib/push";
@@ -34,6 +36,21 @@ const WEB_LINK_TTL_MS = 2 * 60_000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
 /** Dashboard pages the app may open signed in: /dashboard/<words>, optional simple query. */
 const SAFE_WEB_PATH = /^\/dashboard(\/[a-z0-9-]+)*\/?(\?[A-Za-z0-9=&_.%-]{0,120})?$/;
+
+/* The older card system's records (customers.json), cached for a minute. */
+type LegacyRow = { id?: unknown; slug?: string; email?: string; name?: string };
+let legacyRows: LegacyRow[] = [];
+let legacyRowsAt = 0;
+function legacyCustomers(): LegacyRow[] {
+  if (Date.now() - legacyRowsAt < 60_000) return legacyRows;
+  for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
+    try {
+      const rows = JSON.parse(fs.readFileSync(path.resolve(p), "utf-8"));
+      if (Array.isArray(rows)) { legacyRows = rows as LegacyRow[]; legacyRowsAt = Date.now(); return legacyRows; }
+    } catch { /* try the next path */ }
+  }
+  return legacyRows;
+}
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 const newRefreshToken = () => randomBytes(32).toString("base64url");
@@ -304,6 +321,26 @@ export const mobileRouter = createRouter({
         user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role, status: user.status, avatar: user.avatar },
       };
     }),
+
+  /** A card this account still has only on the older system (customers.json).
+      The app works on published cards; opening the website dashboard once moves
+      an older card across (its auto-publish), so the app offers that. Null when
+      the account already has a published card, or has no older card. */
+  legacyCard: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const published = await db.select({ id: publishedCards.id }).from(publishedCards).where(eq(publishedCards.userId, ctx.user.id)).limit(1);
+    if (published[0]) return null;
+    const email = ctx.user.email.toLowerCase().trim();
+    const rows = legacyCustomers().filter((r) => String(r.email || "").toLowerCase().trim() === email && String(r.slug || "").trim());
+    if (!rows.length) return null;
+    // Cards an admin removed stay removed.
+    const setting = await db.select({ value: appSettings.value }).from(appSettings).where(eq(appSettings.key, "hidden_customers")).limit(1);
+    let hidden = new Set<string>();
+    try { hidden = new Set((JSON.parse(setting[0]?.value || "[]") as unknown[]).map(String)); } catch { /* none */ }
+    const row = rows.find((r) => !hidden.has(String(r.id)));
+    if (!row) return null;
+    return { slug: String(row.slug).toLowerCase().trim(), name: String(row.name || "").trim() || null };
+  }),
 
   /** Lets the app ask for an update when an old build can no longer work. */
   config: publicQuery.query(async () => {

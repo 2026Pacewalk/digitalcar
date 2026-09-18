@@ -22,6 +22,12 @@ The content editors follow the website's rules exactly (`src/lib/cardContent.ts`
 
 **Website pages open signed in.** Paying for a plan, NFC orders, the email signature and the full dashboard open on digitalcarda.in through a one-time link (`mobile.webLink` → `/auth/app-link`): the code works once, for two minutes, and the page is fixed by the server. The plan page opens on the plan and term picked in the app (`?cycle=&plan=`).
 
+**Write with AI.** From the owner's website (`ai.fromWebsite`) or a few details (`ai.generate`): what you do, About, services, Google listing text, and — from a website — contact details and social profiles. Each suggestion has a tick box; empty parts of the card start ticked, anything that would replace existing text starts unticked. Nothing is saved until "Add to my card".
+
+**Leads out of the app.** Save an enquiry to the phone's contacts (the phone's own new-contact form, prefilled) and export the list on screen as a CSV through the share sheet. Cells can't run as formulas; phone numbers keep their +.
+
+**Cards on the older system.** Many older accounts still have their card only in customers.json. `mobile.legacyCard` recognises them; the app opens the website dashboard once (signed in), whose auto-publish moves the card into the current format, and checks again when the owner comes back.
+
 Sign-in uses email (or card address / mobile) and password. Account-deletion requests land in the website admin under Account Deletions.
 
 ## Run it on your phone
@@ -65,6 +71,6 @@ npm run typecheck   # includes the server's API types — a wrong input or a rem
 ## Next up (from the PRD)
 
 - Server: photo uploads to file storage (photos live inside the card today), Sign in with Apple and Google.
-- App: NFC tag writing, in-app plan purchase (store rules — see the PRD), AI writing help, notification settings, several cards per account.
+- App: NFC tag writing, in-app plan purchase (store rules — see the PRD), notification settings, several cards per account, paper-card scanner (needs a development build).
 - Push: needs an EAS project id (`npx eas init` with the company Expo account) and a development or store build — Expo Go can't receive remote push.
 - Store: EAS builds, bundle id `in.digitalcarda.app`, Apple Developer and Google Play organisation accounts.
