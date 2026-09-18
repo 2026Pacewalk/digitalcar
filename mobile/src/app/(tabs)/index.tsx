@@ -6,7 +6,7 @@ import * as WebBrowser from "expo-web-browser";
 import { Bell, ChevronRight, Copy, Eye, PenLine, QrCode, Share2, Sparkles } from "lucide-react-native";
 import { ActionTile, AppText, Avatar, Banner, Button, Card, Chip, Loading, Row, Screen, SectionTitle } from "~/components/ui";
 import { completeness, imageOf, useRefreshCard, useSnapshot } from "~/lib/card";
-import { cardUrl } from "~/lib/config";
+import { cardUrl, PURCHASE_LINKS } from "~/lib/config";
 import { compact, dateLabel, displayUrl, firstName, timeAgo } from "~/lib/format";
 import { trpc } from "~/lib/trpc";
 import { useAuth } from "~/lib/auth";
@@ -103,7 +103,7 @@ export default function HomeScreen() {
 
           {plan.banner ? (
             <Banner tone={plan.banner.tone} title={plan.banner.title} body={plan.banner.body}
-              action={<Button size="md" kind="secondary" style={{ marginTop: 6, alignSelf: "flex-start" }} title="See plans" onPress={() => router.push("/plan")} />} />
+              action={PURCHASE_LINKS ? <Button size="md" kind="secondary" style={{ marginTop: 6, alignSelf: "flex-start" }} title="See plans" onPress={() => router.push("/plan")} /> : undefined} />
           ) : null}
 
           <AlertsPrompt />
@@ -199,11 +199,11 @@ function planStatus(sub: Sub, trial: Trial, loading = false) {
   if (loading) {
     // Say nothing until both answers are in — never flash "paused" at a live card.
   } else if (!live) {
-    banner = { tone: "bad", title: "Your card is paused", body: "Renew your plan to bring it back online. Visitors currently see a paused notice." };
+    banner = { tone: "bad", title: "Your card is paused", body: PURCHASE_LINKS ? "Renew your plan to bring it back online. Visitors currently see a paused notice." : "Visitors currently see a paused notice." };
   } else if (onTrial && daysLeft <= 7) {
-    banner = { tone: "warn", title: `Free trial ends in ${Math.max(daysLeft, 0)} day${daysLeft === 1 ? "" : "s"}`, body: "Choose Gold or Platinum so your card stays live." };
+    banner = { tone: "warn", title: `Free trial ends in ${Math.max(daysLeft, 0)} day${daysLeft === 1 ? "" : "s"}`, body: PURCHASE_LINKS ? "Choose Gold or Platinum so your card stays live." : "Your card stays live until the trial ends." };
   } else if (daysLeft > 0 && daysLeft <= 7) {
-    banner = { tone: "warn", title: `${label} ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`, body: "Renew early so your card never goes offline." };
+    banner = { tone: "warn", title: `${label} ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`, body: PURCHASE_LINKS ? "Renew early so your card never goes offline." : "Your card stays live until then." };
   }
   return { live, label, banner, renewsOn: end && live ? dateLabel(end) : "" };
 }

@@ -26,12 +26,12 @@ import { createToken, verifyToken } from "./lib/jwt";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { isExpoPushToken } from "./lib/push";
 import { forgetSession } from "./context";
+import { requestAccountDeletion } from "./lib/account-deletion";
 
 const DAY = 86_400_000;
 const SESSION_DAYS = 90;
 const ACCESS_TTL = "1h";
 const ACCESS_TTL_MS = 60 * 60 * 1000;
-const DELETION_GRACE_DAYS = 30;
 const WEB_LINK_TTL_MS = 2 * 60_000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
 /** Dashboard pages the app may open signed in: /dashboard/<words>, optional simple query. */
@@ -228,39 +228,7 @@ export const mobileRouter = createRouter({
       if (!(await bcrypt.compare(input.password, ctx.user.password))) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "That password isn't right. Enter the password you sign in with." });
       }
-      const db = getDb();
-      const now = new Date();
-      const scheduledFor = new Date(now.getTime() + DELETION_GRACE_DAYS * DAY);
-
-      const pending = await db.select({ id: accountDeletionRequests.id }).from(accountDeletionRequests)
-        .where(and(eq(accountDeletionRequests.userId, ctx.user.id), eq(accountDeletionRequests.status, "pending"))).limit(1);
-      if (!pending[0]) {
-        await db.insert(accountDeletionRequests).values({
-          userId: ctx.user.id, email: ctx.user.email, reason: input.reason || null, source: "app", scheduledFor,
-        });
-      }
-
-      await db.update(users).set({ status: "inactive" }).where(eq(users.id, ctx.user.id));
-      const live = await db.select({ id: appSessions.id }).from(appSessions)
-        .where(and(eq(appSessions.userId, ctx.user.id), isNull(appSessions.revokedAt)));
-      for (const s of live) await revokeSessionRow(db, s.id);
-      await db.update(pushTokens).set({ disabledAt: now }).where(and(eq(pushTokens.userId, ctx.user.id), isNull(pushTokens.disabledAt)));
-
-      // Tell the team so the erasure is completed on time.
-      try {
-        const { sendEmail, ownerAddress } = await import("./lib/mail");
-        const when = scheduledFor.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-        const reason = input.reason ? `\nReason given: ${input.reason}` : "";
-        await sendEmail(ownerAddress(), {
-          kind: "accountDeletionRequestAdmin",
-          subject: `Account deletion requested — ${ctx.user.email}`,
-          text: `${ctx.user.fullName} (${ctx.user.email}, user #${ctx.user.id}) asked to delete their account from the mobile app.\n\nThe account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after ${when}, or cancel it if they change their mind: https://digitalcarda.in/admin/deletion-requests${reason}`,
-          html: `<p><b>${escapeHtml(ctx.user.fullName)}</b> (${escapeHtml(ctx.user.email)}, user #${ctx.user.id}) asked to delete their account from the mobile app.</p><p>The account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after <b>${when}</b>, or cancel it if they change their mind, in <a href="https://digitalcarda.in/admin/deletion-requests">Admin → Account Deletions</a>.</p>${input.reason ? `<p>Reason given: ${escapeHtml(input.reason)}</p>` : ""}`,
-        });
-      } catch (e) {
-        console.error("[mobile] deletion notice email failed:", (e as Error).message);
-      }
-
+      const { scheduledFor } = await requestAccountDeletion(getDb(), ctx.user, { reason: input.reason, source: "app" });
       return { ok: true as const, scheduledFor };
     }),
 
@@ -351,7 +319,3 @@ export const mobileRouter = createRouter({
     return { minVersion: get("app_min_version") ?? "0.0.0", latestVersion: get("app_latest_version") };
   }),
 });
-
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
-}

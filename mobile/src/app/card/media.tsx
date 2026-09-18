@@ -8,6 +8,7 @@ import { imageOf, useSnapshot } from "~/lib/card";
 import { nextId, planLimit, sectionOn, setFields, useCardUpdate } from "~/lib/cardStore";
 import { asList, parseVideo, type GalleryItem, type VideoItem } from "~/lib/cardContent";
 import { pickCardImages, type PickSource } from "~/lib/images";
+import { limitReached } from "~/lib/config";
 import * as haptics from "~/lib/haptics";
 import { radius, space, useTheme } from "~/theme";
 
@@ -53,7 +54,7 @@ export default function MediaScreen() {
 
   const addPhotos = (source: PickSource) => {
     const room = gLimit - gallery.length;
-    if (room <= 0) { setError(`You've used all ${gLimit} photos on your plan. Remove one or upgrade to add more.`); return; }
+    if (room <= 0) { setError(limitReached(gLimit, "photos")); return; }
     void (async () => {
       setBusy(true);
       try {
@@ -90,7 +91,7 @@ export default function MediaScreen() {
 
   const info = parseVideo(videoUrl);
   const addVideo = async () => {
-    if (videos.length >= vLimit) { setError(`You've used all ${vLimit} videos on your plan. Remove one or upgrade to add more.`); return; }
+    if (videos.length >= vLimit) { setError(limitReached(vLimit, "videos")); return; }
     if (!info) { setError("Paste a video link — YouTube, YouTube Shorts or Instagram."); return; }
     setBusy(true);
     const url = videoUrl.trim(), title = videoTitle.trim() || "Video";

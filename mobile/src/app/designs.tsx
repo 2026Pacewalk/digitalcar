@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check, Eye, Lock, Palette } from "lucide-react-native";
 import { AppText, Banner, Button, Chip, EmptyState, Loading } from "~/components/ui";
 import { SNAPSHOT_KEY, useSnapshot } from "~/lib/card";
-import { cardUrl, SITE_URL } from "~/lib/config";
+import { cardUrl, PURCHASE_LINKS, SITE_URL } from "~/lib/config";
 import { errorMessage, trpc } from "~/lib/trpc";
 import { useOpenDashboard } from "~/lib/web";
 import * as haptics from "~/lib/haptics";
@@ -107,6 +107,11 @@ export default function DesignsScreen() {
     setError(null);
     if (locked(d)) {
       const open = () => void openDashboard("/dashboard/subscription");
+      if (!PURCHASE_LINKS) {
+        const note = `${d.name} is an add-on design that isn't part of your plan.`;
+        if (Platform.OS === "web") globalThis.alert?.(note); else Alert.alert("Add-on design", note);
+        return;
+      }
       const body = `${d.name} is an add-on. Add it to your plan on digitalcarda.in to use this design.`;
       if (Platform.OS === "web") { if (globalThis.confirm?.(`${body}\n\nOpen your plan?`)) open(); return; }
       Alert.alert("Add-on design", body, [{ text: "Not now", style: "cancel" }, { text: "See plans", onPress: open }]);

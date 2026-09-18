@@ -11,6 +11,7 @@ import {
   CTA_OPTIONS, DESC_MAX, amount, asList, ctaHint, inr, isoDay, normaliseUrl, percentOff, plainText, type Product,
 } from "~/lib/cardContent";
 import { dateLabel } from "~/lib/format";
+import { PURCHASE_LINKS } from "~/lib/config";
 import * as haptics from "~/lib/haptics";
 import { fonts, radius, space, useTheme } from "~/theme";
 
@@ -119,7 +120,7 @@ export default function ServiceEditor() {
       return { ...d, products: [...list, { ...item, id: nextId(list) }] };
     });
     setSaving(false);
-    if (limitHit) { setError(`You've used all the ${noun}s on your plan. Upgrade to add more.`); return; }
+    if (limitHit) { setError(`You've used all the ${noun}s on your plan.${PURCHASE_LINKS ? " Upgrade to add more." : ""}`); return; }
     if (!r.ok) { setError(r.message); return; }
     haptics.success();
     leaving.current = true;

@@ -30,6 +30,8 @@ The content editors follow the website's rules exactly (`src/lib/cardContent.ts`
 
 Sign-in uses email (or card address / mobile) and password. Account-deletion requests land in the website admin under Account Deletions.
 
+**Store builds.** `eas.json` has three profiles: `development` (a development build, for native work such as NFC), `preview` (internal testing; an APK on Android) and `production` (store). Preview and production set `EXPO_PUBLIC_PURCHASE_LINKS=off`: with no in-app purchase yet, the store rules don't allow the app to send people to pay on the website, so those builds show plan status, usage and payments without prices or upgrade/renew buttons (`PURCHASE_LINKS` in `src/lib/config.ts`). Accounts can be deleted in the app or at digitalcarda.in/account/delete. The listing text, privacy answers, screenshot sizes and submit steps are in [store/STORE.md](store/STORE.md).
+
 ## Run it on your phone
 
 1. Install **Expo Go** from the Play Store or App Store.
@@ -73,4 +75,4 @@ npm run typecheck   # includes the server's API types — a wrong input or a rem
 - Server: photo uploads to file storage (photos live inside the card today), Sign in with Apple and Google.
 - App: NFC tag writing, in-app plan purchase (store rules — see the PRD), notification settings, several cards per account, paper-card scanner (needs a development build).
 - Push: needs an EAS project id (`npx eas init` with the company Expo account) and a development or store build — Expo Go can't receive remote push.
-- Store: EAS builds, bundle id `in.digitalcarda.app`, Apple Developer and Google Play organisation accounts.
+- Store: the company Expo, Apple Developer and Google Play accounts, then the steps in [store/STORE.md](store/STORE.md) (bundle id `in.digitalcarda.app`).

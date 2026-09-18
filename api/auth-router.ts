@@ -662,6 +662,25 @@ export const authRouter = createRouter({
     return { success: true };
   }),
 
+  /* Delete the account from the website (/account/delete) — for people
+     without the app, as Google Play requires. Same rules as the app's
+     More → Delete account: password confirmed, switched off at once, erased
+     after the grace period (api/lib/account-deletion.ts). */
+  requestAccountDeletion: authedQuery
+    .input(z.object({ password: z.string().min(1).max(200), reason: z.string().trim().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`web-delete:${ctx.user.id}`, 5, 15 * 60_000);
+      if (ctx.user.role !== "customer") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Reseller and admin accounts are closed by our team — please contact support." });
+      }
+      if (!(await bcrypt.compare(input.password, ctx.user.password))) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "That password isn't right. Enter the password you sign in with." });
+      }
+      const { requestAccountDeletion } = await import("./lib/account-deletion");
+      const { scheduledFor } = await requestAccountDeletion(getDb(), ctx.user, { reason: input.reason, source: "web" });
+      return { ok: true as const, scheduledFor };
+    }),
+
   changePassword: authedQuery
     .input(
       z.object({

@@ -1,4 +1,4 @@
-import { Ban, Baby, Clock3, Cookie, CreditCard, Database, Eye, Info, Lock, Mail, PenLine, Share2, ShieldCheck, Target, UserCheck, Users } from "lucide-react";
+import { Ban, Baby, Clock3, Cookie, CreditCard, Database, Eye, Info, Lock, Mail, PenLine, Share2, ShieldCheck, Smartphone, Target, UserCheck, Users } from "lucide-react";
 import LegalLayout, { LegalLink } from "@/components/legal/LegalLayout";
 import type { LegalHighlight, LegalSection } from "@/components/legal/LegalLayout";
 import { CONTACT } from "@/lib/publicNav";
@@ -36,7 +36,7 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>DigitalCarda (&ldquo;DigitalCarda&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) lets businesses and professionals in India create, share and manage digital business cards. This policy explains what personal data we collect, why we collect it, who we share it with and the choices you have.</p>
-        <p className="mt-3">It applies to our website, your dashboard, the public cards we host and our emails. We handle personal data in line with India&apos;s Digital Personal Data Protection Act, 2023 and the Information Technology Act, 2000.</p>
+        <p className="mt-3">It applies to our website, your dashboard, the DigitalCarda app for iPhone and Android, the public cards we host and our emails. We handle personal data in line with India&apos;s Digital Personal Data Protection Act, 2023 and the Information Technology Act, 2000.</p>
       </>
     ),
   },
@@ -51,6 +51,22 @@ const SECTIONS: LegalSection[] = [
         <Item label="Enquiries (leads)">the name, phone, email and message a visitor submits through the enquiry form on a card.</Item>
         <Item label="Support and communication">messages you send us by email, WhatsApp or phone, and whether our emails were delivered.</Item>
       </ul>
+    ),
+  },
+  {
+    id: "mobile-app", title: "The DigitalCarda app", icon: Smartphone,
+    body: (
+      <>
+        <p>The app works on the same account and card as the website. On your phone it also uses:</p>
+        <ul className="mt-3 space-y-2">
+          <Item label="Signed-in phones">the phone&apos;s name, type and app version, so you can see where you&apos;re signed in and sign a phone out (More → Signed-in devices). The app keeps its sign-in in your phone&apos;s secure storage.</Item>
+          <Item label="Notifications">if you allow them, a notification address for your phone, so we can tell you the moment someone enquires. Notifications are delivered through Expo&apos;s push service, Apple Push Notification service and Google&apos;s Firebase Cloud Messaging. Follow-up reminders you set are scheduled on your phone itself.</Item>
+          <Item label="Photos and camera">only a photo you choose or take for your card. It&apos;s resized on your phone and saved to your card; the app doesn&apos;t look through your photo library.</Item>
+          <Item label="Contacts">when you tap &ldquo;Save to contacts&rdquo; on an enquiry, the app opens your phone&apos;s own new-contact screen with the details filled in. The app doesn&apos;t read your contacts.</Item>
+          <Item label="Exports">a spreadsheet of your enquiries is created on your phone and goes only where you choose to share it.</Item>
+        </ul>
+        <p className="mt-3">The app has no advertising or tracking tools and doesn&apos;t track your location.</p>
+      </>
     ),
   },
   {
@@ -120,7 +136,7 @@ const SECTIONS: LegalSection[] = [
   },
   {
     id: "retention", title: "How long we keep it", icon: Clock3,
-    body: <p>We keep your account and card data while your account is active. If your plan or trial ends, your data is kept for a period so you can renew without starting over. If you ask us to delete your account, we delete or anonymise your personal data within a reasonable time — except records we must keep by law, such as payment and tax records.</p>,
+    body: <p>We keep your account and card data while your account is active. If your plan or trial ends, your data is kept for a period so you can renew without starting over. If you delete your account — in the app under More → Delete account, or at <LegalLink to="/account/delete">digitalcarda.in/account/delete</LegalLink> — it is switched off and your card is paused straight away. After 30 days, so you can change your mind, we erase your cards, enquiries and personal details. We keep only records we must keep by law, such as payment and tax records, without your name or contact details attached.</p>,
   },
   {
     id: "your-rights", title: "Your rights and choices", icon: UserCheck,
@@ -131,11 +147,11 @@ const SECTIONS: LegalSection[] = [
           "See and update most of your details in your dashboard",
           "Ask for a copy of the personal data we hold about you",
           "Ask us to correct anything inaccurate",
-          "Ask us to delete your account and data",
+          "Delete your account — in the app (More → Delete account) or on our website",
           "Withdraw consent and unsubscribe from marketing emails",
           "Nominate someone to exercise these rights on your behalf",
         ]} />
-        <p className="mt-3">Email {mail} from your account email address. We may need to confirm it&apos;s you before acting, and we&apos;ll respond as soon as we can.</p>
+        <p className="mt-3">To delete your account yourself, use <LegalLink to="/account/delete">digitalcarda.in/account/delete</LegalLink>. For anything else, email {mail} from your account email address. We may need to confirm it&apos;s you before acting, and we&apos;ll respond as soon as we can.</p>
       </>
     ),
   },
@@ -176,8 +192,8 @@ export default function Privacy() {
   return (
     <LegalLayout
       current="privacy"
-      updated="September 16, 2026"
-      readMinutes={7}
+      updated="September 18, 2026"
+      readMinutes={8}
       intro="What we collect, why we collect it and the control you have — written in plain English, for card owners and the people who visit their cards."
       highlights={HIGHLIGHTS}
       sections={SECTIONS}

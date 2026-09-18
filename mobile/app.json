@@ -3,7 +3,7 @@
     "name": "DigitalCarda",
     "slug": "digitalcarda",
     "scheme": "digitalcarda",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -23,7 +23,13 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WRITE_SETTINGS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -32,7 +38,12 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-font",
       "expo-web-browser",
       "expo-image",
@@ -55,7 +66,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "DigitalCarda uses your photos so you can add your picture and logo to your card.",
+          "photosPermission": "DigitalCarda uses your photos so you can add them to your card — your picture, logo, services and gallery.",
           "cameraPermission": "DigitalCarda uses the camera so you can take a photo for your card.",
           "microphonePermission": false
         }

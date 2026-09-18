@@ -8,6 +8,7 @@ import { imageOf, useSnapshot } from "~/lib/card";
 import { planLimit, sectionOn, setFields, useCardUpdate } from "~/lib/cardStore";
 import { amount, asList, inr, offerEnded, percentOff, type Product } from "~/lib/cardContent";
 import { dateLabel } from "~/lib/format";
+import { limitReached } from "~/lib/config";
 import { radius, space, useTheme } from "~/theme";
 
 /* Services / products and offers — one list on the card, offers flagged, as on
@@ -49,7 +50,7 @@ export default function ServicesScreen() {
   };
 
   const add = () => {
-    if (full) { setError(`You've used all ${limit} ${isOffers ? "offers" : "services"} on your plan. Upgrade to add more.`); return; }
+    if (full) { setError(limitReached(limit, isOffers ? "offers" : "services")); return; }
     router.push({ pathname: "/card/service/[id]", params: { id: "new", offer: isOffers ? "1" : "0" } });
   };
 

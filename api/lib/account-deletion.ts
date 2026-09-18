@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray, like, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, or } from "drizzle-orm";
 import {
   accountDeletionRequests, analyticsEvents, appSessions, appSettings, cardBlocks, cardEvents, cards, cardTrials,
   companies, companyMembers, customDomains, emailLogs, leads, mediaLibrary, notifications, publishedCards,
@@ -26,6 +26,62 @@ import { forgetSession } from "../context";
 type Db = ReturnType<typeof getDb>;
 
 export const erasedEmail = (userId: number) => `deleted-user-${userId}@deleted.digitalcarda.in`;
+
+export const DELETION_GRACE_DAYS = 30;
+
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
+
+/* Asking to delete an account — from the app (More → Delete account) or the
+   website (/account/delete, for people without the app, as Google Play
+   requires). Takes effect at once: the account is switched off, signed out of
+   every phone, and its card shows as paused. The erasure itself waits
+   DELETION_GRACE_DAYS so the owner can change their mind; the team finishes it
+   from Admin → Account Deletions. The caller has already checked the password. */
+export async function requestAccountDeletion(
+  db: Db,
+  user: { id: number; email: string; fullName: string },
+  opts: { reason?: string | null; source: "app" | "web" },
+) {
+  const now = new Date();
+  const scheduledFor = new Date(now.getTime() + DELETION_GRACE_DAYS * 86_400_000);
+
+  const pending = await db.select({ id: accountDeletionRequests.id, scheduledFor: accountDeletionRequests.scheduledFor })
+    .from(accountDeletionRequests)
+    .where(and(eq(accountDeletionRequests.userId, user.id), eq(accountDeletionRequests.status, "pending"))).limit(1);
+  if (pending[0]) return { scheduledFor: new Date(pending[0].scheduledFor), already: true };
+
+  await db.insert(accountDeletionRequests).values({
+    userId: user.id, email: user.email, reason: opts.reason || null, source: opts.source, scheduledFor,
+  });
+  await db.update(users).set({ status: "inactive" }).where(eq(users.id, user.id));
+
+  // Signed out of every phone at once.
+  const live = await db.select({ id: appSessions.id }).from(appSessions)
+    .where(and(eq(appSessions.userId, user.id), isNull(appSessions.revokedAt)));
+  if (live.length) {
+    await db.update(appSessions).set({ revokedAt: now }).where(and(eq(appSessions.userId, user.id), isNull(appSessions.revokedAt)));
+    live.forEach((s) => forgetSession(Number(s.id)));
+  }
+  await db.update(pushTokens).set({ disabledAt: now }).where(and(eq(pushTokens.userId, user.id), isNull(pushTokens.disabledAt)));
+
+  // Tell the team so the erasure is completed on time.
+  try {
+    const { sendEmail, ownerAddress } = await import("./mail");
+    const when = scheduledFor.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const where = opts.source === "web" ? "on the website" : "from the mobile app";
+    const link = "https://digitalcarda.in/admin/deletion-requests";
+    await sendEmail(ownerAddress(), {
+      kind: "accountDeletionRequestAdmin",
+      subject: `Account deletion requested — ${user.email}`,
+      text: `${user.fullName} (${user.email}, user #${user.id}) asked to delete their account ${where}.\n\nThe account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after ${when}, or cancel it if they change their mind: ${link}${opts.reason ? `\nReason given: ${opts.reason}` : ""}`,
+      html: `<p><b>${escapeHtml(user.fullName)}</b> (${escapeHtml(user.email)}, user #${user.id}) asked to delete their account ${where}.</p><p>The account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after <b>${when}</b>, or cancel it if they change their mind, in <a href="${link}">Admin → Account Deletions</a>.</p>${opts.reason ? `<p>Reason given: ${escapeHtml(opts.reason)}</p>` : ""}`,
+    });
+  } catch (e) {
+    console.error("[account-deletion] notice email failed:", (e as Error).message);
+  }
+  return { scheduledFor, already: false };
+}
 
 async function hideFromAdminLists(db: Db, userId: number, legacyIds: string[]) {
   const add = async (key: string, values: string[]) => {

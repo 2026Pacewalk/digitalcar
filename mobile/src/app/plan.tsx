@@ -7,13 +7,15 @@ import { asList, inr, type Product } from "~/lib/cardContent";
 import { planLimit } from "~/lib/cardStore";
 import { dateLabel } from "~/lib/format";
 import { trpc } from "~/lib/trpc";
+import { PURCHASE_LINKS } from "~/lib/config";
 import { useOpenDashboard } from "~/lib/web";
 import { radius, space, useTheme } from "~/theme";
 
 /* The owner's plan: what they're on and until when, how much of it they use,
    what Gold and Platinum include, and what they've paid. Buying happens on
    digitalcarda.in (opened signed in, on the plan and term picked here), where
-   discounts, coupons and upgrade credit are worked out. */
+   discounts, coupons and upgrade credit are worked out. Store builds leave the
+   buying part out (see PURCHASE_LINKS) and show status, usage and payments. */
 
 type Term = "monthly" | "yearly" | "triennial";
 const TERMS: { value: Term; label: string; per: string }[] = [
@@ -85,9 +87,9 @@ export default function PlanScreen() {
         </View>
         <AppText tone="heroMuted">
           {onPaid && end ? `Valid till ${dateLabel(end)}${s?.term ? ` · ${TERMS.find((t) => t.value === s.term)?.label.toLowerCase()} plan` : ""}.`
-            : onTrial ? `Free until ${end ? dateLabel(end) : "the trial ends"}. Choose Gold or Platinum to keep your card live after that.`
-            : inGrace ? "Your trial has ended and your card is in its grace period. Choose a plan to keep it live."
-            : "Your card is paused. Choose a plan to bring it back online."}
+            : onTrial ? `Free until ${end ? dateLabel(end) : "the trial ends"}.${PURCHASE_LINKS ? " Choose Gold or Platinum to keep your card live after that." : ""}`
+            : inGrace ? `Your trial has ended and your card is in its grace period.${PURCHASE_LINKS ? " Choose a plan to keep it live." : ""}`
+            : `Your card is paused.${PURCHASE_LINKS ? " Choose a plan to bring it back online." : " Visitors see a paused notice."}`}
         </AppText>
       </View>
 
@@ -120,7 +122,7 @@ export default function PlanScreen() {
       ) : null}
 
       {/* Plans */}
-      {offered.length ? (
+      {PURCHASE_LINKS && offered.length ? (
         <>
           <SectionTitle>{onPaid ? "Upgrade or renew" : "Choose a plan"}</SectionTitle>
           <Segmented<Term> value={term} onChange={setTerm} options={TERMS.map((t) => ({ value: t.value, label: t.label }))} />
