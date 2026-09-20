@@ -4,7 +4,13 @@
  * alternative-tool queries.
  */
 
-export type ComparisonRow = { label: string; ours: string; theirs: string };
+export type ComparisonRow = {
+  label: string;
+  ours: string;
+  theirs: string;
+  /** True when we have something they don't — the page marks the row. */
+  win?: boolean;
+};
 
 export type ComparisonPage = {
   slug: string;
@@ -13,6 +19,9 @@ export type ComparisonPage = {
   rows: ComparisonRow[];
   usDescription: string;
   themDescription: string;
+  /** When their prices were last checked, and where — so the claim can be re-checked. */
+  pricedOn: string;
+  priceSource: string;
 };
 
 export const COMPARISONS: ComparisonPage[] = [
@@ -20,61 +29,66 @@ export const COMPARISONS: ComparisonPage[] = [
     slug: "linktree",
     competitor: "Linktree",
     quickAnswer:
-      "Linktree is a global link-in-bio tool built for creators. DigitalCarda is a digital business card built for Indian professionals — a stack of links plus WhatsApp, UPI payments, lead capture, NFC cards, Hindi content, and Indian pricing (starts ₹99/month vs Linktree's ~₹500/month for paid features). For a business in India, DigitalCarda wins on cost, payments and lead capture.",
+      "Linktree is a global link-in-bio tool built for creators. DigitalCarda is a digital business card built for Indian businesses — the same stack of links, plus WhatsApp, UPI payments, an enquiry form, a services catalogue and printed NFC cards. Linktree's paid plans start at ₹220/month billed yearly; DigitalCarda is ₹999 a year (₹99/month) after a 30-day free trial. If you take enquiries and payments in India, DigitalCarda covers the parts Linktree was never built for.",
     rows: [
-      { label: "Starting price (India)", ours: "₹99/month", theirs: "~₹500/month for paid" },
-      { label: "Free trial", ours: "30-day full free trial", theirs: "Limited free tier" },
-      { label: "WhatsApp button (pre-fill)", ours: "Native", theirs: "Manual link only" },
-      { label: "UPI, GPay, Paytm payments", ours: "Native", theirs: "Not supported" },
-      { label: "Lead capture form → dashboard", ours: "Yes", theirs: "No" },
-      { label: "Save Contact / vCard", ours: "Yes", theirs: "No" },
-      { label: "Product / service catalogue", ours: "With price and CTA", theirs: "No" },
-      { label: "NFC printed card", ours: "₹499", theirs: "Not sold" },
-      { label: "Custom domain", ours: "All paid tiers", theirs: "Higher tier only" },
-      { label: "Hindi and regional languages", ours: "AI translation", theirs: "No" },
-      { label: "White-label / reseller", ours: "20–30% recurring", theirs: "No" },
-      { label: "Made for", ours: "Indian professionals", theirs: "Global creators" },
+      { label: "Starting price in India", ours: "₹999/year (₹99/mo)", theirs: "₹220/mo billed yearly, ₹360 monthly", win: true },
+      { label: "Free to try", ours: "30 days, no card details", theirs: "Free tier; 7-day trial on paid plans" },
+      { label: "WhatsApp button, message ready", ours: "Built in", theirs: "Plain link only", win: true },
+      { label: "UPI, GPay and PhonePe payments", ours: "Built in", theirs: "Card checkout for digital products", win: true },
+      { label: "Enquiry form into your dashboard", ours: "Yes", theirs: "Mailing-list signup", win: true },
+      { label: "Save Contact (vCard)", ours: "Yes", theirs: "No", win: true },
+      { label: "Services and product catalogue", ours: "Photos, price and a Buy button", theirs: "Digital products, with seller fees" },
+      { label: "Printed NFC card", ours: "₹499, free India delivery", theirs: "Not sold", win: true },
+      { label: "Your own domain", ours: "₹499 one-time add-on", theirs: "Not listed on their pricing page" },
+      { label: "Reseller programme", ours: "20–30% recurring", theirs: "Not offered", win: true },
+      { label: "Built for", ours: "Indian businesses", theirs: "Global creators" },
     ],
     usDescription: "You run a business in India — doctors, real estate, jewellers, boutiques, salons, restaurants, coaches. You take WhatsApp enquiries and UPI payments. You want to capture leads and follow up. You network face-to-face and want an NFC card.",
-    themDescription: "You are a global influencer, creator, musician or content maker. Your audience is outside India and you don't need UPI or WhatsApp. You only need a stack of external links, nothing else.",
+    themDescription: "You are a creator, musician or influencer with a global audience. You mainly need a tidy stack of links from an Instagram or TikTok bio and sell digital downloads — and don't need UPI, WhatsApp or an NFC card posted to an Indian address.",
+    pricedOn: "20 September 2026",
+    priceSource: "linktr.ee/pricing (prices shown for India)",
   },
   {
     slug: "hihello",
     competitor: "HiHello",
     quickAnswer:
-      "HiHello is a US-first digital business card, priced in dollars and built for LinkedIn-style networking. DigitalCarda is India-first, priced at ₹99/month, with WhatsApp, UPI, Hindi content and free NFC card delivery across India. For an Indian professional, DigitalCarda is cheaper, faster to set up locally, and has the payment and messaging channels Indian customers actually use.",
+      "HiHello is a US-first digital business card, priced in dollars and built around networking and email signatures. DigitalCarda is built for India: ₹999 a year, with WhatsApp and UPI on the card, a services catalogue, and NFC cards delivered free across India. HiHello's paid plan is $6 a month (about ₹530), and its printed cards ship from the US.",
     rows: [
-      { label: "Pricing", ours: "₹99/month", theirs: "$6+/month (~₹500)" },
-      { label: "Free trial", ours: "30 days, no card", theirs: "Limited free plan" },
-      { label: "WhatsApp button", ours: "Native", theirs: "Not native" },
-      { label: "UPI / Razorpay / Paytm", ours: "Yes", theirs: "No" },
-      { label: "NFC card delivery in India", ours: "₹499, free shipping", theirs: "US shipping only" },
-      { label: "Hindi + regional languages", ours: "AI translation", theirs: "No" },
-      { label: "Product catalogue", ours: "Yes", theirs: "Limited" },
-      { label: "Lead capture form", ours: "Yes → dashboard", theirs: "Contact exchange" },
-      { label: "Reseller program", ours: "20–30% recurring", theirs: "No" },
-      { label: "Made for", ours: "Indian professionals", theirs: "US/global networking" },
+      { label: "Paid plan", ours: "₹999/year (₹99/mo)", theirs: "$6/month, $72 billed yearly (≈ ₹530/mo)", win: true },
+      { label: "Free to try", ours: "30-day full trial, no card details", theirs: "Free plan: 4 cards, 5 scans a month" },
+      { label: "WhatsApp button, message ready", ours: "Built in", theirs: "Not built in", win: true },
+      { label: "UPI, GPay and PhonePe payments", ours: "Built in", theirs: "Not offered", win: true },
+      { label: "Printed NFC card in India", ours: "₹499, free India delivery", theirs: "Ships from the US", win: true },
+      { label: "Services and product catalogue", ours: "Photos, price and a Buy button", theirs: "Not offered", win: true },
+      { label: "Enquiry form into your dashboard", ours: "Yes", theirs: "Contact exchange and enrichment" },
+      { label: "Email signature", ours: "Free signature generator", theirs: "Included on paid plans" },
+      { label: "Reseller programme", ours: "20–30% recurring", theirs: "Not offered", win: true },
+      { label: "Built for", ours: "Indian businesses", theirs: "US and global networking" },
     ],
     usDescription: "You're in India and take WhatsApp enquiries or UPI payments. You want a card in Hindi or a regional language. You want NFC cards shipped to Indian pin codes.",
-    themDescription: "You're US-based and network mostly on LinkedIn. You need Salesforce or HubSpot deep integration on the enterprise plan.",
+    themDescription: "You network mostly in the US or Europe, live on LinkedIn and email, and want company-wide email signatures, virtual backgrounds and directory sync for a large team.",
+    pricedOn: "20 September 2026",
+    priceSource: "hihello.com/pricing",
   },
   {
     slug: "beaconstac",
     competitor: "Beaconstac",
     quickAnswer:
-      "Beaconstac (now Uniqode) is an enterprise QR-code platform with digital business cards as one product. DigitalCarda is a focused digital business card built for Indian professionals. For SMB use in India, DigitalCarda is 5–10× cheaper, integrates natively with WhatsApp and UPI, and ships NFC cards inside India — where Beaconstac's enterprise pricing and US-first delivery don't fit.",
+      "Beaconstac (now Uniqode) is a US QR-code platform that also sells digital business cards, priced per user in dollars. DigitalCarda does one thing — the digital visiting card — for Indian businesses, at ₹999 a year, with WhatsApp, UPI, a services catalogue and NFC cards delivered inside India. If you are a shop, clinic or agency rather than a large company, the fit is very different.",
     rows: [
-      { label: "Starting price", ours: "₹99/month", theirs: "$5+/user/month enterprise" },
-      { label: "Free trial", ours: "30 days, no card", theirs: "14 days, card required" },
-      { label: "WhatsApp button", ours: "Native", theirs: "Manual" },
-      { label: "UPI payments", ours: "Native", theirs: "Not native" },
-      { label: "NFC card in India", ours: "₹499, free ship", theirs: "US catalogue" },
-      { label: "Hindi content + AI translate", ours: "Yes", theirs: "No" },
-      { label: "White-label reseller", ours: "20–30% recurring", theirs: "Partner tier only" },
-      { label: "Best fit", ours: "Indian SMB & professionals", theirs: "US/global enterprise" },
+      { label: "Pricing", ours: "₹999/year (₹99/mo), shown openly", theirs: "Per user in USD, quoted on their site", win: true },
+      { label: "Free to try", ours: "30-day full trial, no card details", theirs: "Free trial on their plans" },
+      { label: "WhatsApp button, message ready", ours: "Built in", theirs: "Not built in", win: true },
+      { label: "UPI, GPay and PhonePe payments", ours: "Built in", theirs: "Not built in", win: true },
+      { label: "Printed NFC card in India", ours: "₹499, free India delivery", theirs: "US catalogue", win: true },
+      { label: "Services and product catalogue", ours: "Photos, price and a Buy button", theirs: "QR landing pages" },
+      { label: "Reseller programme", ours: "20–30% recurring", theirs: "Partner programme" },
+      { label: "Best fit", ours: "Indian shops, clinics and agencies", theirs: "Large US and global teams" },
     ],
     usDescription: "You're an Indian professional or SMB owner. You need WhatsApp, UPI and a card that ships to Indian pin codes without an enterprise contract.",
-    themDescription: "You're an enterprise buyer needing 500+ team cards with SSO, CRM integrations and SOC-2 audit reports.",
+    themDescription: "You are buying for a large organisation that needs hundreds of team cards, a full QR-code platform behind them, single sign-on, CRM integrations and security paperwork.",
+    pricedOn: "20 September 2026",
+    priceSource: "uniqode.com/pricing",
   },
 ];
 

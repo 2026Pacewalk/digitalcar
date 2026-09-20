@@ -62,7 +62,7 @@ export default function CityPage() {
           {
             "@type": "Question",
             name: `Can the card be in Hindi or ${city.localLanguage}?`,
-            acceptedAnswer: { "@type": "Answer", text: `Yes. Every card supports multilingual content with AI translation — publish in English, Hindi and ${city.localLanguage} in one click.` },
+            acceptedAnswer: { "@type": "Answer", text: `Yes. You can write your card in any language — put your details in English, Hindi or ${city.localLanguage}, whichever your customers read.` },
           },
         ],
       },
@@ -148,7 +148,7 @@ export default function CityPage() {
           </details>
           <details className="rounded-lg bg-white ring-1 ring-[#E2E8F0] p-4">
             <summary className="cursor-pointer font-semibold text-[#0F172A]">Can the card be in Hindi or {city.localLanguage}?</summary>
-            <p className="mt-2 text-[14.5px] text-[#475569]">Yes. Every card supports multilingual content with AI translation — publish in English, Hindi and {city.localLanguage} in one click.</p>
+            <p className="mt-2 text-[14.5px] text-[#475569]">Yes. You can write your card in any language — put your details in English, Hindi or {city.localLanguage}, whichever your customers read.</p>
           </details>
         </div>
       </section>
