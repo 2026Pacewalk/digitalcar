@@ -208,19 +208,23 @@ function HeroSection() {
               <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C] animate-pulse" /> AI-Powered Digital Cards
             </span>
             <h1 className="mt-6 text-[2.6rem] sm:text-5xl lg:text-[3.9rem] font-extrabold text-[#0F172A] leading-[1.05] tracking-tight">
-              Create Your Smart{" "}
               <span className="relative inline-block text-gradient-gold">
-                Digital Business
+                Digital Business Card
                 <svg className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 300 10" fill="none" preserveAspectRatio="none">
                   <path d="M2 7c60-5 120-5 180-2s90 3 116-1" stroke="#F7B31C" strokeWidth="3" strokeLinecap="round" opacity="0.5" />
                 </svg>
               </span>{" "}
-              {/* Kept together so "Card" never sits alone on its own line. */}
-              <span className="sm:whitespace-nowrap"><span className="text-gradient-gold">Card</span> in Minutes</span>
+              <span className="sm:whitespace-nowrap">for Every Indian Professional</span>
             </h1>
             <p className="mt-6 text-base sm:text-lg text-[#64748B] leading-relaxed max-w-lg">
-              Beautiful, shareable cards with QR codes, lead tracking, payment links, products, videos, and analytics — built for professionals, agencies, and resellers.
+              Create a shareable digital visiting card with QR code, NFC tap, WhatsApp and UPI payments — in about two minutes. No app, no design skills, no reprinting.
             </p>
+            {/* AEO answer block — a self-contained 40–60 word answer that AI search
+                engines and Google's answer box can lift verbatim. Placed here so it
+                sits near the top of the DOM, above the fold. */}
+            <div className="mt-5 rounded-xl bg-white/70 ring-1 ring-[#FEF3C7] px-4 py-3 max-w-xl text-[13.5px] leading-relaxed text-[#334155]">
+              <strong className="text-[#0F172A]">Quick answer:</strong> A digital business card is a link and QR code that replaces printed visiting cards. DigitalCarda makes one in 2 minutes with 50+ templates, WhatsApp, UPI payments, lead capture and analytics. Starts at <strong>₹99/month</strong> with a <strong>30-day free trial</strong> — no card details needed.
+            </div>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Link to="/signup" className="btn-gold h-12 px-7 flex items-center justify-center gap-2 text-base">
                 Start 30-Day Free Trial <ArrowRight size={18} />

@@ -33,6 +33,9 @@ const ProductDetail = lazy(() => import("./pages/public/ProductDetail"));
 const CardDemo = lazy(() => import("./pages/public/CardDemo"));
 const Industries = lazy(() => import("./pages/public/Industries"));
 const IndustryPage = lazy(() => import("./pages/public/IndustryPage"));
+const CityPage = lazy(() => import("./pages/public/CityPage"));
+const DigitalBusinessCardGuide = lazy(() => import("./pages/public/DigitalBusinessCardGuide"));
+const ComparisonPage = lazy(() => import("./pages/public/ComparisonPage"));
 const Pricing = lazy(() => import("./pages/public/Pricing"));
 const BulkCards = lazy(() => import("./pages/public/BulkCards"));
 const AIGenerator = lazy(() => import("./pages/public/AIGenerator"));
@@ -217,6 +220,11 @@ export default function App() {
           <Route path="/demo/:slug" element={<CardDemo />} />
           <Route path="/industries" element={<Industries />} />
           <Route path="/industries/:slug" element={<IndustryPage />} />
+          {/* Long-tail SEO pages: city landing pages, the topical pillar guide,
+              and head-to-head comparison pages. */}
+          <Route path="/digital-visiting-card/:slug" element={<CityPage />} />
+          <Route path="/digital-business-card-guide" element={<DigitalBusinessCardGuide />} />
+          <Route path="/vs/:slug" element={<ComparisonPage />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/bulk-cards" element={<BulkCards />} />
           <Route path="/ai-card-generator" element={<AIGenerator />} />
