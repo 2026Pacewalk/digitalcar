@@ -167,8 +167,17 @@ const SSR_PATHS = new Set([
   "/digital-business-cards-templates",
   "/privacy", "/refund-policy", "/terms-of-service", "/sitemap",
   "/blog", "/about",
+  // Long-form SEO pages added Sept 2026 — the pillar guide and the /vs/*
+  // comparison pages ship as static content, so SSR gives them crawler-visible
+  // HTML on the first byte.
+  "/digital-business-card-guide",
 ]);
 const PRODUCT_PATH = /^\/digital-business-cards-templates\/([^/]+)$/;
+// City pages (/digital-visiting-card/<slug>) and comparison pages (/vs/<slug>)
+// are matched by regex so any new city or competitor added to
+// src/data/cities.ts or src/data/comparisons.ts gets SSR automatically.
+const CITY_PATH = /^\/digital-visiting-card\/([a-z0-9-]+)$/;
+const VS_PATH = /^\/vs\/([a-z0-9-]+)$/;
 const SSR_DATA_TIMEOUT_MS = 2500;
 const SSR_RENDER_TIMEOUT_MS = 4500;
 
@@ -277,7 +286,7 @@ export function serveStaticFiles(app: App) {
     // anything else is a real 404. Not decoded: valid slugs have no escapes, and
     // decodeURIComponent can throw.
     const industryMatch = INDUSTRY_PATH.exec(clean);
-    const ssrWanted = SSR_ENABLED && (SSR_PATHS.has(clean) || PRODUCT_PATH.test(clean) || isBlogPost || !!industryMatch);
+    const ssrWanted = SSR_ENABLED && (SSR_PATHS.has(clean) || PRODUCT_PATH.test(clean) || isBlogPost || !!industryMatch || CITY_PATH.test(clean) || VS_PATH.test(clean));
     // /industries/Doctors → /industries/doctors: one URL per page, so a pasted
     // link with a capital never becomes a second, non-indexable copy. Only when
     // the lowercase form is a real page; other spellings fall through to 404.

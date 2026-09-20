@@ -246,7 +246,15 @@ function Inner({ ind }: { ind: Industry }) {
                 {h1Before}
                 {h1After && <Underlined text={h1After} accent={accent} />}
               </h1>
-              <p className="mt-5 max-w-[40rem] text-[16px] leading-relaxed text-[#475569] sm:text-[17px]"><RichText text={ind.answer} /></p>
+              {/* AEO answer block — wrapper makes the same answer text visibly a
+                  self-contained "Quick answer", which AI search engines and Google's
+                  answer box lift cleanly. */}
+              <div className="mt-5 max-w-[40rem] rounded-xl bg-white/70 px-4 py-3 ring-1 ring-[#E2E8F0]">
+                <p className="text-[15.5px] leading-relaxed text-[#334155]">
+                  <strong className="text-[#0F172A]">Quick answer:</strong>{" "}
+                  <RichText text={ind.answer} />
+                </p>
+              </div>
 
               <div className="dc-enter dc-enter-1 mt-7 flex flex-col gap-3 sm:flex-row">
                 <Link to={SIGNUP_HREF} className={`btn-gold group inline-flex h-12 w-full items-center justify-center gap-2 px-6 sm:w-auto ${FOCUS}`}>

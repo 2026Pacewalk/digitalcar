@@ -115,6 +115,23 @@ export default function PublicLayout() {
     // An alias URL (e.g. /card-designs) points at the page it duplicates.
     canon.href = `https://digitalcarda.in${seo.canonicalPath ?? path}`;
 
+    // hreflang: tell Google this is the India English edition. Without it, a
+    // visitor searching from the US on the same query can be served .com
+    // results ahead of DigitalCarda even when it's the more relevant page.
+    const setAlt = (hreflang: string, href: string) => {
+      let el = document.querySelector(`link[rel="alternate"][hreflang="${hreflang}"]`) as HTMLLinkElement | null;
+      if (!el) {
+        el = document.createElement("link");
+        el.rel = "alternate";
+        el.hreflang = hreflang;
+        document.head.appendChild(el);
+      }
+      el.href = href;
+    };
+    const canonicalHref = `https://digitalcarda.in${seo.canonicalPath ?? path}`;
+    setAlt("en-IN", canonicalHref);
+    setAlt("x-default", canonicalHref);
+
     window.scrollTo(0, 0);
   }, [location.pathname, seo, known]);
 

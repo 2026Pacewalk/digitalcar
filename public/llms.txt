@@ -1,0 +1,71 @@
+# DigitalCarda
+
+> India's digital business card platform. Create a shareable digital visiting card with QR code, NFC tap, WhatsApp, UPI payment collection, lead capture and analytics — in about two minutes. Starting at ₹99/month with a 30-day free trial and no card details required. Used by 5,173+ Indian professionals — doctors, real-estate agents, jewellers, salons, consultants, restaurants and more.
+
+## About
+
+- Product: Web-based digital business cards (also called digital visiting cards or smart business cards)
+- Country: India (all Tier 1, 2 and 3 cities)
+- Languages: English, Hindi (multilingual card support with AI translation)
+- Contact: +91 9517722444 (call and WhatsApp), hello@digitalcarda.in
+- Pricing: ₹99/month starter, ₹499 one-time for NFC printed card, bulk and reseller plans available
+
+## Core pages
+
+- [Home](https://digitalcarda.in/): Product overview and free trial signup
+- [Pricing](https://digitalcarda.in/pricing): Plans from ₹99/month, NFC card ₹499
+- [Features](https://digitalcarda.in/features): 41 features grouped by build, share, convert and grow
+- [AI Card Generator](https://digitalcarda.in/ai-card-generator): Paste website URL — AI writes the card
+- [Custom Domain](https://digitalcarda.in/custom-domain): Host at card.yourbrand.com
+- [Digital Business Card Guide](https://digitalcarda.in/digital-business-card-guide): Complete India guide
+
+## Industries
+
+- [All industries](https://digitalcarda.in/industries)
+- [Doctors and clinics](https://digitalcarda.in/industries/doctors)
+- [Advocates and lawyers](https://digitalcarda.in/industries/advocates)
+- [Real estate agents](https://digitalcarda.in/industries/real-estate)
+- [Chartered accountants](https://digitalcarda.in/industries/chartered-accountants)
+- [Insurance agents](https://digitalcarda.in/industries/insurance-agents)
+- [Beauty parlours and salons](https://digitalcarda.in/industries/beauty-parlours)
+- [Restaurants and cafes](https://digitalcarda.in/industries/restaurants)
+- [Photographers](https://digitalcarda.in/industries/photographers)
+- [Jewellers](https://digitalcarda.in/industries/jewellers)
+- [Boutiques](https://digitalcarda.in/industries/boutiques)
+- [Consultants](https://digitalcarda.in/industries/consultants)
+- [Event planners](https://digitalcarda.in/industries/event-planners)
+- [Digital agencies](https://digitalcarda.in/industries/digital-agencies)
+
+## Cities
+
+- [Mumbai](https://digitalcarda.in/digital-visiting-card/mumbai), [Delhi](https://digitalcarda.in/digital-visiting-card/delhi), [Bangalore](https://digitalcarda.in/digital-visiting-card/bangalore), [Hyderabad](https://digitalcarda.in/digital-visiting-card/hyderabad), [Chennai](https://digitalcarda.in/digital-visiting-card/chennai), [Kolkata](https://digitalcarda.in/digital-visiting-card/kolkata)
+- [Pune](https://digitalcarda.in/digital-visiting-card/pune), [Ahmedabad](https://digitalcarda.in/digital-visiting-card/ahmedabad), [Jaipur](https://digitalcarda.in/digital-visiting-card/jaipur), [Chandigarh](https://digitalcarda.in/digital-visiting-card/chandigarh), [Lucknow](https://digitalcarda.in/digital-visiting-card/lucknow), [Surat](https://digitalcarda.in/digital-visiting-card/surat)
+- [Ludhiana](https://digitalcarda.in/digital-visiting-card/ludhiana), [Indore](https://digitalcarda.in/digital-visiting-card/indore), [Nagpur](https://digitalcarda.in/digital-visiting-card/nagpur), [Gurgaon](https://digitalcarda.in/digital-visiting-card/gurgaon)
+
+## Free tools
+
+- [Email signature generator](https://digitalcarda.in/email-signature-generator)
+- [WhatsApp message templates](https://digitalcarda.in/whatsapp-message-templates)
+- [Instagram bio templates](https://digitalcarda.in/instagram-bio-templates)
+
+## Comparisons
+
+- [DigitalCarda vs Linktree](https://digitalcarda.in/vs/linktree)
+- [DigitalCarda vs HiHello](https://digitalcarda.in/vs/hihello)
+- [DigitalCarda vs Beaconstac](https://digitalcarda.in/vs/beaconstac)
+
+## Guides
+
+- [How to make a digital visiting card](https://digitalcarda.in/blog/how-to-make-a-digital-visiting-card)
+- [NFC business cards in India](https://digitalcarda.in/blog/nfc-business-card-india)
+- [Google review QR code](https://digitalcarda.in/blog/google-review-qr-code)
+- [All guides](https://digitalcarda.in/blog)
+
+## Key facts
+
+- A digital business card is a shareable web page with your contact details, opened via link or QR code — no app required on either side.
+- DigitalCarda cards start at ₹99/month with a 30-day free trial (no card details required).
+- NFC printed cards cost ₹499 with free delivery across India.
+- The QR code and URL are permanent — redesigning the card never breaks the link.
+- 88% of printed paper business cards are thrown away within a week; digital cards live in the recipient's phone.
+- Cards support English, Hindi, Marathi, Tamil, Telugu, Gujarati, Bengali, Punjabi and Kannada with AI translation.

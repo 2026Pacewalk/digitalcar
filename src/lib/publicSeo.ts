@@ -75,8 +75,8 @@ export const SEO_WHATSAPP_TEMPLATES: PageSeo = {
 };
 
 export const DEFAULT_SEO: PageSeo = {
-  title: "Digital Visiting Card Maker & Digital Business Card India",
-  description: "Make your digital visiting card online in minutes: QR code, NFC tap, WhatsApp, UPI payments and lead capture on one link. Free for 30 days, no payment.",
+  title: "Digital Business Card India — ₹99/mo | DigitalCarda",
+  description: "Make a digital visiting card in 2 minutes. QR + NFC + WhatsApp + UPI on one link. 50+ templates, AI writer, lead tracking. Free 30 days — no card details.",
 };
 
 export const PUBLIC_SEO: Record<string, PageSeo> = {
@@ -177,6 +177,67 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
     description: "Read our terms of service to understand the rules and guidelines for using DigitalCarda.",
     crumb: "Terms & Conditions",
   },
+  "/digital-business-card-guide": {
+    title: "Digital Business Card Guide India 2026 — Complete",
+    description: "The complete guide to digital business cards in India: cost, NFC vs QR, templates, industry cards and how to make one in 2 minutes. Updated 2026.",
+    crumb: "Digital Business Card Guide",
+  },
+  "/vs/linktree": {
+    title: "DigitalCarda vs Linktree — Bio Link for India (2026)",
+    description: "DigitalCarda vs Linktree side by side: WhatsApp, UPI, NFC, Hindi content and Indian pricing. Which link-in-bio wins for professionals in India.",
+    crumb: "vs Linktree",
+    parent: "/",
+  },
+  "/vs/hihello": {
+    title: "DigitalCarda vs HiHello — Digital Card in India",
+    description: "DigitalCarda vs HiHello: INR pricing, WhatsApp, UPI, NFC delivery in India and Hindi support. Which digital business card fits Indian professionals.",
+    crumb: "vs HiHello",
+    parent: "/",
+  },
+  "/vs/beaconstac": {
+    title: "DigitalCarda vs Beaconstac — QR & NFC Card India",
+    description: "DigitalCarda vs Beaconstac QR: pricing in INR, WhatsApp, UPI, lead capture and NFC printed cards. Which suits Indian businesses better.",
+    crumb: "vs Beaconstac",
+    parent: "/",
+  },
+};
+
+// City page SEO (auto-registered below)
+const CITY_SLUGS = [
+  ["delhi", "Delhi"], ["mumbai", "Mumbai"], ["bangalore", "Bangalore"],
+  ["hyderabad", "Hyderabad"], ["chennai", "Chennai"], ["kolkata", "Kolkata"],
+  ["pune", "Pune"], ["ahmedabad", "Ahmedabad"], ["jaipur", "Jaipur"],
+  ["chandigarh", "Chandigarh"], ["lucknow", "Lucknow"], ["surat", "Surat"],
+  ["ludhiana", "Ludhiana"], ["indore", "Indore"], ["nagpur", "Nagpur"],
+  ["gurgaon", "Gurgaon"],
+] as const;
+for (const [slug, name] of CITY_SLUGS) {
+  PUBLIC_SEO[`/digital-visiting-card/${slug}`] = {
+    title: `Digital Visiting Card in ${name} — ₹99/mo | DigitalCarda`,
+    description: `Digital business card for ${name} professionals — QR + NFC + WhatsApp + UPI on one link. Free 30-day trial, free NFC card delivery to ${name}.`,
+    crumb: `Digital Card in ${name}`,
+    parent: "/",
+  };
+}
+
+// New long-form blog posts (SEO used by BlogPost when article data is present)
+PUBLIC_SEO["/blog/nfc-vs-qr-business-card"] = {
+  title: "NFC vs QR Business Card — Which is Better in India",
+  description: "NFC business card vs QR code business card: cost, speed, phone support and use cases. Which one Indian professionals should choose in 2026.",
+  crumb: "NFC vs QR business card",
+  parent: "/blog",
+};
+PUBLIC_SEO["/blog/whatsapp-business-card"] = {
+  title: "WhatsApp Business Card — Share Your Card on WhatsApp",
+  description: "How to share your digital business card on WhatsApp, add it to WhatsApp Business, put the QR in your DP and get more replies from Indian customers.",
+  crumb: "WhatsApp business card",
+  parent: "/blog",
+};
+PUBLIC_SEO["/blog/digital-vs-paper-business-card"] = {
+  title: "Digital vs Paper Business Card — Which is Better 2026",
+  description: "Digital business card vs paper visiting card: cost per year, updates, WhatsApp, UPI and sustainability. Nine-point comparison for Indian professionals.",
+  crumb: "Digital vs paper business card",
+  parent: "/blog",
 };
 
 /** SEO for a public path, or null when the path has none. Trailing slashes are

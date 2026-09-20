@@ -13,4 +13,41 @@ Disallow: /api/
 Disallow: /auth/
 Disallow: /account/
 
+# Explicit allow for major AI crawlers — declaring these keeps DigitalCarda
+# eligible to appear as a citation in ChatGPT, Perplexity, Google AI Overviews
+# and Claude answers. Removing any of these lines opts the site out of that
+# engine's index.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
 Sitemap: https://digitalcarda.in/sitemap.xml
