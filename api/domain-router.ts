@@ -10,6 +10,10 @@ import { cfEnabled, cfFallbackTarget, cfCreateHostname, cfGetByHostname, cfDelet
 import { resolveRazorpay } from "./payment-router";
 import { createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder, type RazorpayOrderFull } from "./lib/razorpay";
 import { notifyUser, notifyTeam } from "./lib/notify";
+import { CURRENCIES, toMinor, formatMoney } from "@contracts/money";
+import { getFxConfig, priceKey, resolveCheckoutCurrency, isInvalidCurrencyError, USD_UNAVAILABLE_MESSAGE } from "./lib/fx";
+import { priceIn, moneyNotes, checkPaidItem, domainPriceLabel } from "./lib/usd-checkout";
+import { edgeGeo } from "./lib/analytics";
 
 const ROOT_HOST = "digitalcarda.in";
 // Manual-mode CNAME target (used only when Cloudflare for SaaS isn't configured).
@@ -19,7 +23,8 @@ export const CNAME_TARGET = "cname.digitalcarda.in";
    The custom domain is a paid add-on, NOT bundled into any plan — except it is
    FREE for Platinum members on the 3-year term. A customer becomes eligible to
    connect a domain either by paying the add-on (Razorpay) or by being free-
-   eligible. Resellers/admins keep their existing (plan-based) access. */
+   eligible. Resellers/admins keep their existing (plan-based) access.
+   While USD is on, the add-on can also be paid in $ (./lib/fx priceKey.domain). */
 export const DOMAIN_ADDON_PRICE = 499;
 const ADDON_USERS_KEY = "domain_addon_users"; // app_settings: JSON array of paid userIds
 
@@ -70,24 +75,34 @@ export async function fulfilDomainAddonPayment(
   if (notes.addon !== "custom_domain") {
     throw new TRPCError({ code: "BAD_REQUEST", message: "This payment isn't for the custom domain add-on. Contact support with your payment ID." });
   }
-  if (Number(gatewayOrder.amount) !== DOMAIN_ADDON_PRICE * 100) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "The paid amount doesn't match the add-on price. Contact support with your payment ID." });
-  }
+  // A ₹ order must pay exactly ₹499, as always; a $ order the $ price.
+  const money = checkPaidItem(gatewayOrder, { key: priceKey.domain, inr: DOMAIN_ADDON_PRICE }, await getFxConfig(db),
+    "The paid amount doesn't match the add-on price. Contact support with your payment ID.");
+  const paidLabel = formatMoney(money.amount, money.currency);
   // Date the sale for the admin dashboard's revenue: once per Razorpay order,
-  // however many times the verify and the webhook arrive. A problem here is
-  // only logged — it must never stop the customer getting what they paid for.
+  // however many times the verify and the webhook arrive. A $ sale is stored
+  // as its ₹ equivalent, the way every other revenue figure is. A problem here
+  // is only logged — it must never stop the customer getting what they paid for.
   try {
     await db.insert(razorpayFulfilments).ignore()
-      .values({ razorpayOrderId, kind: "domain_addon", userId, razorpayPaymentId: paymentId, amount: DOMAIN_ADDON_PRICE.toFixed(2) });
+      .values({ razorpayOrderId, kind: "domain_addon", userId, razorpayPaymentId: paymentId, amount: (money.amount * money.fxRate).toFixed(2) });
   } catch (e) {
     console.error("[domain-addon] sale not recorded:", razorpayOrderId, (e as Error).message);
   }
   const granted = await grantAddon(db, userId);
   if (granted) {
-    void notifyUser({ userId, type: "addon_active", title: "Custom domain add-on is active", message: `Paid ₹${DOMAIN_ADDON_PRICE}. Connect your domain from Custom Domain in your dashboard.`, link: "/dashboard/domain" }, db);
-    void notifyTeam({ type: "domain_sale", title: `Online payment · ₹${DOMAIN_ADDON_PRICE} for the custom domain add-on`, message: `Account #${userId} · ${paymentId}`, link: "/admin/domains", subjectUserId: userId, dedupeKey: `sale:${paymentId}` }, db);
+    void notifyUser({ userId, type: "addon_active", title: "Custom domain add-on is active", message: `Paid ${paidLabel}. Connect your domain from Custom Domain in your dashboard.`, link: "/dashboard/domain" }, db);
+    void notifyTeam({ type: "domain_sale", title: `Online payment · ${paidLabel} for the custom domain add-on`, message: `Account #${userId} · ${paymentId}`, link: "/admin/domains", subjectUserId: userId, dedupeKey: `sale:${paymentId}` }, db);
   }
   return { granted };
+}
+/** The add-on's $ price while USD can be charged (switched on AND Razorpay on),
+    else null: the page and messages stay ₹-only. */
+async function usdDomainPrice(db: ReturnType<typeof getDb>, razorpayEnabled?: boolean): Promise<number | null> {
+  const fx = await getFxConfig(db);
+  if (!fx.enabled) return null;
+  const online = razorpayEnabled ?? (await resolveRazorpay(db)).enabled;
+  return online ? priceIn("USD", priceKey.domain, DOMAIN_ADDON_PRICE, fx) : null;
 }
 // Free custom domain = an active Platinum subscription bought on the 3-year term.
 async function freeDomainEligible(db: ReturnType<typeof getDb>, userId: number): Promise<boolean> {
@@ -256,6 +271,8 @@ export const domainRouter = createRouter({
     const db = getDb();
     const access = await domainAccess(db, ctx.user.id, ctx.user.role);
     const cr = await resolveRazorpay(db);
+    // A USD settings hiccup must not break the page: it just stays ₹-only.
+    const addonPriceUsd = await usdDomainPrice(db, cr.enabled).catch(() => null);
     let domains: Awaited<ReturnType<typeof enrich>>[] = [];
     try {
       const rows = await db.select().from(customDomains).where(eq(customDomains.userId, ctx.user.id)).orderBy(desc(customDomains.createdAt));
@@ -266,6 +283,7 @@ export const domainRouter = createRouter({
     return {
       eligible: access.eligible || domains.length > 0, freeEligible: access.free, addonPaid: access.paid,
       addonPrice: DOMAIN_ADDON_PRICE, onlinePay: cr.enabled,
+      addonPriceUsd,
       cloudflare: cfEnabled(), cnameTarget: cfEnabled() ? cfFallbackTarget() : CNAME_TARGET, domains,
     };
   }),
@@ -273,25 +291,41 @@ export const domainRouter = createRouter({
   // Add-on checkout: free-eligible → grant immediately; else create a Razorpay
   // order (or signal manual/contact when online pay isn't configured yet).
   // Same Razorpay account as every other checkout, so the payment webhook can
-  // confirm it too.
-  addonCheckout: authedQuery.mutation(async ({ ctx }) => {
-    const db = getDb();
-    const access = await domainAccess(db, ctx.user.id, ctx.user.role);
-    if (access.eligible) return { granted: true as const };
-    const cr = await resolveRazorpay(db);
-    if (!cr.enabled) return { manual: true as const, price: DOMAIN_ADDON_PRICE };
-    let order;
-    try {
-      order = await createRazorpayOrder({
-        amount: DOMAIN_ADDON_PRICE * 100, currency: "INR",
-        receipt: `domain_${ctx.user.id}_${Date.now()}`.slice(0, 40),
-        notes: { userId: String(ctx.user.id), addon: "custom_domain" },
-      }, cr);
-    } catch {
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not start the payment. Please try again." });
-    }
-    return { orderId: order.id, amount: order.amount, currency: "INR", keyId: cr.keyId };
-  }),
+  // confirm it too. The browser only picks ₹ or $ (no input = ₹); the price is
+  // decided here, and $ is refused while USD is switched off. Manual payment
+  // stays ₹-only.
+  addonCheckout: authedQuery
+    .input(z.object({ currency: z.enum(CURRENCIES).default("INR") }).optional())
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const access = await domainAccess(db, ctx.user.id, ctx.user.role);
+      if (access.eligible) return { granted: true as const };
+      const cr = await resolveRazorpay(db);
+      if (!cr.enabled) return { manual: true as const, price: DOMAIN_ADDON_PRICE };
+      const fx = await getFxConfig(db);
+      // A one-time fee with no upgrade credit, so no currency lock: only "is USD on?".
+      const currency = resolveCheckoutCurrency({ requested: input?.currency, usdEnabled: fx.enabled, lockedTo: null });
+      const price = priceIn(currency, priceKey.domain, DOMAIN_ADDON_PRICE, fx);
+      let order;
+      try {
+        order = await createRazorpayOrder({
+          amount: toMinor(price), currency,
+          receipt: `domain_${ctx.user.id}_${Date.now()}`.slice(0, 40),
+          notes: {
+            userId: String(ctx.user.id), addon: "custom_domain",
+            ...moneyNotes(currency, fx, edgeGeo((h) => ctx.req.headers.get(h)).country, toMinor(price)),
+          },
+        }, cr);
+      } catch (e) {
+        // International payments are off on the Razorpay account.
+        if (currency === "USD" && isInvalidCurrencyError(e)) {
+          console.error("[domain] Razorpay rejected a USD order:", (e as Error).message);
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: USD_UNAVAILABLE_MESSAGE });
+        }
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not start the payment. Please try again." });
+      }
+      return { orderId: order.id, amount: order.amount, currency: order.currency, keyId: cr.keyId };
+    }),
 
   // Verify a completed Razorpay payment (HMAC of "orderId|paymentId") and grant.
   addonVerify: authedQuery
@@ -317,8 +351,11 @@ export const domainRouter = createRouter({
   add: authedQuery.input(z.object({ domain: z.string().min(3), cardId: z.number().int().positive().default(1) }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      if (!(await domainAccess(db, ctx.user.id, ctx.user.role)).eligible)
-        throw new TRPCError({ code: "FORBIDDEN", message: "Add the Custom Domain add-on (₹499) to connect your domain." });
+      if (!(await domainAccess(db, ctx.user.id, ctx.user.role)).eligible) {
+        // "₹499" alone while USD is off (the old wording); "₹499 or $6" once it's on.
+        const usd = await usdDomainPrice(db).catch(() => null);
+        throw new TRPCError({ code: "FORBIDDEN", message: `Add the Custom Domain add-on (${domainPriceLabel(DOMAIN_ADDON_PRICE, usd)}) to connect your domain.` });
+      }
       const domain = normDomain(input.domain);
       if (!isValidDomain(domain)) throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a valid domain like card.yourbusiness.com" });
       if (await db.query.customDomains.findFirst({ where: eq(customDomains.domain, domain) })) throw new TRPCError({ code: "CONFLICT", message: "That domain is already registered." });

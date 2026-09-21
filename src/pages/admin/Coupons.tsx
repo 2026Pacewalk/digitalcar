@@ -1,5 +1,6 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import { trpc } from "@/providers/trpc";
+import { useCurrency } from "@/hooks/useCurrency";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Copy, Loader2, Pencil, Plus, TicketPercent, Trash2, X } from "lucide-react";
@@ -34,7 +35,8 @@ type Row = {
   id: number; code: string; description: string | null; discountType: "percent" | "flat"; discountValue: string;
   maxDiscount: string | null; minAmount: string | null; validFrom: Date | null; validUntil: Date | null;
   usageLimit: number | null; perUserLimit: number; planIds: string | null; cycles: string | null; active: boolean;
-  uses: number; pendingUses: number; revenue: number; discounted: number;
+  /** revenue and discounted are ₹ equivalents: $ orders are counted at their payment's rate. */
+  uses: number; pendingUses: number; usdUses?: number; revenue: number; discounted: number;
 };
 
 function statusOf(c: Row) {
@@ -77,9 +79,14 @@ export default function AdminCoupons() {
   const stats = useMemo(() => ({
     live: coupons.filter((c) => statusOf(c).label === "Live").length,
     uses: coupons.reduce((n, c) => n + c.uses, 0),
+    usdUses: coupons.reduce((n, c) => n + (c.usdUses ?? 0), 0),
     revenue: coupons.reduce((n, c) => n + c.revenue, 0),
     discounted: coupons.reduce((n, c) => n + c.discounted, 0),
   }), [coupons]);
+  // The "₹ equivalent" wording only appears once a coupon has been used on a $
+  // order; until then every figure is plain ₹, exactly as before.
+  const equiv = (usd: number | undefined) => (usd ? " (₹ equivalent)" : "");
+  const { available: usdOn } = useCurrency();
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
@@ -153,13 +160,14 @@ export default function AdminCoupons() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
             { label: "Live coupons", value: stats.live },
-            { label: "Paid uses", value: stats.uses },
-            { label: "Revenue with coupons", value: inr(stats.revenue) },
-            { label: "Discount given", value: inr(stats.discounted) },
+            { label: "Paid uses", value: stats.uses, note: stats.usdUses ? `incl. ${stats.usdUses} paid in $` : undefined },
+            { label: `Revenue with coupons${equiv(stats.usdUses)}`, value: inr(stats.revenue) },
+            { label: `Discount given${equiv(stats.usdUses)}`, value: inr(stats.discounted) },
           ].map((s) => (
             <div key={s.label} className="rounded-2xl border border-[#F1F5F9] bg-white p-4 shadow-premium">
               <p className="text-[12px] text-[#64748B]">{s.label}</p>
               <p className="mt-1 text-2xl font-extrabold tabular-nums text-[#0F172A]">{s.value}</p>
+              {s.note && <p className="mt-0.5 text-[11px] text-[#94A3B8]">{s.note}</p>}
             </div>
           ))}
         </div>
@@ -214,6 +222,11 @@ export default function AdminCoupons() {
                 <input className={input} inputMode="numeric" value={form.perUserLimit} onChange={(e) => set("perUserLimit", e.target.value.replace(/\D/g, ""))} />
               </Labeled>
             </div>
+            {usdOn && (
+              <p className="mt-3 rounded-xl bg-[#F8FAFC] px-3 py-2 text-[12px] text-[#64748B]">
+                Coupons work on $ orders too. The ₹ amounts here (flat discount, cap and minimum purchase) are converted at the USD rate in Payment settings; a percentage applies as it is.
+              </p>
+            )}
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
@@ -303,7 +316,7 @@ export default function AdminCoupons() {
                     <div><dt className="text-[#94A3B8]">Valid</dt><dd className="font-medium text-[#334155]">{c.validFrom ? day(c.validFrom) : "Now"} → {c.validUntil ? day(c.validUntil) : "No end"}</dd></div>
                     <div><dt className="text-[#94A3B8]">Used</dt><dd className="font-medium text-[#334155]">{c.uses}{c.pendingUses ? ` (+${c.pendingUses} awaiting payment)` : ""}{c.usageLimit ? ` of ${c.usageLimit}` : ""} · {c.perUserLimit ? `${c.perUserLimit} per customer` : "no per-customer limit"}</dd></div>
                     <div><dt className="text-[#94A3B8]">Applies to</dt><dd className="font-medium text-[#334155]">{planIds.length ? planIds.map(planName).join(", ") : "All plans"} · {cycles.length ? cycles.map((x) => CYCLES.find((y) => y.id === x)?.label ?? x).join(", ") : "all terms"}{c.minAmount ? ` · min ${inr(c.minAmount)}` : ""}</dd></div>
-                    <div><dt className="text-[#94A3B8]">Revenue / discount</dt><dd className="font-medium text-[#334155]">{inr(c.revenue)} / {inr(c.discounted)}</dd></div>
+                    <div><dt className="text-[#94A3B8]">Revenue / discount{equiv(c.usdUses)}</dt><dd className="font-medium text-[#334155]">{inr(c.revenue)} / {inr(c.discounted)}</dd></div>
                   </dl>
                 </li>
               );

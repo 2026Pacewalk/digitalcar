@@ -199,6 +199,24 @@ export const previews: Preview[] = [
     }),
   },
   {
+    name: "onlineSaleAdminEmail", module: M, audience: "admin", variant: "usd-plan-referral-reseller",
+    // $12 at ₹85/$ = ₹1,020; the 15% reward and 10% commission are on that ₹ value.
+    render: () => onlineSaleAdminEmail({
+      kind: "plan", itemName: "Gold", cycle: "yearly", amount: 12, currency: "USD", amountInr: 1020, paymentId: "pay_DEMO127",
+      customer: { id: 1060, name: "Daniel Brooks", email: "daniel.brooks@example.com" },
+      referrer: { name: "Priya Sharma", reward: 153 }, reseller: { name: "Joshi Print & Media", commission: 102 },
+      validTill: days(365), at: AT,
+    }),
+  },
+  {
+    name: "onlineSaleAdminEmail", module: M, audience: "admin", variant: "usd-coupon",
+    render: () => onlineSaleAdminEmail({
+      kind: "plan", itemName: "Platinum", cycle: "yearly", amount: 21.6, currency: "USD", amountInr: 1836,
+      paymentId: "pay_DEMO128", coupon: "WELCOME10", discount: 2.4,
+      customer: { id: 1061, name: "Sofia Rossi", email: "sofia.rossi@example.com" }, validTill: days(365), at: AT,
+    }),
+  },
+  {
     name: "onlineSaleAdminEmail", module: M, audience: "admin", variant: "test-mode",
     render: () => onlineSaleAdminEmail({
       kind: "plan", itemName: "Silver", cycle: "monthly", amount: 199, paymentId: "pay_DEMO126", testMode: true,
@@ -259,6 +277,17 @@ export const previews: Preview[] = [
       pendingPayments: [], payoutsPending: [], nfcToProduce: [], nfcAwaitingPayment: [], bulkRequests: [],
       deletionsDue: [], trialsEnding: [], trialsEnded: [], plansExpiring: [], failedEmails: 0,
       automation: { enabled: false, sent: 0 },
+    }),
+  },
+  {
+    name: "ownerDailyDigestEmail", module: M, audience: "admin", variant: "with-usd-sales",
+    // $12 + $24 at ₹85/$ = ₹3,060, already inside the ₹ online figure.
+    render: () => ownerDailyDigestEmail({
+      date: AT, signups: { today: 3, week: 19 },
+      revenue: { manual: 4999, online: 10456, count: 7, usd: { total: 36, count: 2 } },
+      pendingPayments: [{ name: "Sneha Kulkarni", plan: "Platinum", amount: 4999, ageDays: 0 }],
+      payoutsPending: [], nfcToProduce: [], nfcAwaitingPayment: [], bulkRequests: [],
+      deletionsDue: [], trialsEnding: [], trialsEnded: [], plansExpiring: [], failedEmails: 0,
     }),
   },
   {

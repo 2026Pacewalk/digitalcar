@@ -248,8 +248,12 @@ async function section<T>(failed: Set<SectionName>, names: SectionName | Section
 
 /* ── Revenue ───────────────────────────────────────────────────────────── */
 
-/* Every payment that reached us, one row each: (stream, amount, at = unix
+/* Every payment that reached us, one row each: (stream, amount in ₹, at = unix
    seconds, pay = an id unique per payment within its stream).
+     · Every amount here is RUPEES. A plan payment is amount × fx_rate, the way
+       payment.adminStats and the owner digest count it, so a $ sale is its ₹
+       value and not that many rupees. fx_rate is NOT NULL DEFAULT 1.0000, so
+       every existing ₹ row is untouched.
      · A Razorpay plan payment can be recorded twice when the browser's verify
        and the webhook race (payment-router recordRazorpayPayment), so only
        the first row per payment reference counts.
@@ -262,7 +266,7 @@ async function section<T>(failed: Set<SectionName>, names: SectionName | Section
        row), else the yearly price. */
 function revenueEvents(addon: { yearly: number; monthly: number }, domainPrice: number): SQL {
   return sql`
-    SELECT IF(p.gateway = 'razorpay', 'plans_online', 'plans_manual') AS stream, p.amount AS amount,
+    SELECT IF(p.gateway = 'razorpay', 'plans_online', 'plans_manual') AS stream, p.amount * p.fx_rate AS amount,
            UNIX_TIMESTAMP(COALESCE(p.verified_at, p.created_at)) AS at, CONCAT('po', p.id) AS pay
       FROM payment_orders p
      WHERE p.status = 'verified'

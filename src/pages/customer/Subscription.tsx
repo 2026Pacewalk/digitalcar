@@ -10,17 +10,29 @@ import { useCurrentPlan } from "@/hooks/useCurrentPlan";
 import { useCustomer } from "@/hooks/useCustomer";
 import { planFeatures, planRank, isFreePlan, type PlanPkg } from "@/lib/planFeatures";
 import { openRazorpayCheckout } from "@/lib/razorpay";
+import { useCurrency } from "@/hooks/useCurrency";
+import CurrencySwitch from "@/components/CurrencySwitch";
+import { formatMoney, roundMoney, chargeFor, currencySymbol, isCurrency, type Currency, type AddonCycle } from "@contracts/money";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
 const TERM_LABEL: Record<"monthly" | "yearly" | "triennial", string> = { monthly: "Monthly", yearly: "Yearly", triennial: "3-Year" };
-const inr = (v: number) => "₹" + Math.round(Number(v) || 0).toLocaleString("en-IN");
+// ₹ exactly as before (whole rupees, Indian grouping); $ keeps its cents ("$9.18").
+const money = (v: number, cur: Currency) => formatMoney(v, cur, { decimals: cur === "INR" ? 0 : "auto" });
 const fmtDay = (ms: number) => new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+// The tRPC error code ("PRECONDITION_FAILED", …) of a failed call.
+const errCode = (e: unknown) => (e as { data?: { code?: string } } | null)?.data?.code;
+// The server's answer when $ can't be charged right now (USD switched off, or
+// Razorpay refused USD). Anything else keeps the normal error toast.
+const usdUnavailable = (e: unknown) => errCode(e) === "PRECONDITION_FAILED";
+const USD_OFF = "Paying in US dollars isn't available right now. Pay in ₹ or contact us.";
 
 /* The page body renders INSIDE the dashboard layout, which waits for the card
    record to load before showing its children — so every hook below reads the
    member's real card, never the first-render placeholder. */
 type Term = "monthly" | "yearly" | "triennial";
-type PayFor = { id: number; name: string; amount: number; cycle: Term };
+// The currency is captured with the price, like the term, so nothing can switch
+// it under an open payment.
+type PayFor = { id: number; name: string; amount: number; cycle: Term; currency: Currency };
 
 export default function CustomerSubscription() {
   // Kept up here, outside the layout: crossing the mobile/desktop breakpoint
@@ -48,9 +60,15 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
   const utils = trpc.useUtils();
   // Plan, term and expiry — decided in one shared place (also used by the Dashboard).
   const {
-    packages, currentPkgId, currentPlan, currentPlanName, currentPaid,
+    packages, currentPkgId, currentPlan, currentPlanName, currentPaid, currentCurrency,
     expiryMs, planExpired, userCycle, dataReady,
   } = useCurrentPlan();
+  // ₹ or $. A paid plan that is still running fixes it (the server enforces the
+  // same lock). With USD switched off `available` is false and `cur` is INR, so
+  // the page is exactly what it was before USD existed.
+  const { currency, setCurrency, available, locked, prices } = useCurrency({ lockedTo: currentCurrency });
+  const cur: Currency = currency === "USD" && prices ? "USD" : "INR";
+  const lockNote = `Your current plan was paid in ${currencySymbol(currency)}. Upgrades are charged in ${currencySymbol(currency)} until it ends.`;
   const { data: discount } = trpc.referral.myDiscount.useQuery();
   const { data: orders } = trpc.payment.myOrders.useQuery();
   const pendingOrder = (orders || []).find((o) => o.status === "pending");
@@ -82,6 +100,7 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
     const pp = p as unknown as PlanPkg;
     if (planRank(pp) < currentRank) return false; // no downgrade for an active member
     if (isFreePlan(pp) && hasHadPaidPlan) return false; // trial is first-time-only
+    if (cur === "USD" && !prices?.plans[p.id]) return false; // no $ price → not sold in $
     return true;
   });
   // An active top-tier (Platinum) member has nothing to buy, so a "buy now"
@@ -96,6 +115,42 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
   const offerPct = offerActive ? OFFER_PERCENT : 0;
   const offerH = Math.floor(offerMs / 3_600_000), offerM = Math.floor((offerMs % 3_600_000) / 60_000);
   const applyOffer = (v: number) => (offerPct ? Math.round(v * (1 - offerPct / 100) * 100) / 100 : v);
+  // The upgrade credit in the checkout's currency. While USD is on the lock keeps
+  // them the same. A plan really paid in $ (a verified $ payment on record) that
+  // is upgraded in ₹ — only once USD is switched off again — is credited at the
+  // rate it was paid at, as the server does. Every other case: the amount as is.
+  const paidUsd = (orders || []).find((o) => o.currency === "USD" && o.status === "verified");
+  const creditIn = (c: Currency) =>
+    c === "INR" && currentCurrency === "USD" && paidUsd ? currentPaid * (Number(paidUsd.fxRate) || 1) : currentPaid;
+
+  // A plan's card price for a term, in ₹ (the package columns) or $ (the server's
+  // USD table): referral discount on a first paid plan, upgrade credit while a
+  // paid plan runs, then the offer. The server re-prices every checkout.
+  type Pkg = NonNullable<typeof packages>[number];
+  const priceOf = (plan: Pkg, term: Term, c: Currency) => {
+    const base = c === "USD"
+      ? Number(prices?.plans[plan.id]?.[term])
+      : Number(term === "triennial" ? plan.threeYearPrice : term === "yearly" ? plan.yearlyPrice : plan.monthlyPrice);
+    const isPaid = base > 0;
+    // First paid plan → referral discount. Upgrade → credit the old amount (same
+    // currency: a running paid plan locks it).
+    const isOwnPlan = currentPkgId === plan.id && !planExpired;
+    const isUpgrade = hasPaid && !planExpired && !isOwnPlan && isPaid;
+    const discounted = dPct > 0 && isPaid ? Math.round(base * (1 - dPct / 100) * 100) / 100 : base;
+    const payable = isUpgrade ? Math.max(0, Math.round((base - creditIn(c)) * 100) / 100) : discounted;
+    // $ uses the server's own chargeFor, so the card can never advertise a cent
+    // less than payment.quote and the Razorpay order (its half-cent rounding is
+    // done on the decimal string). ₹ keeps the expressions above, unchanged.
+    const finalPrice = c === "USD"
+      ? chargeFor({
+        base, currency: "USD",
+        referralPct: isUpgrade ? 0 : (isPaid ? dPct : 0),
+        credit: isUpgrade ? creditIn(c) : 0,
+        offerPct: isPaid ? offerPct : 0,
+      })
+      : roundMoney(isPaid ? applyOffer(payable) : base, c); // whole rupees
+    return { base, isPaid, isUpgrade, finalPrice };
+  };
 
   // A coupon link (/dashboard/subscription?coupon=CODE) from an offer popup.
   const [urlCoupon] = useState(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("coupon")));
@@ -104,7 +159,15 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
   // choosing pins the tab, so nothing can switch the term under an open payment.
   const choose = (packageId: number, name: string, amount: number) => {
     cyclePinned.current = true;
-    setPayFor({ id: packageId, name, amount, cycle });
+    setPayFor({ id: packageId, name, amount, cycle, currency: cur });
+  };
+
+  // $ can't be paid right now: move to ₹ and carry on with the same plan and term
+  // at its ₹ price. Not offered while a running $ plan locks the currency.
+  const switchToInr = locked ? undefined : () => {
+    setCurrency("INR");
+    const pkg = payFor && (packages || []).find((p) => p.id === payFor.id);
+    setPayFor(pkg && payFor ? { ...payFor, amount: priceOf(pkg, payFor.cycle, "INR").finalPrice, currency: "INR" } : null);
   };
 
   return (
@@ -157,7 +220,7 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
             <span className="w-10 h-10 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0"><Clock size={19} /></span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-[#92400E]">Payment awaiting verification</p>
-              <p className="text-[12px] text-[#B45309]">{pendingOrder.planName} · {inr(Number(pendingOrder.amount))} · ref {pendingOrder.reference}. Your plan activates once our team verifies it.</p>
+              <p className="text-[12px] text-[#B45309]">{pendingOrder.planName} · {money(Number(pendingOrder.amount), isCurrency(pendingOrder.currency) ? pendingOrder.currency : "INR")} · ref {pendingOrder.reference}. Your plan activates once our team verifies it.</p>
             </div>
           </div>
         )}
@@ -188,8 +251,9 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
           </div>
         )}
 
-        {/* Billing Toggle — Monthly · Yearly · 3 Years */}
-        <div className="flex justify-center">
+        {/* Billing Toggle — Monthly · Yearly · 3 Years, and ₹ / $ beside it only
+            when USD can be charged (it wraps under the terms on a phone). */}
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
           <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-white ring-1 ring-[#E2E8F0] shadow-premium">
             {([
               { id: "monthly", label: "Monthly", badge: undefined },
@@ -203,6 +267,8 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
               </button>
             ))}
           </div>
+          {available && <CurrencySwitch value={cur} onChange={setCurrency} disabled={locked} note={locked ? lockNote : undefined} />}
+          {available && locked && <p className="basis-full text-center text-[11.5px] text-[#64748B]">{lockNote}</p>}
         </div>
 
         {/* Plans Grid */}
@@ -218,13 +284,7 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
             const isOwnOtherTerm = isOwnPlan && userCycle !== null && cycle !== userCycle;
             const ownTermUnknown = isOwnPlan && userCycle === null;
             const Icon = PLAN_ICONS[idx % PLAN_ICONS.length];
-            const base = Number(cycle === "triennial" ? plan.threeYearPrice : cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice);
-            const isPaid = base > 0;
-            // First paid plan → referral discount. Upgrade → credit the old amount.
-            const isUpgrade = hasPaid && !planExpired && !isOwnPlan && isPaid;
-            const discounted = dPct > 0 && isPaid ? Math.round(base * (1 - dPct / 100) * 100) / 100 : base;
-            const payable = isUpgrade ? Math.max(0, Math.round((base - currentPaid) * 100) / 100) : discounted;
-            const finalPrice = Math.round(isPaid ? applyOffer(payable) : base); // whole rupees
+            const { base, isPaid, isUpgrade, finalPrice } = priceOf(plan, cycle, cur);
             const popular = plan.name === "Gold";
 
             return (
@@ -240,12 +300,12 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
                 </div>
                 <div className="mb-4">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-[#0F172A]">{inr(finalPrice)}</span>
-                    {isPaid && finalPrice < base && <span className="text-sm text-[#94A3B8] line-through">{inr(base)}</span>}
+                    <span className="text-3xl font-bold text-[#0F172A]">{money(finalPrice, cur)}</span>
+                    {isPaid && finalPrice < base && <span className="text-sm text-[#94A3B8] line-through">{money(base, cur)}</span>}
                   </div>
                   <span className="text-sm text-[#94A3B8]">{cycle === "triennial" ? " for 3 years" : cycle === "yearly" ? " / year" : " / month"}</span>
                   <span className="ml-2 inline-flex flex-wrap gap-1.5 align-middle">
-                    {isUpgrade && <span className="text-[11px] font-semibold text-blue-600">−{inr(currentPaid)} adjusted</span>}
+                    {isUpgrade && <span className="text-[11px] font-semibold text-blue-600">−{money(creditIn(cur), cur)} adjusted</span>}
                     {dPct > 0 && isPaid && <span className="text-[11px] font-semibold text-emerald-600">−{dPct}% referral</span>}
                     {offerPct > 0 && isPaid && <span className="text-[11px] font-semibold text-red-600">−{offerPct}% offer</span>}
                   </span>
@@ -268,21 +328,28 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
         </div>
       </div>
 
-      <AddonsSection cycle={userCycle === "monthly" ? "monthly" : "yearly"} />
+      <AddonsSection cycle={userCycle === "monthly" ? "monthly" : "yearly"} usd={cur === "USD" && prices ? prices.addon : null} onSwitchToInr={switchToInr} />
 
       {payFor && (
         <PayModal
-          plan={payFor} offerPct={offerPct} cycle={payFor.cycle}
+          // A new currency is a new checkout: fresh quote, coupon and errors.
+          key={payFor.currency}
+          plan={payFor} offerPct={offerPct} cycle={payFor.cycle} currency={payFor.currency}
           onClose={() => setPayFor(null)}
           onDone={() => { setPayFor(null); utils.payment.myOrders.invalidate(); utils.subscription.mySubscription.invalidate(); }}
+          onSwitchToInr={switchToInr}
         />
       )}
     </>
   );
 }
 
-/* ─── Add-on cards (ID Card + Membership Card) — bought on top of the plan ─── */
-function AddonsSection({ cycle }: { cycle: "monthly" | "yearly" }) {
+/* ─── Add-on cards (ID Card + Membership Card) — bought on top of the plan ───
+   `usd` is the add-on's $ price list when the page is in US dollars, else null
+   (₹, exactly as before). The server prices the order either way. */
+function AddonsSection({ cycle, usd, onSwitchToInr }: {
+  cycle: AddonCycle; usd: Record<AddonCycle, number> | null; onSwitchToInr?: () => void;
+}) {
   const { data: pricing } = trpc.addon.pricing.useQuery();
   const { data: mine } = trpc.addon.mine.useQuery();
   const rzpCfg = trpc.payment.razorpayConfig.useQuery();
@@ -294,14 +361,14 @@ function AddonsSection({ cycle }: { cycle: "monthly" | "yearly" }) {
 
   if (!pricing) return null;
   const owned = new Set((mine ?? []).map((a) => a.type));
-  const price = cycle === "monthly" ? pricing.monthly : pricing.yearly;
+  const price = usd ? usd[cycle] : cycle === "monthly" ? pricing.monthly : pricing.yearly;
   const suffix = cycle === "monthly" ? "/mo" : "/yr";
-  const money = (n: number) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  const money = (n: number) => (usd ? formatMoney(n, "USD") : "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 }));
 
   const buy = async (type: "id_card" | "membership", name: string) => {
     setBusy(type);
     try {
-      const order = await create.mutateAsync({ type, billingCycle: cycle });
+      const order = await create.mutateAsync({ type, billingCycle: cycle, currency: usd ? "USD" : "INR" });
       await openRazorpayCheckout({
         key: order.keyId, amount: order.amount, currency: order.currency,
         name: "DigitalCarda", description: `${order.name} · ${cycle === "monthly" ? "Monthly" : "Yearly"}`,
@@ -317,7 +384,18 @@ function AddonsSection({ cycle }: { cycle: "monthly" | "yearly" }) {
           finally { setBusy(""); }
         },
       });
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start the payment."); setBusy(""); }
+    } catch (e) {
+      setBusy("");
+      if (usd && usdUnavailable(e)) {
+        // $ can't be charged right now: offer ₹ (unless a $ plan locks it) or a human.
+        toast.error(e instanceof Error ? e.message : USD_OFF, {
+          action: onSwitchToInr ? { label: "Switch to ₹", onClick: onSwitchToInr } : undefined,
+          cancel: { label: "Contact us", onClick: () => { window.open("/contact", "_blank"); } },
+        });
+        return;
+      }
+      toast.error(e instanceof Error ? e.message : "Could not start the payment.");
+    }
   };
 
   return (
@@ -352,18 +430,28 @@ function AddonsSection({ cycle }: { cycle: "monthly" | "yearly" }) {
             );
           })}
         </div>
-        <p className="text-[11px] text-[#94A3B8] mt-3">Billed on the same cycle as your plan. On a monthly plan the yearly ₹{pricing.yearly} is split across 12 months.</p>
+        <p className="text-[11px] text-[#94A3B8] mt-3">
+          {usd
+            // Whole-dollar prices don't split evenly, so say both instead of "÷ 12".
+            ? `Billed in US dollars on the same cycle as your plan: ${money(usd.yearly)}/yr on a yearly plan, ${money(usd.monthly)}/mo on a monthly plan.`
+            : <>Billed on the same cycle as your plan. On a monthly plan the yearly ₹{pricing.yearly} is split across 12 months.</>}
+        </p>
       </div>
     </div>
   );
 }
 
-/* ─── Manual payment modal (UPI QR / bank transfer + submit reference) ─── */
-function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
+/* ─── Manual payment modal (UPI QR / bank transfer + submit reference) ───
+   In US dollars it is card-only: UPI and Indian bank transfer need an Indian
+   account, and manual payments are always ₹. */
+function PayModal({ plan, offerPct, cycle, currency, onClose, onDone, onSwitchToInr }: {
   plan: { id: number; name: string; amount: number }; offerPct: number; cycle: "monthly" | "yearly" | "triennial";
-  onClose: () => void; onDone: () => void;
+  currency: Currency; onClose: () => void; onDone: () => void;
+  /** Move this checkout to ₹. Absent while a running $ plan locks the currency. */
+  onSwitchToInr?: () => void;
 }) {
   const cycleLabel = cycle === "triennial" ? "3 Years" : cycle === "yearly" ? "Yearly" : "Monthly";
+  const usd = currency === "USD";
   const { data: pay } = trpc.payment.instructions.useQuery();
   const createOrder = trpc.payment.createOrder.useMutation();
   const [method, setMethod] = useState<"upi" | "bank">("upi");
@@ -382,24 +470,40 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState<{ code: string; discount: number; amount: number } | null>(null);
   const [couponError, setCouponError] = useState("");
-  const amount = coupon ? coupon.amount : plan.amount;
+
+  // In $ the amount shown is the server's own quote (the card price is only an
+  // estimate there). ₹ keeps the card price, as it always has.
+  const quote = trpc.payment.quote.useQuery(
+    { packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0, currency },
+    { enabled: usd, retry: false, refetchOnWindowFocus: false },
+  );
+  const listAmount = usd && quote.data ? quote.data.amount : plan.amount;
+  const amount = coupon ? coupon.amount : listAmount;
+
+  // $ can't be charged right now (switched off, or Razorpay refused USD): say so
+  // and offer ₹ or a human instead of a button that can only fail.
+  const [usdBlocked, setUsdBlocked] = useState("");
+  const blockedMsg = !usd ? ""
+    : usdBlocked || (quote.error && usdUnavailable(quote.error) ? quote.error.message || USD_OFF : "")
+      || (rzpCfg.data && !rzpCfg.data.enabled ? USD_OFF : "");
 
   const applyCoupon = async (raw?: string) => {
     const code = (raw ?? couponInput).trim();
     if (!code) return;
     setCouponError("");
     try {
-      const r = await checkCoupon.mutateAsync({ packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0, couponCode: code });
+      const r = await checkCoupon.mutateAsync({ packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0, couponCode: code, currency });
       if (r.valid) {
         setCoupon({ code: r.code, discount: r.discount, amount: r.amount });
         setCouponInput(r.code);
-        toast.success(`Coupon ${r.code} applied — you save ${inr(r.discount)}`);
+        toast.success(`Coupon ${r.code} applied — you save ${money(r.discount, currency)}`);
       } else {
         setCoupon(null);
         setCouponError(r.reason);
       }
     } catch (e) {
       setCoupon(null);
+      if (usd && usdUnavailable(e)) { setUsdBlocked(e instanceof Error ? e.message : USD_OFF); return; }
       setCouponError(e instanceof Error ? e.message : "Couldn't check this coupon.");
     }
   };
@@ -414,7 +518,7 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
   const payWithRazorpay = async () => {
     setRzpBusy(true);
     try {
-      const order = await rzpCreate.mutateAsync({ packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0, couponCode: coupon?.code });
+      const order = await rzpCreate.mutateAsync({ packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0, couponCode: coupon?.code, currency });
       const rzp = await openRazorpayCheckout({
         key: order.keyId,
         amount: order.amount,
@@ -456,6 +560,7 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
       });
     } catch (e) {
       setRzpBusy(false);
+      if (usd && usdUnavailable(e)) { setUsdBlocked(e instanceof Error ? e.message : USD_OFF); return; }
       toast.error(e instanceof Error ? e.message : "Could not start the payment");
     }
   };
@@ -484,7 +589,7 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-xl w-full max-w-md relative z-10 max-h-[94vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#F1F5F9] shrink-0">
-          <div><p className="text-base font-bold text-[#0F172A]">Pay {inr(amount)}</p><p className="text-[11px] text-[#94A3B8]">{plan.name} · {cycleLabel}</p></div>
+          <div><p className="text-base font-bold text-[#0F172A]">Pay {money(amount, currency)}</p><p className="text-[11px] text-[#94A3B8]">{plan.name} · {cycleLabel}</p></div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#F1F5F9] text-[#64748B]"><X size={18} /></button>
         </div>
 
@@ -495,7 +600,7 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
               <TicketPercent size={18} className="shrink-0 text-[#16A34A]" />
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-bold text-[#166534]">{coupon.code} applied</p>
-                <p className="text-[11.5px] text-[#15803D]">You save {inr(coupon.discount)} · was {inr(plan.amount)}</p>
+                <p className="text-[11.5px] text-[#15803D]">You save {money(coupon.discount, currency)} · was {money(listAmount, currency)}</p>
               </div>
               <button type="button" onClick={() => { setCoupon(null); setCouponInput(""); }} className="text-[12px] font-semibold text-[#166534] hover:underline">Remove</button>
             </div>
@@ -519,24 +624,57 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
           )}
         </div>
 
+        {/* $ can't be charged right now → ₹ or a human, instead of the pay button */}
+        {!!blockedMsg && (
+          <div className="px-4 pt-4">
+            <div role="alert" className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-3.5 py-3">
+              <p className="text-[13px] font-semibold text-[#92400E]">{blockedMsg}</p>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {onSwitchToInr && (
+                  <button type="button" onClick={onSwitchToInr} className="h-9 px-4 rounded-xl gradient-gold text-[#0F172A] text-[13px] font-bold hover:shadow-gold">Switch to ₹</button>
+                )}
+                <a href="/contact" target="_blank" rel="noreferrer" className="inline-flex items-center h-9 px-4 rounded-xl bg-white ring-1 ring-[#E2E8F0] text-[13px] font-semibold text-[#0F172A] hover:bg-[#F8FAFC]">Contact us</a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Instant online checkout (Razorpay) — card / UPI / netbanking in one modal */}
-        {rzpCfg.data?.enabled && (
+        {rzpCfg.data?.enabled && !blockedMsg && (
           <div className="px-4 pt-4">
             <button onClick={payWithRazorpay} disabled={rzpBusy}
               className="w-full h-12 rounded-2xl bg-[#0F172A] text-white font-bold flex items-center justify-center gap-2 hover:bg-[#1E293B] active:scale-[0.99] disabled:opacity-60">
               {rzpBusy
                 ? <><Loader2 size={18} className="animate-spin" /> Opening secure checkout…</>
-                : <><Zap size={18} className="text-[#F7B31C]" /> Pay {inr(amount)} instantly</>}
+                : <><Zap size={18} className="text-[#F7B31C]" /> Pay {money(amount, currency)} instantly</>}
             </button>
-            <p className="text-[11px] text-[#94A3B8] text-center mt-1.5">Card · UPI · Netbanking · Wallets — activated instantly</p>
-            <div className="flex items-center gap-3 my-3">
-              <div className="h-px flex-1 bg-[#E2E8F0]" />
-              <span className="text-[11px] text-[#94A3B8]">or pay manually</span>
-              <div className="h-px flex-1 bg-[#E2E8F0]" />
-            </div>
+            {usd ? (
+              // Razorpay offers only international cards on a non-INR order.
+              <p className="text-[11px] text-[#94A3B8] text-center mt-1.5">Debit or credit card · charged in US dollars — activated instantly</p>
+            ) : (
+              <>
+                <p className="text-[11px] text-[#94A3B8] text-center mt-1.5">Card · UPI · Netbanking · Wallets — activated instantly</p>
+                <div className="flex items-center gap-3 my-3">
+                  <div className="h-px flex-1 bg-[#E2E8F0]" />
+                  <span className="text-[11px] text-[#94A3B8]">or pay manually</span>
+                  <div className="h-px flex-1 bg-[#E2E8F0]" />
+                </div>
+              </>
+            )}
           </div>
         )}
 
+        {usd ? (
+          // Manual payment is ₹-only (UPI / Indian bank), so it is not offered in $.
+          !blockedMsg && (
+            <div className="p-4">
+              <p className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#64748B]">
+                UPI and Indian bank transfer need an Indian account. Pay by card above
+                {onSwitchToInr ? <>, or <button type="button" onClick={onSwitchToInr} className="font-semibold text-[#0F172A] underline underline-offset-2">switch to ₹</button></> : null}.
+              </p>
+            </div>
+          )
+        ) : (<>
         <div className="flex rounded-xl bg-[#F1F5F9] p-1 m-4 mb-0 mt-0">
           {(["upi", "bank"] as const).map((m) => (
             <button key={m} onClick={() => setMethod(m)} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${method === m ? "bg-white text-[#0F172A] shadow-sm" : "text-[#64748B]"}`}>{m === "upi" ? "UPI / QR" : "Bank Transfer"}</button>
@@ -573,6 +711,7 @@ function PayModal({ plan, offerPct, cycle, onClose, onDone }: {
           </button>
           <p className="text-[11px] text-[#94A3B8] text-center mt-2">Your plan activates once our team verifies the payment.</p>
         </div>
+        </>)}
       </div>
     </div>
   );

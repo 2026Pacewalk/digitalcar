@@ -4,6 +4,7 @@ import { getDb } from "./queries/connection";
 import { subscriptions, invoices } from "@db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { getUpgradeOfferPercent, setUpgradeOfferPercent, MAX_OFFER_PERCENT } from "./lib/pricing";
+import { effectiveRowCurrency, verifiedUsdPayment } from "./lib/fx";
 
 export const subscriptionRouter = createRouter({
   mySubscription: authedQuery.query(async ({ ctx }) => {
@@ -28,7 +29,14 @@ export const subscriptionRouter = createRouter({
     const pkg = sub.package as { monthlyPrice?: unknown; yearlyPrice?: unknown } | null;
     const isFree = sub.packageId === 7 || (!!pkg && Number(pkg.monthlyPrice) === 0 && Number(pkg.yearlyPrice) === 0);
     const term: "monthly" | "yearly" | "triennial" | null = !isActive ? null : isFree ? "monthly" : sub.billingCycle;
-    return { ...sub, isActive, term };
+    //  · currency — the EFFECTIVE one, decided here so the browser never has to
+    //    re-derive it. A row merely labelled 'USD' (the column's old default,
+    //    never rewritten) with no verified $ payment behind it was paid in ₹,
+    //    which is what the server's own checkout lock concludes (api/lib/fx.ts).
+    const currency = sub.currency === "USD"
+      ? effectiveRowCurrency(sub.currency, !!(await verifiedUsdPayment(db, ctx.user.id)))
+      : "INR";
+    return { ...sub, isActive, term, currency };
   }),
 
   // NOTE: the former `subscribe` and `upgrade` mutations were removed (Phase 31

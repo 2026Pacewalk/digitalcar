@@ -443,6 +443,41 @@ try {
   log("✓ live INR plans upserted (Trial/Gold/Platinum + 3-year prices)");
 }
 
+// USD checkout: each payment records its currency and the ₹-per-unit rate it was
+// priced at, so revenue, commission and rewards use amount × fx_rate (an INR
+// value). The defaults (INR, 1) make every existing row correct with no backfill.
+// Runs before the app reload, so the new code never SELECTs a missing column.
+// USD prices live in app_settings — nothing here touches subscription_packages.
+{
+  const [t] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='payment_orders'");
+  if (t[0].n) {
+    for (const [col, ddl] of [
+      ["currency", "VARCHAR(3) NOT NULL DEFAULT 'INR' AFTER amount"],
+      ["fx_rate", "DECIMAL(10,4) NOT NULL DEFAULT 1.0000 AFTER currency"],
+    ]) {
+      const [r] = await conn.query(
+        "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='payment_orders' AND column_name=?", [col]);
+      if (r[0].n === 0) { await conn.query(`ALTER TABLE payment_orders ADD COLUMN ${col} ${ddl}`); log(`✓ payment_orders.${col} added`); }
+      else log(`• payment_orders.${col} present (skipped)`);
+    }
+  } else log("• payment_orders missing (USD columns skipped)");
+
+  const [sc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='subscriptions' AND column_name='currency'");
+  if (sc[0].n) {
+    // The column defaulted to 'USD', a leftover; the app always wrote 'INR'.
+    // Metadata-only and idempotent — no existing row is read or written.
+    await conn.query("ALTER TABLE subscriptions ALTER COLUMN currency SET DEFAULT 'INR'");
+    // Rows that omitted the currency (db/recover-members.mjs) still say 'USD'
+    // although they were paid in ₹. They are NOT relabelled: the deploy never
+    // rewrites live rows. The code resolves the label instead — a plan counts as
+    // paid in $ only when the member has a verified USD payment_orders row
+    // (api/lib/fx.ts effectiveRowCurrency), which every reader goes through.
+    log("✓ subscriptions.currency default is 'INR'");
+  }
+}
+
 // Phase 33: back-fill legacy enquiries.json into the leads CRM so old + new
 // leads live in one place (/dashboard/leads). Idempotent & additive — reads
 // dist/public|public JSON (built just before this step), never deletes it.

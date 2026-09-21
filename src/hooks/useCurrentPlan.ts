@@ -17,6 +17,7 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { useCustomer, DEFAULT_CUSTOMER, readAccountCustomer } from "@/hooks/useCustomer";
+import { isCurrency, type Currency } from "@contracts/money";
 
 export type Term = "monthly" | "yearly" | "triennial";
 export const TERMS: Term[] = ["monthly", "yearly", "triennial"];
@@ -65,6 +66,16 @@ export function useCurrentPlan() {
       ? trial!.status === "expired" || trial!.status === "grace" || trial!.status === "cancelled"
       : !!currentPkgId && Number.isFinite(expiryMs) && expiryMs < now;
 
+  // The currency of the member's paid plan while it is still running — the
+  // server's checkout lock (paidPlanActive: amount > 0, active, not ended), so
+  // an upgrade credit is never ₹ off a $ price. null = nothing locks the currency.
+  // mySubscription already returns the EFFECTIVE currency (a row merely labelled
+  // 'USD' with no verified $ payment behind it comes back as INR), so nothing is
+  // re-derived here; the guard below only keeps an unexpected value out.
+  const currentCurrency: Currency | null = subscription && !planExpired && currentPaid > 0
+    ? (isCurrency(subscription.currency) ? subscription.currency : "INR")
+    : null;
+
   // The billing term the member is actually on (null when not known / expired).
   const userCycle = ((): Term | null => {
     if (!currentPkgId || planExpired) return null;
@@ -88,7 +99,7 @@ export function useCurrentPlan() {
     // a plan display never shows a guess from the card while it is still loading.
     subLoaded: subQ.isFetched,
     subscription, packages, customer,
-    currentPkgId, currentPlan, currentPlanName, currentPaid,
+    currentPkgId, currentPlan, currentPlanName, currentPaid, currentCurrency,
     expiryMs, planExpired, userCycle, dataReady,
   };
 }

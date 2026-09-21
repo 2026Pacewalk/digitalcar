@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
 import JsonLd from "@/components/seo/JsonLd";
+import { useCurrency } from "@/hooks/useCurrency";
+import { formatMoney } from "@contracts/money";
 
 const PRICE = 499; // mirrors DOMAIN_ADDON_PRICE in api/domain-router.ts
 
@@ -53,6 +55,11 @@ const FAQ_LD = {
 export default function CustomDomain() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [copied, setCopied] = useState(false);
+  // Only the price block follows the visitor's currency; the hero, FAQ and its
+  // JSON-LD stay in Rs. like the rest of the server-rendered page. useCurrency is
+  // ₹ until after mount, so the server HTML and hydration never change.
+  const { currency, prices } = useCurrency();
+  const usdPrice = currency === "USD" && prices ? prices.domain : null;
 
   const copyExample = async () => {
     try { await navigator.clipboard.writeText("cname.digitalcarda.in"); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard blocked */ }
@@ -237,12 +244,14 @@ export default function CustomDomain() {
                 <div>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#0F172A] text-[#F7B31C]"><Sparkles size={11} /> Add-on</span>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="text-5xl font-extrabold text-[#0F172A] tracking-tight">Rs. {PRICE}</span>
+                    <span className="text-5xl font-extrabold text-[#0F172A] tracking-tight">{usdPrice ? formatMoney(usdPrice, "USD") : <>Rs. {PRICE}</>}</span>
                     <span className="text-[14px] text-[#64748B]">one-time</span>
                   </div>
                   <p className="mt-2 text-[13.5px] text-[#475569]">
                     <span className="font-bold text-[#0F172A]">Free</span> on the Platinum 3-Year plan.
                   </p>
+                  {/* Squares the $ figure with the Rs. price quoted elsewhere on the page. */}
+                  {usdPrice ? <p className="mt-1 text-[12px] text-[#64748B]">Rs. {PRICE} if you pay in rupees.</p> : null}
                   <p className="mt-3 text-[12px] text-[#94A3B8] leading-relaxed">
                     Domain registration is separate and paid to your registrar. No monthly fee to us.
                   </p>

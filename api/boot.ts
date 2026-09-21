@@ -644,6 +644,37 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// Same idea for USD checkout: payment_orders.currency + fx_rate (the ₹ per unit a
+// payment was priced at). Live gets these from db/migrate-live.mjs before the
+// reload; this covers local/dev databases that never ran it. The defaults
+// (INR, 1) make every existing row correct. Schema only: no data is relabelled here.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    for (const [col, ddl] of [
+      ["currency", "VARCHAR(3) NOT NULL DEFAULT 'INR' AFTER amount"],
+      ["fx_rate", "DECIMAL(10,4) NOT NULL DEFAULT 1.0000 AFTER currency"],
+    ] as const) {
+      const rows = await db.execute(sql.raw(
+        `SELECT COUNT(*) AS n FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'payment_orders' AND column_name = '${col}'`,
+      ));
+      const n = Number((rows as unknown as [{ n?: number }[]])[0]?.[0]?.n ?? (rows as unknown as { n?: number }[])[0]?.n ?? 0);
+      if (!n) {
+        await db.execute(sql.raw(`ALTER TABLE payment_orders ADD COLUMN ${col} ${ddl}`));
+        console.log(`[schema] payment_orders.${col} column added`);
+      }
+    }
+    // subscriptions.currency keeps whatever default it has: live gets 'INR' from
+    // db/migrate-live.mjs on deploy and a fresh dev DB from db/schema.ts, so an
+    // unguarded ALTER here would only re-lock the table on every restart.
+  } catch (e) {
+    console.error("[schema] ensure payment_orders.currency/fx_rate failed:", (e as Error).message);
+  }
+})();
+
 // One-time, idempotent schema ensure for nfc_orders (NFC card & standee orders).
 // CREATE TABLE IF NOT EXISTS is a no-op once the table exists; additive only.
 (async () => {
@@ -1491,11 +1522,24 @@ app.post("/api/razorpay/webhook", async (c) => {
     const billingCycle = (cycle === "monthly" || cycle === "yearly" || cycle === "triennial") ? cycle : "yearly";
     if (!userId || !packageId) return c.json({ ok: true, note: "order missing notes" });
 
+    // The authoritative charged amount and currency, plus the rate noted at
+    // checkout. A currency we never create can't be fixed by a retry: log it and
+    // ack, and support sorts the payment out by hand.
+    const { getFxConfig, readOrderMoney, UnsupportedCurrencyError } = await import("./lib/fx");
+    let paid: ReturnType<typeof readOrderMoney>;
+    try {
+      paid = readOrderMoney({ amount: Number(order.amount || pay.amount || 0), currency: order.currency, notes }, await getFxConfig(db));
+    } catch (e) {
+      if (!(e instanceof UnsupportedCurrencyError)) throw e;
+      console.error(`[razorpay webhook] payment.captured ${pay.id} → NOT recorded: ${e.message}`);
+      return c.json({ ok: true, note: "unsupported currency" });
+    }
+
     const res = await recordRazorpayPayment(db, {
       userId, packageId,
       planName: String(notes.planName || "Plan"),
       billingCycle,
-      amountRupees: Number(order.amount || pay.amount || 0) / 100, // the authoritative charged amount
+      ...paid,
       paymentId: pay.id,
       couponCode: String(notes.couponCode || "") || undefined,
       couponDiscount: Number(notes.couponDiscount || 0),

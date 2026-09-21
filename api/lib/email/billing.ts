@@ -24,6 +24,7 @@ import {
   layout, heroBand, heroLight, sectionLabel, button, actionPills, statTiles, infoGrid, callout, note,
   tickList, progressSteps, receipt, quoteBlock, linkPanel, cardPreview, helpStrip, signoff, darkChip,
   mono, inkLink, waLink, whenIst, dayIst, dateIst, esc, inr, firstName, p, hi,
+  asCurrency, money as showMoney,
   BRAND, TONE, ON_DARK, SITE, SUPPORT_WHATSAPP, FONT, MONO,
   type Email, type Tone,
 } from "./kit";
@@ -36,7 +37,7 @@ const PLANS_URL = `${SITE}/dashboard/subscription`;
 const line = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim();
 const clip = (v: unknown, max: number) => { const s = String(v ?? "").trim(); return s.length > max ? `${s.slice(0, max - 1)}…` : s; };
 const plural = (n: number, word: string) => `${n.toLocaleString("en-IN")} ${word}${n === 1 ? "" : "s"}`;
-/** A finite rupee amount (callers sometimes pass decimal strings from MySQL). */
+/** A finite amount, rounded to paise / cents (callers sometimes pass decimal strings from MySQL). */
 const money = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0; };
 
 /** A date that may arrive as a Date, a calendar day ("2027-09-21"), an ISO
@@ -92,6 +93,11 @@ function paidBy(method?: string | null, gateway?: string | null): string {
   const t = line(method);
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : "";
 }
+
+/** Said on every $ invoice: the amount on the card statement can differ, and
+    that's the bank's conversion, not a different charge from us. */
+const USD_BILLED = "This invoice is billed in US dollars (USD)";
+const USD_CARD_NOTE = "If your card is in another currency, your bank converts the amount at its own rate.";
 
 /** The Subscription page, optionally pre-selecting a plan, a term and a coupon
     (the page reads ?plan=, ?cycle= and ?coupon=). */
@@ -346,12 +352,19 @@ export function paymentSubmittedEmail(o: {
  *     With `listPrice`, anything else between list price and amount paid is
  *     shown as "Other discounts & upgrade credit".
  *   - `billedTo`: name/business on the invoice (defaults to `name`).
+ *   - `currency`: what every amount above is in — order.currency. Default INR
+ *     (the email is then exactly as before); "USD" shows $ with cents and says
+ *     the invoice was billed in US dollars.
  */
 export function paymentVerifiedEmail(o: {
   name?: string | null; planName: string; amount: number; billingCycle?: string | null; invoiceNo: string; validTill: string | Date;
   paidAt?: Date | null; method?: string | null; gateway?: string | null; reference?: string | null;
   listPrice?: number | null; couponCode?: string | null; discount?: number | null; billedTo?: string | null;
+  currency?: string | null;
 }): Email {
+  const usd = asCurrency(o.currency) === "USD";
+  // It's the invoice, so $ always shows cents; ₹ is inr() exactly as before.
+  const fmt = (v: number) => showMoney(v, o.currency, { cents: true });
   const plan = line(o.planName) || "Plan";
   const amount = money(o.amount);
   const till = showDate(o.validTill);
@@ -371,12 +384,12 @@ export function paymentVerifiedEmail(o: {
   if (list > amount) {
     rowAmount = list;
     const c = Math.min(coupon, list - amount);
-    if (c > 0) extra.push({ label: code ? `Coupon ${code}` : "Coupon discount", value: `− ${inr(c)}`, tone: "green" });
+    if (c > 0) extra.push({ label: code ? `Coupon ${code}` : "Coupon discount", value: `− ${fmt(c)}`, tone: "green" });
     const rest = money(list - amount - c);
-    if (rest > 0) extra.push({ label: "Other discounts & upgrade credit", value: `− ${inr(rest)}`, tone: "green" });
+    if (rest > 0) extra.push({ label: "Other discounts & upgrade credit", value: `− ${fmt(rest)}`, tone: "green" });
   } else if (coupon > 0) {
     rowAmount = money(amount + coupon);
-    extra.push({ label: code ? `Coupon ${code}` : "Coupon discount", value: `− ${inr(coupon)}`, tone: "green" });
+    extra.push({ label: code ? `Coupon ${code}` : "Coupon discount", value: `− ${fmt(coupon)}`, tone: "green" });
   }
   const saved = money(rowAmount - amount);
 
@@ -384,7 +397,7 @@ export function paymentVerifiedEmail(o: {
     eyebrow: "Payment confirmed", tone: "green",
     title: `Your ${plan} plan is active`,
     sub: `Thank you${firstName(o.name) ? `, ${firstName(o.name)}` : ""} — your payment is confirmed and your plan is switched on.`,
-    aside: { label: "Paid", value: inr(amount), sub: saved > 0 ? `You saved ${inr(saved)}` : undefined },
+    aside: { label: "Paid", value: fmt(amount), sub: saved > 0 ? `You saved ${fmt(saved)}` : undefined },
     chips: chips(termChip(o.billingCycle), till && `Valid till ${till}`, inv && `Invoice ${inv}`),
   });
 
@@ -395,7 +408,7 @@ export function paymentVerifiedEmail(o: {
     invoiceHeader(inv || "—", dateIst(paidAt)) +
     receipt({
       rows: [{ name: `${plan} plan`, sub: [cycle, till && `valid till ${till}`].filter(Boolean).join(" · ") || undefined, amount: rowAmount }],
-      extra, totalLabel: "Amount paid", total: amount,
+      extra, totalLabel: usd ? "Amount paid (USD)" : "Amount paid", total: amount, currency: o.currency,
     }) +
     `<div style="height:10px;font-size:0;line-height:0">&nbsp;</div>` +
     infoGrid([
@@ -404,7 +417,7 @@ export function paymentVerifiedEmail(o: {
       ["Payment ref", ref && mono(ref)],
       ["Paid on", esc(whenIst(paidAt))],
     ]) +
-    note("This was a one-time payment. Plans don't renew or charge automatically — you decide when to renew.") +
+    note((usd ? `${USD_BILLED}. ${USD_CARD_NOTE} ` : "") + "This was a one-time payment. Plans don't renew or charge automatically — you decide when to renew.") +
     button("Open your dashboard", `${SITE}/dashboard`) +
     helpStrip();
 
@@ -412,7 +425,7 @@ export function paymentVerifiedEmail(o: {
     kind: "paymentVerifiedEmail",
     subject: `Payment confirmed — ${line(plan)} is active 🎉`,
     html: layout({
-      preheader: `${inr(amount)} received${inv ? ` · invoice ${inv}` : ""}${till ? ` · valid till ${till}` : ""}.`,
+      preheader: `${fmt(amount)} received${inv ? ` · invoice ${inv}` : ""}${till ? ` · valid till ${till}` : ""}.`,
       hero, bodyHtml, accent: TONE.green.solid, audience: "customer",
     }),
     text: lines(
@@ -421,9 +434,10 @@ export function paymentVerifiedEmail(o: {
       `INVOICE ${inv || ""}`.trim(),
       `Date: ${dateIst(paidAt)}`,
       billedTo && `Billed to: ${billedTo}`,
-      `${plan} plan${cycle ? ` (${cycle})` : ""}: ${inr(rowAmount)}`,
+      `${plan} plan${cycle ? ` (${cycle})` : ""}: ${fmt(rowAmount)}`,
       ...extra.map((x) => `${x.label}: ${x.value.replace("− ", "-")}`),
-      `Amount paid: ${inr(amount)}`,
+      `Amount paid: ${fmt(amount)}${usd ? " (USD)" : ""}`,
+      usd && `${USD_BILLED}. ${USD_CARD_NOTE}`,
       by && `Paid by: ${by}`,
       ref && `Payment ref: ${ref}`,
       till && `Valid till: ${till}`, BR,
@@ -610,11 +624,14 @@ export function paymentFailedEmail(o: {
  *     (₹0) plans, where there is no credit.
  *   - `lapses`: plain-text lines for what pauses when it ends, to override the
  *     defaults derived from the code.
+ *   - `currency`: what `upgradeCredit` is in — the subscription row's currency.
+ *     Default INR (the email is then exactly as before).
  */
 export function subscriptionRenewalReminderEmail(o: {
   name?: string | null; planName: string; daysLeft: number; validTill: string | Date;
   billingCycle?: string | null; slug?: string | null; packageId?: number | null;
   upgradeCredit?: number | null; nextPlanName?: string | null; lapses?: string[] | null;
+  currency?: string | null;
 }): Email {
   const plan = line(o.planName) || "paid";
   const days = Math.max(0, Math.round(Number(o.daysLeft) || 0));
@@ -648,7 +665,7 @@ export function subscriptionRenewalReminderEmail(o: {
         { label: "See my plan", href: plansUrl({ packageId: o.packageId, cycle: o.billingCycle }), tone: "light" },
       ])) +
     (credit > 0
-      ? note(`<strong style="color:${BRAND.ink}">Thinking of moving up${next ? ` to ${esc(next)}` : ""}?</strong> Upgrade before ${esc(endDate || "your plan ends")} and the ${esc(inr(credit))} you paid for ${esc(plan)} comes off the price. After that date, plans are charged in full.`)
+      ? note(`<strong style="color:${BRAND.ink}">Thinking of moving up${next ? ` to ${esc(next)}` : ""}?</strong> Upgrade before ${esc(endDate || "your plan ends")} and the ${esc(showMoney(credit, o.currency))} you paid for ${esc(plan)} comes off the price. After that date, plans are charged in full.`)
       : "") +
     sectionLabel("If your plan ends") +
     keepPausePanel(KEEPS.map(esc), lapses) +
@@ -676,7 +693,7 @@ export function subscriptionRenewalReminderEmail(o: {
       `Renew without a break: WhatsApp us before ${endDate || "it ends"} and we'll help you renew — ${wa}`,
       `Or renew yourself from the Subscription page once it has ended: ${PLANS_URL}`,
       credit > 0 && BR,
-      credit > 0 && `Thinking of moving up${next ? ` to ${next}` : ""}? Upgrade before ${endDate || "your plan ends"} and the ${inr(credit)} you paid comes off the price. After that date, plans are charged in full.`, BR,
+      credit > 0 && `Thinking of moving up${next ? ` to ${next}` : ""}? Upgrade before ${endDate || "your plan ends"} and the ${showMoney(credit, o.currency)} you paid comes off the price. After that date, plans are charged in full.`, BR,
       "If your plan ends:",
       ...KEEPS.map((k) => `+ ${k}`),
       ...lapses.map((l) => `- ${stripTags(l)}`),

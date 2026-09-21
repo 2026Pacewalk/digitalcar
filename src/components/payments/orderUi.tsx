@@ -5,33 +5,13 @@
 import { useMemo, useState } from "react";
 import {
   Clock, CheckCircle2, XCircle, CreditCard, Landmark, QrCode, X, Check,
-  Search, Download, IndianRupee, Receipt, Zap,
+  Search, Download, IndianRupee, DollarSign, Receipt, Zap,
 } from "lucide-react";
+import { formatMoney, currencySymbol } from "@contracts/money";
+import { money, inrValue, fmt, ordersCsv, type PaymentOrderRow, type OrderStats } from "./orderMoney";
 
-export type PaymentOrderRow = {
-  id: number;
-  userId: number;
-  planName: string | null;
-  billingCycle: string;
-  amount: number;
-  method: "upi" | "bank";
-  gateway: "manual" | "razorpay";
-  reference: string;
-  status: "pending" | "verified" | "rejected";
-  adminNote: string | null;
-  createdAt: string | Date;
-  verifiedAt: string | Date | null;
-  user: { name: string; email: string; phone?: string | null } | null;
-};
-
-export const inr = (v: unknown) =>
-  "₹" + (Number(v) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-export const fmt = (s: string | Date | null | undefined) => {
-  if (!s) return "—";
-  const d = new Date(typeof s === "string" ? s.replace(" ", "T") : s);
-  return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-};
+// The row shape, ₹/$ helpers, stats and CSV live in ./orderMoney (pure, unit-tested).
+export type { PaymentOrderRow, OrderStats } from "./orderMoney";
 
 export function StatusBadge({ status }: { status: PaymentOrderRow["status"] }) {
   const map = {
@@ -76,16 +56,7 @@ export function filterOrders(list: PaymentOrderRow[], f: OrderFilters): PaymentO
 
 /** Turn the (filtered) list into a CSV and trigger a client-side download. */
 export function downloadOrdersCsv(list: PaymentOrderRow[], filename = "payment-orders.csv") {
-  const head = ["ID", "Date", "Customer", "Email", "Phone", "Plan", "Cycle", "Amount", "Gateway", "Method", "Reference", "Status", "Verified At", "Note"];
-  const esc = (v: unknown) => {
-    const s = String(v ?? "");
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const rows = list.map((o) => [
-    o.id, fmt(o.createdAt), o.user?.name ?? "", o.user?.email ?? "", o.user?.phone ?? "",
-    o.planName ?? "", o.billingCycle, o.amount, o.gateway, o.method, o.reference, o.status, fmt(o.verifiedAt), o.adminNote ?? "",
-  ].map(esc).join(","));
-  const csv = [head.join(","), ...rows].join("\n");
+  const csv = ordersCsv(list);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -95,12 +66,16 @@ export function downloadOrdersCsv(list: PaymentOrderRow[], filename = "payment-o
 }
 
 /** Summary cards row. Stats come pre-computed (admin: server; reseller/customer: client). */
-export function SummaryCards({ stats }: {
-  stats: { revenue: number; monthRevenue?: number; pending: number; verified: number; rejected?: number; razorpayRevenue?: number; manualRevenue?: number };
-}) {
-  const cards = [
-    { label: "Total collected", value: inr(stats.revenue), icon: IndianRupee, bg: "#DCFCE7", fg: "#16A34A" },
-    ...(stats.monthRevenue !== undefined ? [{ label: "This month", value: inr(stats.monthRevenue), icon: Receipt, bg: "#E0E7FF", fg: "#4F46E5" }] : []),
+export function SummaryCards({ stats }: { stats: OrderStats }) {
+  const cur = stats.currency ?? "INR";
+  const usdCount = cur === "INR" ? stats.usdCount ?? 0 : 0;
+  // Only when $ payments are in the total — an all-₹ view looks exactly as before.
+  const usdNote = usdCount > 0
+    ? `₹ equivalent · incl. ${money(stats.usdRevenue ?? 0, "USD")} from ${usdCount} USD payment${usdCount === 1 ? "" : "s"}`
+    : undefined;
+  const cards: { label: string; value: string; note?: string; icon: typeof Clock; bg: string; fg: string }[] = [
+    { label: "Total collected", value: money(stats.revenue, cur), note: usdNote, icon: cur === "USD" ? DollarSign : IndianRupee, bg: "#DCFCE7", fg: "#16A34A" },
+    ...(stats.monthRevenue !== undefined ? [{ label: "This month", value: money(stats.monthRevenue, cur), note: usdCount > 0 ? "₹ equivalent" : undefined, icon: Receipt, bg: "#E0E7FF", fg: "#4F46E5" }] : []),
     { label: "Pending", value: String(stats.pending), icon: Clock, bg: "#FEF3C7", fg: "#D97706" },
     { label: "Verified", value: String(stats.verified), icon: CheckCircle2, bg: "#DCFCE7", fg: "#16A34A" },
   ];
@@ -109,7 +84,11 @@ export function SummaryCards({ stats }: {
       {cards.map((s) => (
         <div key={s.label} className="bg-white rounded-2xl p-4 shadow-premium border border-[#F1F5F9] flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: s.bg }}><s.icon size={19} style={{ color: s.fg }} /></div>
-          <div className="min-w-0"><p className="text-lg font-bold text-[#0F172A] leading-none truncate">{s.value}</p><p className="text-[11px] text-[#64748B] mt-1">{s.label}</p></div>
+          <div className="min-w-0">
+            <p className="text-lg font-bold text-[#0F172A] leading-none truncate">{s.value}</p>
+            <p className="text-[11px] text-[#64748B] mt-1">{s.label}</p>
+            {s.note && <p className="text-[10.5px] leading-snug text-[#94A3B8] mt-0.5">{s.note}</p>}
+          </div>
         </div>
       ))}
     </div>
@@ -182,7 +161,10 @@ export function OrdersTable({ list, onRow, hideCustomer }: { list: PaymentOrderR
                   </td>
                 )}
                 <td className="px-4 py-3 text-[#475569]">{o.planName || "—"}<span className="text-[#94A3B8]"> · {o.billingCycle}</span></td>
-                <td className="px-4 py-3 font-bold text-[#0F172A] whitespace-nowrap">{inr(o.amount)}</td>
+                <td className="px-4 py-3 font-bold text-[#0F172A] whitespace-nowrap">
+                  {money(o.amount, o.currency)}
+                  {o.currency !== "INR" && <span className="block text-[11px] font-medium text-[#94A3B8]">≈ {money(inrValue(o))}</span>}
+                </td>
                 <td className="px-4 py-3"><GatewayBadge gateway={o.gateway} /></td>
                 <td className="px-4 py-3 text-[#64748B] whitespace-nowrap">{fmt(o.createdAt)}</td>
                 <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
@@ -191,6 +173,16 @@ export function OrdersTable({ list, onRow, hideCustomer }: { list: PaymentOrderR
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// Module-level so the drawer's rows aren't a new component type on every render.
+function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2.5 border-b border-[#F1F5F9] last:border-0">
+      <span className="text-[12px] text-[#94A3B8] shrink-0">{label}</span>
+      <span className={`text-[13px] font-semibold text-[#0F172A] text-right break-all ${mono ? "font-mono" : ""}`}>{value}</span>
     </div>
   );
 }
@@ -206,12 +198,6 @@ export function OrderDrawer({ order, canManage, busy, onVerify, onReject, onClos
 }) {
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
-  const Row = ({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) => (
-    <div className="flex items-start justify-between gap-3 py-2.5 border-b border-[#F1F5F9] last:border-0">
-      <span className="text-[12px] text-[#94A3B8] shrink-0">{label}</span>
-      <span className={`text-[13px] font-semibold text-[#0F172A] text-right break-all ${mono ? "font-mono" : ""}`}>{value}</span>
-    </div>
-  );
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -219,7 +205,7 @@ export function OrderDrawer({ order, canManage, busy, onVerify, onReject, onClos
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#F1F5F9]">
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-lg font-bold text-[#0F172A]">{inr(order.amount)}</p>
+              <p className="text-lg font-bold text-[#0F172A]">{money(order.amount, order.currency)}</p>
               <GatewayBadge gateway={order.gateway} />
             </div>
             <p className="text-[12px] text-[#94A3B8]">Order #{order.id}</p>
@@ -232,7 +218,9 @@ export function OrderDrawer({ order, canManage, busy, onVerify, onReject, onClos
             <StatusBadge status={order.status} />
             <span className="inline-flex items-center gap-1 text-[12px] text-[#64748B]">
               {order.method === "bank" ? <Landmark size={13} /> : order.gateway === "razorpay" ? <CreditCard size={13} /> : <QrCode size={13} />}
-              {order.gateway === "razorpay" ? "Card / UPI / Netbanking" : order.method === "bank" ? "Bank transfer" : "UPI / QR"}
+              {order.gateway === "razorpay"
+                ? order.currency === "INR" ? "Card / UPI / Netbanking" : "International payment" // $ orders: no UPI or netbanking
+                : order.method === "bank" ? "Bank transfer" : "UPI / QR"}
             </span>
           </div>
 
@@ -241,6 +229,9 @@ export function OrderDrawer({ order, canManage, busy, onVerify, onReject, onClos
             <Row label="Email" value={order.user?.email || "—"} />
             {order.user?.phone && <Row label="Phone" value={order.user.phone} />}
             <Row label="Plan" value={`${order.planName || "—"} · ${order.billingCycle}`} />
+            {order.currency !== "INR" && (
+              <Row label="In ₹" value={`${money(inrValue(order))} at ${formatMoney(order.fxRate, "INR")}/${currencySymbol(order.currency)}`} />
+            )}
             <Row label={order.gateway === "razorpay" ? "Payment ID" : "Reference (UTR)"} value={order.reference} mono />
             <Row label="Created" value={fmt(order.createdAt)} />
             {order.verifiedAt && <Row label="Verified" value={fmt(order.verifiedAt)} />}
@@ -274,20 +265,6 @@ export function OrderDrawer({ order, canManage, busy, onVerify, onReject, onClos
       </div>
     </div>
   );
-}
-
-/** Compute summary stats client-side from a list (reseller/customer views). */
-export function computeStats(list: PaymentOrderRow[]) {
-  const verifiedRows = list.filter((o) => o.status === "verified");
-  const revenue = verifiedRows.reduce((s, o) => s + o.amount, 0);
-  return {
-    revenue,
-    pending: list.filter((o) => o.status === "pending").length,
-    verified: verifiedRows.length,
-    rejected: list.filter((o) => o.status === "rejected").length,
-    razorpayRevenue: verifiedRows.filter((o) => o.gateway === "razorpay").reduce((s, o) => s + o.amount, 0),
-    manualRevenue: verifiedRows.filter((o) => o.gateway === "manual").reduce((s, o) => s + o.amount, 0),
-  };
 }
 
 /** Small hook: manage filters + derived filtered list + selection in one place. */

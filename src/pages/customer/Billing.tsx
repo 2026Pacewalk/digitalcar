@@ -1,24 +1,20 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
+import { useMemo } from "react";
 import { Link } from "react-router";
 import { CreditCard } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import {
-  SummaryCards, FilterBar, OrdersTable, OrderDrawer, downloadOrdersCsv, computeStats, useOrderTable,
-  type PaymentOrderRow,
+  SummaryCards, FilterBar, OrdersTable, OrderDrawer, downloadOrdersCsv, useOrderTable,
 } from "@/components/payments/orderUi";
+import { computeStats, toOrderRow, type PaymentOrderRow } from "@/components/payments/orderMoney";
 
 /* Customer "Billing" — their own payment history / invoices. Read-only, with the
    same filters + CSV export. Reuses payment.myOrders (raw rows → mapped shape). */
 export default function CustomerBilling() {
   const { data: raw } = trpc.payment.myOrders.useQuery();
-  const orders: PaymentOrderRow[] = (raw || []).map((o) => ({
-    ...o,
-    amount: Number(o.amount),
-    createdAt: o.createdAt as unknown as string,
-    verifiedAt: (o.verifiedAt as unknown as string) ?? null,
-    user: null, // it's always the signed-in user
-  }));
+  // user stays null: it's always the signed-in user. Each row keeps its own currency.
+  const orders: PaymentOrderRow[] = useMemo(() => (raw || []).map((o) => toOrderRow({ ...o, user: null })), [raw]);
   const { filters, setFilters, filtered, selected, setSelected } = useOrderTable(orders);
   const stats = computeStats(orders);
 

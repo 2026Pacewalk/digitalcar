@@ -88,6 +88,23 @@ export const previews: {
       validTill: at(365), paidAt: at(0), gateway: "manual", method: "upi", reference: "426598761234", listPrice: 1999,
     }),
   },
+  {
+    name: "paymentVerifiedEmail", module: "billing", audience: "customer", variant: "usd-referral-discount",
+    // Gold yearly at $12 with the 15% first-plan referral discount; Razorpay rows say "upi".
+    render: () => paymentVerifiedEmail({
+      name: "Daniel Brooks", billedTo: "Brooks Design Studio", planName: "Gold", amount: 10.2, billingCycle: "yearly",
+      invoiceNo: "DC-00045-2027", validTill: at(365), paidAt: at(0), gateway: "razorpay", method: "upi",
+      reference: "pay_DEMO127", listPrice: 12, currency: "USD",
+    }),
+  },
+  {
+    name: "paymentVerifiedEmail", module: "billing", audience: "customer", variant: "usd-coupon",
+    render: () => paymentVerifiedEmail({
+      name: "Sofia Rossi", planName: "Platinum", amount: 21.6, billingCycle: "yearly", invoiceNo: "DC-00046-2027",
+      validTill: at(365), paidAt: at(0), gateway: "razorpay", method: "upi", reference: "pay_DEMO128",
+      listPrice: 24, couponCode: "WELCOME10", discount: 2.4, currency: "USD",
+    }),
+  },
 
   /* ── paymentRejectedEmail ── */
   {
@@ -141,6 +158,13 @@ export const previews: {
   {
     name: "subscriptionRenewalReminderEmail", module: "billing", audience: "customer", variant: "minimal-text-date",
     render: () => subscriptionRenewalReminderEmail({ name: "Rohan Gupta", planName: "Gold", daysLeft: 7, validTill: "28 Sept 2026" }),
+  },
+  {
+    name: "subscriptionRenewalReminderEmail", module: "billing", audience: "customer", variant: "usd-7-days-with-upgrade-credit",
+    render: () => subscriptionRenewalReminderEmail({
+      name: "Daniel Brooks", planName: "Gold", daysLeft: 7, validTill: at(7), billingCycle: "yearly",
+      packageId: 5, upgradeCredit: 12, nextPlanName: "Platinum", currency: "USD",
+    }),
   },
 
   /* ── subscriptionExpiredEmail ── */

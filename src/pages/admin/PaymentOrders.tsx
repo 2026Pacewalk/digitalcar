@@ -1,22 +1,26 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
+import { useMemo } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Settings2 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import {
   SummaryCards, FilterBar, OrdersTable, OrderDrawer, downloadOrdersCsv, useOrderTable,
-  type PaymentOrderRow,
 } from "@/components/payments/orderUi";
+import { toOrderRow } from "@/components/payments/orderMoney";
 
 export default function AdminPaymentOrders() {
   const utils = trpc.useUtils();
-  const { data: orders } = trpc.payment.adminOrders.useQuery();
+  const { data: raw } = trpc.payment.adminOrders.useQuery();
+  // Server stats are ₹ (equivalent) totals, with any $ part as usdRevenue/usdCount.
   const { data: stats } = trpc.payment.adminStats.useQuery();
   const verifyMut = trpc.payment.verifyOrder.useMutation();
   const rejectMut = trpc.payment.rejectOrder.useMutation();
 
-  const { filters, setFilters, filtered, selected, setSelected } = useOrderTable(orders as PaymentOrderRow[] | undefined);
+  // Each row keeps its own currency and rate (formatMoney per row, ₹ value for CSV).
+  const orders = useMemo(() => raw?.map(toOrderRow), [raw]);
+  const { filters, setFilters, filtered, selected, setSelected } = useOrderTable(orders);
 
   const refresh = () => { utils.payment.adminOrders.invalidate(); utils.payment.adminStats.invalidate(); };
   const verify = async (id: number) => {

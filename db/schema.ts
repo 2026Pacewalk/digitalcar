@@ -120,7 +120,9 @@ export const subscriptions = mysqlTable("subscriptions", {
   status: mysqlEnum("status", ["trial", "active", "cancelled", "expired", "suspended"]).notNull().default("trial"),
   billingCycle: mysqlEnum("billing_cycle", ["monthly", "yearly", "triennial"]).notNull().default("monthly"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  // Was "USD", a leftover: the app always passed "INR", so a row that omitted it
+  // (db/recover-members.mjs) was mislabelled. migrate-live sets the live default too.
+  currency: varchar("currency", { length: 3 }).notNull().default("INR"),
   trialEndsAt: timestamp("trial_ends_at"),
   currentPeriodStart: timestamp("current_period_start").notNull(),
   currentPeriodEnd: timestamp("current_period_end").notNull(),
@@ -930,6 +932,11 @@ export const paymentOrders = mysqlTable("payment_orders", {
   planName: varchar("plan_name", { length: 100 }),
   billingCycle: mysqlEnum("billing_cycle", ["monthly", "yearly", "triennial"]).notNull().default("monthly"),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  // The currency `amount` is in, and the ₹ per unit it was priced at (1 for INR),
+  // so amount × fx_rate is always the INR value that revenue, commission and
+  // rewards use. The defaults make every pre-USD row correct without a backfill.
+  currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+  fxRate: decimal("fx_rate", { precision: 10, scale: 4 }).notNull().default("1.0000"),
   method: mysqlEnum("method", ["upi", "bank"]).notNull(),
   // How the order was paid: "manual" = user-submitted UPI/bank proof (admin verifies);
   // "razorpay" = online checkout (auto-verified by signature). Added for the Payment

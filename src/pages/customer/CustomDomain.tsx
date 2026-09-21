@@ -5,19 +5,10 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Globe, Loader2, Plus, Trash2, ShieldCheck, Copy, Check, CheckCircle2, ExternalLink, Sparkles, ChevronDown, ShoppingCart, Headphones, BadgeCheck } from "lucide-react";
-
-type RzpResponse = { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string };
-type RazorpayCtor = new (opts: Record<string, unknown>) => { open: () => void };
-function loadRazorpay(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if ((window as unknown as { Razorpay?: RazorpayCtor }).Razorpay) return resolve(true);
-    const s = document.createElement("script");
-    s.src = "https://checkout.razorpay.com/v1/checkout.js";
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
-}
+import { openRazorpayCheckout } from "@/lib/razorpay";
+import { useCurrency } from "@/hooks/useCurrency";
+import CurrencySwitch from "@/components/CurrencySwitch";
+import { formatMoney, type Currency } from "@contracts/money";
 
 function CopyRow({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
@@ -31,7 +22,8 @@ function CopyRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const inr = (v: number) => "₹" + (Number(v) || 0).toLocaleString("en-IN");
+// A registrar's rough yearly price, only for the "How it works" copy.
+const DOMAIN_ESTIMATE: Record<Currency, string> = { INR: "~₹800/year", USD: "~$10/year" };
 
 export default function CustomerCustomDomain() {
   const { data, isLoading, refetch } = trpc.domain.mine.useQuery();
@@ -44,17 +36,25 @@ export default function CustomerCustomDomain() {
   const [busy, setBusy] = useState<number | null>(null);
   const [paying, setPaying] = useState(false);
   const [showDiy, setShowDiy] = useState(false);
+  // ₹ or $ (only once the server says $ can be charged; ₹ otherwise, as before).
+  // The server prices the checkout itself — this is only what we show.
+  const { currency, setCurrency, available, prices } = useCurrency();
+  // $ can't be charged right now (switched off, or Razorpay refused USD).
+  const [usdBlocked, setUsdBlocked] = useState("");
 
   const eligible = data?.eligible;
   const freeEligible = data?.freeEligible;
-  const price = data?.addonPrice ?? 499;
+  const cur: Currency = currency === "USD" && prices ? "USD" : "INR";
+  const price = cur === "USD" && prices ? prices.domain : data?.addonPrice ?? 499; // whole ₹ or $
   const domains = data?.domains ?? [];
+  const pickCurrency = (c: Currency) => { setUsdBlocked(""); setCurrency(c); };
 
   // Buy / unlock the add-on.
   const getAddon = async () => {
     setPaying(true);
+    setUsdBlocked("");
     try {
-      const r = await checkout.mutateAsync();
+      const r = await checkout.mutateAsync({ currency: cur });
       if ("granted" in r && r.granted) { toast.success("Custom domain unlocked for your account!"); await refetch(); return; }
       if ("manual" in r && r.manual) {
         toast.info("Online payment isn't set up yet — contact us to arrange it.");
@@ -62,14 +62,11 @@ export default function CustomerCustomDomain() {
         return;
       }
       if ("orderId" in r) {
-        const ok = await loadRazorpay();
-        if (!ok) { toast.error("Couldn't load the payment window. Check your connection."); return; }
-        const Rzp = (window as unknown as { Razorpay: RazorpayCtor }).Razorpay;
-        const rzp = new Rzp({
+        await openRazorpayCheckout({
           key: r.keyId, order_id: r.orderId, amount: r.amount, currency: r.currency || "INR",
           name: "DigitalCarda", description: "Custom Domain — one-time setup",
           theme: { color: "#F7B31C" },
-          handler: async (resp: RzpResponse) => {
+          handler: async (resp) => {
             try {
               await verifyPay.mutateAsync({ orderId: resp.razorpay_order_id, paymentId: resp.razorpay_payment_id, signature: resp.razorpay_signature });
               toast.success("Payment received — your custom domain is unlocked!");
@@ -77,9 +74,15 @@ export default function CustomerCustomDomain() {
             } catch { toast.error("Payment captured but verification failed — contact support with your payment id."); }
           },
         });
-        rzp.open();
       }
-    } catch (e) { toast.error((e as { message?: string })?.message || "Could not start checkout."); }
+    } catch (e) {
+      const m = (e as { message?: string })?.message;
+      if (cur === "USD" && (e as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED") {
+        setUsdBlocked(m || "Paying in US dollars isn't available right now. Pay in ₹ or contact us.");
+        return;
+      }
+      toast.error(m || "Could not start checkout.");
+    }
     finally { setPaying(false); }
   };
 
@@ -126,9 +129,10 @@ export default function CustomerCustomDomain() {
               </div>
 
               {/* Price */}
-              <div className="mt-6 flex items-end gap-3">
-                <span className="text-4xl font-extrabold text-[#0F172A]">{inr(price)}</span>
+              <div className="mt-6 flex flex-wrap items-end gap-3">
+                <span className="text-4xl font-extrabold text-[#0F172A]">{formatMoney(price, cur)}</span>
                 <span className="text-sm text-[#64748B] mb-1.5">one-time setup fee</span>
+                {available && <CurrencySwitch value={cur} onChange={pickCurrency} className="sm:ml-auto" />}
               </div>
               <p className="text-[12px] text-[#94A3B8] mt-1">Your domain name is billed separately by a registrar (GoDaddy, Namecheap, etc.) — or use a domain you already own.</p>
 
@@ -136,6 +140,17 @@ export default function CustomerCustomDomain() {
                 className="mt-5 w-full sm:w-auto inline-flex items-center justify-center gap-2 h-12 px-8 rounded-xl gradient-gold text-[#0F172A] font-bold text-sm hover:shadow-gold transition-all disabled:opacity-60">
                 {paying ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />} Add Custom Domain
               </button>
+
+              {/* $ can't be charged right now → ₹ or a human */}
+              {!!usdBlocked && cur === "USD" && (
+                <div role="alert" className="mt-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3">
+                  <p className="text-[13px] font-semibold text-[#92400E]">{usdBlocked}</p>
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => pickCurrency("INR")} className="h-9 px-4 rounded-xl gradient-gold text-[#0F172A] text-[13px] font-bold hover:shadow-gold">Switch to ₹</button>
+                    <a href="/contact" target="_blank" rel="noreferrer" className="inline-flex items-center h-9 px-4 rounded-xl bg-white ring-1 ring-[#E2E8F0] text-[13px] font-semibold text-[#0F172A] hover:bg-[#F8FAFC]">Contact us</a>
+                  </div>
+                </div>
+              )}
 
               {/* Free for Platinum 3-year */}
               <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-gradient-to-r from-[#F5F3FF] to-[#FAF5FF] border border-[#E9D5FF] px-4 py-3">
@@ -149,8 +164,8 @@ export default function CustomerCustomDomain() {
               <h4 className="text-sm font-bold text-[#0F172A] mb-4">How it works</h4>
               <ol className="space-y-4">
                 {[
-                  { icon: ShoppingCart, t: "Get a domain", d: "Buy one from any registrar (from ~₹800/year), or use a domain you already own. You keep full ownership." },
-                  { icon: BadgeCheck, t: `Pay the ${inr(price)} setup`, d: "One-time fee — free on the Platinum 3-year plan. Pay securely online in seconds." },
+                  { icon: ShoppingCart, t: "Get a domain", d: `Buy one from any registrar (from ${DOMAIN_ESTIMATE[cur]}), or use a domain you already own. You keep full ownership.` },
+                  { icon: BadgeCheck, t: `Pay the ${formatMoney(price, cur)} setup`, d: "One-time fee — free on the Platinum 3-year plan. Pay securely online in seconds." },
                   { icon: Headphones, t: "We set it up for you", d: "After payment, our team connects your domain to your card with HTTPS — usually within 24–48 hours. No technical work needed." },
                 ].map((s, i) => (
                   <li key={i} className="flex gap-3.5">

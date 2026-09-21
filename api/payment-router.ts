@@ -12,7 +12,7 @@ import { sendEmail, ownerAddress } from "./lib/mail";
 import { allows } from "./lib/notify-prefs";
 import {
   paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail, referralRewardEmail, resellerCommissionEmail,
-  onlineSaleAdminEmail, paymentSettingsChangedAdminEmail,
+  onlineSaleAdminEmail, paymentSettingsChangedAdminEmail, type Email,
 } from "./lib/email-templates";
 import { getUpgradeOfferPercent } from "./lib/pricing";
 import { evaluateCoupon, recordRedemption, recordPaidCoupon, completeRedemptionForOrder, cancelRedemptionForOrder } from "./lib/coupons";
@@ -20,9 +20,23 @@ import { envRazorpayCreds, credsComplete, inferMode, createRazorpayOrder, verify
 import { clientIp } from "./lib/rate-limit";
 import { notifyUser, notifyTeam, resolveTeam } from "./lib/notify";
 import { linkedSince, visibleSinceLink } from "./lib/reseller-links";
+import { edgeGeo } from "./lib/analytics";
+import {
+  FX_KEYS, getFxConfig, usdFor, priceKey, readOrderMoney, resolveCheckoutCurrency, isInvalidCurrencyError,
+  UnsupportedCurrencyError, USD_UNAVAILABLE_MESSAGE, effectiveRowCurrency, verifiedUsdPayment,
+} from "./lib/fx";
+import { layout, heroLight, p as para, small, esc, whenIst, TONE } from "./lib/email/kit";
+import { CURRENCIES, isCurrency, chargeFor, roundMoney, toMinor, formatMoney, type Currency } from "@contracts/money";
 
 type Order = typeof paymentOrders.$inferSelect;
-type RazorpayPayment = { userId: number; packageId: number; planName: string; billingCycle: "monthly" | "yearly" | "triennial"; amountRupees: number; paymentId: string; couponCode?: string; couponDiscount?: number };
+/** A confirmed online plan payment. `amount` is in `currency` (from the gateway
+    order); `fxRate` is ₹ per unit it was priced at (1 for INR), so amount × fxRate
+    is the INR value that revenue, commission and rewards use. */
+type RazorpayPayment = {
+  userId: number; packageId: number; planName: string; billingCycle: "monthly" | "yearly" | "triennial";
+  amount: number; currency: Currency; fxRate: number;
+  paymentId: string; couponCode?: string; couponDiscount?: number;
+};
 /** What activateVerifiedOrder actually credited for this sale, for the owner's sale alert. */
 type Credited = { periodEnd: Date; resellerCommission?: number; referrerReward?: number };
 
@@ -59,7 +73,9 @@ export async function recordRazorpayPayment(
     packageId: p.packageId,
     planName: p.planName,
     billingCycle: p.billingCycle,
-    amount: money(p.amountRupees),
+    amount: money(p.amount),
+    currency: p.currency,
+    fxRate: p.fxRate.toFixed(4),
     method: "upi",
     gateway: "razorpay",
     reference: p.paymentId,
@@ -71,7 +87,8 @@ export async function recordRazorpayPayment(
     try {
       await recordPaidCoupon(db, {
         code: p.couponCode, discount: Number(p.couponDiscount || 0), userId: p.userId, packageId: p.packageId,
-        amountPaid: p.amountRupees, paymentOrderId: order.id, paymentRef: p.paymentId,
+        // In the sale's currency; the admin totals get ₹ via the payment_orders row's fx_rate.
+        amountPaid: p.amount, paymentOrderId: order.id, paymentRef: p.paymentId,
       });
     } catch (e) { console.error("[coupon] could not record redemption:", (e as Error).message); }
   }
@@ -110,7 +127,11 @@ async function emailOnlineSale(db: ReturnType<typeof getDb>, p: RazorpayPayment,
     kind: "plan",
     itemName: p.planName,
     cycle: p.billingCycle,
-    amount: p.amountRupees,
+    // Amount and coupon discount are in the sale's currency; the reward and
+    // commission below are always ₹ (credited on the INR value).
+    amount: p.amount,
+    currency: p.currency,
+    amountInr: p.currency === "INR" ? undefined : Number(money(p.amount * p.fxRate)),
     paymentId: p.paymentId,
     coupon: p.couponCode || null,
     discount: p.couponDiscount || null,
@@ -123,7 +144,9 @@ async function emailOnlineSale(db: ReturnType<typeof getDb>, p: RazorpayPayment,
   }));
   await notifyTeam({
     type: "online_sale",
-    title: `${cr.mode === "test" ? "[Test] " : ""}Online payment · ₹${p.amountRupees} for ${p.planName}`,
+    // ₹ keeps the exact wording it has always had (no digit grouping); only a $
+    // sale uses the formatter.
+    title: `${cr.mode === "test" ? "[Test] " : ""}Online payment · ${p.currency === "INR" ? `₹${p.amount}` : formatMoney(p.amount, p.currency)} for ${p.planName}`,
     message: `${buyer?.fullName || `Account #${p.userId}`}${buyer?.email ? ` (${buyer.email})` : ""} · ${p.billingCycle}${p.couponCode ? ` · coupon ${p.couponCode}` : ""} · ${p.paymentId}`,
     link: "/admin/payment-orders",
     entity: { type: "payment_order", id: order.id },
@@ -172,19 +195,65 @@ function alertPaymentSettings(ctx: { user: { fullName: string; email: string }; 
   } catch { /* non-critical */ }
 }
 
+const DAY_MS = 86_400_000;
+
+/* Razorpay refused a USD order: International Payments isn't active on the
+   account (or was switched off). The buyer is told to pay in ₹ or contact us;
+   the owner gets at most one email a day about it. The day's slot is claimed
+   with a conditional UPDATE, so failures arriving together send one email.
+   Exported for the add-on and domain checkouts, which can hit the same refusal. */
+export async function alertUsdRejected(db: ReturnType<typeof getDb>, where: string, detail: string): Promise<void> {
+  const now = Date.now();
+  await db.insert(appSettings).ignore().values({ key: FX_KEYS.gatewayAlertAt, value: "0" }); // 0 = never alerted
+  const claim = await db.update(appSettings).set({ value: String(now) }).where(and(
+    eq(appSettings.key, FX_KEYS.gatewayAlertAt),
+    sql`CAST(${appSettings.value} AS UNSIGNED) <= ${now - DAY_MS}`,
+  ));
+  const affected = (claim as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+    ?? (claim as unknown as { affectedRows?: number })?.affectedRows ?? 0;
+  if (!affected) return;
+  await sendEmail(ownerAddress(), usdRejectedAdminEmail(where, detail.slice(0, 300), new Date(now)));
+}
+
+/** The owner's "Razorpay refused USD" alert. The detail is Razorpay's error body (no keys in it). */
+function usdRejectedAdminEmail(where: string, detail: string, at: Date): Email {
+  const fix = "In the Razorpay dashboard (Live mode): Account & Settings → Payment methods → International payments → International Cards → Activate.";
+  const off = "To stop offering $ meanwhile, switch off “Accept USD” in Admin → Settings → Payment.";
+  return {
+    kind: "usdGatewayRejectedAdminEmail",
+    subject: "Razorpay refused a US dollar payment",
+    html: layout({
+      preheader: "A customer tried to pay in $ and Razorpay refused the currency. They were asked to pay in ₹ or contact you.",
+      hero: heroLight({ badge: "Payment problem", tone: "amber", title: "Razorpay refused a US dollar payment", sub: `${where} — ${whenIst(at)}` }),
+      bodyHtml:
+        para("A customer chose to pay in US dollars and Razorpay refused the currency, which usually means International Payments isn't active on the account. They were asked to pay in ₹ or contact you.") +
+        para(esc(fix)) + para(esc(off)) +
+        small(`Razorpay said: ${esc(detail)}`) +
+        small("You get this email at most once a day."),
+      accent: TONE.amber.solid, audience: "admin",
+    }),
+    text: [
+      `Razorpay refused a US dollar payment (${where}, ${whenIst(at)}).`, "",
+      "The customer was asked to pay in ₹ or contact you. This usually means International Payments isn't active on the Razorpay account.",
+      fix, off, "", `Razorpay said: ${detail}`, "", "You get this email at most once a day.",
+    ].join("\n"),
+  };
+}
+
 /* Amount the user should pay for a package (mirrors subscribe pricing:
-   referral discount on first paid plan, upgrade credit, limited-time offer). */
+   referral discount on first paid plan, upgrade credit, limited-time offer), in
+   the currency the checkout is charged in. `requested` is only what the browser
+   asked for; resolveCheckoutCurrency decides (INR unless USD is switched on, and
+   a running paid plan locks upgrades to its own currency). */
 async function computeAmount(
   db: ReturnType<typeof getDb>,
   user: { id: number; referredById: number | null },
-  packageId: number, cycle: "monthly" | "yearly" | "triennial", wantsOffer: boolean, couponCode?: string
+  packageId: number, cycle: "monthly" | "yearly" | "triennial", wantsOffer: boolean, couponCode?: string,
+  requested: Currency = "INR",
 ) {
   const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, packageId) });
   if (!pkg) throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
-  // Prices are shown and charged in whole rupees — round every discounted amount
-  // to the nearest ₹1 (e.g. ₹99 − 10% = ₹89, not ₹89.10).
-  const round2 = (v: number) => Math.round(v);
-  const base = n(cycle === "triennial" ? pkg.threeYearPrice : cycle === "yearly" ? pkg.yearlyPrice : pkg.monthlyPrice);
+  const inrBase = n(cycle === "triennial" ? pkg.threeYearPrice : cycle === "yearly" ? pkg.yearlyPrice : pkg.monthlyPrice);
   const existingPaid = await db.query.subscriptions.findFirst({
     where: and(eq(subscriptions.userId, user.id), gt(subscriptions.amount, "0")),
     orderBy: [desc(subscriptions.createdAt)],
@@ -203,31 +272,51 @@ async function computeAmount(
   const paidPlanActive = !!latest && n(latest.amount) > 0
     && (latest.status === "active" || latest.status === "trial")
     && new Date(latest.currentPeriodEnd).getTime() > Date.now();
-  let charged: number, discountPct = 0;
-  if (!existingPaid) {
-    if (user.referredById) {
-      const row = await db.query.appSettings.findFirst({ where: eq(appSettings.key, "referral_discount_percent") });
-      discountPct = row ? n(row.value) : 15;
-    }
-    charged = round2(base * (1 - discountPct / 100));
-  } else if (paidPlanActive && latest) {
-    charged = Math.max(0, round2(base - n(latest.amount)));
-  } else {
-    charged = round2(base);
+
+  // The lock never trusts the subscriptions.currency label on its own: a row
+  // merely LABELLED 'USD' (the column's old default, never rewritten) was paid
+  // in ₹, so it must not lock a member out of paying in rupees — nor hand them
+  // a $ price with their ₹ amount taken off it. See api/lib/fx.ts.
+  const paidUsd = latest?.currency === "USD" ? await verifiedUsdPayment(db, user.id) : undefined;
+  const latestCurrency = effectiveRowCurrency(latest?.currency, !!paidUsd);
+
+  const fx = await getFxConfig(db);
+  const currency = resolveCheckoutCurrency({
+    requested, usdEnabled: fx.enabled, lockedTo: paidPlanActive && latest ? latestCurrency : null,
+  });
+  // ₹ per unit this checkout is priced at: recorded with the payment, so what gets
+  // credited never depends on the rate at verify time.
+  const fxRate = currency === "USD" ? fx.rate : 1;
+  const base = currency === "USD" ? usdFor(priceKey.plan(pkg.id, cycle), inrBase, fx) : inrBase;
+
+  let discountPct = 0;
+  if (!existingPaid && user.referredById) {
+    const row = await db.query.appSettings.findFirst({ where: eq(appSettings.key, "referral_discount_percent") });
+    discountPct = row ? n(row.value) : 15;
+  }
+  // Upgrade credit: what the running plan cost. While USD is on, the lock keeps it
+  // in the checkout's currency. With USD off every checkout is INR and there is no
+  // lock, so a plan really paid in $ (a USD payment on record) is credited at the
+  // rate it was paid at, not as that many rupees. A row merely labelled USD (the
+  // old column default) keeps today's credit.
+  let credit = paidPlanActive && latest ? n(latest.amount) : 0;
+  if (credit > 0 && currency === "INR" && latestCurrency === "USD" && paidUsd) {
+    credit *= n(paidUsd.fxRate) || fx.rate;
   }
   // The offer percentage is server-controlled; the client may only request it.
   const offer = wantsOffer ? await getUpgradeOfferPercent(db) : 0;
-  if (offer) charged = round2(charged * (1 - offer / 100));
+  // Whole rupees (₹99 − 10% = ₹89, exactly as before USD) or cents ($2 − 10% = $1.80).
+  let charged = chargeFor({ base, currency, referralPct: discountPct, credit, offerPct: offer });
   // A coupon comes off last, from the price after every other discount. It is
   // checked here on the server every time — the browser only sends the code.
   let coupon: { id: number; code: string; discount: number; before: number } | null = null;
   if (couponCode && couponCode.trim()) {
-    const r = await evaluateCoupon(db, couponCode, { userId: user.id, packageId, cycle, amount: charged });
+    const r = await evaluateCoupon(db, couponCode, { userId: user.id, packageId, cycle, amount: charged, base, currency, rate: fxRate });
     if (!r.ok) throw new TRPCError({ code: "BAD_REQUEST", message: r.reason });
     coupon = { id: r.coupon.id, code: r.coupon.code, discount: r.discount, before: charged };
-    charged = charged - r.discount;
+    charged = roundMoney(charged - r.discount, currency);
   }
-  return { pkg, base, charged, isUpgrade: paidPlanActive, coupon };
+  return { pkg, base, charged, isUpgrade: paidPlanActive, coupon, currency, fxRate };
 }
 
 /* Atomically flip a pending order → verified. The WHERE status='pending' guard
@@ -255,6 +344,10 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
   else if (order.billingCycle === "yearly") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
   else periodEnd.setMonth(periodEnd.getMonth() + 1);
   const credited: Credited = { periodEnd };
+  // The plan keeps the currency it was paid in (the upgrade lock reads it), while
+  // commission and rewards are always credited on the INR value: amount × fx_rate.
+  const currency: Currency = isCurrency(order.currency) ? order.currency : "INR";
+  const inrValue = currency === "INR" ? n(order.amount) : n(order.amount) * n(order.fxRate);
 
   // Activate a paid subscription for the user
   await db.insert(subscriptions).values({
@@ -263,7 +356,7 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
     status: "active",
     billingCycle: order.billingCycle,
     amount: money(n(order.amount)),
-    currency: "INR",
+    currency,
     currentPeriodStart: now,
     currentPeriodEnd: periodEnd,
     paymentGateway: gateway,
@@ -286,7 +379,7 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
       const resellerId = rc.resellerId;
       const profile = await db.query.resellerProfiles.findFirst({ where: eq(resellerProfiles.userId, resellerId) });
       const rate = Number(profile?.commissionRate ?? 10);
-      const orderValue = n(order.amount); // the plan's rupee value
+      const orderValue = inrValue; // the plan's rupee value (USD orders converted at the order's fx rate)
       const commission = money((orderValue * rate) / 100);
       const balanceAfter = await db.transaction(async (tx) => {
         const ins = await tx.insert(resellerCommissions).ignore().values({
@@ -339,7 +432,7 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
     const validTill = periodEnd.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
     void sendEmail(buyerUser?.email, paymentVerifiedEmail({
       name: buyerUser?.fullName, planName: order.planName || pkg?.name || "Plan",
-      amount: n(order.amount), billingCycle: order.billingCycle, invoiceNo, validTill,
+      amount: n(order.amount), currency, billingCycle: order.billingCycle, invoiceNo, validTill,
     }));
   } catch { /* non-critical */ }
 
@@ -355,7 +448,7 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
       if (ref) {
         const pctRow = await db.query.appSettings.findFirst({ where: eq(appSettings.key, "referral_commission_percent") });
         const pct = pctRow ? Number(pctRow.value) : 15;
-        const reward = money((n(order.amount) * (Number.isFinite(pct) ? pct : 15)) / 100);
+        const reward = money((inrValue * (Number.isFinite(pct) ? pct : 15)) / 100);
         await db.update(referrals).set({ status: "rewarded", rewardAmount: reward, rewardedAt: now }).where(eq(referrals.id, ref.id));
         const nextBal = money(await applyWallet(db, buyer.referredById, n(reward), {
           type: "reward", referralId: ref.id, note: "Referral reward — paid conversion",
@@ -383,13 +476,19 @@ export const paymentRouter = createRouter({
     return getSettings(db);
   }),
 
-  // Amount preview for a plan before paying
+  // Amount preview for a plan before paying. `currency` is only a request; the
+  // answer says what the checkout will actually be charged in.
   quote: authedQuery
-    .input(z.object({ packageId: z.number(), billingCycle: z.enum(["monthly", "yearly"]), wantsOffer: z.boolean().optional() }))
+    .input(z.object({
+      packageId: z.number(),
+      billingCycle: z.enum(["monthly", "yearly", "triennial"]),
+      wantsOffer: z.boolean().optional(),
+      currency: z.enum(CURRENCIES).optional(),
+    }))
     .query(async ({ ctx, input }) => {
       const db = getDb();
-      const { pkg, base, charged, isUpgrade } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false);
-      return { planName: pkg.name, base, amount: charged, isUpgrade };
+      const { pkg, base, charged, isUpgrade, currency } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false, undefined, input.currency);
+      return { planName: pkg.name, base, amount: charged, isUpgrade, currency };
     }),
 
   // Try a coupon on a plan before paying: the exact amount it leaves, or why it
@@ -400,19 +499,24 @@ export const paymentRouter = createRouter({
       billingCycle: z.enum(["monthly", "yearly", "triennial"]),
       wantsOffer: z.boolean().optional(),
       couponCode: z.string().trim().min(1).max(40),
+      currency: z.enum(CURRENCIES).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      const before = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false);
-      const r = await evaluateCoupon(db, input.couponCode, { userId: ctx.user.id, packageId: input.packageId, cycle: input.billingCycle, amount: before.charged });
-      if (!r.ok) return { valid: false as const, reason: r.reason, amount: before.charged };
+      const before = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false, undefined, input.currency);
+      const { currency } = before;
+      const r = await evaluateCoupon(db, input.couponCode, {
+        userId: ctx.user.id, packageId: input.packageId, cycle: input.billingCycle, amount: before.charged, base: before.base, currency, rate: before.fxRate,
+      });
+      if (!r.ok) return { valid: false as const, reason: r.reason, amount: before.charged, currency };
       return {
         valid: true as const,
         code: r.coupon.code,
         description: r.coupon.description,
         discount: r.discount,
         amountBefore: before.charged,
-        amount: before.charged - r.discount,
+        amount: roundMoney(before.charged - r.discount, currency),
+        currency,
       };
     }),
 
@@ -434,7 +538,9 @@ export const paymentRouter = createRouter({
       });
       if (pending) throw new TRPCError({ code: "BAD_REQUEST", message: "You already have a payment awaiting verification." });
 
-      const { pkg, charged, coupon } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false, input.couponCode);
+      // UPI and Indian bank transfer take rupees only, so a manual order is always
+      // INR (the table default). A member whose running plan is in $ is refused by the lock.
+      const { pkg, charged, coupon } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false, input.couponCode, "INR");
       const [ins] = await db.insert(paymentOrders).values({
         userId: ctx.user.id,
         packageId: input.packageId,
@@ -506,6 +612,7 @@ export const paymentRouter = createRouter({
       billingCycle: z.enum(["monthly", "yearly", "triennial"]),
       wantsOffer: z.boolean().optional(),
       couponCode: z.string().trim().max(40).optional(),
+      currency: z.enum(CURRENCIES).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -513,19 +620,33 @@ export const paymentRouter = createRouter({
       if (!cr.enabled) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Online payments are not enabled." });
       }
-      const { pkg, charged, coupon } = await computeAmount(db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false, input.couponCode);
-      const amountPaise = Math.round(charged * 100);
-      if (amountPaise < 100) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This plan's payable amount is below the ₹1 online minimum — please use the manual option or contact support." });
+      const { pkg, charged, coupon, currency, fxRate } = await computeAmount(
+        db, ctx.user, input.packageId, input.billingCycle, input.wantsOffer ?? false, input.couponCode, input.currency,
+      );
+      const amountMinor = toMinor(charged); // paise or cents
+      if (amountMinor < 100) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: currency === "INR"
+            ? "This plan's payable amount is below the ₹1 online minimum — please use the manual option or contact support."
+            : `This plan's payable amount is below the ${formatMoney(1, currency)} online minimum — please contact support.`,
+        });
       }
+      // The edge country (code only, never the IP) is the accountant's evidence of
+      // where a sale came from: an Indian buyer paying in $ is still a domestic sale.
+      const country = edgeGeo((h) => ctx.req.headers.get(h)).country;
       try {
         const order = await createRazorpayOrder({
-          amount: amountPaise,
-          currency: "INR",
+          amount: amountMinor,
+          currency,
           receipt: `dc_${ctx.user.id}_${Date.now()}`.slice(0, 40),
           notes: {
             userId: String(ctx.user.id), packageId: String(input.packageId), billingCycle: input.billingCycle, planName: pkg.name,
             couponCode: coupon?.code ?? "", couponDiscount: String(coupon?.discount ?? 0),
+            // Read back by verify and the webhook (readOrderMoney), so a rate change
+            // in between can't change what is credited.
+            currency, fxRate: String(fxRate),
+            ...(country ? { country } : {}),
           },
         }, cr);
         // keyId lets the browser open checkout.js without needing a build-time env var.
@@ -533,6 +654,13 @@ export const paymentRouter = createRouter({
       } catch (e) {
         const status = (e as { status?: number }).status;
         if (status === 401) throw new TRPCError({ code: "UNAUTHORIZED", message: "Payment gateway authentication failed." });
+        // International payments off (or switched off) on the Razorpay account.
+        if (currency !== "INR" && isInvalidCurrencyError(e)) {
+          console.error("[usd] Razorpay refused a USD plan order:", (e as Error).message);
+          void alertUsdRejected(db, "Plan checkout", (e as Error).message)
+            .catch((err) => console.error("[usd] owner alert failed:", (err as Error).message));
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: USD_UNAVAILABLE_MESSAGE });
+        }
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not start the payment. Please try again." });
       }
     }),
@@ -584,14 +712,24 @@ export const paymentRouter = createRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "This order is missing its plan details. Contact support — you have not been charged for a plan." });
       }
 
+      // The gateway's own figure and currency are the authoritative amount actually
+      // paid; the rate comes from the order's notes (written at checkout).
+      let paid: ReturnType<typeof readOrderMoney>;
+      try {
+        paid = readOrderMoney({ amount: Number(order.amount || 0), currency: order.currency, notes }, await getFxConfig(db));
+      } catch (e) {
+        if (!(e instanceof UnsupportedCurrencyError)) throw e;
+        console.error(`[razorpay verify] ${input.razorpayPaymentId}: ${e.message}`);
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This payment is in a currency we don't accept. If you were charged, contact support — the plan was not activated." });
+      }
+
       const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, paidPackageId) });
       await recordRazorpayPayment(db, {
         userId: ctx.user.id,
         packageId: paidPackageId,
         planName: pkg?.name || String(notes.planName || "Plan"),
         billingCycle: paidCycle,
-        // The gateway's own figure is the authoritative amount actually paid.
-        amountRupees: Number(order.amount || 0) / 100,
+        ...paid,
         paymentId: input.razorpayPaymentId, // the gateway payment id = our proof of payment
         couponCode: String(notes.couponCode || "") || undefined,
         couponDiscount: Number(notes.couponDiscount || 0),
@@ -617,23 +755,27 @@ export const paymentRouter = createRouter({
 
   // Revenue + status summary across ALL orders (accurate beyond the list's page
   // limit) for the Payment Orders module cards. Split by gateway (manual vs razorpay).
+  // Every revenue figure is ₹: amount × fx_rate, which is the amount itself for an
+  // INR row (rate 1). usdRevenue/usdCount are the $ sales inside those totals.
   adminStats: adminQuery.query(async () => {
     const db = getDb();
     const grouped = await db.select({
       status: paymentOrders.status,
       gateway: paymentOrders.gateway,
+      currency: paymentOrders.currency,
       cnt: sql<number>`count(*)`,
-      sum: sql<string>`coalesce(sum(${paymentOrders.amount}), 0)`,
-    }).from(paymentOrders).groupBy(paymentOrders.status, paymentOrders.gateway);
+      sum: sql<string>`coalesce(sum(${paymentOrders.amount} * ${paymentOrders.fxRate}), 0)`,
+      native: sql<string>`coalesce(sum(${paymentOrders.amount}), 0)`,
+    }).from(paymentOrders).groupBy(paymentOrders.status, paymentOrders.gateway, paymentOrders.currency);
 
     const [{ sum: monthSum } = { sum: "0" }] = await db.select({
-      sum: sql<string>`coalesce(sum(${paymentOrders.amount}), 0)`,
+      sum: sql<string>`coalesce(sum(${paymentOrders.amount} * ${paymentOrders.fxRate}), 0)`,
     }).from(paymentOrders).where(and(
       eq(paymentOrders.status, "verified"),
       sql`${paymentOrders.verifiedAt} >= date_format(now(), '%Y-%m-01')`,
     ));
 
-    let pending = 0, verified = 0, rejected = 0, revenue = 0, manualRevenue = 0, razorpayRevenue = 0;
+    let pending = 0, verified = 0, rejected = 0, revenue = 0, manualRevenue = 0, razorpayRevenue = 0, usdRevenue = 0, usdCount = 0;
     for (const g of grouped) {
       const c = Number(g.cnt), s = n(g.sum);
       if (g.status === "pending") pending += c;
@@ -641,9 +783,13 @@ export const paymentRouter = createRouter({
       else if (g.status === "verified") {
         verified += c; revenue += s;
         if (g.gateway === "razorpay") razorpayRevenue += s; else manualRevenue += s;
+        if (g.currency === "USD") { usdRevenue += n(g.native); usdCount += c; }
       }
     }
-    return { pending, verified, rejected, revenue, manualRevenue, razorpayRevenue, monthRevenue: n(monthSum) };
+    return {
+      pending, verified, rejected, revenue, manualRevenue, razorpayRevenue, monthRevenue: n(monthSum),
+      usdRevenue: roundMoney(usdRevenue, "USD"), usdCount, // cents: adding per-group floats can leave 0.0000001s
+    };
   }),
 
   // ═══════ RESELLER: read-only view of THEIR OWN customers' payment orders ═══════

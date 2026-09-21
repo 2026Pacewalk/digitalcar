@@ -85,6 +85,26 @@ function groupNfc<R extends { id: number; userId: number; product: string; quant
   }));
 }
 
+/** One gateway × currency group of verified payment_orders: payments, the raw
+    sum (in that currency) and the ₹ sum (amount × fx_rate). */
+export type RevenueGroup = { gateway: string | null; currency: string | null; n: unknown; sum: unknown; inr: unknown };
+
+/** The digest's revenue from grouped sums. Every figure is ₹: a $ payment counts
+    at the rate saved with it, and an INR row's rate is 1, so an all-₹ day adds up
+    exactly as it always has. The $ part is also reported on its own. */
+export function revenueFromGroups(rows: RevenueGroup[]): NonNullable<OwnerDigest["revenue"]> {
+  let manual = 0, online = 0, count = 0, usdTotal = 0, usdCount = 0;
+  for (const r of rows) {
+    const s = Number(r.inr) || 0;
+    if (r.gateway === "razorpay") online += s; else manual += s;
+    count += Number(r.n) || 0;
+    if (r.currency === "USD") { usdTotal += Number(r.sum) || 0; usdCount += Number(r.n) || 0; }
+  }
+  return usdCount
+    ? { manual, online, count, usd: { total: Math.round(usdTotal * 100) / 100, count: usdCount } }
+    : { manual, online, count };
+}
+
 /** runLifecycle()'s result, if that's what was passed. */
 function automationOf(v: unknown): OwnerDigest["automation"] {
   if (!v || typeof v !== "object") return undefined;
@@ -107,19 +127,16 @@ export async function buildOwnerDigest(db: Db, now = Date.now(), lifecycle?: unk
     return { today: countOf(day), week: countOf(week) };
   });
 
-  // Plan payments only (payment_orders), the same figures as Payment Orders' cards.
-  const revenue = await gather("revenue", async () => {
-    const rows = await db.select({ gateway: paymentOrders.gateway, n: sql<number>`count(*)`, sum: sql<string>`coalesce(sum(${paymentOrders.amount}), 0)` })
-      .from(paymentOrders).where(and(eq(paymentOrders.status, "verified"), gte(paymentOrders.verifiedAt, since24h)))
-      .groupBy(paymentOrders.gateway);
-    let manual = 0, online = 0, count = 0;
-    for (const r of rows) {
-      const s = Number(r.sum) || 0;
-      if (r.gateway === "razorpay") online += s; else manual += s;
-      count += Number(r.n) || 0;
-    }
-    return { manual, online, count };
-  });
+  // Plan payments only (payment_orders), the same figures as Payment Orders' cards:
+  // ₹ equivalents (amount × fx_rate), with the $ payments also counted on their own.
+  const revenue = await gather("revenue", async () => revenueFromGroups(
+    await db.select({
+      gateway: paymentOrders.gateway, currency: paymentOrders.currency, n: sql<number>`count(*)`,
+      sum: sql<string>`coalesce(sum(${paymentOrders.amount}), 0)`,
+      inr: sql<string>`coalesce(sum(${paymentOrders.amount} * ${paymentOrders.fxRate}), 0)`,
+    }).from(paymentOrders).where(and(eq(paymentOrders.status, "verified"), gte(paymentOrders.verifiedAt, since24h)))
+      .groupBy(paymentOrders.gateway, paymentOrders.currency),
+  ));
 
   const pendingPayments = await gather("pending payments", async () => {
     const where = and(eq(paymentOrders.status, "pending"), eq(paymentOrders.gateway, "manual"));

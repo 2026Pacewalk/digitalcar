@@ -30,6 +30,8 @@ import {
 import { teamMessageEmail, oneLine, normalizeMessage, linkPieces } from "./email/manual";
 import { PAID_PACKAGE_IDS, legacyPlanOf } from "./entitlement";
 import { getPrefs } from "./notify-prefs";
+import { effectiveRowCurrency, getFxConfig, verifiedUsdPayment } from "./fx";
+import type { Currency } from "@contracts/money";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -59,6 +61,9 @@ export type PlanInfo = {
       only a paid platform row with a plan above it has one. */
   upgradeCredit: number | null;
   nextPlanName: string | null;
+  /** The currency `upgradeCredit` is in. Absent means ₹, which is every plan
+      except one really paid in $ (api/lib/fx.ts effectiveRowCurrency). */
+  currency?: Currency;
 };
 
 export type TrialInfo = {
@@ -258,14 +263,26 @@ export async function resolveRecipient(db: Db, ref: RecipientRef, now = Date.now
     const end = new Date(sub.currentPeriodEnd);
     const dated = !Number.isNaN(end.getTime());
     const paid = PAID_PACKAGE_IDS.has(Number(sub.packageId));
-    // Same rule as the renewal job: a paid row with a plan above it (admin-granted ₹0 rows get no tip).
-    const next = paid && Number(sub.amount) > 0 ? billing.nextTier(pkgs, pkgById.get(Number(sub.packageId)), sub.billingCycle) : null;
+    // The currency the credit is really in: a row merely LABELLED 'USD' (the old
+    // column default) with no verified $ payment behind it was paid in ₹. Only a
+    // 'USD' label costs the extra reads, so an all-₹ account makes none.
+    const currency = sub.currency === "USD"
+      ? effectiveRowCurrency(sub.currency, !!(await verifiedUsdPayment(db, Number(sub.userId))))
+      : "INR";
+    // Same rule as the renewal job (cron/billing creditTipApplies): a paid row
+    // with a plan above it, and for a $ plan only while $ checkout is on —
+    // with it off the upgrade is charged in ₹, so "the $12 you paid comes off"
+    // would not be true.
+    const usdOn = currency === "USD" ? (await getFxConfig(db).catch(() => null))?.enabled ?? false : false;
+    const next = billing.creditTipApplies({ amount: sub.amount, currency }, usdOn) && paid
+      ? billing.nextTier(pkgs, pkgById.get(Number(sub.packageId)), sub.billingCycle)
+      : null;
     platform = {
       source: "platform", packageId: Number(sub.packageId), name: pkgName(Number(sub.packageId)), paid,
       // Active exactly while it keeps their card live (publish-router publicState).
       active: publish.subscriptionKeepsCardLive(sub, now),
       endsAt: dated ? end : null, lastDay: dated ? end : null, billingCycle: sub.billingCycle,
-      upgradeCredit: next ? Number(sub.amount) : null, nextPlanName: next?.name ?? null,
+      upgradeCredit: next ? Number(sub.amount) : null, nextPlanName: next?.name ?? null, currency,
     };
   }
   const lp = legacyPlanOf(email);
@@ -407,7 +424,7 @@ const TEMPLATES: Record<ManualTemplateKey, Def> = {
       return subscriptionRenewalReminderEmail({
         name: r.name, planName: plan.name, daysLeft: Math.max(0, istDaysUntil(plan.lastDay!, now)), validTill: plan.lastDay!,
         billingCycle: plan.billingCycle, slug: cardOf(r), packageId: plan.packageId,
-        upgradeCredit: plan.upgradeCredit, nextPlanName: plan.nextPlanName,
+        upgradeCredit: plan.upgradeCredit, nextPlanName: plan.nextPlanName, currency: plan.currency,
       });
     },
   },

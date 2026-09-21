@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { coupons, couponGrants, couponRedemptions, subscriptionPackages } from "@db/schema";
 import type { getDb } from "../queries/connection";
+import { roundMoney, type Currency } from "@contracts/money";
 
 /* The day-2 trial offer: EARLY20, 20% off a paid plan.
 
@@ -63,6 +64,16 @@ export async function earlyGrantReason(db: Db, couponId: number, userId: number,
   if (!g || !g.sentAt || !g.expiresAt) return "This coupon code isn't valid.";
   if (now > g.expiresAt) return `Your ${EARLY_COUPON_CODE} offer ended on ${deadlineIst(g.expiresAt)}.`;
   return null;
+}
+
+/** EARLY20's discount from a list price ALREADY in the checkout's currency —
+    the same rule as exactPercentDiscount below, for a $ checkout, where the
+    plan's ₹ column is not the price being charged. Rounded like the price
+    (cents in $), so it can't hand back a fraction of a cent. */
+export function exactPercentFrom(listPrice: number, amount: number, percent: number, currency: Currency): number {
+  if (!Number.isFinite(listPrice) || listPrice <= 0) return roundMoney((amount * percent) / 100, currency);
+  const target = roundMoney(listPrice * (1 - percent / 100), currency);
+  return Math.max(0, roundMoney(amount, currency) - target);
 }
 
 /** EARLY20's discount: whatever brings the price down to 20% off the plan's

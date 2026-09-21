@@ -12,11 +12,12 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import {
-  AlertTriangle, Check, CheckCircle2, Loader2, MapPin, Minus, Nfc, PackageCheck, Plus, Printer,
+  AlertTriangle, Check, CheckCircle2, Globe, Loader2, MapPin, Minus, Nfc, PackageCheck, Plus, Printer,
   ScanLine, ShieldCheck, Sparkles, Truck, X,
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { useCustomer } from "@/hooks/useCustomer";
+import { useCurrency } from "@/hooks/useCurrency";
 import { openRazorpayCheckout } from "@/lib/razorpay";
 import { NFC_DELIVERY, NFC_MAX_QTY, NFC_PRODUCTS, type NfcProductId } from "@/lib/nfcProducts";
 
@@ -189,6 +190,9 @@ export default function CustomerNfcOrder() {
   const { data, isLoading, refetch } = trpc.nfc.mine.useQuery(undefined, { retry: false });
   const checkout = trpc.nfc.checkout.useMutation();
   const verify = trpc.nfc.verify.useMutation();
+  // NFC is printed and shipped in India and always billed in ₹, even for a
+  // member who pays in $ elsewhere — they only get a note saying so.
+  const { currency } = useCurrency();
 
   // Quantity per product; 0 means it isn't in this order. Card and standee can
   // be bought together — one payment, one delivery.
@@ -326,6 +330,15 @@ export default function CustomerNfcOrder() {
     <ResponsiveDashboardLayout>
       <div className="hidden md:block"><TopBar title="NFC Card & Standee" subtitle="Printed NFC products that open your digital card with a tap" /></div>
       <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+
+        {currency === "USD" && (
+          <div className="flex items-start gap-3 rounded-2xl border border-[#BAE6FD] bg-[#F0F9FF] px-4 py-3">
+            <Globe size={16} className="mt-0.5 shrink-0 text-[#0369A1]" />
+            <p className="text-[13px] text-[#075985]">
+              NFC cards and standees are printed and shipped within India only, and are billed in ₹. Your digital card, QR and link work worldwide.
+            </p>
+          </div>
+        )}
 
         {/* Intro */}
         <div className="relative overflow-hidden rounded-2xl bg-[#0B1120] p-5 text-white sm:p-6">

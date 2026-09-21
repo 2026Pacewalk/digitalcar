@@ -15,6 +15,7 @@ import {
   progressSteps, receipt, quoteBlock, cardPreview,
   pill, darkChip, codeValue, inkLink, goldLink, phoneLink, emailLink, mailtoLink, waLink, telLink, showPhone,
   whenIst, dayIst, dateIst, esc, inr, safeUrl, safeHex, firstName, p, strong, muted, small, mono,
+  asCurrency, money as showMoney,
   BRAND, TONE, SITE, FONT,
   type Email, type Tone,
 } from "./kit";
@@ -804,11 +805,16 @@ export type OnlineSaleAlert = {
   itemName: string;
   /** Billing cycle, when the item has one ("monthly" | "yearly" | "triennial"). */
   cycle?: string | null;
-  /** Rupees actually paid (after any coupon). */
+  /** What was actually paid (after any coupon), in `currency`. */
   amount: number;
+  /** The currency `amount` and `discount` are in (order.currency). Default INR. */
+  currency?: string | null;
+  /** A $ sale's value in rupees (amount × the order's fx_rate), shown next to it.
+      Referral reward and reseller commission are always ₹. */
+  amountInr?: number | null;
   /** Razorpay payment id (pay_…). */
   paymentId: string;
-  /** Coupon code used, and the rupees it took off. */
+  /** Coupon code used, and what it took off (in `currency`). */
   coupon?: string | null;
   discount?: number | null;
   customer: { id: number; name: string; email: string; phone?: string | null };
@@ -823,6 +829,10 @@ export type OnlineSaleAlert = {
   at?: Date;
 };
 
+/** A $ sale reaches the bank as ₹ at Razorpay's conversion, not at the rate it was priced at. */
+const usdSettles = (inrValue: number) =>
+  `It was paid in US dollars: Razorpay settles it to your bank in ₹ at its own conversion rate, so the amount that arrives can differ a little${inrValue ? ` from ${inr(inrValue)}` : ""}.`;
+
 /**
  * Owner alert for money that arrived online. Plans, add-ons and domains all switch
  * on automatically after Razorpay confirms, so this is news, not a task.
@@ -835,6 +845,13 @@ export function onlineSaleAdminEmail(o: OnlineSaleAlert): Email {
   const at = o.at ?? new Date();
   const amount = num(o.amount);
   const discount = num(o.discount);
+  const usd = asCurrency(o.currency) === "USD";
+  /** The sale's own currency; ₹ is inr() exactly as before. */
+  const fmt = (v: unknown) => showMoney(v, o.currency);
+  // Whole rupees: it's an approximation next to the real $ figure.
+  const inrValue = usd && num(o.amountInr) > 0 ? Math.round(num(o.amountInr)) : 0;
+  /** "$12 (≈₹1,020)" for a $ sale; "₹999" for ₹. */
+  const paid = fmt(amount) + (inrValue ? ` (≈${inr(inrValue)})` : "");
   const cycle = cycleLabel(o.cycle);
   const c = o.customer;
   const buyer = c.name || c.email;
@@ -848,10 +865,13 @@ export function onlineSaleAdminEmail(o: OnlineSaleAlert): Email {
 
   const hero = heroBand({
     eyebrow: o.testMode ? "Test payment · no real money" : "Online sale · Razorpay",
-    tone: o.testMode ? "amber" : "green", icon: "&#8377;",
+    tone: o.testMode ? "amber" : "green", icon: usd ? "$" : "&#8377;",
     title: `${buyer} bought ${what}`,
     sub: `${auto}${o.testMode ? "." : " — nothing for you to do."}`,
-    aside: { label: o.testMode ? "Test amount" : "Received", value: inr(amount), sub: cycle || undefined },
+    aside: {
+      label: o.testMode ? "Test amount" : "Received", value: fmt(amount),
+      sub: (usd ? [cycle, inrValue ? `≈ ${inr(inrValue)}` : ""].filter(Boolean).join(" · ") : cycle) || undefined,
+    },
     chips: [
       dc(kindLabel),
       o.coupon ? dc(`Coupon ${o.coupon}`, "#86EFAC") : "",
@@ -874,8 +894,8 @@ export function onlineSaleAdminEmail(o: OnlineSaleAlert): Email {
     sectionLabel("The sale") +
     receipt({
       rows: [{ name: o.itemName, sub: [kindLabel, cycle].filter(Boolean).join(" · "), amount: amount + discount }],
-      extra: discount > 0 ? [{ label: `Coupon ${o.coupon || ""}`.trim(), value: `− ${inr(discount)}`, tone: "green" }] : [],
-      totalLabel: o.testMode ? "Paid (test)" : "Paid online", total: amount,
+      extra: discount > 0 ? [{ label: `Coupon ${o.coupon || ""}`.trim(), value: `− ${showMoney(discount, o.currency, { cents: true })}`, tone: "green" }] : [],
+      totalLabel: (o.testMode ? "Paid (test)" : "Paid online") + (usd ? " in USD" : ""), total: amount, currency: o.currency,
     }) +
     (credits.length ? callout("violet", o.referrer && o.reseller ? "Referral and reseller" : o.referrer ? "Referral" : "Reseller", credits.join("<br>")) : "") +
     sectionLabel("Customer") +
@@ -893,22 +913,23 @@ export function onlineSaleAdminEmail(o: OnlineSaleAlert): Email {
       { label: "Open customer", href: customerSearch(c.email), tone: "dark" },
       { label: o.kind === "plan" ? "Payment Orders" : "Custom domains", href: o.kind === "plan" ? ADMIN.paymentOrders : o.kind === "domain" ? ADMIN.domains : null },
     ]) +
-    small(`Search ${mono(o.paymentId)} in your Razorpay dashboard to see the settlement.`);
+    small(`Search ${mono(o.paymentId)} in your Razorpay dashboard to see the settlement.${usd ? ` ${esc(usdSettles(inrValue))}` : ""}`);
 
   return {
     kind: "onlineSaleAdminEmail",
-    subject: `${o.testMode ? "[Test] " : ""}Online sale: ${inr(amount)} · ${o.itemName}${cycle ? ` (${cycle.toLowerCase()})` : ""} · ${buyer}`,
+    subject: `${o.testMode ? "[Test] " : ""}Online sale: ${paid} · ${o.itemName}${cycle ? ` (${cycle.toLowerCase()})` : ""} · ${buyer}`,
     html: layout({
-      preheader: `${buyer} paid ${inr(amount)} online for ${what}${o.coupon ? ` with coupon ${o.coupon}` : ""}. ${auto}.`,
+      preheader: `${buyer} paid ${paid} online for ${what}${o.coupon ? ` with coupon ${o.coupon}` : ""}. ${auto}.`,
       hero, bodyHtml, accent: o.testMode ? TONE.amber.solid : TONE.green.solid, audience: "admin",
     }),
     text: lines([
       o.testMode ? "TEST PAYMENT — Razorpay is in test mode, no real money moved.\n" : null,
-      `Online sale: ${buyer} bought ${what} for ${inr(amount)}.`,
+      `Online sale: ${buyer} bought ${what} for ${paid}.`,
       `${auto}.`, "",
       `Item: ${o.itemName} (${kindLabel}${cycle ? `, ${cycle}` : ""})`,
-      discount > 0 ? `Coupon: ${o.coupon || "-"} (${inr(discount)} off, list price ${inr(amount + discount)})` : null,
-      `Paid: ${inr(amount)}`,
+      discount > 0 ? `Coupon: ${o.coupon || "-"} (${fmt(discount)} off, list price ${fmt(amount + discount)})` : null,
+      `Paid: ${paid}`,
+      usd ? usdSettles(inrValue) : null,
       `Payment ID: ${o.paymentId}`,
       validTill ? `Valid till: ${dateIst(validTill)}` : null, "",
       `Customer: ${buyer} (${c.email}), account #${c.id}`,
@@ -1046,8 +1067,10 @@ export type OwnerDigest = {
   periodLabel?: string | null;
   /** New customer accounts: `today` in the period, `week` in the last 7 days. */
   signups?: { today: number; week?: number | null } | null;
-  /** Verified revenue in the period, in rupees, split by gateway; `count` = payments. */
-  revenue?: { manual: number; online: number; count: number } | null;
+  /** Verified revenue in the period, in rupees, split by gateway; `count` = payments.
+      A $ payment counts at its ₹ value (amount × the order's fx_rate); `usd` is
+      that part on its own, in dollars, and how many payments it was. */
+  revenue?: { manual: number; online: number; count: number; usd?: { total: number; count: number } | null } | null;
   /** Manual payment orders with status "pending". */
   pendingPayments?: { name: string; plan: string; amount: number; ageDays: number }[] | null;
   /** NFC order rows with status "paid", grouped per customer: row ids, name, "1 × NFC card, 1 × standee". */
@@ -1243,6 +1266,9 @@ export function ownerDailyDigestEmail(o: OwnerDigest): Email {
     : `${phrases[0]}, ${phrases[1]} and more`;
 
   const rev = o.revenue ? { total: num(o.revenue.manual) + num(o.revenue.online), manual: num(o.revenue.manual), online: num(o.revenue.online), count: num(o.revenue.count) } : null;
+  // Only mentioned when there were $ payments, so an all-₹ day reads as before.
+  const usdRev = rev && o.revenue?.usd && num(o.revenue.usd.count) > 0 ? o.revenue.usd : null;
+  const usdLine = usdRev ? `incl. ${showMoney(num(usdRev.total), "USD")} from ${plural(usdRev.count, "USD payment")}` : "";
   const signupsToday = o.signups ? num(o.signups.today) : null;
 
   const hero = heroBand({
@@ -1260,7 +1286,7 @@ export function ownerDailyDigestEmail(o: OwnerDigest): Email {
   const tiles: { label: string; value: string; sub?: string }[] = [];
   if (o.signups) tiles.push({ label: "New signups", value: esc(count(o.signups.today)), sub: o.signups.week != null ? `${esc(count(o.signups.week))} in 7 days` : esc(period) });
   if (rev) {
-    tiles.push({ label: "Revenue", value: esc(inr(rev.total)), sub: `${esc(inr(rev.online))} online · ${esc(inr(rev.manual))} manual` });
+    tiles.push({ label: "Revenue", value: esc(inr(rev.total)), sub: `${esc(inr(rev.online))} online · ${esc(inr(rev.manual))} manual${usdLine ? `<br>${esc(usdLine)}` : ""}` });
     tiles.push({ label: "Payments", value: esc(count(rev.count)), sub: esc(period) });
   }
 
@@ -1328,7 +1354,7 @@ export function ownerDailyDigestEmail(o: OwnerDigest): Email {
       `DigitalCarda daily summary — ${dayIst(date)}`,
       headline, "",
       o.signups ? `New signups: ${count(o.signups.today)} (${period})${o.signups.week != null ? `, ${count(o.signups.week)} in 7 days` : ""}` : null,
-      rev ? `Revenue: ${inr(rev.total)} from ${plural(rev.count, "payment")} (${inr(rev.online)} online, ${inr(rev.manual)} manual) — ${period}` : null,
+      rev ? `Revenue: ${inr(rev.total)} from ${plural(rev.count, "payment")} (${inr(rev.online)} online, ${inr(rev.manual)} manual${usdLine ? `; ${usdLine}` : ""}) — ${period}` : null,
       ...textSections,
       clearNames.length ? `\nAll clear: no ${clearNames.join(", ")}.` : null,
       o.automation ? (o.automation.enabled ? `\nAutomatic trial emails sent today: ${o.automation.sent}${num(o.automation.abandoned) > 0 ? ` (+${o.automation.abandoned} publish reminders)` : ""}` : "\nAutomatic trial emails are switched off.") : null,

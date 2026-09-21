@@ -1,17 +1,20 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
+import { useMemo } from "react";
 import { trpc } from "@/providers/trpc";
 import {
-  SummaryCards, FilterBar, OrdersTable, OrderDrawer, downloadOrdersCsv, computeStats, useOrderTable,
-  type PaymentOrderRow,
+  SummaryCards, FilterBar, OrdersTable, OrderDrawer, downloadOrdersCsv, useOrderTable,
 } from "@/components/payments/orderUi";
+import { computeStats, toOrderRow } from "@/components/payments/orderMoney";
 
 /* Reseller view: read-only list of THEIR OWN customers' payment orders. Resellers
-   can't verify/reject (that's admin) — they get visibility, filters, and export. */
+   can't verify/reject (that's admin) — they get visibility, filters, and export.
+   Customers may pay in ₹ or $: rows show their own currency, totals the ₹ equivalent. */
 export default function ResellerPaymentOrders() {
-  const { data: orders } = trpc.payment.resellerOrders.useQuery();
-  const { filters, setFilters, filtered, selected, setSelected } = useOrderTable(orders as PaymentOrderRow[] | undefined);
-  const stats = computeStats((orders as PaymentOrderRow[]) || []);
+  const { data: raw } = trpc.payment.resellerOrders.useQuery();
+  const orders = useMemo(() => raw?.map(toOrderRow), [raw]);
+  const { filters, setFilters, filtered, selected, setSelected } = useOrderTable(orders);
+  const stats = computeStats(orders || []);
 
   return (
     <ResponsiveDashboardLayout>

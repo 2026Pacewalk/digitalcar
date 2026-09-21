@@ -458,7 +458,9 @@ export const resellerRouter = createRouter({
       if (cust.role !== "customer") return { ok: false as const, reason: "not_customer" as const };
       const blocked = await customerBlock(db, cust);
 
-      const [paid] = await db.select({ n: sql<number>`count(*)`, total: sql<string>`coalesce(sum(${paymentOrders.amount}), 0)` })
+      // Lifetime ₹ value: amount × fx_rate, so a $ payment counts as its rupee
+      // value (fx_rate is 1.0000 on every ₹ row, so existing totals don't move).
+      const [paid] = await db.select({ n: sql<number>`count(*)`, total: sql<string>`coalesce(sum(${paymentOrders.amount} * ${paymentOrders.fxRate}), 0)` })
         .from(paymentOrders).where(and(eq(paymentOrders.userId, cust.id), eq(paymentOrders.status, "verified")));
       const [pending] = await db.select({ n: sql<number>`count(*)` })
         .from(paymentOrders).where(and(eq(paymentOrders.userId, cust.id), eq(paymentOrders.status, "pending")));

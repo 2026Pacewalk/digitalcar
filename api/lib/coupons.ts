@@ -1,7 +1,8 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { coupons, couponRedemptions, subscriptionPackages, type Coupon } from "@db/schema";
 import type { getDb } from "../queries/connection";
-import { EARLY_COUPON_CODE, earlyGrantReason, exactPercentDiscount } from "./offer-grants";
+import { EARLY_COUPON_CODE, earlyGrantReason, exactPercentDiscount, exactPercentFrom } from "./offer-grants";
+import { roundMoney, formatMoney, type Currency } from "@contracts/money";
 
 /* Discount coupons for PLAN purchases only.
 
@@ -29,17 +30,62 @@ export type CouponCheck =
   | { ok: true; coupon: Coupon; discount: number }
   | { ok: false; reason: string };
 
+/** The coupon fields that set the discount. Its money figures (flat amount, cap,
+    minimum) are always rupees: coupons have no currency of their own. */
+export type CouponTerms = Pick<Coupon, "discountType" | "discountValue" | "maxDiscount" | "minAmount">;
+
+/** Why an order is too small for this coupon, or null when it qualifies. The ₹
+    minimum is compared with the order's INR value (`amount` × `rate`), so a $12
+    order at ₹85 counts as ₹1,020. For INR this is exactly the old check. */
+export function couponMinimumReason(c: CouponTerms, amount: number, currency: Currency = "INR", rate = 1): string | null {
+  const min = Number(c.minAmount);
+  if (!c.minAmount || !(currency === "INR" ? amount < min : amount * rate < min)) return null;
+  // Rounded up to the cent, so paying the figure shown always qualifies.
+  const approx = currency === "INR" ? "" : ` (about ${formatMoney(Math.ceil((min / rate) * 100 - 1e-9) / 100, currency)})`;
+  return `This coupon needs a purchase of at least ${rupees(min)}${approx}.`;
+}
+
+/** What the coupon takes off `amount` (the price after every other discount, in
+    `currency`); 0 means it doesn't apply to this amount.
+    - A percentage works the same in any currency.
+    - A flat amount and the cap are rupees, so a USD order gets them at `rate`
+      (₹100 off at ₹85 = $1.18 off).
+    - Rounded like the price (whole rupees, or cents), and always leaves at least
+      1 unit to pay: the gateway can't take 0, and its floor is ₹1 / $1.
+    For INR this is exactly the arithmetic evaluateCoupon has always used. */
+export function couponDiscount(c: CouponTerms, amount: number, currency: Currency = "INR", rate = 1): number {
+  const fromInr = (v: number) => (currency === "INR" ? v : v / rate);
+  const round = (v: number) => roundMoney(v, currency);
+  let discount = c.discountType === "percent"
+    ? (amount * Number(c.discountValue)) / 100
+    : fromInr(Number(c.discountValue));
+  if (c.maxDiscount && discount > fromInr(Number(c.maxDiscount))) discount = fromInr(Number(c.maxDiscount));
+  return Math.max(0, Math.min(round(discount), Math.max(0, round(round(amount) - 1))));
+}
+
 /** Is this code usable for this plan purchase, and how much does it take off
-    `amount` (the price after every other discount, in whole rupees)? */
+    `amount` (the price after every other discount, in `currency`, INR unless the
+    checkout is in USD)? `rate` is ₹ per unit of `currency`; INR is always 1. */
 export async function evaluateCoupon(
   db: Db,
   rawCode: string,
-  ctx: { userId: number; packageId: number; cycle: Cycle; amount: number; now?: Date },
+  ctx: {
+    userId: number; packageId: number; cycle: Cycle; amount: number;
+    /** The plan's LIST price in `currency`, before any discount. Only EARLY20's
+        exact-percent rule needs it, and only on a $ checkout (the ₹ branch reads
+        the plan's rupee column itself). */
+    base?: number;
+    currency?: Currency; rate?: number; now?: Date;
+  },
 ): Promise<CouponCheck> {
+  const currency = ctx.currency ?? "INR";
+  const rate = currency === "INR" ? 1 : Number(ctx.rate);
   const code = normalizeCode(rawCode);
   if (!code) return { ok: false, reason: "Enter a coupon code." };
   // The free-trial voucher is not a discount on a purchase (see below).
   if (code === TRIAL_COUPON_CODE) return { ok: false, reason: `${TRIAL_COUPON_CODE} starts the free trial — it isn't a discount on a plan.` };
+  // Without a rate the coupon's rupee figures can't be converted; refuse rather than guess.
+  if (!Number.isFinite(rate) || rate <= 0) return { ok: false, reason: "This coupon can't be used right now. Please try again later." };
 
   const [c] = await db.select().from(coupons).where(eq(coupons.code, code)).limit(1);
   if (!c || !c.active) return { ok: false, reason: "This coupon code isn't valid." };
@@ -60,9 +106,8 @@ export async function evaluateCoupon(
   if (cycles.length && !cycles.includes(ctx.cycle)) {
     return { ok: false, reason: `This coupon works on ${cycles.map((x) => CYCLE_LABEL[x] || x).join(" or ")} billing only.` };
   }
-  if (c.minAmount && ctx.amount < Number(c.minAmount)) {
-    return { ok: false, reason: `This coupon needs a purchase of at least ${rupees(Number(c.minAmount))}.` };
-  }
+  const tooSmall = couponMinimumReason(c, ctx.amount, currency, rate);
+  if (tooSmall) return { ok: false, reason: tooSmall };
 
   const [counts] = await db.select({
     total: sql<number>`count(*)`,
@@ -74,17 +119,29 @@ export async function evaluateCoupon(
   if (c.usageLimit && total >= c.usageLimit) return { ok: false, reason: "This coupon has reached its usage limit." };
   if (c.perUserLimit && mine >= c.perUserLimit) return { ok: false, reason: "You've already used this coupon." };
 
-  // EARLY20 is exactly its percentage off the plan's FULL price — never on top
-  // of the referral or upgrade discounts already in `amount`.
+  /* EARLY20 is exactly its percentage off the plan's FULL price — never on top
+     of the referral or upgrade discounts already in `amount`. The rule means the
+     same thing in both currencies, so the browser can't make the code worth more
+     by asking for $: in ₹ it works off the plan's ₹ column, in $ off the $ list
+     price this checkout was priced at (ctx.base). The ₹ branch is untouched. */
   const exact = code === EARLY_COUPON_CODE && c.discountType === "percent";
-  let discount = exact
-    ? await exactPercentDiscount(db, ctx, Number(c.discountValue))
-    : c.discountType === "percent"
-      ? (ctx.amount * Number(c.discountValue)) / 100
-      : Number(c.discountValue);
-  if (c.maxDiscount && discount > Number(c.maxDiscount)) discount = Number(c.maxDiscount);
-  // Always leave at least ₹1 to pay — the payment gateway can't take ₹0.
-  discount = Math.min(Math.round(discount), Math.max(0, Math.round(ctx.amount) - 1));
+  let discount: number;
+  if (exact && currency === "INR") {
+    discount = await exactPercentDiscount(db, ctx, Number(c.discountValue));
+    if (c.maxDiscount && discount > Number(c.maxDiscount)) discount = Number(c.maxDiscount);
+    // Always leave at least ₹1 to pay — the payment gateway can't take ₹0.
+    discount = Math.min(Math.round(discount), Math.max(0, Math.round(ctx.amount) - 1));
+  } else if (exact) {
+    discount = exactPercentFrom(Number(ctx.base), ctx.amount, Number(c.discountValue), currency);
+    // The cap is a rupee figure, like couponDiscount's.
+    const cap = c.maxDiscount ? Number(c.maxDiscount) / rate : null;
+    if (cap !== null && discount > cap) discount = cap;
+    // Always leave at least $1 to pay — the same floor couponDiscount applies.
+    const round = (v: number) => roundMoney(v, currency);
+    discount = Math.max(0, Math.min(round(discount), Math.max(0, round(round(ctx.amount) - 1))));
+  } else {
+    discount = couponDiscount(c, ctx.amount, currency, rate);
+  }
   if (discount <= 0) {
     return { ok: false, reason: exact ? `Your price already includes more than ${Number(c.discountValue)}% off, so ${code} adds nothing more.` : "This coupon doesn't apply to this amount." };
   }

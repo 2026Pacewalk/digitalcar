@@ -277,9 +277,27 @@ export function serveStaticFiles(app: App) {
   // meta build + render work (origin TTFB drops from ~200ms to ~few ms). Bounded
   // and short-lived so content stays fresh.
   const htmlCache = new Map<string, { html: string; at: number }>();
-  clearHtmlCache = () => htmlCache.clear();
   const HTML_TTL = 5 * 60_000;
   const EDGE_CACHE = "public, max-age=0, s-maxage=120, stale-while-revalidate=600";
+
+  // Is $ checkout switched on? Baked into every page as window.__dcSettings.usd,
+  // so the browser asks currency.context ONLY when $ can be charged — with USD
+  // off, /pricing and /custom-domain make exactly the requests they made before
+  // USD existed (src/hooks/useCurrency.ts). Cached like the pages themselves and
+  // dropped with them when the admin saves the USD settings.
+  let usdOn = false;
+  let usdAt = 0;
+  clearHtmlCache = () => { htmlCache.clear(); usdAt = 0; };
+  const usdEnabled = async (): Promise<boolean> => {
+    if (Date.now() - usdAt < HTML_TTL) return usdOn;
+    try {
+      const [{ getDb }, { FX_KEYS }] = await Promise.all([import("../queries/connection"), import("./fx")]);
+      const row = await getDb().query.appSettings.findFirst({ where: (s, { eq }) => eq(s.key, FX_KEYS.enabled) });
+      usdOn = row?.value === "true";
+    } catch { /* unreadable: keep the last answer, retry after the TTL */ }
+    usdAt = Date.now();
+    return usdOn;
+  };
 
   // Serve index.html with per-page OG/meta + JSON-LD injected (marketing pages,
   // cards, products), and the page itself rendered for the public routes above.
@@ -358,8 +376,9 @@ export function serveStaticFiles(app: App) {
         content = content.replace(/<div id="root">\s*<\/div>/, () =>
           `<div id="root" data-ssr="1">${ssr.html}</div>\n    <script type="application/json" id="__dc_rq">${ssr.state.replace(/</g, "\\u003c")}</script>`);
       }
-      // Contact details from Admin → Settings, read by src/lib/publicNav.ts.
-      const pub = JSON.stringify(publicSettings()).replace(/</g, "\u003c");
+      // Contact details from Admin → Settings, read by src/lib/publicNav.ts,
+      // plus the $ switch read by src/hooks/useCurrency.ts.
+      const pub = JSON.stringify({ ...publicSettings(), usd: await usdEnabled() }).replace(/</g, "\u003c");
       content = content.replace("</head>", () => `    <script>window.__dcSettings=${pub}</script>
   </head>`);
     } catch { /* fall back to plain index.html */ }

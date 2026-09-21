@@ -32,6 +32,7 @@ import { mobileRouter } from "./mobile-router";
 import { staffRouter } from "./staff-router";
 import { customerEmailRouter } from "./customer-email-router";
 import { cardViewsRouter } from "./card-views-router";
+import { currencyRouter } from "./currency-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -70,6 +71,7 @@ export const appRouter = createRouter({
   staff: staffRouter,
   customerEmail: customerEmailRouter,
   cardViews: cardViewsRouter,
+  currency: currencyRouter,
 });
 
 export type AppRouter = typeof appRouter;

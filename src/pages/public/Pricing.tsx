@@ -1,6 +1,6 @@
 import {
   Check, ArrowRight, ChevronRight, Sparkles, Zap, Crown, IdCard, QrCode, Images, Tag, MessageSquare, Globe, Star,
-  ShieldCheck, Nfc, Truck, X, CalendarCheck, CreditCard, Rocket, Link2, BadgeIndianRupee, Users, Lock,
+  ShieldCheck, Nfc, Truck, X, CalendarCheck, CreditCard, Rocket, Link2, BadgeIndianRupee, BadgeDollarSign, Users, Lock,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useLayoutEffect, useRef, useEffect } from "react";
@@ -10,6 +10,9 @@ import { NFC_PRODUCTS, NFC_DELIVERY } from "@/lib/nfcProducts";
 import { Reveal } from "@/components/public/Reveal";
 import JsonLd from "@/components/seo/JsonLd";
 import { OFFER_POLICY } from "@/lib/offerPolicy";
+import CurrencySwitch from "@/components/CurrencySwitch";
+import { useCurrency } from "@/hooks/useCurrency";
+import { formatMoney, roundMoney, type Currency, type UsdPriceTable } from "@contracts/money";
 
 /* ── Billing periods ──────────────────────────────────────────── */
 type Period = "monthly" | "yearly" | "3year";
@@ -18,8 +21,16 @@ const PERIODS: { id: Period; label: string; short: string; badge?: string }[] = 
   { id: "yearly", label: "Yearly", short: "Yearly", badge: "Save 16%" },
   { id: "3year", label: "3 Years", short: "3 Years", badge: "Best value" },
 ];
+/* "Save 16%" is the ₹ ladder. Whole-dollar prices give each plan a different
+   saving (Gold $2/mo vs $12/yr is 50%), so in $ the toggle stays generic and the
+   per-card pills carry the real figure. */
+const periodBadge = (p: (typeof PERIODS)[number], cur: Currency) =>
+  cur === "USD" && p.id === "yearly" ? "Save more" : p.badge;
 
-/* ── Plans (prices in ₹) ──────────────────────────────────────── */
+/* The custom-domain add-on in ₹; mirrors DOMAIN_ADDON_PRICE in api/domain-router.ts. */
+const DOMAIN_INR = 499;
+
+/* ── Plans (prices in the page's currency; ₹ unless the visitor picked $) ── */
 type Plan = {
   name: string; tagline: string; icon: typeof IdCard; accent: string; popular?: boolean;
   cards: number;                    // digital cards the plan allows
@@ -88,10 +99,15 @@ const PLANS: Plan[] = [
   },
 ];
 
-const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
-/* Effective per-month + savings vs paying monthly */
-const perMonth = (p: Plan, period: Period) =>
-  period === "monthly" ? p.price.monthly : period === "yearly" ? Math.round(p.price.yearly / 12) : Math.round(p.price["3year"] / 36);
+/* ₹ keeps this page's whole-rupee format exactly ("₹1,999"); $ shows cents only
+   when there are some ("$24", "$19.67" per card). */
+const money = (n: number, cur: Currency) => formatMoney(n, cur, { decimals: cur === "INR" ? 0 : "auto" });
+/* A real edge country outside India. "XX" is Cloudflare's "unknown"; Tor's "T1" fails the pattern. */
+const isAbroad = (c: string | null) => !!c && /^[A-Z]{2}$/.test(c) && c !== "IN" && c !== "XX";
+/* Effective per-month + savings vs paying monthly. roundMoney is Math.round for ₹,
+   cents for $ (Gold's $30 over 3 years is $0.83/mo, not $1). */
+const perMonth = (p: Plan, period: Period, cur: Currency) =>
+  period === "monthly" ? p.price.monthly : roundMoney(period === "yearly" ? p.price.yearly / 12 : p.price["3year"] / 36, cur);
 const perDay = (p: Plan, period: Period) => {
   const paid = p.price[period];
   const days = period === "monthly" ? 30 : period === "yearly" ? 365 : 1095;
@@ -111,6 +127,7 @@ const periodLabel = (period: Period) => (period === "monthly" ? "/mo" : period =
    auto-generated from that data, so editing a plan in the admin updates this
    page. Falls back to the static PLANS while the query loads. ── */
 type DbPkg = {
+  id?: number; // keys the USD price table; the static fallbacks have none
   name: string; description?: string | null; monthlyPrice: string | number; yearlyPrice: string | number;
   threeYearPrice?: string | number | null;
   maxCards: number; maxProducts: number; maxGalleryImages: number; maxVideos: number;
@@ -122,7 +139,25 @@ const ICON_BY: Record<string, typeof IdCard> = { Trial: Sparkles, Gold: Star, Pl
 const ACCENT_BY: Record<string, string> = { Trial: "#14B8A6", Gold: "#F7B31C", Platinum: "#8B5CF6" };
 const num = (v: unknown) => Number(v ?? 0);
 
-function buildPlans(pkgs: DbPkg[]): Plan[] {
+/* USD list prices for every package, or null when any package can't be shown in
+   $ (no id, missing from the server's table, or a paid plan priced $0 because its
+   3-year column is empty). The page then stays in ₹ rather than show a wrong price. */
+type PeriodPrices = Record<number, Record<Period, number>>;
+function usdPlanPrices(pkgs: DbPkg[] | null, usd: UsdPriceTable | null): PeriodPrices | null {
+  if (!pkgs?.length || !usd) return null;
+  const out: PeriodPrices = {};
+  for (const p of pkgs) {
+    if (p.id == null) return null;
+    const u = usd.plans[p.id];
+    if (!u) return null;
+    const isFree = num(p.monthlyPrice) === 0 && num(p.yearlyPrice) === 0;
+    if (!isFree && !(u.monthly > 0 && u.yearly > 0 && u.triennial > 0)) return null;
+    out[p.id] = { monthly: u.monthly, yearly: u.yearly, "3year": u.triennial };
+  }
+  return out;
+}
+
+function buildPlans(pkgs: DbPkg[], usd?: PeriodPrices | null): Plan[] {
   return pkgs.map((p) => {
     const monthly = num(p.monthlyPrice), yearly = num(p.yearlyPrice);
     const isFree = monthly === 0 && yearly === 0;
@@ -135,7 +170,7 @@ function buildPlans(pkgs: DbPkg[]): Plan[] {
       accent: ACCENT_BY[p.name] || "#F7B31C",
       popular: p.name === "Gold",
       cards: Math.max(1, num(p.maxCards) || 1),
-      price: { monthly, yearly, "3year": three },
+      price: (usd && p.id != null ? usd[p.id] : undefined) ?? { monthly, yearly, "3year": three },
       cta: isFree ? TRIAL_CTA : `Get ${p.name}`,
       headline: isFree ? "Everything, free for 30 days:" : `Your ${p.name} plan includes:`,
       // Shared with the dashboard Subscription module so the two never drift.
@@ -152,7 +187,7 @@ const FALLBACK_PKGS: DbPkg[] = [
   { name: "Gold", monthlyPrice: 99, yearlyPrice: 999, threeYearPrice: 2499, maxCards: 1, maxProducts: 25, maxGalleryImages: 20, maxVideos: 8, featureCustomDomain: false, featureSEO: false, featureAnalytics: true, featureLeadCapture: true, featureRemoveBranding: false, featureWhiteLabel: false, featurePrioritySupport: false, featureAI: false, featureMultilingual: false, featureCRM: false },
   { name: "Platinum", monthlyPrice: 199, yearlyPrice: 1999, threeYearPrice: 4999, maxCards: 3, maxProducts: 9999, maxGalleryImages: 60, maxVideos: 25, featureCustomDomain: true, featureSEO: true, featureAnalytics: true, featureLeadCapture: true, featureRemoveBranding: true, featureWhiteLabel: false, featurePrioritySupport: true, featureAI: true, featureMultilingual: true, featureCRM: true },
 ];
-function compareGroups(pkgs: DbPkg[]): { title: string; rows: CompareRow[] }[] {
+function compareGroups(pkgs: DbPkg[], domainPrice: string): { title: string; rows: CompareRow[] }[] {
   const all = (fn: (p: DbPkg) => Cell) => pkgs.map(fn);
   return [
     {
@@ -183,7 +218,7 @@ function compareGroups(pkgs: DbPkg[]): { title: string; rows: CompareRow[] }[] {
       title: "Your brand",
       rows: [
         { label: "Remove DigitalCarda branding", cells: all((p) => !!p.featureRemoveBranding) },
-        { label: "Custom domain", cells: all((p) => (p.featureCustomDomain ? "₹499 add-on" : false)) },
+        { label: "Custom domain", cells: all((p) => (p.featureCustomDomain ? `${domainPrice} add-on` : false)) },
         { label: "Priority support", cells: all((p) => !!p.featurePrioritySupport) },
       ],
     },
@@ -300,9 +335,25 @@ export default function Pricing() {
   const [period, setPeriod] = useState<Period>("yearly");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const { data: pkgs } = trpc.package.list.useQuery();
-  const plans = pkgs && pkgs.length ? buildPlans(pkgs as unknown as DbPkg[]) : PLANS;
-  const tablePkgs = pkgs && pkgs.length ? (pkgs as unknown as DbPkg[]) : FALLBACK_PKGS;
-  const groups = compareGroups(tablePkgs);
+  const dbPkgs = pkgs && pkgs.length ? (pkgs as unknown as DbPkg[]) : null;
+
+  // ₹ on the server render and hydration (useCurrency guarantees it). $ only after
+  // mount, when the server says USD can be charged and every plan has a $ price.
+  const { currency, setCurrency, available, country, prices } = useCurrency();
+  const usdPlans = usdPlanPrices(dbPkgs, prices);
+  const canUsd = !!usdPlans && !!prices;
+  const cur: Currency = canUsd && currency === "USD" ? "USD" : "INR";
+
+  const inrPlans = dbPkgs ? buildPlans(dbPkgs) : PLANS;
+  const plans = cur === "USD" && dbPkgs ? buildPlans(dbPkgs, usdPlans) : inrPlans;
+  const domainPrice = money(cur === "USD" && prices ? prices.domain : DOMAIN_INR, cur);
+  const tablePkgs = dbPkgs ?? FALLBACK_PKGS;
+  const groups = compareGroups(tablePkgs, domainPrice);
+  // $ is live but this page can't price in it (a plan has no $ price) and the
+  // visitor is abroad: say how they can pay. While USD is switched off the page
+  // is exactly what it was before USD existed — no note, no extra request.
+  const showInrNote = available && !canUsd && isAbroad(country);
+  const PriceIcon = cur === "USD" ? BadgeDollarSign : BadgeIndianRupee;
 
   // Phones show one plan at a time; Gold first.
   const popularIdx = Math.max(0, plans.findIndex((p) => p.popular));
@@ -323,13 +374,13 @@ export default function Pricing() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [periodIdx]);
+  }, [periodIdx, cur]); // cur: the yearly badge's wording (so its width) changes with the currency
 
   /* Structured data: the FAQ, plus the paid plans as real Offers built from the
      LIVE prices so the markup can never drift from what is on screen. Built
-     during render from the same `plans` the cards use, so it is in the
-     server-rendered HTML and matches on hydration. */
-  const paid = plans.filter((p) => p.price.monthly > 0);
+     during render from the ₹ plans (never the $ ones: the markup says INR), so it
+     is in the server-rendered HTML and matches on hydration. */
+  const paid = inrPlans.filter((p) => p.price.monthly > 0);
   const ld = {
     "@context": "https://schema.org",
     "@graph": [
@@ -375,19 +426,20 @@ export default function Pricing() {
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <Reveal stagger>
             <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.07] px-3 py-1.5 text-[12px] font-bold uppercase tracking-[0.16em] text-[#FCD34D] ring-1 ring-white/10">
-              <BadgeIndianRupee size={14} /> Simple pricing
+              <PriceIcon size={14} /> Simple pricing
             </span>
             <h1 className="mt-5 font-display text-[2.4rem] sm:text-[3.2rem] lg:text-[3.3rem] font-extrabold leading-[1.04] tracking-tight text-white [text-wrap:balance]">
               One card. <span className="text-gradient-gold">Every way to be found.</span>
             </h1>
             <p className="mt-5 mx-auto max-w-2xl text-[15.5px] sm:text-[18px] leading-relaxed text-[#CBD5E1]">
               Start free for 30 days — every feature, no payment required. Then keep your card live from just{" "}
-              <span className="font-bold text-white">{goldPlan ? inr(Math.round(goldPlan.price.yearly / 12)) : "₹83"}/month</span>, billed yearly.
+              <span className="font-bold text-white">{goldPlan ? money(perMonth(goldPlan, "yearly", cur), cur) : "₹83"}/month</span>, billed yearly.
             </p>
           </Reveal>
 
-          {/* Billing toggle */}
-          <Reveal className="mt-8 flex justify-center">
+          {/* Billing toggle, and the ₹/$ switch beside it once $ can be charged
+              (never in the server HTML: canUsd is false until after mount) */}
+          <Reveal className={`mt-8 flex justify-center${canUsd ? " flex-wrap items-center gap-3" : ""}`}>
             <div role="radiogroup" aria-label="Billing period" className="relative inline-flex items-center gap-1 p-1.5 rounded-2xl bg-white/[0.07] ring-1 ring-white/15 backdrop-blur">
               <span
                 aria-hidden="true"
@@ -405,12 +457,20 @@ export default function Pricing() {
                 >
                   <span className="flex flex-col sm:flex-row items-center sm:gap-1.5 leading-none">
                     {p.label}
-                    {p.badge && <span className={`mt-1 sm:mt-0 text-[9.5px] sm:text-[10px] font-extrabold px-1.5 py-0.5 rounded-full transition-colors ${period === p.id ? "bg-[#0F172A]/12 text-[#0F172A]" : "bg-[#22C55E]/20 text-[#4ADE80]"}`}>{p.badge}</span>}
+                    {periodBadge(p, cur) && <span className={`mt-1 sm:mt-0 text-[9.5px] sm:text-[10px] font-extrabold px-1.5 py-0.5 rounded-full transition-colors ${period === p.id ? "bg-[#0F172A]/12 text-[#0F172A]" : "bg-[#22C55E]/20 text-[#4ADE80]"}`}>{periodBadge(p, cur)}</span>}
                   </span>
                 </button>
               ))}
             </div>
+            {canUsd && <CurrencySwitch value={cur} onChange={setCurrency} tone="dark" />}
           </Reveal>
+
+          {showInrNote && (
+            <p className="dc-rise mt-4 mx-auto max-w-md text-[12.5px] leading-relaxed text-[#CBD5E1]">
+              Prices are in Indian rupees (₹). Paying from outside India? Pay by card, or{" "}
+              <Link to="/contact" className="font-semibold text-[#FCD34D] underline underline-offset-2 hover:text-white">contact us</Link>.
+            </p>
+          )}
 
           <Reveal className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12.5px] text-[#94A3B8]">
             <span className="inline-flex items-center gap-1.5"><Check size={14} className="text-[#4ADE80]" /> No payment details for the trial</span>
@@ -431,7 +491,7 @@ export default function Pricing() {
                   className={`relative h-12 rounded-xl text-[13px] font-bold transition-all active:scale-95 flex flex-col items-center justify-center leading-tight ${on ? "text-white shadow-md" : "text-[#64748B]"}`}
                   style={on ? { background: p.popular ? "linear-gradient(135deg,#F7B31C,#E09A12)" : "#0F172A", color: p.popular ? "#0F172A" : "#fff" } : undefined}>
                   <span className="flex items-center gap-1"><p.icon size={13} /> {p.name.replace("Free ", "")}</span>
-                  <span className={`text-[10.5px] font-semibold ${on ? "opacity-80" : "text-[#94A3B8]"}`}>{p.price.monthly === 0 ? "₹0" : inr(p.price[period])}</span>
+                  <span className={`text-[10.5px] font-semibold ${on ? "opacity-80" : "text-[#94A3B8]"}`}>{money(p.price.monthly === 0 ? 0 : p.price[period], cur)}</span>
                 </button>
               );
             })}
@@ -475,19 +535,20 @@ export default function Pricing() {
 
                   {/* Price */}
                   <div className="mt-6 lg:mt-4 flex items-end gap-1.5">
-                    <span key={`${plan.name}-${period}`} className="dc-rise font-display text-[3rem] lg:text-[2.4rem] leading-none font-extrabold text-[#0F172A] tabular-nums tracking-tight">{isFree ? "₹0" : inr(price)}</span>
+                    <span key={`${plan.name}-${period}-${cur}`} className="dc-rise font-display text-[3rem] lg:text-[2.4rem] leading-none font-extrabold text-[#0F172A] tabular-nums tracking-tight">{money(isFree ? 0 : price, cur)}</span>
                     <span className="text-[14px] font-semibold text-[#94A3B8] mb-1.5">{isFree ? "/ 30 days" : periodLabel(period)}</span>
                   </div>
                   <div className="mt-2 min-h-[24px] flex flex-wrap items-center gap-1.5 text-[12.5px] text-[#64748B]">
-                    {isFree && <span>No payment required · then from {goldPlan ? inr(Math.round(goldPlan.price.yearly / 12)) : "₹83"}/mo</span>}
+                    {isFree && <span>No payment required · then from {goldPlan ? money(perMonth(goldPlan, "yearly", cur), cur) : "₹83"}/mo</span>}
                     {/* Multi-card plans are priced per card — ₹1,999 buys 3 cards, not one. */}
                     {!isFree && plan.cards > 1 && (
                       <span className="inline-flex items-center gap-1 font-semibold text-[#0F172A]">
-                        <IdCard size={13} style={{ color: plan.accent }} /> {plan.cards} cards · {inr(price / plan.cards)}/card{periodLabel(period)}
+                        <IdCard size={13} style={{ color: plan.accent }} /> {plan.cards} cards · {money(price / plan.cards, cur)}/card{periodLabel(period)}
                       </span>
                     )}
-                    {!isFree && plan.cards <= 1 && period !== "monthly" && <span className="font-semibold text-[#0F172A]">{inr(perMonth(plan, period))}/mo</span>}
-                    {!isFree && plan.cards <= 1 && <span className="text-[#94A3B8]">≈ ₹{perDay(plan, period).toFixed(1)} a day</span>}
+                    {!isFree && plan.cards <= 1 && period !== "monthly" && <span className="font-semibold text-[#0F172A]">{money(perMonth(plan, period, cur), cur)}/mo</span>}
+                    {/* Hidden in $: a few cents a day says nothing useful. */}
+                    {!isFree && plan.cards <= 1 && cur === "INR" && <span className="text-[#94A3B8]">≈ ₹{perDay(plan, period).toFixed(1)} a day</span>}
                     {sv > 0 && <span key={`sv-${period}`} className="dc-rise text-[11px] font-extrabold text-[#166534] bg-[#DCFCE7] px-2 py-0.5 rounded-full">Save {sv}%</span>}
                   </div>
 
@@ -500,7 +561,7 @@ export default function Pricing() {
                   <p className="mt-2.5 text-center text-[11.5px] text-[#94A3B8]">
                     {isFree
                       ? <span className="inline-flex items-center gap-1 font-semibold text-[#0F9488]"><Check size={12} /> {TRIAL_PROMO} — auto applied</span>
-                      : <span className="inline-flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-500" /> Secure checkout · UPI, card, net banking</span>}
+                      : <span className="inline-flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-500" /> Secure checkout · {cur === "USD" ? "credit or debit card" : "UPI, card, net banking"}</span>}
                   </p>
 
                   <div className="my-6 lg:my-4 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
@@ -527,17 +588,17 @@ export default function Pricing() {
                     })}
                   </ul>
 
-                  {/* Custom-domain add-on — free on Platinum 3-year, else a ₹499 add-on */}
+                  {/* Custom-domain add-on — free on Platinum 3-year, else a one-time add-on */}
                   {plan.name === "Platinum" && (
                     period === "3year" ? (
                       <div key="free-domain" className="dc-rise mt-5 flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#F0FDF4] to-[#ECFDF5] border border-[#BBF7D0] px-3 py-2.5">
                         <span className="w-7 h-7 rounded-lg bg-[#16A34A] flex items-center justify-center shrink-0"><Globe size={14} className="text-white" /></span>
-                        <span className="text-[12.5px] leading-tight text-[#166534]"><span className="font-bold">Custom domain included FREE</span> — worth ₹499</span>
+                        <span className="text-[12.5px] leading-tight text-[#166534]"><span className="font-bold">Custom domain included FREE</span> — worth {domainPrice}</span>
                       </div>
                     ) : (
                       <div key="paid-domain" className="mt-5 flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#F5F3FF] to-[#FAF5FF] border border-[#E9D5FF] px-3 py-2.5">
                         <span className="w-7 h-7 rounded-lg bg-[#8B5CF6] flex items-center justify-center shrink-0"><Globe size={14} className="text-white" /></span>
-                        <span className="text-[12.5px] leading-tight text-[#5B21B6]"><span className="font-bold">Add-on: Custom domain</span> — ₹499 <span className="text-[#8B5CF6]">(free on 3-Year)</span></span>
+                        <span className="text-[12.5px] leading-tight text-[#5B21B6]"><span className="font-bold">Add-on: Custom domain</span> — {domainPrice} <span className="text-[#8B5CF6]">(free on 3-Year)</span></span>
                       </div>
                     )
                   )}
@@ -614,7 +675,7 @@ export default function Pricing() {
                           <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: p.accent }}><p.icon size={14} className={p.popular ? "text-[#0F172A]" : "text-white"} /></span>
                           <span className="text-[12px] sm:text-[14px] font-bold">{p.name.replace("Free ", "")}</span>
                         </span>
-                        <span className="block mt-1 text-[10.5px] sm:text-[11.5px] font-medium text-[#94A3B8]">{p.price.monthly === 0 ? "₹0 · 30 days" : `${inr(p.price[period])}${periodLabel(period)}`}</span>
+                        <span className="block mt-1 text-[10.5px] sm:text-[11.5px] font-medium text-[#94A3B8]">{p.price.monthly === 0 ? `${money(0, cur)} · 30 days` : `${money(p.price[period], cur)}${periodLabel(period)}`}</span>
                       </th>
                     ))}
                   </tr>
@@ -689,7 +750,7 @@ export default function Pricing() {
 
                 <div className="relative mt-auto pt-5 flex items-end justify-between gap-3">
                   <div>
-                    <p className="flex items-baseline gap-1.5"><span className="text-3xl font-extrabold text-white">₹499</span><span className="text-[12px] text-[#94A3B8]">one-time</span></p>
+                    <p className="flex items-baseline gap-1.5"><span className="text-3xl font-extrabold text-white">{domainPrice}</span><span className="text-[12px] text-[#94A3B8]">one-time</span></p>
                     <p className="text-[11.5px] text-[#C4B5FD] font-semibold">Free on Platinum 3-Year</p>
                   </div>
                   <Link to="/custom-domain" className="group inline-flex items-center gap-1.5 h-11 px-4 rounded-xl bg-white text-[#0F172A] text-[13px] font-bold hover:bg-[#F1F5F9] active:scale-95 transition-all">
@@ -710,6 +771,14 @@ export default function Pricing() {
                   </div>
                   <p className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#F0FDF4] px-2.5 py-1 text-[12px] font-semibold text-[#166534]"><Truck size={14} /> Free delivery · {NFC_DELIVERY.label}</p>
                 </div>
+                {/* NFC is never sold in $ (the server stays ₹ and India-only), so a $
+                    visitor is told before they reach the order form. */}
+                {cur === "USD" && (
+                  <p className="dc-rise mt-4 flex items-start gap-2.5 rounded-xl bg-[#FFFBEB] px-3.5 py-3 text-[12.5px] leading-snug text-[#78350F] ring-1 ring-[#FDE68A]">
+                    <Globe size={15} className="mt-px shrink-0 text-[#B45309]" />
+                    <span>NFC cards and standees are printed and shipped within India only, and are billed in ₹. Your digital card, QR and link work worldwide.</span>
+                  </p>
+                )}
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   {NFC_PRODUCTS.map((p) => {
                     const isCard = p.id === "nfc_card";
@@ -821,7 +890,7 @@ export default function Pricing() {
             <div className="relative">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#22C55E]/15 px-3 py-1 text-[12px] font-bold text-[#4ADE80] ring-1 ring-[#22C55E]/30"><ShieldCheck size={13} /> 7-day money-back on your first plan</span>
               <h2 className="mt-4 font-display text-[1.9rem] sm:text-[2.8rem] font-extrabold text-white leading-[1.1] tracking-tight">Your card is ready <span className="text-gradient-gold">in minutes.</span></h2>
-              <p className="mt-3 text-[14.5px] text-[#94A3B8] max-w-lg mx-auto">₹0 for 30 days with every feature unlocked. No payment required — {TRIAL_PROMO} is applied for you.</p>
+              <p className="mt-3 text-[14.5px] text-[#94A3B8] max-w-lg mx-auto">{money(0, cur)} for 30 days with every feature unlocked. No payment required — {TRIAL_PROMO} is applied for you.</p>
               <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
                 <Link to={TRIAL_SIGNUP} className="dc-btn-shine group relative overflow-hidden h-[52px] px-8 rounded-2xl gradient-gold text-[#0F172A] text-[15px] font-extrabold inline-flex items-center justify-center gap-2 shadow-gold transition-all hover:-translate-y-0.5 active:scale-[0.97]">
                   <span className="relative z-10">{TRIAL_CTA}</span> <ArrowRight size={17} className="relative z-10 transition-transform group-hover:translate-x-1" />

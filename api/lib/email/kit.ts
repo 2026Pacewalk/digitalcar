@@ -12,6 +12,7 @@
  * Every helper that takes `html` expects TRUSTED markup (callers escape user
  * text with esc()); every helper that takes plain text escapes it itself.
  */
+import { formatMoney, type Currency } from "@contracts/money";
 
 export const SITE = "https://digitalcarda.in";
 export const SUPPORT_WHATSAPP = { display: "+91 95177 22444", wa: "919517722444" };
@@ -66,6 +67,16 @@ export const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] || c));
 
 export const inr = (n: unknown) => "₹" + Number(n || 0).toLocaleString("en-IN");
+
+/** The currency an amount was charged in. Only an explicit "USD" is dollars:
+    a missing, legacy or unknown value is ₹, so a rupee amount can never be
+    shown as dollars by accident. */
+export const asCurrency = (v: unknown): Currency => (String(v ?? "").trim().toUpperCase() === "USD" ? "USD" : "INR");
+
+/** An amount in its own currency. INR is exactly inr(), so every ₹ email reads
+    as it always has. USD is "$12" / "$10.20"; `cents` gives "$12.00" for invoices. */
+export const money = (n: unknown, cur?: unknown, opts: { cents?: boolean } = {}) =>
+  asCurrency(cur) === "USD" ? formatMoney(Number(n), "USD", { decimals: opts.cents ? 2 : "auto" }) : inr(n);
 
 /** An http(s) URL or null — never let javascript:/data: into an href or src. */
 export const safeUrl = (u?: string | null) => (u && /^https?:\/\/[^\s"'<>]+$/i.test(u.trim()) ? u.trim() : null);
@@ -413,13 +424,18 @@ export function progressBar(o: { pct: number; label: string; value: string; tone
   </table>`;
 }
 
-/** Itemised money table with a gold total band. Names are text; amounts are numbers. */
+/** Itemised money table with a gold total band. Names are text; amounts are numbers.
+    `currency` (default INR) is what the amounts are in; `extra` values are
+    pre-formatted, so callers format those in the same currency. */
 export function receipt(o: {
   rows: { name: string; sub?: string; qty?: number; amount: number }[];
   extra?: { label: string; value: string; tone?: Tone }[];   // delivery, discount… (text)
   totalLabel?: string; total: number;
+  currency?: string | null;
 }): string {
   const cell = `border-bottom:1px solid ${BRAND.line};font-family:${FONT}`;
+  // $ always shows cents here, so a column of amounts lines up ("$12.00", "$1.80").
+  const amt = (v: number) => money(v, o.currency, { cents: true });
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${BRAND.line};border-radius:14px;background:#FFFFFF">
     ${o.rows.map((r) => `<tr>
       <td style="padding:13px 0 13px 18px;${cell}">
@@ -427,7 +443,7 @@ export function receipt(o: {
         ${r.sub ? `<div style="font-size:12px;color:${BRAND.sub};padding-top:2px">${esc(r.sub)}</div>` : ""}
       </td>
       <td align="center" style="padding:13px 8px;${cell};font-size:14px;font-weight:700;color:${BRAND.ink};white-space:nowrap">${r.qty ? `&times; ${r.qty}` : ""}</td>
-      <td align="right" style="padding:13px 18px 13px 0;${cell};font-size:14.5px;font-weight:700;color:${BRAND.ink};white-space:nowrap">${esc(inr(r.amount))}</td>
+      <td align="right" style="padding:13px 18px 13px 0;${cell};font-size:14.5px;font-weight:700;color:${BRAND.ink};white-space:nowrap">${esc(amt(r.amount))}</td>
     </tr>`).join("")}
     ${(o.extra || []).map((x) => `<tr>
       <td style="padding:12px 0 12px 18px;font-family:${FONT};font-size:13px;color:${BRAND.sub}">${esc(x.label)}</td>
@@ -437,7 +453,7 @@ export function receipt(o: {
     <tr>
       <td bgcolor="${BRAND.goldTint}" style="background:${BRAND.goldTint};padding:14px 0 14px 18px;border-top:1px solid ${BRAND.goldLine};border-radius:0 0 0 14px;font-family:${FONT};font-size:14px;font-weight:800;color:${BRAND.ink}">${esc(o.totalLabel || "Total")}</td>
       <td bgcolor="${BRAND.goldTint}" style="background:${BRAND.goldTint};border-top:1px solid ${BRAND.goldLine}"></td>
-      <td bgcolor="${BRAND.goldTint}" align="right" style="background:${BRAND.goldTint};padding:14px 18px 14px 0;border-top:1px solid ${BRAND.goldLine};border-radius:0 0 14px 0;font-family:${FONT};font-size:18px;font-weight:800;color:${BRAND.ink};white-space:nowrap">${esc(inr(o.total))}</td>
+      <td bgcolor="${BRAND.goldTint}" align="right" style="background:${BRAND.goldTint};padding:14px 18px 14px 0;border-top:1px solid ${BRAND.goldLine};border-radius:0 0 14px 0;font-family:${FONT};font-size:18px;font-weight:800;color:${BRAND.ink};white-space:nowrap">${esc(amt(o.total))}</td>
     </tr>
   </table>`;
 }

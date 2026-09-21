@@ -11,7 +11,7 @@ export type RazorpayHandlerResponse = {
 
 export type RazorpayOptions = {
   key: string;
-  amount: number; // paise
+  amount: number; // minor units: paise for INR, cents for USD (from the server's order)
   currency: string;
   name: string;
   description?: string;

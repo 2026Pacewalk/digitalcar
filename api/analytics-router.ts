@@ -5,6 +5,7 @@ import { analyticsEvents, cards, users, subscriptions, subscriptionPackages, pay
 import { eq, and, sql, gte, desc, inArray, isNotNull } from "drizzle-orm";
 import { mergedCustomerCount } from "./admin-router";
 import { buildAdminDashboard, revenueSection, viewerAccess, PASSIVE_TYPES } from "./lib/admin-dashboard";
+import { formatMoney } from "@contracts/money";
 
 /* ── Deep card insights ────────────────────────────────────────────────────
    Everything the customer Analytics page needs, in ONE round trip, computed
@@ -475,7 +476,7 @@ export const analyticsRouter = createRouter({
       db.select({ fullName: users.fullName, email: users.email, role: users.role, createdAt: users.createdAt }).from(users).orderBy(desc(users.createdAt)).limit(6),
       db.select({ fullName: leads.fullName, createdAt: leads.createdAt }).from(leads).orderBy(desc(leads.createdAt)).limit(3),
       seesMoney
-        ? db.select({ amount: paymentOrders.amount, paidAt: paymentOrders.verifiedAt }).from(paymentOrders)
+        ? db.select({ amount: paymentOrders.amount, currency: paymentOrders.currency, paidAt: paymentOrders.verifiedAt }).from(paymentOrders)
           .where(eq(paymentOrders.status, "verified")).orderBy(desc(paymentOrders.verifiedAt)).limit(3)
         : [],
     ]);
@@ -488,7 +489,13 @@ export const analyticsRouter = createRouter({
     const activity = [
       ...recentUsers.slice(0, 3).map((u) => ({ type: "user", text: `New ${u.role.replace("_", " ")} registered: ${u.fullName}`, at: u.createdAt as Date | null })),
       ...recentLeads.map((l) => ({ type: "lead", text: `New lead captured: ${l.fullName}`, at: l.createdAt as Date | null })),
-      ...recentPaid.map((p) => ({ type: "purchase", text: `Payment received: ₹${Number(p.amount).toLocaleString("en-IN")}`, at: p.paidAt as Date | null })),
+      // A $ payment is shown in $ (its own amount); every ₹ row keeps the exact
+      // string it has always had.
+      ...recentPaid.map((p) => ({
+        type: "purchase",
+        text: `Payment received: ${p.currency === "USD" ? formatMoney(Number(p.amount), "USD") : `₹${Number(p.amount).toLocaleString("en-IN")}`}`,
+        at: p.paidAt as Date | null,
+      })),
     ]
       .filter((a) => a.at)
       .sort((a, b) => new Date(b.at as Date).getTime() - new Date(a.at as Date).getTime())

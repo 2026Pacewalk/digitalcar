@@ -3,11 +3,15 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { coupons, couponRedemptions, users, subscriptionPackages } from "@db/schema";
+import { coupons, couponRedemptions, users, subscriptionPackages, paymentOrders } from "@db/schema";
 import { normalizeCode } from "./lib/coupons";
 
 /* Super-admin coupon management. Coupons discount plan purchases only — the
    pricing rules live in api/lib/coupons.ts. */
+
+// amount × fx_rate comes back with 6 decimals; ₹ totals only need paise. A value
+// that already has 2 decimals (every INR total) is returned unchanged.
+const paise = (v: unknown) => Math.round(Number(v || 0) * 100) / 100;
 
 const couponInput = z.object({
   id: z.number().int().positive().optional(),
@@ -27,18 +31,24 @@ const couponInput = z.object({
 });
 
 export const couponRouter = createRouter({
-  // Every coupon with how it has performed.
+  // Every coupon with how it has performed. A redemption's amounts are in its
+  // order's currency, so totals are ₹ equivalents: × the order's fx_rate (1 for
+  // INR, and for redemptions with no order row, e.g. the ₹0 FREE30D trials).
   list: adminQuery.query(async () => {
     const db = getDb();
     const rows = await db.select().from(coupons).orderBy(desc(coupons.createdAt));
+    const fx = sql`coalesce(${paymentOrders.fxRate}, 1)`;
     const stats = rows.length
       ? await db.select({
           couponId: couponRedemptions.couponId,
           completed: sql<number>`sum(case when ${couponRedemptions.status} = 'completed' then 1 else 0 end)`,
           pending: sql<number>`sum(case when ${couponRedemptions.status} = 'pending' then 1 else 0 end)`,
-          revenue: sql<string>`coalesce(sum(case when ${couponRedemptions.status} = 'completed' then ${couponRedemptions.amountPaid} else 0 end), 0)`,
-          discounted: sql<string>`coalesce(sum(case when ${couponRedemptions.status} = 'completed' then ${couponRedemptions.discount} else 0 end), 0)`,
-        }).from(couponRedemptions).groupBy(couponRedemptions.couponId)
+          usdUses: sql<number>`sum(case when ${couponRedemptions.status} = 'completed' and ${paymentOrders.currency} = 'USD' then 1 else 0 end)`,
+          revenue: sql<string>`coalesce(sum(case when ${couponRedemptions.status} = 'completed' then ${couponRedemptions.amountPaid} * ${fx} else 0 end), 0)`,
+          discounted: sql<string>`coalesce(sum(case when ${couponRedemptions.status} = 'completed' then ${couponRedemptions.discount} * ${fx} else 0 end), 0)`,
+        }).from(couponRedemptions)
+          .leftJoin(paymentOrders, eq(paymentOrders.id, couponRedemptions.paymentOrderId))
+          .groupBy(couponRedemptions.couponId)
       : [];
     const byId = new Map(stats.map((s) => [s.couponId, s]));
     const plans = await db.select({ id: subscriptionPackages.id, name: subscriptionPackages.name }).from(subscriptionPackages);
@@ -50,8 +60,9 @@ export const couponRouter = createRouter({
           ...c,
           uses: Number(s?.completed || 0),
           pendingUses: Number(s?.pending || 0),
-          revenue: Number(s?.revenue || 0),
-          discounted: Number(s?.discounted || 0),
+          usdUses: Number(s?.usdUses || 0),
+          revenue: paise(s?.revenue),
+          discounted: paise(s?.discounted),
         };
       }),
     };
@@ -125,6 +136,21 @@ export const couponRouter = createRouter({
     const people = ids.length
       ? await db.select({ id: users.id, email: users.email, fullName: users.fullName }).from(users).where(inArray(users.id, ids))
       : [];
-    return rows.map((r) => ({ ...r, customer: people.find((u) => u.id === r.userId) ?? null }));
+    // Each redemption's amounts are in its order's currency; no order row means ₹.
+    const orderIds = [...new Set(rows.map((r) => r.paymentOrderId).filter((x): x is number => !!x))];
+    const orders = orderIds.length
+      ? await db.select({ id: paymentOrders.id, currency: paymentOrders.currency, fxRate: paymentOrders.fxRate })
+          .from(paymentOrders).where(inArray(paymentOrders.id, orderIds))
+      : [];
+    const orderById = new Map(orders.map((o) => [o.id, o]));
+    return rows.map((r) => {
+      const o = r.paymentOrderId ? orderById.get(r.paymentOrderId) : undefined;
+      return {
+        ...r,
+        currency: o?.currency ?? "INR",
+        fxRate: Number(o?.fxRate ?? 1),
+        customer: people.find((u) => u.id === r.userId) ?? null,
+      };
+    });
   }),
 });

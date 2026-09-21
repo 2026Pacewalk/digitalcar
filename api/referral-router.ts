@@ -4,9 +4,11 @@ import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware
 import { getDb } from "./queries/connection";
 import {
   users, referrals, walletTransactions, withdrawalRequests, appSettings,
-  subscriptions, notifications, publishedCards, type Referral, type WithdrawalRequest,
+  subscriptions, notifications, publishedCards, paymentOrders, type Referral, type WithdrawalRequest,
 } from "@db/schema";
-import { eq, ne, desc, and, gt, inArray, sql } from "drizzle-orm";
+import { eq, ne, desc, and, asc, gt, inArray, sql } from "drizzle-orm";
+import { getFxConfig, DEFAULT_RATE } from "./lib/fx";
+import { referralPlanValue } from "./lib/referral-value";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { allows } from "./lib/notify-prefs";
@@ -354,11 +356,29 @@ export const referralRouter = createRouter({
       if (!prev || new Date(s.createdAt) < new Date(prev.createdAt)) subMap.set(s.userId, s);
     }
 
+    // The reward is a % of the plan's ₹ value (referralPlanValue). Only members
+    // whose plan row says USD cost a lookup of their $ payments.
+    const usdSubs = [...subMap.values()].filter((s) => s.currency === "USD");
+    const usdOrders = usdSubs.length
+      ? await db.query.paymentOrders.findMany({
+          where: and(
+            inArray(paymentOrders.userId, usdSubs.map((s) => s.userId)),
+            eq(paymentOrders.currency, "USD"),
+            eq(paymentOrders.status, "verified"),
+          ),
+          columns: { userId: true, packageId: true, amount: true, fxRate: true },
+          orderBy: [asc(paymentOrders.id)],
+        })
+      : [];
+    // Only for a stored rate that's unusable, which a recorded payment never has.
+    const fallbackRate = usdOrders.length ? (await getFxConfig(db)).rate : DEFAULT_RATE;
+
     return rows.map((r) => {
       const referrer = userMap.get(r.referrerId);
       const referee = r.refereeId ? userMap.get(r.refereeId) : undefined;
       const sub = r.refereeId ? subMap.get(r.refereeId) : undefined;
-      const planAmount = n(sub?.amount);
+      const value = sub ? referralPlanValue(sub, usdOrders, fallbackRate) : null;
+      const planAmount = value?.inr ?? 0; // ₹ (equivalent): what the reward is a % of
       const suggestedReward = Math.round(planAmount * commission) / 100;
       return {
         id: r.id,
@@ -376,6 +396,9 @@ export const referralRouter = createRouter({
         hasPaidPlan: !!sub,
         planName: sub?.package?.name ?? null,
         planAmount,
+        // What the friend actually paid, in its own currency (planAmount is its ₹ value).
+        planCurrency: value?.currency ?? "INR",
+        planAmountPaid: value?.paid ?? 0,
         suggestedReward,
         commissionPercent: commission,
       };

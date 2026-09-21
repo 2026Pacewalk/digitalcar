@@ -31,6 +31,8 @@ import { and, eq, ne, gte, lt, inArray, asc, desc } from "drizzle-orm";
 import { sendEmail } from "../lib/mail";
 import { allows } from "../lib/notify-prefs";
 import { subscriptionRenewalReminderEmail, subscriptionExpiredEmail } from "../lib/email-templates";
+import { getFxConfig, effectiveRowCurrency, usersWithUsdPayments } from "../lib/fx";
+import { isCurrency, type Currency } from "@contracts/money";
 
 type Db = ReturnType<typeof getDb>;
 type Email = Parameters<typeof sendEmail>[1];
@@ -106,6 +108,23 @@ export function nextTier(pkgs: Pkg[], current: Pkg | undefined, cycle: string): 
     .sort((a, b) => priceFor(a, cycle) - priceFor(b, cycle))[0] ?? null;
 }
 
+/** The currency a subscription was paid in. Anything but "USD" (every row from
+    before USD existed) is ₹. */
+export const rowCurrency = (v: unknown): Currency => (isCurrency(v) ? v : "INR");
+
+/** Whether the reminder may say "upgrade before it ends and what you paid comes
+    off": a paid row (admin-granted ₹0 rows get no tip, as before), and for a $
+    plan only while USD checkout is on — with it off, upgrades are charged in ₹,
+    so "the $12 you paid comes off" wouldn't be true. */
+export const creditTipApplies = (row: { amount: unknown; currency?: unknown }, usdCheckoutOn: boolean) =>
+  Number(row.amount) > 0 && (rowCurrency(row.currency) === "INR" || usdCheckoutOn);
+
+/** USD checkout switch, for the tip above. Unreadable means off: the tip is then
+    only left out of $ plans' reminders. */
+async function usdCheckoutOn(db: Db): Promise<boolean> {
+  try { return (await getFxConfig(db)).enabled; } catch { return false; }
+}
+
 export type BillingStage = "renew7" | "renew1" | "subexp";
 export type DueBillingEmail = {
   subId: number; userId: number; to: string; stage: BillingStage;
@@ -133,6 +152,14 @@ export async function dueBillingEmails(db: Db, now = Date.now()): Promise<{ scan
   const pkgOf = new Map(pkgs.map((p) => [p.id, p]));
   const slugOf = new Map<number, string>();
   for (const c of cards) if (!slugOf.has(c.userId)) slugOf.set(c.userId, c.slug); // primary card first
+  // Only a $ plan needs the USD switch, so an all-₹ run makes no extra query.
+  // And a row counts as $ only when that member really has a verified $ payment:
+  // the 'USD' column default on a pre-USD row must not change their reminder
+  // (api/lib/fx.ts — the rule the checkout lock uses too).
+  const labelledUsd = rows.filter((s) => rowCurrency(s.currency) === "USD");
+  const usdOn = labelledUsd.length ? await usdCheckoutOn(db) : false;
+  const usdUsers = await usersWithUsdPayments(db, [...new Set(labelledUsd.map((s) => s.userId))]);
+  const curOf = (s: { userId: number; currency: unknown }) => effectiveRowCurrency(s.currency, usdUsers.has(s.userId));
 
   const due: DueBillingEmail[] = [];
   for (const s of rows) {
@@ -156,11 +183,13 @@ export async function dueBillingEmails(db: Db, now = Date.now()): Promise<{ scan
       if (daysLeft > 7) continue;
       stage = daysLeft <= 1 ? "renew1" : "renew7";
       // "What you paid comes off" only holds for a paid row with a plan above it
-      // (payment-router computeAmount); admin-granted ₹0 rows get no tip.
-      const next = Number(s.amount) > 0 ? nextTier(pkgs, pkg, s.billingCycle) : null;
+      // (payment-router computeAmount); see creditTipApplies. The credit is shown
+      // in the currency the row was paid in.
+      const next = creditTipApplies({ amount: s.amount, currency: curOf(s) }, usdOn) ? nextTier(pkgs, pkg, s.billingCycle) : null;
       render = () => subscriptionRenewalReminderEmail({
         ...base, daysLeft, validTill: new Date(end),
         upgradeCredit: next ? Number(s.amount) : null, nextPlanName: next?.name ?? null,
+        currency: curOf(s),
       });
       title = daysLeft === 0 ? `Your ${planWords} ends today` : daysLeft === 1 ? `Your ${planWords} ends tomorrow` : `Your ${planWords} ends in ${daysLeft} days`;
       message = `It ends on ${showDate(end)} and doesn't renew by itself. Renew to keep your premium features.`;
