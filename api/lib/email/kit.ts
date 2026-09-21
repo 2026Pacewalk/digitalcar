@@ -49,6 +49,10 @@ export type Tone = keyof typeof TONE;
 export interface Email {
   /** Which template produced this — recorded in the email log. */
   kind?: string;
+  /** The account this email is about, for the email log, when the recipient
+      address no longer belongs to it (e.g. the old address after an email change),
+      so erasing the account also erases the log row. */
+  userId?: number;
   subject: string;
   html: string;
   text: string;

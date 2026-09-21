@@ -5,8 +5,10 @@ import { nanoid } from "nanoid";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEvents, users, accountDeletionRequests } from "@db/schema";
+import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEvents, users, accountDeletionRequests, type User } from "@db/schema";
 import { legacyPaidPlan } from "./lib/entitlement";
+import { sendEmail } from "./lib/mail";
+import { cardPublishedEmail } from "./lib/email-templates";
 import { eq, desc, and } from "drizzle-orm";
 
 const DAY = 86_400_000;
@@ -102,6 +104,19 @@ export async function slugTakenByOther(
   return snap.some((t) => !(t.userId === ownerUserId && t.cardId === ownerCardId));
 }
 
+/* "Your card is live" to the owner, for a card's FIRST snapshot. Best-effort:
+   never awaited by the publish, so a mail problem can't slow or fail it. */
+async function notifyCardPublished(owner: Pick<User, "email" | "fullName">, slug: string, publicId: string, data: unknown): Promise<void> {
+  // A legacy owner reclaiming their customers.json address has been live for
+  // years; the go-live email would be news to nobody.
+  if (legacySlugSet().has(slug.toLowerCase())) return;
+  const company = (data as { customer?: { company_name?: unknown } } | null)?.customer?.company_name;
+  await sendEmail(owner.email, cardPublishedEmail({
+    name: owner.fullName, slug, publicId,
+    company: typeof company === "string" && company.trim() ? company.trim() : null,
+  }));
+}
+
 /* Published-card snapshots + permanent QR identity.
    On publish, the builder sends the whole card here; the public /slug page
    reads it back. Each card also gets an immutable `public_id` — the target the
@@ -165,6 +180,11 @@ export const publishRouter = createRouter({
       }
       const publicId = nanoid(10);
       await db.insert(publishedCards).values({ userId: ctx.user.id, cardId, slug, publicId, data });
+      // First time this card goes live (republishes take the update path above;
+      // (user, card) is unique, so a racing second insert throws before here).
+      // The signup starter card is inserted in auth-router, so this never
+      // doubles up with the welcome email.
+      void notifyCardPublished(ctx.user, slug, publicId, data).catch(() => {});
       const fresh = await db.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner);
       return { ok: true, publicId, updatedAt: fresh[0]?.updatedAt ? new Date(fresh[0].updatedAt).toISOString() : null };
     }),

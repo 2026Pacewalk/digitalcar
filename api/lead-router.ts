@@ -133,10 +133,11 @@ export const leadRouter = createRouter({
         .set({ leadCount: sql`${cards.leadCount} + 1` })
         .where(eq(cards.id, input.cardId));
 
-      // Notify the owner by email (non-blocking, never throws).
+      // Email the platform inbox and the card's owner (non-blocking, never throws).
       void sendLeadNotification({
         name: input.fullName, email: input.email, contact: input.phone,
         message: input.message, slug: card.slug, cardName: card.title,
+        company: input.company, ownerUserId: card.userId,
       });
 
       return db.query.leads.findFirst({ where: eq(leads.id, result[0].id) });

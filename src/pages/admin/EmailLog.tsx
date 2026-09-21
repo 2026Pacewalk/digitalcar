@@ -17,42 +17,90 @@ type Status = "all" | "sent" | "failed" | "skipped";
 
 /* Template function name → what a human would call it. Anything not listed
    falls back to a de-camel-cased version of the name, so a new template shows
-   up readably the day it is added. */
+   up readably the day it is added. Grouped like the modules in api/lib/email/;
+   the keys are the stored `kind` strings, which are NOT always the function
+   name (see the owner alerts). */
 const KIND_LABEL: Record<string, string> = {
-  accountDetailsEmail: "Account details",
-  featureUpdateEmail: "What's new announcement",
+  // Account
   welcomeEmail: "Welcome",
-  enquiryAutoReplyEmail: "Enquiry auto-reply",
-  leadNotificationEmail: "New lead",
-  hotLeadEmail: "Hot lead",
-  planUpgradedEmail: "Plan upgraded",
-  cardPublishedEmail: "Card published",
-  monthlyDigestEmail: "Monthly digest",
-  dormantCardEmail: "Dormant card nudge",
-  reviewRequestEmail: "Review request",
-  paymentSubmittedEmail: "Payment submitted",
-  paymentToVerifyAdminEmail: "Payment to verify",
-  paymentVerifiedEmail: "Payment verified",
-  paymentRejectedEmail: "Payment rejected",
+  accountDetailsEmail: "Account details",
   verifyEmailAddressEmail: "Verify email address",
   passwordChangedEmail: "Password changed",
   passwordResetEmail: "Password reset",
-  trialEndingEmail: "Trial ending",
+  emailChangedEmail: "Sign-in email changed",
+  accountDeletionScheduledEmail: "Account deletion scheduled",
+  accountRestoredEmail: "Account restored",
+  // Trial & card lifecycle
   trialDay1Email: "Trial day 1",
   trialDay7Email: "Trial day 7",
-  newSignupAdminEmail: "New signup (admin)",
-  referralSignupAdminEmail: "Referral signup (admin)",
+  trialDay15Email: "Trial day 15",
+  trialDay21Email: "Trial day 21",
+  trialDay25Email: "Trial day 25",
+  trialEndingEmail: "Trial ending",
+  trialEndedEmail: "Trial ended",
+  abandonedPublishEmail: "Unpublished card nudge",
+  cardPublishedEmail: "Card published",
+  cardLinkChangedEmail: "Card link changed",
+  monthlyDigestEmail: "Monthly digest",
+  dormantCardEmail: "Dormant card nudge",
+  // Plans & payments
+  planUpgradedEmail: "Plan upgraded",
+  planExtendedEmail: "Plan extended",
+  paymentSubmittedEmail: "Payment submitted",
+  paymentVerifiedEmail: "Payment verified",
+  paymentRejectedEmail: "Payment rejected",
+  paymentFailedEmail: "Payment failed",
+  subscriptionRenewalReminderEmail: "Plan renewal reminder",
+  subscriptionExpiredEmail: "Plan expired",
+  // NFC orders
+  nfcOrderReceivedEmail: "NFC order received",
+  nfcOrderConfirmedEmail: "NFC order confirmed",
+  nfcOrderShippedEmail: "NFC order shipped",
+  nfcOrderDeliveredEmail: "NFC order delivered",
+  nfcOrderCancelledEmail: "NFC order cancelled",
+  nfcOrderAdmin: "NFC order (admin)",
+  // Leads
+  enquiryAutoReplyEmail: "Enquiry auto-reply",
+  newLeadOwnerEmail: "New lead (card owner)",
+  leadFollowUpsDueEmail: "Lead follow-ups due",
+  leadNotificationEmail: "New lead (admin)",
+  hotLeadEmail: "Hot lead (admin)",
+  // Refer & Earn
+  referralJoinedEmail: "Referral joined",
   referralRewardEmail: "Referral reward",
-  payoutRequestAdminEmail: "Payout request (admin)",
-  resellerApplicationAdminEmail: "Reseller application (admin)",
+  payoutRequestReceivedEmail: "Payout request received",
+  payoutCompletedEmail: "Payout completed",
+  payoutRejectedEmail: "Payout rejected",
+  // Resellers
   resellerApplicationReceivedEmail: "Reseller application received",
   resellerApprovedEmail: "Reseller approved",
   resellerApprovedExistingEmail: "Reseller approved (existing)",
   resellerRejectedEmail: "Reseller rejected",
+  resellerCommissionEmail: "Reseller commission",
+  // Owner alerts
+  newSignupAdminEmail: "New signup (admin)",
+  referralSignupAdminEmail: "Referral signup (admin)",
+  paymentToVerifyAdminEmail: "Payment to verify",
+  payoutRequestAdminEmail: "Payout request (admin)",
+  resellerApplicationAdminEmail: "Reseller application (admin)",
+  contactEnquiryAdmin: "Contact enquiry (admin)",
+  accountDeletionRequestAdmin: "Deletion request (admin)",
+  bulkOrderAdmin: "Bulk order (admin)",
+  onlineSaleAdminEmail: "Online sale (admin)",
+  paymentSettingsChangedAdminEmail: "Payment settings changed (admin)",
+  ownerDailyDigestEmail: "Daily digest (admin)",
+  // Marketing & system
+  featureUpdateEmail: "What's new announcement",
+  marketingIntroEmail: "Marketing intro",
+  contactReceivedEmail: "Contact form received",
+  reviewRequestEmail: "Review request",
+  bulkOrderReceivedEmail: "Bulk order received",
   smtpTestEmail: "SMTP test",
 };
 
-const kindLabel = (k: string | null) =>
+// Shared with Admin → Email previews so both pages call a template the same thing.
+// eslint-disable-next-line react-refresh/only-export-components
+export const kindLabel = (k: string | null) =>
   !k ? "—"
     : KIND_LABEL[k]
     || k.replace(/Email$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());

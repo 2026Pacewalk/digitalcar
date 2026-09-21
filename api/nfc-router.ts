@@ -4,10 +4,13 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { nfcOrders, publishedCards, users, type NfcOrder } from "@db/schema";
-import { resolveRazorpay } from "./payment-router";
+import { resolveRazorpay, getSettings as getPaySettings } from "./payment-router";
 import { createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder, type RazorpayOrderFull } from "./lib/razorpay";
 import { sendEmail, ownerAddress } from "./lib/mail";
-import { nfcOrderConfirmedEmail, nfcOrderShippedEmail, nfcOrderAdminEmail } from "./lib/email-templates";
+import {
+  nfcOrderConfirmedEmail, nfcOrderShippedEmail, nfcOrderAdminEmail, nfcOrderReceivedEmail,
+  nfcOrderDeliveredEmail, nfcOrderCancelledEmail, type Email, type NfcPaymentDetails,
+} from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { NFC_PRODUCTS, NFC_DELIVERY, NFC_MAX_QTY, nfcProduct } from "../src/lib/nfcProducts";
 
@@ -87,8 +90,29 @@ const addressOf = (o: NfcOrder) =>
 const printLinesOf = (o: NfcOrder) =>
   [o.printName, o.printTitle, o.printCompany, o.printPhone].filter((x): x is string => !!x);
 
+/* The same row, field by field, for the emails: the printed words (so title and
+   company land in the right place in the drawing), the product line, the parcel. */
+const printOf = (o: NfcOrder) => ({ name: o.printName, title: o.printTitle, company: o.printCompany, phone: o.printPhone });
+const itemOf = (o: NfcOrder) => {
+  const product = nfcProduct(o.product);
+  return {
+    product: o.product,
+    name: product?.name ?? o.product,
+    print: product?.print ?? "",
+    quantity: o.quantity,
+    unitPrice: Number(o.unitPrice),
+    amount: Number(o.amount),
+  };
+};
+const shipOf = (o: NfcOrder) => ({
+  name: o.shipName, phone: o.shipPhone, line1: o.shipLine1, line2: o.shipLine2,
+  city: o.shipCity, state: o.shipState, pincode: o.shipPincode,
+});
+
+type Customer = { id: number; fullName: string; email: string };
+
 /* One email to the team per checkout, however many products it holds. */
-function notifyTeam(rows: NfcOrder[], opts: { paid: boolean; paymentId?: string | null; customer?: { id: number; fullName: string; email: string } | null }) {
+function notifyTeam(rows: NfcOrder[], opts: { paid: boolean; paymentId?: string | null; customer?: Customer | null; customerEmailed?: boolean }) {
   const sorted = [...rows].sort((a, b) => a.id - b.id);
   const first = sorted[0];
   if (!first) return;
@@ -96,28 +120,17 @@ function notifyTeam(rows: NfcOrder[], opts: { paid: boolean; paymentId?: string 
     ids: sorted.map((r) => r.id),
     paid: opts.paid,
     paymentId: opts.paymentId,
-    items: sorted.map((r) => {
-      const product = nfcProduct(r.product);
-      return {
-        product: r.product,
-        name: product?.name ?? r.product,
-        print: product?.print ?? "",
-        quantity: r.quantity,
-        unitPrice: Number(r.unitPrice),
-        amount: Number(r.amount),
-      };
-    }),
+    items: sorted.map(itemOf),
     printLines: printLinesOf(first),
+    print: printOf(first),
     cardUrl: first.cardUrl,
     // Most logos are embedded in the card rather than hosted, so usually none
     // comes with the order — the card itself is the source.
     logoUrl: first.logoUrl,
-    ship: {
-      name: first.shipName, phone: first.shipPhone, line1: first.shipLine1, line2: first.shipLine2,
-      city: first.shipCity, state: first.shipState, pincode: first.shipPincode,
-    },
+    ship: shipOf(first),
     customer: opts.customer ? { id: opts.customer.id, name: opts.customer.fullName, email: opts.customer.email } : null,
     delivery: { label: NFC_DELIVERY.label, maxDays: NFC_DELIVERY.maxDays },
+    customerEmailed: opts.customerEmailed,
   }));
 }
 
@@ -176,17 +189,124 @@ export async function fulfilNfcPayment(
         orderId: first.id,
         productName: product?.name ?? first.product,
         quantity: first.quantity,
-        items: paid.map((p) => ({ name: nfcProduct(p.product)?.name ?? p.product, quantity: p.quantity })),
+        items: paid.map(itemOf),
+        ids: paid.map((p) => p.id),
         amount: paid.reduce((sum, p) => sum + Number(p.amount), 0),
         printLines: printLinesOf(first),
+        print: printOf(first),
+        logoUrl: first.logoUrl,
         address: `${first.shipName}, ${addressOf(first)} · ${first.shipPhone}`,
+        ship: shipOf(first),
         cardUrl: first.cardUrl,
         deliveryDays: NFC_DELIVERY.label,
+        paymentId,
       }), ownerAddress());
     }
     void notifyTeam(paid, { paid: true, paymentId, customer: customer ?? null });
   }
   return { orderIds: ids, confirmed: true };
+}
+
+/* Manual checkout (online payment off): tell the customer the order is in and
+   how to pay, then alert the team. The payment details are the same UPI / bank
+   settings the plan checkout shows; with none (or a failed read) the email says
+   the team will be in touch. Run fire-and-forget — nothing here may fail the order. */
+async function notifyManualCheckout(db: ReturnType<typeof getDb>, rows: NfcOrder[], customer: Customer) {
+  const sorted = [...rows].sort((a, b) => a.id - b.id);
+  const first = sorted[0];
+  if (!first) return;
+  const s = await getPaySettings(db).catch(() => null);
+  const upiQr = s?.upiQr.trim() ?? "";
+  const payment: NfcPaymentDetails | null = s ? {
+    upiId: s.upiId.trim() || null,
+    payeeName: s.upiName.trim() || null,
+    upiQrUrl: /^https?:\/\//i.test(upiQr) ? upiQr : null,
+    bank: s.bankAccount.trim()
+      ? { name: s.bankName.trim() || null, account: s.bankAccount.trim(), ifsc: s.bankIfsc.trim() || null, holder: s.bankHolder.trim() || null }
+      : null,
+    note: s.note.trim() || null,
+  } : null;
+  let emailedHowToPay = false;
+  try {
+    void sendEmail(customer.email, nfcOrderReceivedEmail({
+      name: first.shipName,
+      ids: sorted.map((r) => r.id),
+      items: sorted.map(itemOf),
+      total: sorted.reduce((sum, r) => sum + Number(r.amount), 0),
+      deliveryLabel: NFC_DELIVERY.label,
+      printLines: printLinesOf(first),
+      print: printOf(first),
+      logoUrl: first.logoUrl,
+      cardUrl: first.cardUrl,
+      ship: shipOf(first),
+      payment,
+    }), ownerAddress());
+    // The team's alert says "the customer has been emailed how to pay" only when it's true.
+    emailedHowToPay = !!(payment?.upiId || payment?.bank);
+  } catch { /* the team alert below must still go out */ }
+  void notifyTeam(sorted, { paid: false, customer, customerEmailed: emailedHowToPay });
+}
+
+/* The customer email for an admin status change, or null when there isn't one.
+   Sent per order row, like the shipped email always has been. */
+function statusEmail(prev: NfcOrder, status: NfcOrder["status"], tracking: string | null | undefined): Email | null {
+  const product = nfcProduct(prev.product);
+  const ids = [prev.id];
+  const items = [itemOf(prev)];
+  if (status === "shipped") {
+    return nfcOrderShippedEmail({
+      name: prev.shipName,
+      orderId: prev.id,
+      productName: product?.name ?? prev.product,
+      quantity: prev.quantity,
+      tracking,
+      ids, items, ship: shipOf(prev), cardUrl: prev.cardUrl,
+    });
+  }
+  // A manual payment has reached the team: the confirmation an online payment gets at verify.
+  if (status === "paid" && prev.status === "pending_payment") {
+    return nfcOrderConfirmedEmail({
+      name: prev.shipName,
+      orderId: prev.id,
+      productName: product?.name ?? prev.product,
+      quantity: prev.quantity,
+      items, ids,
+      amount: Number(prev.amount),
+      printLines: printLinesOf(prev),
+      print: printOf(prev),
+      logoUrl: prev.logoUrl,
+      address: `${prev.shipName}, ${addressOf(prev)} · ${prev.shipPhone}`,
+      ship: shipOf(prev),
+      cardUrl: prev.cardUrl,
+      deliveryDays: NFC_DELIVERY.label,
+      paymentId: prev.razorpayPaymentId,
+    });
+  }
+  if (status === "delivered") {
+    return nfcOrderDeliveredEmail({ name: prev.shipName, ids, items, cardUrl: prev.cardUrl });
+  }
+  if (status === "cancelled") {
+    // An online checkout closed without paying was never an order the customer
+    // placed (it's hidden from their list), and once it has shipped the email's
+    // "won't be printed or shipped" is no longer true.
+    if (prev.status === "pending_payment" && prev.razorpayOrderId) return null;
+    if (prev.status === "shipped" || prev.status === "delivered") return null;
+    // adminNote is the team's internal note, so it is not quoted to the customer.
+    return nfcOrderCancelledEmail({
+      name: prev.shipName, ids, items,
+      amount: Number(prev.amount),
+      paid: prev.status !== "pending_payment",
+      paymentId: prev.razorpayPaymentId,
+    });
+  }
+  return null;
+}
+
+async function emailStatusChange(db: ReturnType<typeof getDb>, prev: NfcOrder, status: NfcOrder["status"], tracking: string | null | undefined) {
+  const email = statusEmail(prev, status, tracking);
+  if (!email) return;
+  const [owner] = await db.select({ email: users.email }).from(users).where(eq(users.id, prev.userId));
+  if (owner?.email) await sendEmail(owner.email, email, ownerAddress());
 }
 
 export const nfcRouter = createRouter({
@@ -256,7 +376,7 @@ export const nfcRouter = createRouter({
     const cr = await resolveRazorpay(db);
     if (!cr.enabled) {
       const rows = await db.select().from(nfcOrders).where(inArray(nfcOrders.id, orderIds));
-      void notifyTeam(rows, { paid: false, customer: ctx.user });
+      void notifyManualCheckout(db, rows, ctx.user).catch(() => {});
       return { manual: true as const, orderId, orderIds };
     }
 
@@ -344,26 +464,26 @@ export const nfcRouter = createRouter({
       const db = getDb();
       const [prev] = await db.select().from(nfcOrders).where(eq(nfcOrders.id, input.id));
       if (!prev) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
-      await db.update(nfcOrders).set({
+      const changes = {
         status: input.status,
         ...(input.tracking !== undefined ? { tracking: input.tracking || null } : {}),
         ...(input.adminNote !== undefined ? { adminNote: input.adminNote || null } : {}),
-      }).where(eq(nfcOrders.id, input.id));
-
-      // Tell the customer when it ships (once).
-      if (input.status === "shipped" && prev.status !== "shipped") {
-        const [owner] = await db.select({ email: users.email }).from(users).where(eq(users.id, prev.userId));
-        if (owner?.email) {
-          const product = nfcProduct(prev.product);
-          void sendEmail(owner.email, nfcOrderShippedEmail({
-            name: prev.shipName,
-            orderId: prev.id,
-            productName: product?.name ?? prev.product,
-            quantity: prev.quantity,
-            tracking: input.tracking ?? prev.tracking,
-          }), ownerAddress());
-        }
+      };
+      // A status change is written only while the row still has the status we
+      // read, so of two overlapping saves (a double click) exactly one "moves"
+      // it and emails. Anything else is saved as before, unconditionally.
+      let moved = false;
+      if (input.status !== prev.status) {
+        const res = await db.update(nfcOrders).set(changes)
+          .where(and(eq(nfcOrders.id, input.id), eq(nfcOrders.status, prev.status)));
+        moved = ((res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+          ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? 0) > 0;
       }
+      if (!moved) await db.update(nfcOrders).set(changes).where(eq(nfcOrders.id, input.id));
+
+      // Tell the customer on the first move into shipped, paid (manual payment),
+      // delivered or cancelled. Non-blocking: the save never waits on email.
+      if (moved) void emailStatusChange(db, prev, input.status, input.tracking ?? prev.tracking).catch(() => {});
       return { ok: true };
     }),
 });

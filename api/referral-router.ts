@@ -4,12 +4,14 @@ import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware
 import { getDb } from "./queries/connection";
 import {
   users, referrals, walletTransactions, withdrawalRequests, appSettings,
-  subscriptions, notifications, publishedCards,
+  subscriptions, notifications, publishedCards, type Referral, type WithdrawalRequest,
 } from "@db/schema";
 import { eq, desc, and, gt, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
-import { payoutRequestAdminEmail, payoutCompletedEmail } from "./lib/email-templates";
+import {
+  payoutRequestAdminEmail, payoutCompletedEmail, payoutRequestReceivedEmail, payoutRejectedEmail, referralRewardEmail,
+} from "./lib/email-templates";
 import { enforceRateLimit } from "./lib/rate-limit";
 
 const COMMISSION_KEY = "referral_commission_percent";
@@ -102,6 +104,31 @@ async function applyWallet(
     note: opts.note ?? null,
   });
   return next;
+}
+
+/* Customer emails for admin wallet actions. Fire-and-forget (the payee lookup
+   runs after the response), so an email problem never fails the admin's action. */
+
+/** The payee: their payout was declined and the held amount is back in the wallet. */
+async function emailPayoutRejected(db: ReturnType<typeof getDb>, wr: WithdrawalRequest, note: string | null, balance: number) {
+  const payee = await db.query.users.findFirst({ where: eq(users.id, wr.userId), columns: { email: true, fullName: true } });
+  await sendEmail(payee?.email, payoutRejectedEmail({
+    name: payee?.fullName, amount: n(wr.amount), note, balance,
+    // The template masks it (aa•••@bank / •••• 7890).
+    method: wr.method, destinationMasked: wr.destination, requestId: wr.id,
+  }));
+}
+
+/** The referrer: the team credited a referral reward by hand. */
+async function emailManualReward(db: ReturnType<typeof getDb>, ref: Referral, amount: number, balance: number) {
+  const ids = [ref.referrerId, ref.refereeId].filter((x): x is number => !!x);
+  const people = await db.query.users.findMany({ where: inArray(users.id, ids), columns: { id: true, email: true, fullName: true } });
+  const referrer = people.find((u) => u.id === ref.referrerId);
+  // The friend's name only — never their email. May be unknown (refereeId is nullable).
+  const referee = ref.refereeId ? people.find((u) => u.id === ref.refereeId) : undefined;
+  await sendEmail(referrer?.email, referralRewardEmail({
+    name: referrer?.fullName, refereeName: referee?.fullName, amount, balance, creditedByTeam: true,
+  }));
 }
 
 export const referralRouter = createRouter({
@@ -206,7 +233,7 @@ export const referralRouter = createRouter({
         status: "pending",
       });
       // Hold the funds immediately so the balance can't be double-spent.
-      await applyWallet(db, ctx.user.id, -input.amount, {
+      const balanceAfter = await applyWallet(db, ctx.user.id, -input.amount, {
         type: "withdrawal",
         status: "pending",
         withdrawalId: ins.insertId,
@@ -217,6 +244,13 @@ export const referralRouter = createRouter({
       void sendEmail(ownerAddress(), payoutRequestAdminEmail({
         name: ctx.user.fullName, email: ctx.user.email, amount: input.amount, method: input.method,
         destination: input.destination.trim(), accountName: input.accountName?.trim() || null, ifsc: input.ifsc?.trim() || null,
+      }));
+      // And confirm it to the requester, so a wrong UPI id / account can be caught
+      // before the team pays. The template masks the destination (non-blocking).
+      void sendEmail(ctx.user.email, payoutRequestReceivedEmail({
+        name: ctx.user.fullName, amount: input.amount, method: input.method,
+        destinationMasked: input.destination.trim(), accountName: input.accountName?.trim() || null, ifsc: input.ifsc?.trim() || null,
+        balance: balanceAfter, requestId: ins.insertId, requestedAt: new Date(),
       }));
 
       return { ok: true, id: ins.insertId };
@@ -367,7 +401,7 @@ export const referralRouter = createRouter({
         .update(referrals)
         .set({ status: "rewarded", rewardAmount: money(input.amount), rewardedAt: new Date() })
         .where(eq(referrals.id, input.referralId));
-      await applyWallet(db, ref.referrerId, input.amount, {
+      const balance = await applyWallet(db, ref.referrerId, input.amount, {
         type: "reward",
         referralId: ref.id,
         note: "Referral reward — paid-plan conversion",
@@ -379,6 +413,8 @@ export const referralRouter = createRouter({
         message: `₹${money(input.amount)} has been added to your wallet for a successful referral.`,
         link: "/dashboard/refer",
       });
+      // Once per referral: a second credit is refused above ("already been rewarded").
+      void emailManualReward(db, ref, input.amount, balance).catch(() => {});
       return { ok: true };
     }),
 
@@ -449,7 +485,7 @@ export const referralRouter = createRouter({
         .set({ status: "reversed" })
         .where(and(eq(walletTransactions.withdrawalId, input.id), eq(walletTransactions.type, "withdrawal")));
       // refund the held amount back to the wallet
-      await applyWallet(db, wr.userId, n(wr.amount), {
+      const balance = await applyWallet(db, wr.userId, n(wr.amount), {
         type: "adjustment",
         withdrawalId: wr.id,
         note: `Payout rejected — amount refunded${input.note ? `: ${input.note}` : ""}`,
@@ -461,6 +497,8 @@ export const referralRouter = createRouter({
         message: `Your payout of ₹${money(n(wr.amount))} was declined and refunded to your wallet.`,
         link: "/dashboard/refer",
       });
+      // The note is already on the customer's wallet statement (above), so it can be quoted.
+      void emailPayoutRejected(db, wr, input.note?.trim() || null, balance).catch(() => {});
       return { ok: true };
     }),
 });

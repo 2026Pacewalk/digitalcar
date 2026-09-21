@@ -29,9 +29,6 @@ export const erasedEmail = (userId: number) => `deleted-user-${userId}@deleted.d
 
 export const DELETION_GRACE_DAYS = 30;
 
-const escapeHtml = (s: string) =>
-  s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
-
 /* Asking to delete an account — from the app (More → Delete account) or the
    website (/account/delete, for people without the app, as Google Play
    requires). Takes effect at once: the account is switched off, signed out of
@@ -65,18 +62,19 @@ export async function requestAccountDeletion(
   }
   await db.update(pushTokens).set({ disabledAt: now }).where(and(eq(pushTokens.userId, user.id), isNull(pushTokens.disabledAt)));
 
-  // Tell the team so the erasure is completed on time.
+  // Tell the owner what happened and how to undo it (it also exposes a request
+  // made by someone else), and the team so the erasure is completed on time.
+  // Both copies land in email_logs under the address, and the erasure purges them.
   try {
-    const { sendEmail, ownerAddress } = await import("./mail");
-    const when = scheduledFor.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-    const where = opts.source === "web" ? "on the website" : "from the mobile app";
-    const link = "https://digitalcarda.in/admin/deletion-requests";
-    await sendEmail(ownerAddress(), {
-      kind: "accountDeletionRequestAdmin",
-      subject: `Account deletion requested — ${user.email}`,
-      text: `${user.fullName} (${user.email}, user #${user.id}) asked to delete their account ${where}.\n\nThe account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after ${when}, or cancel it if they change their mind: ${link}${opts.reason ? `\nReason given: ${opts.reason}` : ""}`,
-      html: `<p><b>${escapeHtml(user.fullName)}</b> (${escapeHtml(user.email)}, user #${user.id}) asked to delete their account ${where}.</p><p>The account is signed out everywhere and deactivated, and its card is paused. Complete the deletion on or after <b>${when}</b>, or cancel it if they change their mind, in <a href="${link}">Admin → Account Deletions</a>.</p>${opts.reason ? `<p>Reason given: ${escapeHtml(opts.reason)}</p>` : ""}`,
-    });
+    const [{ sendEmail, ownerAddress }, { accountDeletionScheduledEmail, accountDeletionRequestAdminEmail }] =
+      await Promise.all([import("./mail"), import("./email-templates")]);
+    void sendEmail(user.email, accountDeletionScheduledEmail({
+      name: user.fullName, scheduledFor, source: opts.source, requestedAt: now, reason: opts.reason || null,
+    }));
+    await sendEmail(ownerAddress(), accountDeletionRequestAdminEmail({
+      userId: user.id, name: user.fullName, email: user.email, source: opts.source,
+      reason: opts.reason || null, scheduledFor, at: now,
+    }));
   } catch (e) {
     console.error("[account-deletion] notice email failed:", (e as Error).message);
   }
@@ -191,9 +189,29 @@ export async function cancelAccountDeletion(db: Db, requestId: number) {
   const [request] = await db.select().from(accountDeletionRequests).where(eq(accountDeletionRequests.id, requestId)).limit(1);
   if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "That request no longer exists." });
   if (request.status !== "pending") throw new TRPCError({ code: "CONFLICT", message: `This request is already ${request.status}.` });
-  await db.update(accountDeletionRequests).set({ status: "cancelled" })
+  const res = await db.update(accountDeletionRequests).set({ status: "cancelled" })
     .where(and(eq(accountDeletionRequests.userId, request.userId), eq(accountDeletionRequests.status, "pending")));
   // Only undo what the request did — never lift a suspension.
   await db.update(users).set({ status: "active" }).where(and(eq(users.id, request.userId), eq(users.status, "inactive")));
+  // Only the call that actually closed the request emails, so a double-click
+  // on Cancel sends one "welcome back".
+  const affected = (res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+    ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? 0;
+  if (affected > 0) {
+    void sendRestoredEmail(db, request.userId, request.email)
+      .catch((e) => console.error("[account-deletion] restored email failed:", (e as Error).message));
+  }
   return { ok: true as const };
+}
+
+/* "Welcome back" to the address the request was made from. Skipped when the
+   account isn't active afterwards (e.g. it's suspended), since the email says
+   the account and card are back on. */
+async function sendRestoredEmail(db: Db, userId: number, to: string): Promise<void> {
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId), columns: { fullName: true, status: true } });
+  if (!user || user.status !== "active") return;
+  const [card] = await db.select({ slug: publishedCards.slug }).from(publishedCards)
+    .where(eq(publishedCards.userId, userId)).orderBy(publishedCards.cardId).limit(1);
+  const [{ sendEmail }, { accountRestoredEmail }] = await Promise.all([import("./mail"), import("./email-templates")]);
+  await sendEmail(to, accountRestoredEmail({ name: user.fullName, slug: card?.slug ?? null }));
 }

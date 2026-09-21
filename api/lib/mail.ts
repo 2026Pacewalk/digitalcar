@@ -89,7 +89,7 @@ function previewTransport(): Promise<Transporter | null> {
 }
 
 import type { Email } from "./email-templates";
-import { leadNotificationEmail, hotLeadEmail } from "./email-templates";
+import { leadNotificationEmail, hotLeadEmail, newLeadOwnerEmail } from "./email-templates";
 import { classifyLeadSmart } from "./lead-intel";
 
 // The platform's own email — used as the default sender and the fallback address
@@ -173,7 +173,8 @@ async function logEmail(
     ]);
     const db = getDb();
     const addr = to.toLowerCase().trim().slice(0, 255);
-    const owner = await db.query.users.findFirst({ where: eq(users.email, addr), columns: { id: true } });
+    const owner = email.userId ? { id: email.userId }
+      : await db.query.users.findFirst({ where: eq(users.email, addr), columns: { id: true } });
     await db.insert(emailLogs).values({
       toEmail: addr,
       subject: String(email.subject || "").slice(0, 300),
@@ -196,10 +197,60 @@ export interface LeadEmail {
   message?: string | null;
   slug?: string | null;
   cardName?: string | null;
+  /** The visitor's company, when the form asked for it (lead.create). */
+  company?: string | null;
+  /** The card owner (users.id), when the caller resolved the card. Without it
+      only the platform inbox hears about the lead. */
+  ownerUserId?: number | null;
+}
+
+/** A visitor address safe to put in Reply-To. /api/enquiry doesn't validate
+    the field, and whitespace in it could smuggle in extra headers. */
+const replyableEmail = (e?: string | null): string | null => {
+  const t = String(e ?? "").trim();
+  return t.length <= 254 && /^[^@\s"'<>,;]+@[^@\s"'<>,;]+\.[^@\s"'<>,;]+$/.test(t) ? t : null;
+};
+
+/** The card owner's own copy of a lead (newLeadOwnerEmail). Looked up here so
+    both enquiry paths share one rule: active accounts only, and never a second
+    copy into the platform inbox, which already gets the admin alert. */
+async function emailCardOwner(ownerUserId: number, lead: LeadEmail, hot: boolean, reasons: string[] | null, at: Date): Promise<void> {
+  const [{ getDb }, { users, publishedCards }, { and, eq }] = await Promise.all([
+    import("../queries/connection"),
+    import("@db/schema"),
+    import("drizzle-orm"),
+  ]);
+  const db = getDb();
+  const owner = await db.query.users.findFirst({
+    where: eq(users.id, ownerUserId),
+    columns: { email: true, fullName: true, status: true },
+  });
+  // Suspended accounts and pending deletions (status "inactive") get nothing.
+  if (!owner?.email || owner.status !== "active") return;
+  if (addressOf(owner.email) === addressOf(ownerAddress())) return;
+
+  // Snapshot cards have no title column; their business name lives in the
+  // published data. Only a nicer label, so a failed lookup just drops it.
+  let cardName = lead.cardName || null;
+  if (!cardName && lead.slug) {
+    try {
+      const rows = await db.select({ data: publishedCards.data }).from(publishedCards)
+        .where(and(eq(publishedCards.userId, ownerUserId), eq(publishedCards.slug, lead.slug))).limit(1);
+      const cust = (rows[0]?.data as { customer?: Record<string, unknown> } | undefined)?.customer || {};
+      cardName = String(cust.company_name || cust.name || "").trim() || null;
+    } catch { /* fall back to the card link */ }
+  }
+
+  await sendEmail(owner.email, newLeadOwnerEmail({
+    ownerName: owner.fullName,
+    name: lead.name, email: lead.email, contact: lead.contact, company: lead.company,
+    message: lead.message, slug: lead.slug, cardName, hot, at, reasons,
+  }), replyableEmail(lead.email));
 }
 
 /**
- * Smartly notify the owner about a new lead:
+ * Smartly notify about a new lead — the platform inbox always, and the card
+ * owner too when the caller passes ownerUserId:
  *   important → 🔥 Hot lead email (immediate priority)
  *   normal    → standard lead email
  *   spam      → suppressed (no email)
@@ -207,18 +258,32 @@ export interface LeadEmail {
  * Returns the category so callers can store it.
  */
 export async function sendLeadNotification(lead: LeadEmail): Promise<"important" | "normal" | "spam"> {
+  const at = new Date();
+  // The platform inbox gets exactly the fields it always has.
+  const alert = { name: lead.name, email: lead.email, contact: lead.contact, message: lead.message, slug: lead.slug, cardName: lead.cardName };
+  // Queued at most once, whichever branch runs, and never awaited: /api/enquiry
+  // awaits this function, so the visitor would otherwise wait on a second send.
+  let ownerQueued = false;
+  const notifyOwner = (hot: boolean, reasons: string[] | null) => {
+    if (ownerQueued || !lead.ownerUserId) return;
+    ownerQueued = true;
+    void emailCardOwner(lead.ownerUserId, lead, hot, reasons, at)
+      .catch((e) => console.error("[mail] card owner lead email skipped:", e instanceof Error ? e.message : e));
+  };
   try {
     const v = await classifyLeadSmart({ name: lead.name, email: lead.email, contact: lead.contact, description: lead.message, uname: lead.slug });
     if (v.category === "spam") {
       console.log(`[mail] lead from "${lead.name}" classified spam (${v.via}) — owner alert suppressed`);
       return "spam";
     }
-    await sendEmail(ownerAddress(), v.category === "important" ? hotLeadEmail({ ...lead, name: lead.name }) : leadNotificationEmail(lead), lead.email);
+    notifyOwner(v.category === "important", v.reasons);
+    await sendEmail(ownerAddress(), v.category === "important" ? hotLeadEmail(alert) : leadNotificationEmail(alert), lead.email);
     return v.category;
   } catch (e) {
     // On any classification error, fall back to a normal alert.
     console.error("[mail] lead classify failed, sending normal alert:", (e as Error).message);
-    await sendEmail(ownerAddress(), leadNotificationEmail(lead), lead.email);
+    notifyOwner(false, null);
+    await sendEmail(ownerAddress(), leadNotificationEmail(alert), lead.email);
     return "normal";
   }
 }

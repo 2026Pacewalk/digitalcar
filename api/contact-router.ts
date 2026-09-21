@@ -5,7 +5,7 @@ import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { leads, users } from "@db/schema";
 import { sendEmail, ownerAddress } from "./lib/mail";
-import { contactReceivedEmail } from "./lib/email-templates";
+import { contactReceivedEmail, contactEnquiryAdminEmail } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
 /* Public contact enquiries (the /contact form). Three things happen:
@@ -82,28 +82,15 @@ export const contactRouter = createRouter({
 
       const userId = (ctx.user?.id as number | undefined) ?? null;
       const requirement = input.requirement ? (REQUIREMENTS[input.requirement] ?? input.requirement) : null;
-      const lines = [
-        `Name: ${input.name}`,
-        `Email: ${input.email}`,
-        `Phone: ${input.phone || "-"}`,
-        `Business: ${input.businessName || "-"}`,
-        `Requirement: ${requirement || "-"}`,
-        input.message ? `Message: ${input.message}` : "",
-        userId ? `From logged-in user #${userId}` : "From a guest",
-      ].filter(Boolean);
-
-      const esc = (s: string) => s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
 
       const stored = await storeEnquiry(input, requirement, ip);
 
-      // sendEmail never throws — it reports failure in its return value.
-      const team = await sendEmail(ownerAddress(), {
-        kind: "contactEnquiryAdmin",
-        subject: `New enquiry — ${input.name}${input.businessName ? ` (${input.businessName})` : ""}`,
-        text: lines.join("\n"),
-        html: `<h2>New website enquiry</h2><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`
-          + (stored ? `<p>Also saved to Admin → Leads.</p>` : `<p><strong>Not saved to Admin → Leads</strong> — this email is the only record.</p>`),
-      }, input.email);
+      // sendEmail never throws — it reports failure in its return value. Awaited:
+      // when the enquiry wasn't stored, this email is the only record of it.
+      const team = await sendEmail(ownerAddress(), contactEnquiryAdminEmail({
+        name: input.name, email: input.email, phone: input.phone, businessName: input.businessName,
+        requirement, message: input.message, userId, stored,
+      }), input.email);
 
       if (!stored && !team.ok) {
         throw new TRPCError({

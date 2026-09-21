@@ -5,12 +5,15 @@ import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { users, referrals, notifications, cards, publishedCards, cardTrials, appSettings, products } from "@db/schema";
-import { eq, like, sql } from "drizzle-orm";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { slugTakenByOther } from "./publish-router";
 import { resolveReferrer } from "./referral-router";
 import { createToken, createResetToken, verifyResetToken, createVerifyToken, verifyVerifyToken } from "./lib/jwt";
 import { sendEmail, ownerAddress } from "./lib/mail";
-import { welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail, verifyEmailAddressEmail } from "./lib/email-templates";
+import {
+  welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail, verifyEmailAddressEmail,
+  emailChangedEmail, referralJoinedEmail,
+} from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { verifyGoogleIdToken } from "./lib/google-auth";
 import { TRIAL_COUPON_CODE, evaluateTrialCoupon, recordTrialRedemption } from "./lib/coupons";
@@ -255,6 +258,56 @@ async function alertOwnerOfSignup(
   }));
 }
 
+/* Email the referrer that someone joined with their link. The percentages are
+   the admin's Refer & Earn settings, read the same way (and with the same 15%
+   defaults) as referral-router.ts and payment-router.ts. A referrer whose own
+   account isn't active (suspended, or waiting to be erased) isn't emailed. */
+async function tellReferrerOfSignup(
+  db: ReturnType<typeof getDb>,
+  referrer: { email: string; fullName: string; status: string },
+  friendName: string,
+  code: string,
+): Promise<void> {
+  if (referrer.status !== "active") return;
+  const rows = await db.select({ key: appSettings.key, value: appSettings.value }).from(appSettings)
+    .where(inArray(appSettings.key, ["referral_commission_percent", "referral_discount_percent"]));
+  const percent = (key: string) => {
+    const row = rows.find((r) => r.key === key);
+    const val = row ? Number(row.value) : 15;
+    return Number.isFinite(val) ? val : 15;
+  };
+  await sendEmail(referrer.email, referralJoinedEmail({
+    name: referrer.fullName,
+    friendName,
+    code,
+    commissionPercent: percent("referral_commission_percent"),
+    discountPercent: percent("referral_discount_percent"),
+    joinedAt: new Date(),
+  }));
+}
+
+/* After the sign-in email really changed: a confirm link to the NEW address,
+   then a security notice to the OLD one (the standard account-takeover path,
+   so the rightful owner hears about it). The notice only says a link was sent
+   when that send actually went out. Capped per account, so switching the
+   address back and forth can't be used to flood an inbox with our emails. */
+async function notifyEmailChange(
+  user: { id: number; fullName: string },
+  oldEmail: string,
+  newEmail: string,
+): Promise<void> {
+  try { enforceRateLimit(`email-change-mail:${user.id}`, 5, 3_600_000); } catch { return; }
+  const at = new Date();
+  let verificationSent = false;
+  try {
+    const token = await createVerifyToken(user.id, newEmail);
+    const link = `${PUBLIC_BASE_URL}/verify-email?token=${encodeURIComponent(token)}`;
+    verificationSent = (await sendEmail(newEmail, verifyEmailAddressEmail({ name: user.fullName, link, email: newEmail, purpose: "changed" }))).ok;
+  } catch { verificationSent = false; }
+  // The old address no longer maps to this account, so tag the log row with it.
+  await sendEmail(oldEmail, { ...emailChangedEmail({ name: user.fullName, oldEmail, newEmail, at, verificationSent }), userId: user.id });
+}
+
 /* Everything a brand-new account gets, whichever way it signed up (email or
    Google): welcome emails, the owner alert, referral linking, the welcome
    notification, and its own live card with the trial started. */
@@ -263,14 +316,13 @@ async function welcomeNewAccount(
   insertedUser: typeof users.$inferSelect,
   opts: { referralCode?: string; companyName?: string; promo?: string; verifyEmail: boolean; card?: StarterCard; method: "email" | "google"; req?: Request },
 ): Promise<string | null> {
-  // Welcome email (+ an email-verification link when the address isn't already
-  // verified) to the new user — non-blocking. The owner's alert goes at the
-  // end, once the card, trial and referral it describes exist.
-  void sendEmail(insertedUser.email, welcomeEmail({ name: insertedUser.fullName, role: insertedUser.role }));
+  // An email-verification link when the address isn't already verified —
+  // non-blocking. The welcome email and the owner's alert go at the end, once
+  // the card, trial and referral they describe exist.
   if (opts.verifyEmail) {
     const vtoken = await createVerifyToken(insertedUser.id, insertedUser.email);
     const vlink = `${PUBLIC_BASE_URL}/verify-email?token=${encodeURIComponent(vtoken)}`;
-    void sendEmail(insertedUser.email, verifyEmailAddressEmail({ name: insertedUser.fullName, link: vlink }));
+    void sendEmail(insertedUser.email, verifyEmailAddressEmail({ name: insertedUser.fullName, link: vlink, email: insertedUser.email, purpose: "signup" }));
   }
   let referral: { name: string; code: string } | null = null;
 
@@ -296,6 +348,9 @@ async function welcomeNewAccount(
           code,
           status: "joined",
         });
+        // Email the referrer too (non-blocking; its lookups can't fail the signup).
+        void tellReferrerOfSignup(db, referrer, insertedUser.fullName, code)
+          .catch((e) => console.error("[signup] referrer email failed:", (e as Error).message));
         // Tell the referrer someone joined with their link
         await db.insert(notifications).values({
           userId: referrer.id,
@@ -324,6 +379,12 @@ async function welcomeNewAccount(
   // Give the new account its own live card URL + start the trial. The slug is
   // returned so the browser seeds the SAME link the server just published.
   const starter = await provisionStarterCard(db, insertedUser, opts.companyName, opts.promo, opts.card);
+  // Welcome email (non-blocking), sent now so it can carry the live card link and
+  // the trial's length and end date. With no starter card it's a plain welcome.
+  void sendEmail(insertedUser.email, welcomeEmail({
+    name: insertedUser.fullName, role: insertedUser.role,
+    slug: starter?.slug ?? null, companyName: opts.companyName ?? null, trial: starter?.trial ?? null,
+  }));
   void alertOwnerOfSignup(db, insertedUser, {
     method: opts.method, req: opts.req, companyName: opts.companyName, card: opts.card, starter, referral,
   }).catch((e) => console.error("[signup] owner alert failed:", (e as Error).message));
@@ -868,14 +929,37 @@ export const authRouter = createRouter({
         }
       }
 
-      await db
-        .update(users)
-        .set({
-          fullName: input.fullName,
-          phone: input.phone || null,
-          ...(email ? { email } : {}),
-        })
-        .where(eq(users.id, ctx.user.id));
+      // The profile page sends the email on every save, so only a different
+      // address is a real change of sign-in email.
+      const oldEmail = ctx.user.email;
+      let emailChanged = false;
+      if (email && email !== oldEmail.toLowerCase().trim()) {
+        // Guarded on the old address, so a double-submit changes (and emails)
+        // once. Nobody has confirmed the new address yet, so it starts
+        // unverified — emailVerified only drives the "verify your email"
+        // prompts and the owner's signup alert; it never gates sign-in.
+        const res = await db
+          .update(users)
+          .set({ fullName: input.fullName, phone: input.phone || null, email, emailVerified: false, emailVerifiedAt: null })
+          .where(and(eq(users.id, ctx.user.id), eq(users.email, oldEmail)));
+        const affected = (res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+          ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? 0;
+        emailChanged = affected > 0;
+      }
+      if (!emailChanged) {
+        await db
+          .update(users)
+          .set({
+            fullName: input.fullName,
+            phone: input.phone || null,
+            ...(email ? { email } : {}),
+          })
+          .where(eq(users.id, ctx.user.id));
+      }
+      if (email && emailChanged) {
+        void notifyEmailChange({ id: ctx.user.id, fullName: ctx.user.fullName }, oldEmail, email)
+          .catch((e) => console.error("[profile] email-change notices failed:", (e as Error).message));
+      }
 
       return {
         success: true,
@@ -958,7 +1042,7 @@ export const authRouter = createRouter({
     enforceRateLimit(`emailverify:${ctx.user.id}`, 4, 300_000);
     const token = await createVerifyToken(ctx.user.id, ctx.user.email);
     const link = `${PUBLIC_BASE_URL}/verify-email?token=${encodeURIComponent(token)}`;
-    const res = await sendEmail(ctx.user.email, verifyEmailAddressEmail({ name: ctx.user.fullName, link }));
+    const res = await sendEmail(ctx.user.email, verifyEmailAddressEmail({ name: ctx.user.fullName, link, email: ctx.user.email, purpose: "resend" }));
     if (!res.ok) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
@@ -982,6 +1066,11 @@ export const authRouter = createRouter({
       if (!user) throw new TRPCError({ code: "BAD_REQUEST", message: "We couldn't find that account." });
       const already = !!user.emailVerified;
       if (!already) {
+        // A link sent to an earlier address must not confirm the one the account
+        // uses now (updateProfile resets the flag when the sign-in email changes).
+        if (data.email.toLowerCase().trim() !== user.email.toLowerCase().trim()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This link was sent to an earlier email address. Please request a new one from your dashboard." });
+        }
         await db.update(users).set({ emailVerified: true, emailVerifiedAt: new Date() }).where(eq(users.id, user.id));
       }
       return { ok: true, already, email: user.email };

@@ -8,6 +8,26 @@ import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLog
 import { eq, and, desc, like, or, sql, gte, inArray } from "drizzle-orm";
 import { legacySlugSet, legacySlugOwners, slugTakenByOther } from "./publish-router";
 import { cancelAccountDeletion, completeAccountDeletion } from "./lib/account-deletion";
+import { sendEmail } from "./lib/mail";
+import { cardLinkChangedEmail } from "./lib/email-templates";
+
+/* Tell a card's owner our team moved it to a new link: the old one stops
+   working, and the permanent /q/<publicId> link (what their QR codes use) keeps
+   working. Skipped for accounts that aren't active, whose card is paused anyway. */
+async function tellOwnerOfNewLink(
+  db: ReturnType<typeof getDb>,
+  userId: number,
+  card: { id: number; oldSlug: string; newSlug: string; publicId: string | null },
+): Promise<void> {
+  const owner = await db.query.users.findFirst({ where: eq(users.id, userId), columns: { email: true, fullName: true, status: true } });
+  if (!owner || owner.status !== "active") return;
+  const [row] = await db.select({ data: publishedCards.data }).from(publishedCards).where(eq(publishedCards.id, card.id)).limit(1);
+  const company = (row?.data as { customer?: { company_name?: unknown } } | null)?.customer?.company_name;
+  await sendEmail(owner.email, cardLinkChangedEmail({
+    name: owner.fullName, oldSlug: card.oldSlug, newSlug: card.newSlug, publicId: card.publicId,
+    company: typeof company === "string" ? company : null, changedAt: new Date(),
+  }));
+}
 
 /* Emails that belong to a LEGACY customers.json card — used to flag which DB
    accounts are genuinely "new-flow" (i.e. NOT already in the legacy list, which
@@ -253,9 +273,21 @@ export const adminRouter = createRouter({
       if (await slugTakenByOther(db, slug, input.userId, input.cardId))
         throw new TRPCError({ code: "CONFLICT", message: "That URL is already taken — pick another." });
       const owner = and(eq(publishedCards.userId, input.userId), eq(publishedCards.cardId, input.cardId));
-      const existing = await db.select({ id: publishedCards.id }).from(publishedCards).where(owner);
+      const existing = await db.select({ id: publishedCards.id, slug: publishedCards.slug, publicId: publishedCards.publicId })
+        .from(publishedCards).where(owner);
       if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "No published card for that account." });
-      await db.update(publishedCards).set({ slug }).where(owner);
+      const oldSlug = existing[0].slug;
+      // Guarded on the old slug, so a double-click moves the card (and emails its
+      // owner) once; if it moved in between, fall back to the plain update.
+      const res = await db.update(publishedCards).set({ slug }).where(and(owner, eq(publishedCards.slug, oldSlug)));
+      const affected = (res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+        ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? 0;
+      if (!affected) await db.update(publishedCards).set({ slug }).where(owner);
+      // Only a real change of address is news to the owner (not a case-only fix).
+      if (affected && String(oldSlug).toLowerCase() !== slug) {
+        void tellOwnerOfNewLink(db, input.userId, { id: Number(existing[0].id), oldSlug, newSlug: slug, publicId: existing[0].publicId ?? null })
+          .catch((e) => console.error("[reslugCard] owner email failed:", (e as Error).message));
+      }
       return { ok: true, slug };
     }),
 

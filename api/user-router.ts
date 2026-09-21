@@ -3,10 +3,42 @@ import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, authedQuery, resellerQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, resellerProfiles, cards, subscriptions, publishedCards, cardTrials } from "@db/schema";
+import { users, resellerProfiles, cards, subscriptions, subscriptionPackages, publishedCards, cardTrials } from "@db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { sendEmail } from "./lib/mail";
-import { accountDetailsEmail, featureUpdateEmail, planUpgradedEmail } from "./lib/email-templates";
+import { accountDetailsEmail, featureUpdateEmail, planUpgradedEmail, planExtendedEmail, passwordChangedEmail } from "./lib/email-templates";
+
+type Db = ReturnType<typeof getDb>;
+
+/* The customer's main card link (first card), for the plan emails. */
+async function firstCardSlug(db: Db, userId: number): Promise<string | null> {
+  const [card] = await db.select({ slug: publishedCards.slug }).from(publishedCards)
+    .where(eq(publishedCards.userId, userId)).orderBy(publishedCards.cardId).limit(1);
+  return card?.slug || null;
+}
+
+/* A plan's name from the catalogue. The old inline map (6 = Platinum, 5 = Gold,
+   anything else "Trial") is only the fallback when the row is missing. */
+async function packageName(db: Db, packageId: number): Promise<string> {
+  const [pkg] = await db.select({ name: subscriptionPackages.name }).from(subscriptionPackages)
+    .where(eq(subscriptionPackages.id, packageId)).limit(1);
+  return pkg?.name?.trim() || (packageId === 6 ? "Platinum" : packageId === 5 ? "Gold" : packageId === 7 ? "Trial" : "");
+}
+
+/* "We've added N days" to the customer, after an admin extends their validity.
+   Only for active accounts: a suspended or to-be-erased account's card stays
+   paused, so the email's "already applied" would not be true for them. */
+async function sendPlanExtended(
+  db: Db,
+  user: { id: number; email: string; fullName: string; status: string },
+  o: { days: number; validTill: Date; previousEnd: Date | null; packageId: number },
+): Promise<void> {
+  if (user.status !== "active") return;
+  const [planName, slug] = await Promise.all([packageName(db, o.packageId), firstCardSlug(db, user.id)]);
+  await sendEmail(user.email, planExtendedEmail({
+    name: user.fullName, planName, days: o.days, validTill: o.validTill, previousEnd: o.previousEnd, slug,
+  }));
+}
 
 export const userRouter = createRouter({
   list: adminQuery
@@ -216,11 +248,13 @@ export const userRouter = createRouter({
       } catch { /* ignore */ }
 
       // Let the customer know — this used to change silently.
+      // The plan's real catalogue name (the old 5/6 map called every other paid
+      // plan "Trial") and their card link, so the email names the right plan.
       try {
         const u = await db.query.users.findFirst({ where: eq(users.id, user.id), columns: { fullName: true, email: true } });
-        const planName = input.packageId === 6 ? "Platinum" : input.packageId === 5 ? "Gold" : "Trial";
         if (u?.email && !isTrial) {
-          await sendEmail(u.email, planUpgradedEmail({ name: u.fullName, planName, validTill: expiredOn, slug: null }));
+          const [planName, slug] = await Promise.all([packageName(db, input.packageId), firstCardSlug(db, user.id)]);
+          await sendEmail(u.email, planUpgradedEmail({ name: u.fullName, planName, validTill: expiredOn, slug, billingCycle: input.cycle }));
         }
       } catch { /* the plan change already succeeded — never fail it on email */ }
 
@@ -282,10 +316,13 @@ export const userRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const email = input.email.toLowerCase().trim();
-      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } });
+      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true, email: true, fullName: true } });
       if (!user) return { ok: false as const, reason: "no_account" as const };
       const hashed = await bcrypt.hash(input.password, 12);
       await db.update(users).set({ password: hashed }).where(eq(users.id, user.id));
+      // Security notice to the account's own address (non-blocking), so a
+      // password set by our team never happens without the customer knowing.
+      void sendEmail(user.email, passwordChangedEmail({ name: user.fullName, byTeam: true, at: new Date() }));
       return { ok: true as const, password: input.password };
     }),
 
@@ -370,7 +407,9 @@ export const userRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const email = input.email.toLowerCase().trim();
-      const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } });
+      const user = await db.query.users.findFirst({
+        where: eq(users.email, email), columns: { id: true, email: true, fullName: true, status: true },
+      });
       if (!user) return { ok: false as const, reason: "no_account" as const };
       const sub = await db.query.subscriptions.findFirst({
         where: eq(subscriptions.userId, user.id),
@@ -387,6 +426,12 @@ export const userRouter = createRouter({
           amount: "0.00", currency: "INR", currentPeriodStart: now, currentPeriodEnd: end, paymentGateway: "manual",
         });
       }
+      // Each extension is its own real change, so each one is emailed (non-blocking).
+      void sendPlanExtended(db, user, {
+        days: input.days, validTill: end,
+        previousEnd: sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null,
+        packageId: sub?.packageId ?? 7,
+      }).catch((e) => console.error("[extendValidity] email failed:", (e as Error).message));
       return { ok: true as const, expiredOn: end.toISOString().slice(0, 10) };
     }),
 

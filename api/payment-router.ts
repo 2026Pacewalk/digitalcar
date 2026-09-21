@@ -8,12 +8,19 @@ import {
 import { eq, desc, and, gt, ne, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
-import { paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail, referralRewardEmail, resellerCommissionEmail } from "./lib/email-templates";
+import {
+  paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail, referralRewardEmail, resellerCommissionEmail,
+  onlineSaleAdminEmail, paymentSettingsChangedAdminEmail,
+} from "./lib/email-templates";
 import { getUpgradeOfferPercent } from "./lib/pricing";
 import { evaluateCoupon, recordRedemption, recordPaidCoupon, completeRedemptionForOrder, cancelRedemptionForOrder } from "./lib/coupons";
 import { envRazorpayCreds, credsComplete, inferMode, createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder } from "./lib/razorpay";
+import { clientIp } from "./lib/rate-limit";
 
 type Order = typeof paymentOrders.$inferSelect;
+type RazorpayPayment = { userId: number; packageId: number; planName: string; billingCycle: "monthly" | "yearly" | "triennial"; amountRupees: number; paymentId: string; couponCode?: string; couponDiscount?: number };
+/** What activateVerifiedOrder actually credited for this sale, for the owner's sale alert. */
+type Credited = { periodEnd: Date; resellerCommission?: number; referrerReward?: number };
 
 /* Resolve the active Razorpay credentials: admin-set DB settings take precedence,
    falling back to the process env. This is what lets a super-admin switch from the
@@ -39,7 +46,7 @@ export async function resolveRazorpay(db: ReturnType<typeof getDb>) {
    webhook retries) can't double-activate in the common sequential case. */
 export async function recordRazorpayPayment(
   db: ReturnType<typeof getDb>,
-  p: { userId: number; packageId: number; planName: string; billingCycle: "monthly" | "yearly" | "triennial"; amountRupees: number; paymentId: string; couponCode?: string; couponDiscount?: number },
+  p: RazorpayPayment,
 ): Promise<{ ok: boolean; already?: boolean }> {
   const existing = await db.query.paymentOrders.findFirst({ where: eq(paymentOrders.reference, p.paymentId) });
   if (existing) return { ok: true, already: true };
@@ -64,8 +71,52 @@ export async function recordRazorpayPayment(
       });
     } catch (e) { console.error("[coupon] could not record redemption:", (e as Error).message); }
   }
-  if (order) await activateVerifiedOrder(db, order, "razorpay");
+  if (order) {
+    const credited = await activateVerifiedOrder(db, order, "razorpay");
+    // Past the early return above, so a retried verify or webhook never re-alerts.
+    void emailOnlineSale(db, p, order, credited).catch(() => {});
+  }
   return { ok: true };
+}
+
+/* Owner alert for a plan paid online (manual payments already alert at
+   createOrder). Fire-and-forget, so neither the verify nor the webhook's 2xx
+   waits on these lookups or SMTP. */
+async function emailOnlineSale(db: ReturnType<typeof getDb>, p: RazorpayPayment, order: Order, credited: Credited) {
+  // The client verify and the webhook can arrive together and both get past the
+  // idempotency check; only the call that wrote the first row for this payment alerts.
+  const [first] = await db.select({ id: sql<number>`min(${paymentOrders.id})` })
+    .from(paymentOrders).where(eq(paymentOrders.reference, p.paymentId));
+  if (first?.id != null && Number(first.id) !== order.id) return;
+
+  const buyer = await db.query.users.findFirst({
+    where: eq(users.id, p.userId),
+    columns: { fullName: true, email: true, phone: true, resellerId: true, referredById: true },
+  });
+  const linked = [buyer?.resellerId, buyer?.referredById].filter((x): x is number => !!x);
+  const people = linked.length
+    ? await db.query.users.findMany({ where: inArray(users.id, linked), columns: { id: true, fullName: true } })
+    : [];
+  const nameOf = (id?: number | null) => (id ? people.find((u) => u.id === id)?.fullName || null : null);
+  const referrerName = nameOf(buyer?.referredById);
+  const resellerName = nameOf(buyer?.resellerId);
+  const cr = await resolveRazorpay(db);
+
+  await sendEmail(ownerAddress(), onlineSaleAdminEmail({
+    kind: "plan",
+    itemName: p.planName,
+    cycle: p.billingCycle,
+    amount: p.amountRupees,
+    paymentId: p.paymentId,
+    coupon: p.couponCode || null,
+    discount: p.couponDiscount || null,
+    customer: { id: p.userId, name: buyer?.fullName || `Account #${p.userId}`, email: buyer?.email || "", phone: buyer?.phone },
+    // Amounts only when this sale actually credited them; the email says so otherwise.
+    referrer: referrerName ? { name: referrerName, reward: credited.referrerReward ?? null } : null,
+    reseller: resellerName ? { name: resellerName, commission: credited.resellerCommission ?? null } : null,
+    validTill: credited.periodEnd,
+    testMode: cr.mode === "test",
+  }));
 }
 
 const n = (v: unknown) => Number(v ?? 0);
@@ -76,7 +127,8 @@ const PAY_KEYS = [
   "pay_bank_name", "pay_bank_account", "pay_bank_ifsc", "pay_bank_holder", "pay_note",
 ] as const;
 
-async function getSettings(db: ReturnType<typeof getDb>) {
+/** Where customers pay by hand (UPI / QR / bank). Also used by nfc-router's manual checkout email. */
+export async function getSettings(db: ReturnType<typeof getDb>) {
   const rows = await db.query.appSettings.findMany({ where: inArray(appSettings.key, [...PAY_KEYS]) });
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   return {
@@ -87,6 +139,18 @@ async function getSettings(db: ReturnType<typeof getDb>) {
 }
 async function setSetting(db: ReturnType<typeof getDb>, key: string, value: string) {
   await db.insert(appSettings).values({ key, value }).onDuplicateKeyUpdate({ set: { value } });
+}
+
+/* Tell the owner that where customers pay (or the Razorpay keys) changed — a
+   hijacked admin session could redirect customer money. Setting names only,
+   never values. Non-blocking, and never fails the save it reports on. */
+function alertPaymentSettings(ctx: { user: { fullName: string; email: string }; req: Request }, changedKeys: string[]) {
+  try {
+    const ip = clientIp(ctx.req);
+    void sendEmail(ownerAddress(), paymentSettingsChangedAdminEmail({
+      changedKeys, who: `${ctx.user.fullName} (${ctx.user.email})`, ip: ip === "unknown" ? null : ip,
+    }));
+  } catch { /* non-critical */ }
 }
 
 /* Amount the user should pay for a package (mirrors subscribe pricing:
@@ -162,14 +226,16 @@ async function claimPendingOrder(db: ReturnType<typeof getDb>, orderId: number):
    subscription, convert the trial, credit reseller commission + referral reward,
    notify + email the buyer. Shared by the manual admin-verify flow and the
    automatic Razorpay flow so both behave identically. The caller MUST have already
-   claimed the order via claimPendingOrder(). `gateway` is recorded on the sub. */
-async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order, gateway: "manual" | "razorpay") {
+   claimed the order via claimPendingOrder(). `gateway` is recorded on the sub.
+   Returns what it credited, for the online-sale alert. */
+async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order, gateway: "manual" | "razorpay"): Promise<Credited> {
   const now = new Date();
   const pkg = await db.query.subscriptionPackages.findFirst({ where: eq(subscriptionPackages.id, order.packageId) });
   const periodEnd = new Date(now);
   if (order.billingCycle === "triennial") periodEnd.setFullYear(periodEnd.getFullYear() + 3);
   else if (order.billingCycle === "yearly") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
   else periodEnd.setMonth(periodEnd.getMonth() + 1);
+  const credited: Credited = { periodEnd };
 
   // Activate a paid subscription for the user
   await db.insert(subscriptions).values({
@@ -200,6 +266,7 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
         totalEarnings: sql`${resellerProfiles.totalEarnings} + ${commission}`,
         pendingPayout: sql`${resellerProfiles.pendingPayout} + ${commission}`,
       }).where(eq(resellerProfiles.userId, rc.resellerId));
+      credited.resellerCommission = n(commission);
       await db.insert(notifications).values({
         userId: rc.resellerId, type: "reseller_commission", title: "Commission earned 💰",
         message: `${rc.fullName} activated a plan — ₹${commission} added to your pending payout.`, link: "/reseller",
@@ -248,6 +315,7 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
         const rr = await db.query.users.findFirst({ where: eq(users.id, buyer.referredById), columns: { walletBalance: true } });
         const nextBal = money(n(rr?.walletBalance) + n(reward));
         await db.update(users).set({ walletBalance: nextBal }).where(eq(users.id, buyer.referredById));
+        credited.referrerReward = n(reward);
         await db.insert(walletTransactions).values({
           userId: buyer.referredById, type: "reward", amount: reward, balanceAfter: nextBal,
           status: "completed", referralId: ref.id, note: "Referral reward — paid conversion",
@@ -261,6 +329,7 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
       }
     }
   } catch { /* non-critical */ }
+  return credited;
 }
 
 export const paymentRouter = createRouter({
@@ -571,14 +640,35 @@ export const paymentRouter = createRouter({
       mode: z.enum(["test", "live"]).optional(),
       enabled: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      // The effective settings before the save, to alert only on a real change.
+      // The page re-sends every field on each save, so "was sent" isn't "changed".
+      const before = await resolveRazorpay(db).catch(() => null);
       if (input.keyId !== undefined) await setSetting(db, "razorpay_key_id", input.keyId);
       if (input.keySecret) await setSetting(db, "razorpay_key_secret", input.keySecret); // never blank-overwrite
       if (input.webhookSecret) await setSetting(db, "razorpay_webhook_secret", input.webhookSecret);
       if (input.mode !== undefined) await setSetting(db, "razorpay_mode", input.mode);
       if (input.enabled !== undefined) await setSetting(db, "razorpay_enabled", input.enabled ? "true" : "false");
       const cr = await resolveRazorpay(db);
+      // Key NAMES only — the secrets never go into an email. Unknown "before"
+      // (read failed) → list what was saved, since this is a security alert.
+      const changed = before
+        ? ([
+            ["razorpay_key_id", before.keyId !== cr.keyId],
+            ["razorpay_key_secret", before.keySecret !== cr.keySecret],
+            ["razorpay_webhook_secret", before.webhookSecret !== cr.webhookSecret],
+            ["razorpay_mode", before.mode !== cr.mode],
+            ["razorpay_enabled", before.enabled !== cr.enabled],
+          ] as const).filter(([, diff]) => diff).map(([k]) => k)
+        : ([
+            input.keyId !== undefined && "razorpay_key_id",
+            !!input.keySecret && "razorpay_key_secret",
+            !!input.webhookSecret && "razorpay_webhook_secret",
+            input.mode !== undefined && "razorpay_mode",
+            input.enabled !== undefined && "razorpay_enabled",
+          ].filter(Boolean) as string[]);
+      if (changed.length) alertPaymentSettings(ctx, changed);
       return { ok: true, enabled: cr.enabled, mode: cr.mode, keyId: cr.keyId, hasSecret: !!cr.keySecret, hasWebhookSecret: !!cr.webhookSecret };
     }),
 
@@ -638,14 +728,20 @@ export const paymentRouter = createRouter({
       bankName: z.string().optional(), bankAccount: z.string().optional(), bankIfsc: z.string().optional(),
       bankHolder: z.string().optional(), note: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      // What customers were shown before, so only a real change alerts (the page sends every field).
+      const before = await getSettings(db).catch(() => null);
       const map: Record<string, string | undefined> = {
         pay_upi_id: input.upiId, pay_upi_name: input.upiName, pay_upi_qr: input.upiQr,
         pay_bank_name: input.bankName, pay_bank_account: input.bankAccount, pay_bank_ifsc: input.bankIfsc,
         pay_bank_holder: input.bankHolder, pay_note: input.note,
       };
       for (const [k, v] of Object.entries(map)) if (v !== undefined) await setSetting(db, k, v);
+      // The input names match getSettings()'s fields; the template maps them to labels.
+      const changed = (Object.keys(input) as (keyof typeof input)[])
+        .filter((k) => input[k] !== undefined && (!before || input[k] !== before[k]));
+      if (changed.length) alertPaymentSettings(ctx, changed);
       return { ok: true };
     }),
 });

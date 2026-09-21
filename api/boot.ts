@@ -293,7 +293,8 @@ app.get("/sig-img/:slug/:file", sigImgHandler);
 app.get("/api/sig-img/:slug/:file", sigImgHandler);
 
 // Public enquiry capture for the legacy (customers.json) cards — stores the lead
-// when the slug maps to a known card, and always emails the owner.
+// when the slug maps to a known card, and always emails the platform inbox (plus
+// the card's owner when the slug maps to one).
 app.post("/api/enquiry", async (c) => {
   if (!rateLimit(c, "enquiry", 10, 60_000)) return c.json({ ok: false, error: "rate_limited" }, 429);
   try {
@@ -308,6 +309,7 @@ app.post("/api/enquiry", async (c) => {
 
     // Best-effort DB storage (only if the slug maps to a card).
     let pushOwnerId: number | null = null;
+    let cardName: string | null = null; // snapshot cards: mail.ts reads it from the published data
     try {
       const { getDb } = await import("./queries/connection");
       const { cards, leads, publishedCards, cardEvents } = await import("@db/schema");
@@ -316,6 +318,7 @@ app.post("/api/enquiry", async (c) => {
       const card = await db.query.cards.findFirst({ where: eq(cards.slug, slug) });
       if (card) {
         pushOwnerId = card.userId;
+        cardName = card.title;
         await db.insert(leads).values({
           cardId: card.id, userId: card.userId, fullName: name,
           email: body.email || null, phone: body.contact || null,
@@ -341,7 +344,9 @@ app.post("/api/enquiry", async (c) => {
     }
 
     const { sendLeadNotification, sendEmail } = await import("./lib/mail");
-    const verdict = await sendLeadNotification({ name, email: body.email, contact: body.contact, message: body.description, slug });
+    // The owner's own copy goes out in the background (mail.ts); only the
+    // platform alert is awaited here, as before.
+    const verdict = await sendLeadNotification({ name, email: body.email, contact: body.contact, message: body.description, slug, cardName, ownerUserId: pushOwnerId });
 
     /* Tell the card owner on their phone (DigitalCarda app). Enquiries the
        triage marks as spam don't buzz anyone. Not awaited: the visitor's
@@ -371,7 +376,8 @@ app.post("/api/enquiry", async (c) => {
        the enquiry, which is already stored. */
     try {
       const visitorEmail = String(body.email || "").trim();
-      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(visitorEmail)) {
+      // No reply to spam: it would mail addresses bots typed in, in our customer's name.
+      if (verdict !== "spam" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(visitorEmail)) {
         const { getDb } = await import("./queries/connection");
         const { publishedCards } = await import("@db/schema");
         const { eq } = await import("drizzle-orm");
@@ -406,13 +412,21 @@ app.post("/api/enquiry", async (c) => {
 // Daily lifecycle + trial emails. Runs the §9 milestone journey (card_trials
 // engine) plus the legacy subscription-trial FOMO emailer. Both are dedup-safe.
 async function runDailyEmailJobs() {
-  const [{ runLifecycle }, { runTrialEmails }] = await Promise.all([
+  const [{ runLifecycle }, { runTrialEmails }, { runBillingEmails }, { runLeadFollowUps }, { runOwnerDigest }] = await Promise.all([
     import("./cron/lifecycle"),
     import("./cron/trial-emails"),
+    import("./cron/billing"),
+    import("./cron/lead-followups"),
+    import("./cron/owner-digest"),
   ]);
-  const lifecycle = await runLifecycle();          // new card_trials milestones
+  // Each job is independent: one failing must not skip the ones after it.
+  const lifecycle = await runLifecycle().catch((e) => { console.error("[cron] lifecycle:", (e as Error).message); return null; }); // new card_trials milestones
   const legacy = await runTrialEmails().catch((e) => { console.error("[cron] legacy trial-emails:", (e as Error).message); return null; });
-  return { lifecycle, legacy };
+  const billing = await runBillingEmails();        // paid-plan renewal reminders + ended notices
+  const followUps = await runLeadFollowUps();      // card owners' follow-ups due today
+  // Last, so the summary can report what the jobs above did. Once per India day.
+  const digest = await runOwnerDigest({ lifecycle });
+  return { lifecycle, legacy, billing, followUps, digest };
 }
 
 // Manual/external trigger (e.g. an OS cron): POST with ?key=CRON_SECRET. Always runs.

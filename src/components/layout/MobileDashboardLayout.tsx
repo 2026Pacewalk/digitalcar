@@ -145,6 +145,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/url-conflicts": "URL Conflicts",
   "/admin/domains": "Custom Domains",
   "/admin/email-log": "Email Log",
+  "/admin/email-previews": "Email Previews",
   "/admin/analytics": "Analytics",
   "/admin/leads": "Leads",
   "/admin/bulk-orders": "Bulk Orders",
