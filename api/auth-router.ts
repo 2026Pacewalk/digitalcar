@@ -4,8 +4,8 @@ import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, referrals, notifications, cards, publishedCards, cardTrials, appSettings } from "@db/schema";
-import { eq, like } from "drizzle-orm";
+import { users, referrals, notifications, cards, publishedCards, cardTrials, appSettings, products } from "@db/schema";
+import { eq, like, sql } from "drizzle-orm";
 import { slugTakenByOther } from "./publish-router";
 import { resolveReferrer } from "./referral-router";
 import { createToken, createResetToken, verifyResetToken, createVerifyToken, verifyVerifyToken } from "./lib/jwt";
@@ -15,6 +15,8 @@ import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { verifyGoogleIdToken } from "./lib/google-auth";
 import { TRIAL_COUPON_CODE, evaluateTrialCoupon, recordTrialRedemption } from "./lib/coupons";
 import { randomBytes } from "crypto";
+import { edgeGeo, parseUa } from "./lib/analytics";
+import { mergedCustomerCount } from "./admin-router";
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
 
@@ -85,7 +87,7 @@ async function provisionStarterCard(
   companyName?: string,
   promo?: string,
   card?: StarterCard,
-): Promise<string | null> {
+): Promise<{ slug: string; trial: { days: number; endsAt: Date; voucher: string | null } } | null> {
   try {
     // Unique slug from the business name (e.g. "Sharma Sweets" -> sharma-sweets,
     // then -2, -3…). It used to be built from the PERSON's name while the form
@@ -123,9 +125,10 @@ async function provisionStarterCard(
       else console.log(`[trial] voucher not applied for user ${user.id}: ${check.reason}`);
     } catch (e) { console.error("[trial] voucher check failed:", (e as Error).message); }
 
+    const endsAt = new Date(now.getTime() + days * 86_400_000);
     await db.insert(cardTrials).values({
       userId: user.id, status: "active", startedAt: now, publishedAt: now,
-      endsAt: new Date(now.getTime() + days * 86_400_000),
+      endsAt,
       couponCode: voucher?.code ?? null,
       activationSource: voucher ? "signup_voucher" : "signup",
     });
@@ -133,8 +136,123 @@ async function provisionStarterCard(
       try { await recordTrialRedemption(db, { couponId: voucher.couponId, userId: user.id }); }
       catch (e) { console.error("[trial] voucher record failed:", (e as Error).message); }
     }
-    return slug;
+    return { slug, trial: { days, endsAt, voucher: voucher?.code ?? null } };
   } catch { return null; }
+}
+
+/* The owner's new-signup alert, with everything worth knowing about the person
+   in one place: how and where they signed up, what they picked first, their new
+   card and trial, and how busy signups are. Every lookup is best-effort — a
+   missing detail just leaves that line out, and nothing here can fail a signup. */
+async function alertOwnerOfSignup(
+  db: ReturnType<typeof getDb>,
+  user: typeof users.$inferSelect,
+  info: {
+    method: "email" | "google";
+    req?: Request;
+    companyName?: string;
+    card?: StarterCard;
+    starter: Awaited<ReturnType<typeof provisionStarterCard>>;
+    referral: { name: string; code: string } | null;
+  },
+): Promise<void> {
+  const header = (n: string) => info.req?.headers.get(n) ?? null;
+
+  // Coarse place from the Cloudflare edge headers (never an IP lookup).
+  let place: string | null = null;
+  try {
+    const { city, country } = edgeGeo(header);
+    let region = header("cf-region") || "";
+    try { region = decodeURIComponent(region); } catch { /* keep as sent */ }
+    let countryName = country || "";
+    try { if (country) countryName = new Intl.DisplayNames(["en"], { type: "region" }).of(country) || country; } catch { /* the code is fine */ }
+    place = [city, region && region !== city ? region : "", countryName].filter(Boolean).join(", ").slice(0, 120) || null;
+  } catch { place = null; }
+
+  // The phone app's requests carry the network library's user agent, not a
+  // browser's: okhttp on Android, CFNetwork/Darwin on iOS.
+  let device: string | null = null;
+  const ua = header("user-agent");
+  if (ua && /okhttp/i.test(ua)) device = "DigitalCarda app · Android";
+  else if (ua && /CFNetwork|Darwin/i.test(ua)) device = "DigitalCarda app · iOS";
+  else if (ua) {
+    const u = parseUa(ua);
+    const desktopOs = ["Windows", "macOS", "Linux", "ChromeOS"].includes(u.os);
+    const kind = u.device === "mobile" ? "Phone" : u.device === "tablet" ? "Tablet" : desktopOs ? "Computer" : "";
+    device = [kind, u.os, u.browser].filter((b) => b && b !== "Other").join(" · ") || null;
+  }
+
+  // The page the signup form was on (this site only), e.g. /signup?product=…
+  let page: string | null = null;
+  try {
+    const ref = header("referer");
+    if (ref) {
+      const url = new URL(ref);
+      if (/(^|\.)digitalcarda\.in$|^localhost$|^127\.0\.0\.1$/.test(url.hostname)) page = (url.pathname + url.search).slice(0, 140);
+    }
+  } catch { page = null; }
+
+  // The template they chose before signing up.
+  let template: { name: string; image: string | null; url: string } | null = null;
+  try {
+    const c = info.card;
+    const where = c?.product_id ? eq(products.id, c.product_id)
+      : c?.product_slug ? eq(products.slug, c.product_slug)
+      : c?.theme ? eq(products.styleNumber, c.theme)
+      : null;
+    if (where) {
+      const [row] = await db.select({ name: products.name, slug: products.slug, images: products.images }).from(products).where(where).limit(1);
+      if (row) {
+        const imgs = Array.isArray(row.images) ? (row.images as unknown[]).map(String) : [];
+        // PNG/JPG first: Outlook and older mail apps don't show WebP.
+        const img = imgs.find((i) => /\.(png|jpe?g)$/i.test(i)) || imgs[0] || null;
+        template = {
+          name: row.name,
+          image: img ? (/^https?:\/\//i.test(img) ? img : `https://digitalcarda.in${img.startsWith("/") ? "" : "/"}${img}`) : null,
+          url: `https://digitalcarda.in/digital-business-cards-templates/${encodeURIComponent(row.slug)}`,
+        };
+      }
+    }
+  } catch { template = null; }
+
+  // Signups today / this month, by the India calendar. The day and month starts
+  // are worked out here as epoch seconds and compared with UNIX_TIMESTAMP(),
+  // which is the stored instant whatever the MySQL session's time zone is.
+  // The all-time total is the same merged figure the admin Dashboard shows.
+  let counts: { today: number; month: number; total: number } | null = null;
+  try {
+    const IST_OFFSET = 19_800; // +05:30 in seconds
+    const ist = new Date(Date.now() + IST_OFFSET * 1000);
+    const dayStart = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()) / 1000 - IST_OFFSET;
+    const monthStart = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), 1) / 1000 - IST_OFFSET;
+    const [c] = await db.select({
+      today: sql<string>`COALESCE(SUM(UNIX_TIMESTAMP(${users.createdAt}) >= ${dayStart}), 0)`,
+      month: sql<string>`COALESCE(SUM(UNIX_TIMESTAMP(${users.createdAt}) >= ${monthStart}), 0)`,
+    }).from(users).where(eq(users.role, "customer"));
+    const { total } = await mergedCustomerCount(db);
+    if (c) counts = { today: Number(c.today) || 0, month: Number(c.month) || 0, total };
+  } catch { counts = null; }
+
+  await sendEmail(ownerAddress(), newSignupAdminEmail({
+    id: user.id,
+    name: user.fullName,
+    email: user.email,
+    phone: user.phone,
+    photo: user.avatar,
+    method: info.method,
+    emailVerified: !!user.emailVerified,
+    business: info.companyName?.trim() || null,
+    slug: info.starter?.slug ?? null,
+    trial: info.starter?.trial ?? null,
+    template,
+    colour: info.card?.color ?? null,
+    aiDraft: !!info.card?.about,
+    referral: info.referral,
+    place,
+    device,
+    page,
+    counts,
+  }));
 }
 
 /* Everything a brand-new account gets, whichever way it signed up (email or
@@ -143,18 +261,18 @@ async function provisionStarterCard(
 async function welcomeNewAccount(
   db: ReturnType<typeof getDb>,
   insertedUser: typeof users.$inferSelect,
-  opts: { referralCode?: string; companyName?: string; promo?: string; verifyEmail: boolean; card?: StarterCard },
+  opts: { referralCode?: string; companyName?: string; promo?: string; verifyEmail: boolean; card?: StarterCard; method: "email" | "google"; req?: Request },
 ): Promise<string | null> {
   // Welcome email (+ an email-verification link when the address isn't already
-  // verified) to the new user, and a new-signup alert to the owner — all
-  // non-blocking.
+  // verified) to the new user — non-blocking. The owner's alert goes at the
+  // end, once the card, trial and referral it describes exist.
   void sendEmail(insertedUser.email, welcomeEmail({ name: insertedUser.fullName, role: insertedUser.role }));
   if (opts.verifyEmail) {
     const vtoken = await createVerifyToken(insertedUser.id, insertedUser.email);
     const vlink = `${PUBLIC_BASE_URL}/verify-email?token=${encodeURIComponent(vtoken)}`;
     void sendEmail(insertedUser.email, verifyEmailAddressEmail({ name: insertedUser.fullName, link: vlink }));
   }
-  void sendEmail(ownerAddress(), newSignupAdminEmail({ name: insertedUser.fullName, email: insertedUser.email, role: insertedUser.role, phone: insertedUser.phone }));
+  let referral: { name: string; code: string } | null = null;
 
   // (No reseller branch here: public signup creates customers only. Reseller
   // profiles are created by reseller.approve / user.createReseller.)
@@ -168,6 +286,7 @@ async function welcomeNewAccount(
     try {
       const referrer = await resolveReferrer(db, code);
       if (referrer && referrer.id !== insertedUser.id) {
+        referral = { name: referrer.fullName, code };
         await db.update(users).set({ referredById: referrer.id }).where(eq(users.id, insertedUser.id));
         // Reward is credited later by an admin once this user buys a paid plan.
         await db.insert(referrals).values({
@@ -204,7 +323,11 @@ async function welcomeNewAccount(
 
   // Give the new account its own live card URL + start the trial. The slug is
   // returned so the browser seeds the SAME link the server just published.
-  return provisionStarterCard(db, insertedUser, opts.companyName, opts.promo, opts.card);
+  const starter = await provisionStarterCard(db, insertedUser, opts.companyName, opts.promo, opts.card);
+  void alertOwnerOfSignup(db, insertedUser, {
+    method: opts.method, req: opts.req, companyName: opts.companyName, card: opts.card, starter, referral,
+  }).catch((e) => console.error("[signup] owner alert failed:", (e as Error).message));
+  return starter?.slug ?? null;
 }
 
 /* Legacy-auth bridge: the old site stored plaintext passwords (some with stray
@@ -384,6 +507,7 @@ export const authRouter = createRouter({
 
       const cardSlug = await welcomeNewAccount(db, insertedUser, {
         referralCode: input.referralCode, companyName: input.companyName, promo: input.promo, verifyEmail: true, card: input.card,
+        method: "email", req: ctx.req,
       });
 
       const token = await createToken({
@@ -522,6 +646,7 @@ export const authRouter = createRouter({
         created = true;
         cardSlug = await welcomeNewAccount(db, user, {
           referralCode: input.referralCode, companyName: input.companyName, promo: input.promo, verifyEmail: false, card: input.card,
+          method: "google", req: ctx.req,
         });
       }
 

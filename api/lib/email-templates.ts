@@ -140,8 +140,9 @@ function tickList(label: string, items: string[]): string {
 }
 
 /** Wrap content in the branded shell. `accent` sets the header strip mood.
-    `footer` overrides the default account-email footer line. */
-function layout(opts: { preheader: string; badge?: string; heading: string; bodyHtml: string; accent?: string; footer?: string }): string {
+    `footer` overrides the default account-email footer line. `hero` replaces
+    the standard badge + heading band with custom rows (the owner alerts). */
+function layout(opts: { preheader: string; badge?: string; heading: string; bodyHtml: string; accent?: string; footer?: string; hero?: string }): string {
   const accent = opts.accent || BRAND.gold;
   const footerLine = opts.footer ?? "You're receiving this because you have a DigitalCarda account.";
   return `<!doctype html>
@@ -171,12 +172,12 @@ function layout(opts: { preheader: string; badge?: string; heading: string; body
         <tr><td style="height:3px;background:${accent};line-height:3px;font-size:0">&nbsp;</td></tr>
 
         <!-- hero -->
-        <tr><td bgcolor="${BRAND.goldTint}" style="background:${BRAND.goldTint};padding:30px 32px 26px;border-bottom:1px solid ${BRAND.goldLine}">
+        ${opts.hero ?? `<tr><td bgcolor="${BRAND.goldTint}" style="background:${BRAND.goldTint};padding:30px 32px 26px;border-bottom:1px solid ${BRAND.goldLine}">
           ${opts.badge ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 13px"><tr>
             <td bgcolor="${BRAND.navy}" style="border-radius:999px;padding:6px 14px;font-family:${FONT};font-size:10px;font-weight:700;color:${BRAND.gold};text-transform:uppercase;letter-spacing:1.2px">${esc(opts.badge)}</td>
           </tr></table>` : ""}
           <h1 style="margin:0;font-family:${FONT};font-size:27px;line-height:1.25;font-weight:800;color:${BRAND.ink};letter-spacing:-.3px">${opts.heading}</h1>
-        </td></tr>
+        </td></tr>`}
 
         <!-- body -->
         <tr><td style="padding:30px 32px 8px">
@@ -675,21 +676,245 @@ export function trialEndingEmail(o: { name?: string; daysLeft: number; cardUrl?:
 
 /* ── Owner / admin alerts ────────────────────────────────────────────── */
 
-export function newSignupAdminEmail(o: { name?: string; email?: string; role?: string; phone?: string | null }): Email {
+/* Owner alerts are read on a phone between other work. So they open on a
+   dark "who / how much" band, put every way to reach the person one tap away,
+   and only then list the detail. Same rules as above: tables, inline styles,
+   solid colours (no rgba — Outlook drops it), nothing that needs a web font. */
+
+const ON_DARK = { text: "#FFFFFF", sub: "#93A4BD", chip: "#1C2F4D", chipLine: "#2A4166", chipText: "#DCE4EF" };
+const TONE = {
+  green: { solid: "#16A34A", tint: "#ECFDF3", line: "#B7EBC9", text: "#14532D" },
+  amber: { solid: "#F59E0B", tint: "#FFF8E6", line: "#F8DC9B", text: "#78350F" },
+};
+
+const IST = "Asia/Kolkata";
+/** "Sun, 21 Sept, 3:42 pm" in India time, whatever the server clock's zone. */
+const whenIst = (d: Date) => d.toLocaleString("en-IN", { timeZone: IST, weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
+const dayIst = (d: Date) => d.toLocaleDateString("en-IN", { timeZone: IST, weekday: "short", day: "numeric", month: "short" });
+const safeUrl = (u?: string | null) => (u && /^https?:\/\//i.test(u) ? u : null);
+
+/** wa.me wants the full number, digits only: 10-digit Indian numbers get 91. */
+function waNumber(phone?: string | null): string | null {
+  const d = String(phone || "").replace(/\D/g, "");
+  if (d.length === 10) return `91${d}`;
+  if (d.length === 11 && d.startsWith("0")) return `91${d.slice(1)}`;
+  return d.length >= 11 && d.length <= 15 ? d : null;
+}
+const waLink = (phone: string | null | undefined, message: string) => {
+  const n = waNumber(phone);
+  return n ? `https://wa.me/${n}?text=${encodeURIComponent(message)}` : null;
+};
+const telLink = (phone?: string | null) => { const n = waNumber(phone); return n ? `tel:+${n}` : null; };
+/** "+91 90000 01234" for Indian mobiles; anything else as typed. */
+const showPhone = (phone: string) => { const n = waNumber(phone); return n && n.length === 12 && n.startsWith("91") ? `+91 ${n.slice(2, 7)} ${n.slice(7)}` : phone; };
+const phoneLink = (phone: string) => { const t = telLink(phone); return t ? inkLink(t, showPhone(phone)) : esc(phone); };
+
+/** Small uppercase heading for each block of an alert. */
+function sectionLabel(t: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0 12px"><tr>
+    <td width="18" style="width:18px;padding:0 8px 0 0"><div style="height:2px;width:18px;background:${BRAND.gold};font-size:0;line-height:0">&nbsp;</div></td>
+    <td style="font-family:${FONT};font-size:10.5px;font-weight:800;color:${BRAND.goldDark};text-transform:uppercase;letter-spacing:1.3px;white-space:nowrap">${esc(t)}</td>
+  </tr></table>`;
+}
+
+/** Pill on the dark hero band. */
+const darkChip = (html: string, fg = ON_DARK.chipText) =>
+  `<span style="display:inline-block;margin:0 6px 6px 0;padding:5px 11px;border-radius:999px;background:${ON_DARK.chip};border:1px solid ${ON_DARK.chipLine};font-family:${FONT};font-size:11.5px;font-weight:700;color:${fg};line-height:1.2;white-space:nowrap">${html}</span>`;
+
+/** Two to three figures side by side. Values are trusted HTML; labels are text. */
+function statTiles(tiles: { label: string; value: string; sub?: string }[]): string {
+  const w = Math.floor(100 / tiles.length);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 4px"><tr>
+    ${tiles.map((t, i) => `<td width="${w}%" valign="top" style="padding:0 ${i < tiles.length - 1 ? 8 : 0}px 0 0">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td bgcolor="${BRAND.soft}" style="background:${BRAND.soft};border:1px solid ${BRAND.line};border-radius:14px;padding:14px 14px 13px">
+          <div style="font-family:${FONT};font-size:10px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:.9px">${esc(t.label)}</div>
+          <div style="font-family:${FONT};font-size:21px;font-weight:800;color:${BRAND.ink};letter-spacing:-.4px;line-height:1.25;padding-top:5px">${t.value}</div>
+          ${t.sub ? `<div style="font-family:${FONT};font-size:11.5px;line-height:1.45;color:${BRAND.sub};padding-top:2px">${t.sub}</div>` : ""}
+        </td></tr></table>
+    </td>`).join("")}
+  </tr></table>`;
+}
+
+/** Tap-to-act buttons that wrap on a narrow screen. Links without a target are skipped. */
+function actionPills(actions: { label: string; href: string | null; tone?: "whatsapp" | "dark" | "light" }[]): string {
+  const tones = {
+    whatsapp: { bg: "#25D366", fg: "#FFFFFF", bd: "#1FAF55" },
+    dark: { bg: BRAND.navy, fg: "#FFFFFF", bd: BRAND.navyDeep },
+    light: { bg: "#FFFFFF", fg: BRAND.ink, bd: "#D5DDE8" },
+  };
+  const live = actions.filter((a): a is { label: string; href: string; tone?: "whatsapp" | "dark" | "light" } => !!a.href);
+  if (!live.length) return "";
+  return `<div style="margin:0 0 4px">${live.map((a) => {
+    const t = tones[a.tone || "light"];
+    return `<a href="${esc(a.href)}" target="_blank" style="display:inline-block;margin:0 8px 9px 0;padding:11px 17px;border-radius:999px;background:${t.bg};border:1px solid ${t.bd};font-family:${FONT};font-size:13.5px;font-weight:700;color:${t.fg};text-decoration:none;line-height:1.1;white-space:nowrap">${esc(a.label)}</a>`;
+  }).join("")}</div>`;
+}
+
+/** Label | value rows — denser than detailTable, for alerts with many facts.
+    Values are trusted HTML (callers escape); rows with an empty value drop out. */
+function infoGrid(rows: [string, string | null | undefined][]): string {
+  const live = rows.filter((r): r is [string, string] => !!r[1]);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${BRAND.line};border-radius:14px;background:#FFFFFF">
+    ${live.map(([k, v], i) => `<tr>
+      <td width="34%" valign="top" style="padding:12px 10px 12px 18px;${i < live.length - 1 ? `border-bottom:1px solid ${BRAND.line};` : ""}font-family:${FONT};font-size:12px;font-weight:600;color:${BRAND.sub}">${esc(k)}</td>
+      <td valign="top" style="padding:12px 18px 12px 0;${i < live.length - 1 ? `border-bottom:1px solid ${BRAND.line};` : ""}font-family:${FONT};font-size:14px;font-weight:600;line-height:1.5;color:${BRAND.ink};word-break:break-word">${v}</td>
+    </tr>`).join("")}
+  </table>`;
+}
+
+const inkLink = (href: string, label: string) =>
+  `<a href="${esc(href)}" target="_blank" style="color:${BRAND.ink};text-decoration:none;border-bottom:1px solid ${BRAND.goldLine}">${esc(label)}</a>`;
+const mutedSpan = (t: string) => `<span style="color:${BRAND.sub};font-weight:500">${t}</span>`;
+
+/** A coloured "what to do now" panel. */
+function callout(tone: keyof typeof TONE, title: string, bodyHtml: string, actionsHtml = ""): string {
+  const t = TONE[tone];
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:26px 0 0">
+    <tr><td bgcolor="${t.tint}" style="background:${t.tint};border:1px solid ${t.line};border-left:5px solid ${t.solid};border-radius:14px;padding:18px 20px 12px">
+      <div style="font-family:${FONT};font-size:16px;font-weight:800;color:${t.text};letter-spacing:-.2px">${title}</div>
+      <div style="font-family:${FONT};font-size:13.5px;line-height:1.6;color:${BRAND.body};padding:5px 0 12px">${bodyHtml}</div>
+      ${actionsHtml}
+    </td></tr>
+  </table>`;
+}
+
+/* ── New signup ─────────────────────────────────────────────────────────── */
+
+export type SignupAlert = {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string | null;
+  /** Google profile photo, when they signed up with Google. */
+  photo?: string | null;
+  method: "email" | "google";
+  emailVerified: boolean;
+  business?: string | null;
+  /** Their new card's slug (null if provisioning failed). */
+  slug?: string | null;
+  trial?: { days: number; endsAt: Date; voucher?: string | null } | null;
+  /** The template chosen before signing up, if any. */
+  template?: { name: string; image?: string | null; url?: string | null } | null;
+  colour?: string | null;
+  aiDraft?: boolean;
+  referral?: { name: string; code: string } | null;
+  place?: string | null;
+  device?: string | null;
+  /** The page the signup form was on, e.g. /signup?product=bloom-profile-card */
+  page?: string | null;
+  counts?: { today: number; month: number; total: number } | null;
+  at?: Date;
+};
+
+export function newSignupAdminEmail(o: SignupAlert): Email {
+  const at = o.at ?? new Date();
+  const first = (o.name || "").trim().split(/\s+/)[0] || "there";
+  const cardUrl = o.slug ? `${SITE}/${encodeURIComponent(o.slug)}` : null;
+  const photo = safeUrl(o.photo);
+  const colour = o.colour && /^#[0-9a-f]{6}$/i.test(o.colour) ? o.colour : null;
+  const via = o.method === "google" ? "Google" : "email";
+
+  const avatar = photo
+    ? `<img src="${esc(photo)}" width="64" height="64" alt="" style="display:block;width:64px;height:64px;border-radius:50%;border:3px solid ${BRAND.gold};object-fit:cover">`
+    : `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="64" height="64" align="center" valign="middle" bgcolor="${BRAND.gold}" style="width:64px;height:64px;border-radius:50%;font-family:${FONT};font-size:26px;font-weight:800;color:${BRAND.navyDeep}">${esc(first.charAt(0).toUpperCase() || "?")}</td></tr></table>`;
+
+  const hero = `<tr><td bgcolor="${BRAND.navyDeep}" style="background:${BRAND.navyDeep};padding:28px 32px 24px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td width="80" valign="top" style="width:80px;padding-top:2px">${avatar}</td>
+      <td valign="top">
+        <div style="font-family:${FONT};font-size:10.5px;font-weight:800;color:${TONE.green.solid};text-transform:uppercase;letter-spacing:1.4px">&#9679;&nbsp; New signup &nbsp;<span style="color:${ON_DARK.sub};font-weight:600;letter-spacing:.4px;text-transform:none">${esc(whenIst(at))}</span></div>
+        <div style="font-family:${FONT};font-size:27px;line-height:1.2;font-weight:800;color:${ON_DARK.text};letter-spacing:-.4px;padding-top:7px">${esc(o.name || o.email)}</div>
+        ${o.business ? `<div style="font-family:${FONT};font-size:15px;font-weight:700;color:${BRAND.gold};padding-top:4px">${esc(o.business)}</div>` : ""}
+        <div style="padding-top:14px">
+          ${darkChip(`Signed up with ${via}`)}${darkChip(o.emailVerified ? "&#10003; Email verified" : "Email not verified yet", o.emailVerified ? "#86EFAC" : "#FCD34D")}${o.place ? darkChip(`&#9906; ${esc(o.place)}`) : ""}${o.referral ? darkChip(`Referred by ${esc(o.referral.name)}`, "#C4B5FD") : ""}
+        </div>
+      </td>
+    </tr></table>
+  </td></tr>`;
+
+  const tiles: { label: string; value: string; sub?: string }[] = [];
+  if (o.trial) tiles.push({ label: "Trial ends", value: esc(dayIst(o.trial.endsAt)), sub: `${o.trial.days}-day free trial${o.trial.voucher ? ` · ${esc(o.trial.voucher)}` : ""}` });
+  if (o.counts) {
+    tiles.push({ label: "Signups today", value: o.counts.today.toLocaleString("en-IN"), sub: `${o.counts.month.toLocaleString("en-IN")} this month` });
+    tiles.push({ label: "Customers", value: o.counts.total.toLocaleString("en-IN"), sub: "all time" });
+  }
+
+  const waHello = waLink(o.phone, `Hi ${first}, this is the DigitalCarda team 👋 Thanks for signing up!${cardUrl ? ` Your card is already live at ${cardUrl.replace(/^https:\/\//, "")}.` : ""} Would you like a hand setting it up?`);
+  const reach = actionPills([
+    { label: "WhatsApp", href: waHello, tone: "whatsapp" },
+    { label: "Call", href: telLink(o.phone), tone: "dark" },
+    { label: "Email", href: `mailto:${o.email}?subject=${encodeURIComponent("Welcome to DigitalCarda")}` },
+    { label: "Open their card", href: cardUrl },
+  ]);
+
+  const picked = o.template || colour || o.aiDraft
+    ? sectionLabel("What they picked before signing up") +
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${BRAND.line};border-radius:14px;background:#FFFFFF"><tr>
+        ${o.template && safeUrl(o.template.image) ? `<td width="132" valign="top" style="width:132px;padding:14px 0 14px 14px">
+          <img src="${esc(o.template.image)}" width="118" alt="${esc(o.template.name)}" style="display:block;width:118px;height:auto;border-radius:10px;border:1px solid ${BRAND.line};background:${BRAND.soft}">
+        </td>` : ""}
+        <td valign="middle" style="padding:16px 18px">
+          ${o.template ? `<div style="font-family:${FONT};font-size:10px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:.9px">Template</div>
+          <div style="font-family:${FONT};font-size:16px;font-weight:800;color:${BRAND.ink};padding:3px 0 10px">${o.template.url ? inkLink(o.template.url, o.template.name) : esc(o.template.name)}</div>` : ""}
+          ${colour ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 8px"><tr>
+            <td width="18" height="18" bgcolor="${colour}" style="width:18px;height:18px;border-radius:5px;border:1px solid ${BRAND.line};font-size:0;line-height:0">&nbsp;</td>
+            <td style="padding-left:8px;font-family:${FONT};font-size:13px;color:${BRAND.body}">Colour <span style="font-family:'SF Mono',Menlo,Consolas,monospace;color:${BRAND.ink}">${colour.toUpperCase()}</span></td>
+          </tr></table>` : ""}
+          ${o.aiDraft ? `<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:${BRAND.body}">&#10022; Brought a draft from the <strong style="color:${BRAND.ink}">AI Card Generator</strong>, so their card already has text.</div>` : ""}
+        </td>
+      </tr></table>`
+    : "";
+
   const bodyHtml =
-    p(`A new ${esc(o.role || "customer")} just created a free-trial account on DigitalCarda.`) +
-    detailTable([
-      ["Name", esc(o.name || "—")],
-      ["Email", esc(o.email || "—")],
-      ["Phone", esc(o.phone || "—")],
-      ["Role", esc(o.role || "customer")],
+    (tiles.length ? statTiles(tiles) : "") +
+    sectionLabel("Say hello") +
+    p(`<span style="font-size:14px">A short message while they're still setting up is the easiest way to help them finish their card.</span>`) +
+    reach +
+    sectionLabel("Account") +
+    infoGrid([
+      ["Email", inkLink(`mailto:${o.email}`, o.email)],
+      ["Phone", o.phone ? phoneLink(o.phone) : mutedSpan("Not given")],
+      ["Business", o.business ? esc(o.business) : mutedSpan("Not given")],
+      ["Card link", cardUrl ? inkLink(cardUrl, cardUrl.replace(/^https:\/\//, "")) : mutedSpan("Not created — check the admin")],
+      ["Account", `#${o.id} ${mutedSpan("· customer")}`],
     ]) +
-    button("View in admin", `${SITE}/admin/customers`);
+    sectionLabel("Where they came from") +
+    infoGrid([
+      ["Location", o.place ? esc(o.place) : mutedSpan("Unknown")],
+      ["Device", o.device ? esc(o.device) : null],
+      ["Signup page", o.page ? `<span style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12.5px">${esc(o.page)}</span>` : null],
+      ["Referred by", o.referral ? `${esc(o.referral.name)} ${mutedSpan(`· code ${esc(o.referral.code)}`)}` : null],
+      ["Signed up", esc(whenIst(at))],
+    ]) +
+    picked +
+    (o.slug ? sectionLabel("Their card right now") + cardPreview(o.slug, `${o.name}'s card`) : "") +
+    button("Open in admin", `${SITE}/admin/customers?q=${encodeURIComponent(o.email)}`);
+
+  const subjectBits = [o.name || o.email, o.business, o.place].filter(Boolean);
   return {
     kind: "newSignupAdminEmail",
-    subject: `New signup: ${o.name || o.email || "New user"}`,
-    html: layout({ preheader: `${o.name || o.email} started a free trial.`, badge: "New Signup", heading: "New account created 🎉", bodyHtml, accent: "#22C55E" }),
-    text: `New signup on DigitalCarda.\n\nName: ${o.name}\nEmail: ${o.email}\nRole: ${o.role}`,
+    subject: `New signup: ${subjectBits.join(" · ")}`,
+    html: layout({
+      preheader: `${o.name || o.email}${o.business ? ` (${o.business})` : ""} just started a free trial${o.place ? ` from ${o.place}` : ""}.`,
+      heading: "New signup", hero, bodyHtml, accent: TONE.green.solid,
+      footer: "You're receiving this because you run DigitalCarda. Owner alerts go to the admin address in Settings.",
+    }),
+    text: [
+      `New signup: ${o.name || o.email}${o.business ? ` (${o.business})` : ""}`, "",
+      `Email: ${o.email}${o.emailVerified ? " (verified)" : " (not verified yet)"}`,
+      `Phone: ${o.phone || "not given"}`,
+      `Signed up with: ${via}, ${whenIst(at)}`,
+      ...(cardUrl ? [`Card: ${cardUrl}`] : []),
+      ...(o.trial ? [`Trial: ${o.trial.days} days, ends ${dayIst(o.trial.endsAt)}${o.trial.voucher ? ` (${o.trial.voucher})` : ""}`] : []),
+      ...(o.place ? [`Location: ${o.place}`] : []),
+      ...(o.device ? [`Device: ${o.device}`] : []),
+      ...(o.page ? [`Signup page: ${o.page}`] : []),
+      ...(o.referral ? [`Referred by: ${o.referral.name} (code ${o.referral.code})`] : []),
+      ...(o.template ? [`Template: ${o.template.name}`] : []),
+      ...(o.counts ? ["", `Signups today: ${o.counts.today} · this month: ${o.counts.month} · customers: ${o.counts.total}`] : []),
+      "", `Admin: ${SITE}/admin/customers?q=${encodeURIComponent(o.email)}`,
+    ].join("\n"),
   };
 }
 
@@ -900,6 +1125,231 @@ export function nfcOrderShippedEmail(o: {
       `Your ${o.quantity} × ${o.productName} (order #${o.orderId}) is on its way.`,
       ...(o.tracking ? [`Tracking: ${o.tracking}`] : []), "",
       "Any problem, just reply to this email.",
+    ].join("\n"),
+  };
+}
+
+/* ── NFC order → the team ───────────────────────────────────────────────
+   One email per checkout (a card and a standee bought together arrive as one),
+   laid out in the order the work happens: collect or confirm the money, print,
+   encode and test the chip, ship. */
+
+export type NfcAdminAlert = {
+  ids: number[];
+  paid: boolean;
+  paymentId?: string | null;
+  items: { product: "nfc_card" | "nfc_standee" | string; name: string; print: string; quantity: number; unitPrice: number; amount: number }[];
+  printLines: string[];
+  cardUrl: string;
+  logoUrl?: string | null;
+  ship: { name: string; phone: string; line1: string; line2?: string | null; city: string; state: string; pincode: string };
+  customer?: { id: number; name: string; email: string } | null;
+  delivery: { label: string; maxDays: number };
+  at?: Date;
+};
+
+/** `days` working days after `from` (Mon–Sat; couriers deliver on Saturdays). */
+function addWorkingDays(from: Date, days: number): Date {
+  const d = new Date(from.getTime());
+  for (let left = days; left > 0;) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    // The weekday in India, not in the server's zone.
+    if (new Date(d.getTime() + 5.5 * 3_600_000).getUTCDay() !== 0) left--;
+  }
+  return d;
+}
+
+/** What gets printed, drawn as the object: a bank-card-sized PVC card (front
+    and back) and/or a counter standee. Layout only — the words are exact. */
+function printMock(o: { lines: string[]; short: string; card: boolean; standee: boolean; logo: boolean }): string {
+  const [name = "", ...rest] = o.lines;
+  const text = (big: boolean) =>
+    `<div style="font-family:${FONT};font-size:${big ? 17 : 15}px;font-weight:800;color:#FFFFFF;letter-spacing:-.2px;line-height:1.25">${esc(name)}</div>
+     ${rest.map((l) => `<div style="font-family:${FONT};font-size:11.5px;line-height:1.5;color:#C3CFDF;padding-top:2px">${esc(l)}</div>`).join("")}`;
+  const logoChip = o.logo
+    ? `<span style="display:inline-block;padding:3px 7px;border:1px dashed #5B7090;border-radius:5px;font-family:${FONT};font-size:9px;font-weight:700;color:#93A4BD;letter-spacing:.8px">LOGO</span>`
+    : `<span style="display:inline-block;height:4px;width:28px;background:${BRAND.gold};border-radius:2px;font-size:0;line-height:0">&nbsp;</span>`;
+  const qr = (size: number) => `<table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr>
+    <td width="${size}" height="${size}" align="center" valign="middle" bgcolor="#FFFFFF" style="width:${size}px;height:${size}px;border:2px solid ${BRAND.ink};border-radius:8px;font-family:${FONT};font-size:10px;font-weight:800;color:${BRAND.ink};letter-spacing:.6px">QR</td>
+  </tr></table>`;
+  const caption = (t: string) => `<div style="font-family:${FONT};font-size:10.5px;font-weight:700;color:${BRAND.sub};text-transform:uppercase;letter-spacing:.9px;padding:8px 0 0;text-align:center">${t}</div>`;
+
+  const card = o.card ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px"><tr>
+    <td width="50%" valign="top" style="padding:0 6px 0 0">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="150" valign="top" bgcolor="${BRAND.navy}" style="height:150px;background:${BRAND.navy};border-radius:14px;padding:16px 16px 12px;border:1px solid ${BRAND.navy};border-bottom:4px solid ${BRAND.gold}">
+          ${logoChip}
+          <div style="padding-top:22px">${text(false)}</div>
+          <div style="font-family:${FONT};font-size:13px;font-weight:800;color:${BRAND.gold};text-align:right;letter-spacing:-1px;padding-top:6px">)))</div>
+        </td></tr></table>
+      ${caption("Card · front")}
+    </td>
+    <td width="50%" valign="top" style="padding:0 0 0 6px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="150" align="center" valign="middle" bgcolor="${BRAND.soft}" style="height:150px;background:${BRAND.soft};border:1px solid ${BRAND.line};border-bottom:4px solid ${BRAND.line};border-radius:14px;padding:14px 10px">
+          ${qr(66)}
+          <div style="font-family:${FONT};font-size:11.5px;font-weight:700;color:${BRAND.ink};padding-top:10px;word-break:break-all">${esc(o.short)}</div>
+          <div style="font-family:${FONT};font-size:10.5px;color:${BRAND.sub};padding-top:2px">Tap or scan to open</div>
+        </td></tr></table>
+      ${caption("Card · back")}
+    </td>
+  </tr></table>` : "";
+
+  const standee = o.standee ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td valign="middle" bgcolor="${BRAND.navy}" style="background:${BRAND.navy};border-radius:14px 0 0 14px;padding:18px 18px">
+        ${logoChip}
+        <div style="padding-top:14px">${text(true)}</div>
+        <div style="font-family:${FONT};font-size:11.5px;font-weight:700;color:${BRAND.gold};padding-top:10px">Tap your phone here )))</div>
+      </td>
+      <td width="120" align="center" valign="middle" bgcolor="${BRAND.soft}" style="width:120px;background:${BRAND.soft};border:1px solid ${BRAND.line};border-left:0;border-radius:0 14px 14px 0;padding:14px 10px">
+        ${qr(74)}
+        <div style="font-family:${FONT};font-size:10.5px;color:${BRAND.sub};padding-top:8px">or scan</div>
+      </td>
+    </tr></table>
+    ${caption("Standee · one side")}
+  </td></tr></table>` : "";
+
+  return card + standee;
+}
+
+export function nfcOrderAdminEmail(o: NfcAdminAlert): Email {
+  const at = o.at ?? new Date();
+  const ref = o.ids.map((id) => `#${id}`).join(" + ");
+  const total = o.items.reduce((s, i) => s + i.amount, 0);
+  const itemText = o.items.map((i) => `${i.quantity} × ${i.name}`).join(" + ");
+  const first = (o.ship.name || "").trim().split(/\s+/)[0] || "there";
+  const tone = o.paid ? TONE.green : TONE.amber;
+  const short = o.cardUrl.replace(/^https?:\/\//, "");
+  const slug = (() => { try { return new URL(o.cardUrl).pathname.replace(/^\/+|\/+$/g, ""); } catch { return ""; } })();
+  const addressLines = [o.ship.line1, o.ship.line2, `${o.ship.city}, ${o.ship.state}`].filter((x): x is string => !!x);
+  const fullAddress = [...addressLines, o.ship.pincode].join(", ");
+  const deliverBy = addWorkingDays(at, o.delivery.maxDays);
+
+  const hero = `<tr><td bgcolor="${BRAND.navyDeep}" style="background:${BRAND.navyDeep};padding:26px 32px 24px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td valign="top">
+        <span style="display:inline-block;padding:5px 12px;border-radius:999px;background:${tone.solid};font-family:${FONT};font-size:10.5px;font-weight:800;color:${o.paid ? "#FFFFFF" : "#1A1206"};text-transform:uppercase;letter-spacing:1.1px">${o.paid ? "&#10003; Paid · ready to print" : "Awaiting payment"}</span>
+        <div style="font-family:${FONT};font-size:12px;font-weight:700;color:${ON_DARK.sub};text-transform:uppercase;letter-spacing:1.3px;padding-top:16px">NFC order</div>
+        <div style="font-family:${FONT};font-size:34px;line-height:1.1;font-weight:800;color:${BRAND.gold};letter-spacing:-.6px;padding-top:2px">${esc(ref)}</div>
+        <div style="font-family:${FONT};font-size:14px;font-weight:600;color:${ON_DARK.text};padding-top:8px">${esc(itemText)}</div>
+      </td>
+      <td valign="top" align="right" style="padding-left:12px">
+        <div style="font-family:${FONT};font-size:10.5px;font-weight:700;color:${ON_DARK.sub};text-transform:uppercase;letter-spacing:1.2px;padding-top:42px">${o.paid ? "Paid" : "To collect"}</div>
+        <div style="font-family:${FONT};font-size:30px;line-height:1.15;font-weight:800;color:${ON_DARK.text};letter-spacing:-.6px;white-space:nowrap">${esc(inr(total))}</div>
+        <div style="font-family:${FONT};font-size:11.5px;color:${ON_DARK.sub};padding-top:2px">free delivery</div>
+      </td>
+    </tr></table>
+    <div style="padding-top:16px">
+      ${darkChip(esc(whenIst(at)))}${darkChip(`&#9906; ${esc(o.ship.city)}, ${esc(o.ship.state)}`)}${darkChip(`Deliver by ${esc(dayIst(deliverBy))}`, "#FCD34D")}
+    </div>
+  </td></tr>`;
+
+  const waMsg = o.paid
+    ? `Hi ${first}, this is DigitalCarda 👋 We've received your payment for order ${ref} (${itemText}). We're printing it now and will send tracking as soon as it ships.`
+    : `Hi ${first}, this is DigitalCarda 👋 Thanks for your order ${ref}: ${itemText}, ${inr(total)} with free delivery. How would you like to pay? As soon as it's paid we print it and ship within ${o.delivery.label}.`;
+  const contact = actionPills([
+    { label: `WhatsApp ${first}`, href: waLink(o.ship.phone, waMsg), tone: "whatsapp" },
+    { label: "Call", href: telLink(o.ship.phone), tone: "dark" },
+    { label: "Email", href: o.customer?.email ? `mailto:${o.customer.email}?subject=${encodeURIComponent(`Your DigitalCarda order ${ref}`)}` : null },
+  ]);
+  const next = o.paid
+    ? callout("green", "Paid online — go ahead and print",
+        `${esc(inr(total))} received${o.paymentId ? ` · Razorpay <span style="font-family:'SF Mono',Menlo,Consolas,monospace;color:${BRAND.ink}">${esc(o.paymentId)}</span>` : ""}. The customer already has their confirmation email.`, contact)
+    : callout("amber", `Collect ${esc(inr(total))} before printing`,
+        `Online payment is switched off, so nothing has been charged. Contact ${esc(first)} to arrange payment, then set the order to <strong>Paid</strong> in Admin.`, contact);
+
+  const itemRows = o.items.map((i) => `<tr>
+      <td style="padding:13px 0 13px 18px;border-bottom:1px solid ${BRAND.line};font-family:${FONT}">
+        <div style="font-size:14.5px;font-weight:700;color:${BRAND.ink}">${esc(i.name)}</div>
+        <div style="font-size:12px;color:${BRAND.sub};padding-top:2px">${esc(i.print)} · ${esc(inr(i.unitPrice))} each</div>
+      </td>
+      <td align="center" style="padding:13px 8px;border-bottom:1px solid ${BRAND.line};font-family:${FONT};font-size:14px;font-weight:700;color:${BRAND.ink};white-space:nowrap">× ${i.quantity}</td>
+      <td align="right" style="padding:13px 18px 13px 0;border-bottom:1px solid ${BRAND.line};font-family:${FONT};font-size:14.5px;font-weight:700;color:${BRAND.ink};white-space:nowrap">${esc(inr(i.amount))}</td>
+    </tr>`).join("");
+  const itemsTable = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${BRAND.line};border-radius:14px;background:#FFFFFF">
+    ${itemRows}
+    <tr>
+      <td style="padding:12px 0 12px 18px;font-family:${FONT};font-size:13px;color:${BRAND.sub}">Delivery · ${esc(o.delivery.label)}</td>
+      <td></td>
+      <td align="right" style="padding:12px 18px 12px 0;font-family:${FONT};font-size:13px;font-weight:700;color:${TONE.green.solid}">Free</td>
+    </tr>
+    <tr>
+      <td bgcolor="${BRAND.goldTint}" style="background:${BRAND.goldTint};padding:14px 0 14px 18px;border-top:1px solid ${BRAND.goldLine};border-radius:0 0 0 14px;font-family:${FONT};font-size:14px;font-weight:800;color:${BRAND.ink}">Total</td>
+      <td bgcolor="${BRAND.goldTint}" style="background:${BRAND.goldTint};border-top:1px solid ${BRAND.goldLine}"></td>
+      <td bgcolor="${BRAND.goldTint}" align="right" style="background:${BRAND.goldTint};padding:14px 18px 14px 0;border-top:1px solid ${BRAND.goldLine};border-radius:0 0 14px 0;font-family:${FONT};font-size:18px;font-weight:800;color:${BRAND.ink};white-space:nowrap">${esc(inr(total))}</td>
+    </tr>
+  </table>`;
+
+  const hasCard = o.items.some((i) => i.product === "nfc_card");
+  const hasStandee = o.items.some((i) => i.product === "nfc_standee");
+  const logo = safeUrl(o.logoUrl);
+
+  const label = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td bgcolor="#FFFFFF" style="background:#FFFFFF;border:2px dashed #C3CDDA;border-radius:14px;padding:18px 20px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td valign="top">
+          <div style="font-family:${FONT};font-size:10px;font-weight:800;color:${BRAND.sub};text-transform:uppercase;letter-spacing:1.2px">Ship to</div>
+          <div style="font-family:${FONT};font-size:17px;font-weight:800;color:${BRAND.ink};padding-top:6px">${esc(o.ship.name)}</div>
+          <div style="font-family:${FONT};font-size:14px;line-height:1.6;color:${BRAND.body};padding-top:4px">${addressLines.map((l) => esc(l)).join("<br>")}</div>
+          <div style="font-family:${FONT};font-size:14px;font-weight:700;color:${BRAND.ink};padding-top:6px">${phoneLink(o.ship.phone)}</div>
+        </td>
+        <td valign="top" align="right" width="96" style="width:96px">
+          <div style="font-family:${FONT};font-size:10px;font-weight:800;color:${BRAND.sub};text-transform:uppercase;letter-spacing:1.2px">PIN</div>
+          <div style="display:inline-block;margin-top:6px;padding:7px 10px;border:2px solid ${BRAND.ink};border-radius:8px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:17px;font-weight:800;color:${BRAND.ink};letter-spacing:1px">${esc(o.ship.pincode)}</div>
+        </td>
+      </tr></table>
+      <div style="padding-top:12px;font-family:${FONT};font-size:12.5px"><a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(fullAddress)}" target="_blank" style="color:${BRAND.goldDark};font-weight:700;text-decoration:none">Open in Google Maps &rarr;</a></div>
+    </td>
+  </tr></table>`;
+
+  const steps: [string, string][] = [
+    ...(o.paid ? [] : [["Collect the payment", `${esc(inr(total))} from ${esc(o.ship.name)}, then set the order to <strong>Paid</strong>.`] as [string, string]]),
+    ["Print it", `Use the exact text above${logo ? " and the logo file" : ", with the logo from their card if it has one"}.`],
+    ["Write the chip", `Encode <strong>${esc(short)}</strong> on the NFC chip — the same link as the QR code.`],
+    ["Test it", "Tap it on an Android phone and an iPhone, and scan the QR code. Both must open the card."],
+    ["Ship it", "Set the order to <strong>Shipped</strong> with the tracking number — the customer is emailed automatically."],
+  ];
+
+  const bodyHtml =
+    next +
+    sectionLabel("Order") + itemsTable +
+    sectionLabel("What to print") +
+    printMock({ lines: o.printLines, short, card: hasCard, standee: hasStandee, logo: !!logo }) +
+    infoGrid([
+      ["Printed text", o.printLines.map((l) => esc(l)).join("<br>")],
+      ["Chip + QR open", inkLink(o.cardUrl, short)],
+      ["Logo", logo ? inkLink(logo, "Download the logo") : `${mutedSpan("Not uploaded")} — take it from ${inkLink(o.cardUrl, "their card")} if it has one`],
+    ]) +
+    (slug ? `<div style="height:14px;font-size:0;line-height:0">&nbsp;</div>` + cardPreview(slug, `The card the chip opens`) : "") +
+    sectionLabel("Shipping label") + label +
+    (o.customer ? sectionLabel("Customer account") + infoGrid([
+      ["Name", esc(o.customer.name)],
+      ["Email", inkLink(`mailto:${o.customer.email}`, o.customer.email)],
+      ["Account", `#${o.customer.id} ${mutedSpan(`· ${inkLink(`${SITE}/admin/customers?q=${encodeURIComponent(o.customer.email)}`, "open in admin")}`)}`],
+    ]) : "") +
+    sectionLabel("Checklist") +
+    steps.map(([t, b], i) => featureRow(i + 1, t, b)).join("") +
+    button("Open NFC orders", `${SITE}/admin/nfc-orders`);
+
+  return {
+    kind: "nfcOrderAdmin",
+    subject: `NFC order ${ref} · ${itemText} · ${inr(total)} · ${o.paid ? "Paid, ready to print" : "Awaiting payment"}`,
+    html: layout({
+      preheader: `${o.paid ? "Paid" : "Collect payment"}: ${itemText} for ${o.ship.name}, ${o.ship.city}. ${inr(total)}.`,
+      heading: `NFC order ${ref}`, hero, bodyHtml, accent: tone.solid,
+      footer: "You're receiving this because you run DigitalCarda. Owner alerts go to the admin address in Settings.",
+    }),
+    text: [
+      `NFC order ${ref} — ${o.paid ? `PAID${o.paymentId ? ` (Razorpay ${o.paymentId})` : ""}, ready to print` : "AWAITING PAYMENT — collect it before printing"}`, "",
+      ...o.items.map((i) => `${i.quantity} × ${i.name} (${i.print}) = ${inr(i.amount)}`),
+      `Total: ${inr(total)} · free delivery, ${o.delivery.label} (by ${dayIst(deliverBy)})`, "",
+      "Print:", ...o.printLines,
+      `NFC chip + QR open: ${o.cardUrl}`,
+      `Logo: ${logo || `not uploaded — take it from ${o.cardUrl} if the card has one`}`, "",
+      `Ship to: ${o.ship.name}, ${o.ship.phone}`, fullAddress, "",
+      ...(o.customer ? [`Customer account: #${o.customer.id} ${o.customer.name} <${o.customer.email}>`, ""] : []),
+      `Manage it: ${SITE}/admin/nfc-orders`,
     ].join("\n"),
   };
 }

@@ -7,7 +7,7 @@ import { nfcOrders, publishedCards, users, type NfcOrder } from "@db/schema";
 import { resolveRazorpay } from "./payment-router";
 import { createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder } from "./lib/razorpay";
 import { sendEmail, ownerAddress } from "./lib/mail";
-import { nfcOrderConfirmedEmail, nfcOrderShippedEmail } from "./lib/email-templates";
+import { nfcOrderConfirmedEmail, nfcOrderShippedEmail, nfcOrderAdminEmail } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { NFC_PRODUCTS, NFC_DELIVERY, NFC_MAX_QTY, nfcProduct } from "../src/lib/nfcProducts";
 
@@ -70,9 +70,6 @@ const orderInput = z.preprocess(
 
 const STATUSES = ["pending_payment", "paid", "in_production", "shipped", "delivered", "cancelled"] as const;
 
-const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c] as string));
-const money = (n: number) => `Rs. ${Math.round(n).toLocaleString("en-IN")}`;
-
 /** The link the NFC chip and printed QR open: the account's primary published card. */
 async function cardUrlFor(db: ReturnType<typeof getDb>, userId: number): Promise<string | null> {
   try {
@@ -90,26 +87,38 @@ const addressOf = (o: NfcOrder) =>
 const printLinesOf = (o: NfcOrder) =>
   [o.printName, o.printTitle, o.printCompany, o.printPhone].filter((x): x is string => !!x);
 
-function notifyTeam(o: NfcOrder, headline: string) {
-  const product = nfcProduct(o.product);
-  const lines = [
-    `Order #${o.id}`,
-    `${o.quantity} × ${product?.name ?? o.product} (${product?.print ?? ""}) = ${money(Number(o.amount))}`,
-    `Print: ${printLinesOf(o).join(" · ")}`,
-    `NFC chip + QR open: ${o.cardUrl}`,
-    // Most logos are embedded in the card rather than hosted, so none is sent
-    // with the order — the card itself is the source.
-    o.logoUrl ? `Logo: ${o.logoUrl}` : `Logo: take it from the customer's card (${o.cardUrl}), if it has one`,
-    `Ship to: ${o.shipName}, ${o.shipPhone}`,
-    `Address: ${addressOf(o)}`,
-    `Promised delivery: ${NFC_DELIVERY.label}, free`,
-  ];
-  return sendEmail(ownerAddress(), {
-    kind: "nfcOrderAdmin",
-    subject: `NFC order #${o.id} — ${o.quantity} × ${product?.name ?? o.product} (${headline})`,
-    text: [headline, ...lines].join("\n"),
-    html: `<h2>${esc(headline)}</h2><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><p>Manage it in Admin → NFC Orders.</p>`,
-  });
+/* One email to the team per checkout, however many products it holds. */
+function notifyTeam(rows: NfcOrder[], opts: { paid: boolean; paymentId?: string | null; customer?: { id: number; fullName: string; email: string } | null }) {
+  const sorted = [...rows].sort((a, b) => a.id - b.id);
+  const first = sorted[0];
+  if (!first) return;
+  return sendEmail(ownerAddress(), nfcOrderAdminEmail({
+    ids: sorted.map((r) => r.id),
+    paid: opts.paid,
+    paymentId: opts.paymentId,
+    items: sorted.map((r) => {
+      const product = nfcProduct(r.product);
+      return {
+        product: r.product,
+        name: product?.name ?? r.product,
+        print: product?.print ?? "",
+        quantity: r.quantity,
+        unitPrice: Number(r.unitPrice),
+        amount: Number(r.amount),
+      };
+    }),
+    printLines: printLinesOf(first),
+    cardUrl: first.cardUrl,
+    // Most logos are embedded in the card rather than hosted, so usually none
+    // comes with the order — the card itself is the source.
+    logoUrl: first.logoUrl,
+    ship: {
+      name: first.shipName, phone: first.shipPhone, line1: first.shipLine1, line2: first.shipLine2,
+      city: first.shipCity, state: first.shipState, pincode: first.shipPincode,
+    },
+    customer: opts.customer ? { id: opts.customer.id, name: opts.customer.fullName, email: opts.customer.email } : null,
+    delivery: { label: NFC_DELIVERY.label, maxDays: NFC_DELIVERY.maxDays },
+  }));
 }
 
 export const nfcRouter = createRouter({
@@ -175,12 +184,11 @@ export const nfcRouter = createRouter({
       orderIds.push(Number(inserted.insertId));
     }
     const orderId = orderIds[0];
-    const together = orderIds.length > 1 ? ` (ordered together: #${orderIds.join(" + #")})` : "";
 
     const cr = await resolveRazorpay(db);
     if (!cr.enabled) {
       const rows = await db.select().from(nfcOrders).where(inArray(nfcOrders.id, orderIds));
-      for (const r of rows) void notifyTeam(r, `Awaiting payment — contact the customer to collect it${together}`);
+      void notifyTeam(rows, { paid: false, customer: ctx.user });
       return { manual: true as const, orderId, orderIds };
     }
 
@@ -259,7 +267,6 @@ export const nfcRouter = createRouter({
         const first = paid[0];
         if (first) {
           const product = nfcProduct(first.product);
-          const together = paid.length > 1 ? ` (ordered together: #${paid.map((p) => p.id).join(" + #")})` : "";
           void sendEmail(ctx.user.email, nfcOrderConfirmedEmail({
             name: first.shipName,
             orderId: first.id,
@@ -272,7 +279,7 @@ export const nfcRouter = createRouter({
             cardUrl: first.cardUrl,
             deliveryDays: NFC_DELIVERY.label,
           }), ownerAddress());
-          for (const p of paid) void notifyTeam(p, `Paid online — ready to print${together}`);
+          void notifyTeam(paid, { paid: true, paymentId: input.razorpayPaymentId, customer: ctx.user });
         }
       }
       return { ok: true, orderId: ids[0], orderIds: ids };
