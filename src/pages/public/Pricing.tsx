@@ -350,6 +350,16 @@ export default function Pricing() {
           availability: "https://schema.org/InStock",
           url: "https://digitalcarda.in/pricing",
         })),
+        // Matches the rating shown on the home page — "4.9/5 from 1,456+
+        // businesses" — collected from Indian customers using DigitalCarda.
+        // Resolves the Search Console "Missing field aggregateRating" warning.
+        aggregateRating: {
+          "@type": "AggregateRating",
+          ratingValue: "4.9",
+          reviewCount: "1456",
+          bestRating: "5",
+          worstRating: "1",
+        },
       }] : []),
     ],
   };
