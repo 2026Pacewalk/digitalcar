@@ -98,6 +98,13 @@ const TABLES = {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX addon_user_idx (user_id), UNIQUE INDEX uq_addon_user_type (user_id, type))`,
+  /* Razorpay orders already fulfilled (card add-ons) — dedups the in-browser
+     verify against the payment webhook. */
+  razorpay_fulfilments: `CREATE TABLE IF NOT EXISTS razorpay_fulfilments (
+    razorpay_order_id VARCHAR(64) NOT NULL PRIMARY KEY, kind VARCHAR(32) NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL, razorpay_payment_id VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX rzp_fulfil_user_idx (user_id))`,
   ai_generations: `CREATE TABLE IF NOT EXISTS ai_generations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, business_name VARCHAR(120) NULL, profession VARCHAR(80) NULL,
     city VARCHAR(80) NULL, phone VARCHAR(30) NULL, source VARCHAR(16) NULL, ip VARCHAR(64) NULL,

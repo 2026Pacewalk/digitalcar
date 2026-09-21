@@ -5,7 +5,7 @@ import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { nfcOrders, publishedCards, users, type NfcOrder } from "@db/schema";
 import { resolveRazorpay } from "./payment-router";
-import { createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder } from "./lib/razorpay";
+import { createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder, type RazorpayOrderFull } from "./lib/razorpay";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { nfcOrderConfirmedEmail, nfcOrderShippedEmail, nfcOrderAdminEmail } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
@@ -119,6 +119,74 @@ function notifyTeam(rows: NfcOrder[], opts: { paid: boolean; paymentId?: string 
     customer: opts.customer ? { id: opts.customer.id, name: opts.customer.fullName, email: opts.customer.email } : null,
     delivery: { label: NFC_DELIVERY.label, maxDays: NFC_DELIVERY.maxDays },
   }));
+}
+
+/** Confirm a paid online NFC checkout: mark its orders paid, then email the
+    customer and the team. Shared by the in-browser verify and the Razorpay
+    webhook, so a checkout whose tab closed after paying is confirmed the same
+    way, and the two together confirm it once.
+    The caller has already proven the payment genuine (checkout or webhook
+    signature). `gatewayOrder` is Razorpay's own copy of the order: its notes
+    must name this user and these orders, and its amount must equal theirs,
+    or this throws a TRPCError. `confirmed` is false when the orders were
+    already paid — nothing is marked or sent again. */
+export async function fulfilNfcPayment(
+  db: ReturnType<typeof getDb>,
+  { userId, razorpayOrderId, paymentId, gatewayOrder }: { userId: number; razorpayOrderId: string; paymentId: string; gatewayOrder: RazorpayOrderFull },
+): Promise<{ orderIds: number[]; confirmed: boolean }> {
+  const notes = gatewayOrder.notes || {};
+  if (String(notes.userId || "") !== String(userId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "This payment belongs to another account." });
+  }
+
+  // Every order row this payment covers (one, or card + standee together).
+  // Orders created before combined checkout only carry nfcOrderId.
+  const ids = String(notes.nfcOrderIds || notes.nfcOrderId || "")
+    .split(",").map((x) => Number(x)).filter((n) => Number.isInteger(n) && n > 0);
+  const rows = ids.length
+    ? await db.select().from(nfcOrders).where(and(inArray(nfcOrders.id, ids), eq(nfcOrders.userId, userId)))
+    : [];
+  if (!rows.length || rows.length !== ids.length || rows.some((r) => r.razorpayOrderId !== razorpayOrderId)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "This payment doesn't match an order. Contact support with your payment ID." });
+  }
+  const totalPaise = rows.reduce((sum, r) => sum + Math.round(Number(r.amount) * 100), 0);
+  if (totalPaise !== Number(gatewayOrder.amount)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "The paid amount doesn't match this order. Contact support with your payment ID." });
+  }
+
+  // Idempotent: the conditional update is the claim. Whether it's a repeated
+  // verify, a webhook retry, or the verify and the webhook arriving together,
+  // only the call that moves the orders out of pending_payment sends email.
+  const claim = await db.update(nfcOrders)
+    .set({ status: "paid", razorpayPaymentId: paymentId, paidAt: new Date() })
+    .where(and(inArray(nfcOrders.id, ids), eq(nfcOrders.status, "pending_payment")));
+  const affected = (claim as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+    ?? (claim as unknown as { affectedRows?: number })?.affectedRows ?? 0;
+  if (affected === 0) return { orderIds: ids, confirmed: false };
+
+  const [customer] = await db.select({ id: users.id, fullName: users.fullName, email: users.email })
+    .from(users).where(eq(users.id, userId));
+  const paid = (await db.select().from(nfcOrders).where(inArray(nfcOrders.id, ids))).sort((a, b) => a.id - b.id);
+  const first = paid[0];
+  if (first) {
+    const product = nfcProduct(first.product);
+    if (customer?.email) {
+      void sendEmail(customer.email, nfcOrderConfirmedEmail({
+        name: first.shipName,
+        orderId: first.id,
+        productName: product?.name ?? first.product,
+        quantity: first.quantity,
+        items: paid.map((p) => ({ name: nfcProduct(p.product)?.name ?? p.product, quantity: p.quantity })),
+        amount: paid.reduce((sum, p) => sum + Number(p.amount), 0),
+        printLines: printLinesOf(first),
+        address: `${first.shipName}, ${addressOf(first)} · ${first.shipPhone}`,
+        cardUrl: first.cardUrl,
+        deliveryDays: NFC_DELIVERY.label,
+      }), ownerAddress());
+    }
+    void notifyTeam(paid, { paid: true, paymentId, customer: customer ?? null });
+  }
+  return { orderIds: ids, confirmed: true };
 }
 
 export const nfcRouter = createRouter({
@@ -238,50 +306,12 @@ export const nfcRouter = createRouter({
       } catch {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not confirm this payment with the gateway. If you were charged, contact support with your payment ID." });
       }
-      const notes = gatewayOrder.notes || {};
-      if (String(notes.userId || "") !== String(ctx.user.id)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "This payment belongs to another account." });
-      }
-
-      // Every order row this payment covers (one, or card + standee together).
-      // Orders created before combined checkout only carry nfcOrderId.
-      const ids = String(notes.nfcOrderIds || notes.nfcOrderId || "")
-        .split(",").map((x) => Number(x)).filter((n) => Number.isInteger(n) && n > 0);
-      const rows = ids.length
-        ? await db.select().from(nfcOrders).where(and(inArray(nfcOrders.id, ids), eq(nfcOrders.userId, ctx.user.id)))
-        : [];
-      if (!rows.length || rows.length !== ids.length || rows.some((r) => r.razorpayOrderId !== input.razorpayOrderId)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This payment doesn't match an order. Contact support with your payment ID." });
-      }
-      const totalPaise = rows.reduce((sum, r) => sum + Math.round(Number(r.amount) * 100), 0);
-      if (totalPaise !== Number(gatewayOrder.amount)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "The paid amount doesn't match this order. Contact support with your payment ID." });
-      }
-
-      // Idempotent: a repeated verify (double click, retry) confirms once.
-      if (rows.some((r) => r.status === "pending_payment")) {
-        await db.update(nfcOrders)
-          .set({ status: "paid", razorpayPaymentId: input.razorpayPaymentId, paidAt: new Date() })
-          .where(and(inArray(nfcOrders.id, ids), eq(nfcOrders.status, "pending_payment")));
-        const paid = (await db.select().from(nfcOrders).where(inArray(nfcOrders.id, ids))).sort((a, b) => a.id - b.id);
-        const first = paid[0];
-        if (first) {
-          const product = nfcProduct(first.product);
-          void sendEmail(ctx.user.email, nfcOrderConfirmedEmail({
-            name: first.shipName,
-            orderId: first.id,
-            productName: product?.name ?? first.product,
-            quantity: first.quantity,
-            items: paid.map((p) => ({ name: nfcProduct(p.product)?.name ?? p.product, quantity: p.quantity })),
-            amount: paid.reduce((sum, p) => sum + Number(p.amount), 0),
-            printLines: printLinesOf(first),
-            address: `${first.shipName}, ${addressOf(first)} · ${first.shipPhone}`,
-            cardUrl: first.cardUrl,
-            deliveryDays: NFC_DELIVERY.label,
-          }), ownerAddress());
-          void notifyTeam(paid, { paid: true, paymentId: input.razorpayPaymentId, customer: ctx.user });
-        }
-      }
+      const { orderIds: ids } = await fulfilNfcPayment(db, {
+        userId: ctx.user.id,
+        razorpayOrderId: input.razorpayOrderId,
+        paymentId: input.razorpayPaymentId,
+        gatewayOrder,
+      });
       return { ok: true, orderId: ids[0], orderIds: ids };
     }),
 

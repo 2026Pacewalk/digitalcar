@@ -141,6 +141,20 @@ export const cardAddons = mysqlTable("card_addons", {
 
 export type CardAddon = typeof cardAddons.$inferSelect;
 
+// One row per Razorpay order whose purchase has been fulfilled, for purchases
+// with no order table of their own (card add-ons). The in-browser verify and
+// the Razorpay webhook both claim the order here first, so one payment grants
+// once however many times either arrives. Created at boot by api/boot.ts if missing.
+export const razorpayFulfilments = mysqlTable("razorpay_fulfilments", {
+  razorpayOrderId: varchar("razorpay_order_id", { length: 64 }).primaryKey(),
+  kind: varchar("kind", { length: 32 }).notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  razorpayPaymentId: varchar("razorpay_payment_id", { length: 64 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("rzp_fulfil_user_idx").on(table.userId),
+]);
+
 // Physical NFC products (PVC card, standee) ordered from the dashboard. Prices
 // are copied onto the order at checkout, so a later price change never rewrites
 // history. Fulfilment: pending_payment → paid → in_production → shipped →

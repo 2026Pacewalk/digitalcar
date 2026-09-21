@@ -632,6 +632,29 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// One-time, idempotent schema ensure for razorpay_fulfilments (which Razorpay
+// orders for card add-ons have been granted — dedups verify vs webhook). Additive only.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    await getDb().execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS razorpay_fulfilments (
+        razorpay_order_id varchar(64) NOT NULL,
+        kind varchar(32) NOT NULL,
+        user_id bigint unsigned NOT NULL,
+        razorpay_payment_id varchar(64) NOT NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (razorpay_order_id),
+        KEY rzp_fulfil_user_idx (user_id)
+      )
+    `));
+    console.log("[schema] razorpay_fulfilments table ensured");
+  } catch (e) {
+    console.error("[schema] ensure razorpay_fulfilments failed:", (e as Error).message);
+  }
+})();
+
 // One-time, idempotent schema ensure for coupons, coupon_redemptions and
 // announcements (coupon system + offer popups). Additive only.
 (async () => {
@@ -1102,11 +1125,12 @@ app.post("/api/funnel", async (c) => {
 
 // ── Razorpay webhook: server-to-server payment confirmation (backstop to the
 // browser-side verify). If the customer's browser closed after paying but before
-// the client verify ran, this still activates their plan. Verifies the webhook
-// signature (HMAC of the RAW body with the webhook secret), then on
-// payment.captured records + activates the order idempotently (dedup by payment id,
-// shared with the client-verify path). Non-2xx makes Razorpay retry, so a transient
-// DB/API hiccup never loses a payment.
+// the client verify ran, this still activates their plan — or confirms their NFC
+// order / grants their add-on. Verifies the webhook signature (HMAC of the RAW
+// body with the webhook secret), then on payment.captured runs the same
+// fulfilment as the client-verify path, idempotently (plans dedup by payment id,
+// NFC orders by their pending→paid flip, add-ons per Razorpay order). Non-2xx
+// makes Razorpay retry, so a transient DB/API hiccup never loses a payment.
 app.post("/api/razorpay/webhook", async (c) => {
   const raw = await c.req.text();
   try {
@@ -1128,6 +1152,34 @@ app.post("/api/razorpay/webhook", async (c) => {
     const order = await fetchRazorpayOrder(pay.order_id, cr);
     const notes = order.notes || {};
     const userId = Number(notes.userId);
+
+    // NFC orders and add-ons carry no packageId. Confirm them with the function
+    // their in-browser verify calls — same checks, same emails — which is
+    // idempotent against that verify and against Razorpay's own retries.
+    if (!notes.packageId && userId) {
+      const kind = notes.nfcOrderIds || notes.nfcOrderId ? "nfc order"
+        : notes.addonType ? "card add-on"
+        : notes.addon === "custom_domain" ? "domain add-on"
+        : null;
+      if (kind) {
+        const args = { userId, razorpayOrderId: pay.order_id, paymentId: pay.id, gatewayOrder: order };
+        const { TRPCError } = await import("@trpc/server");
+        try {
+          let fulfilled: boolean;
+          if (kind === "nfc order") fulfilled = (await (await import("./nfc-router")).fulfilNfcPayment(db, args)).confirmed;
+          else if (kind === "card add-on") fulfilled = (await (await import("./addon-router")).fulfilAddonPayment(db, args)).granted;
+          else fulfilled = (await (await import("./domain-router")).fulfilDomainAddonPayment(db, args)).granted;
+          console.log(`[razorpay webhook] payment.captured ${pay.id} → ${kind} ${fulfilled ? "fulfilled" : "already fulfilled"}`);
+        } catch (e) {
+          if (!(e instanceof TRPCError)) throw e; // DB / gateway trouble → 500 → Razorpay retries
+          // Owner, amount or notes don't match — a retry can't change that, so
+          // ack it and leave the payment for support to look at.
+          console.error(`[razorpay webhook] payment.captured ${pay.id} → ${kind} NOT fulfilled: ${e.message}`);
+        }
+        return c.json({ ok: true });
+      }
+    }
+
     const packageId = Number(notes.packageId);
     const cycle = notes.billingCycle;
     const billingCycle = (cycle === "monthly" || cycle === "yearly" || cycle === "triennial") ? cycle : "yearly";

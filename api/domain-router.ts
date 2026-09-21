@@ -5,9 +5,10 @@ import { getDb } from "./queries/connection";
 import { customDomains, publishedCards, users, appSettings, subscriptions } from "@db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import crypto from "node:crypto";
 import { promises as dns } from "node:dns";
 import { cfEnabled, cfFallbackTarget, cfCreateHostname, cfGetByHostname, cfDeleteByHostname, cfIsActive, cfHealthCheck, type CfHostname } from "./lib/cloudflare";
+import { resolveRazorpay } from "./payment-router";
+import { createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder, type RazorpayOrderFull } from "./lib/razorpay";
 
 const ROOT_HOST = "digitalcarda.in";
 // Manual-mode CNAME target (used only when Cloudflare for SaaS isn't configured).
@@ -25,18 +26,53 @@ async function readSetting(db: ReturnType<typeof getDb>, key: string): Promise<s
   const r = await db.query.appSettings.findFirst({ where: eq(appSettings.key, key) });
   return r?.value ?? "";
 }
-async function razorpayCreds(db: ReturnType<typeof getDb>) {
-  return { keyId: await readSetting(db, "pay_razorpay_key_id"), keySecret: await readSetting(db, "pay_razorpay_key_secret") };
-}
-async function paidAddonUsers(db: ReturnType<typeof getDb>): Promise<number[]> {
-  try { const v = JSON.parse((await readSetting(db, ADDON_USERS_KEY)) || "[]"); return Array.isArray(v) ? v.map(Number) : []; }
+const parseUserList = (raw: string | null | undefined): number[] => {
+  try { const v = JSON.parse(raw || "[]"); return Array.isArray(v) ? v.map(Number) : []; }
   catch { return []; }
+};
+async function paidAddonUsers(db: ReturnType<typeof getDb>): Promise<number[]> {
+  return parseUserList(await readSetting(db, ADDON_USERS_KEY));
 }
-async function grantAddon(db: ReturnType<typeof getDb>, userId: number): Promise<void> {
-  const list = await paidAddonUsers(db);
-  if (!list.includes(userId)) list.push(userId);
-  const value = JSON.stringify(list);
-  await db.insert(appSettings).values({ key: ADDON_USERS_KEY, value }).onDuplicateKeyUpdate({ set: { value } });
+/** Add a user to the paid list; true if this call added them. Idempotent:
+    already listed → no write. The list is one shared row, so it is read under
+    a row lock — otherwise two grants at once (say, one user's webhook while
+    another user's verify runs) could each write back a list missing the
+    other's id. */
+async function grantAddon(db: ReturnType<typeof getDb>, userId: number): Promise<boolean> {
+  await db.insert(appSettings).ignore().values({ key: ADDON_USERS_KEY, value: "[]" }); // make sure the row exists to lock
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select({ value: appSettings.value }).from(appSettings)
+      .where(eq(appSettings.key, ADDON_USERS_KEY)).for("update");
+    const list = parseUserList(row?.value);
+    if (list.includes(userId)) return false;
+    list.push(userId);
+    await tx.update(appSettings).set({ value: JSON.stringify(list) }).where(eq(appSettings.key, ADDON_USERS_KEY));
+    return true;
+  });
+}
+
+/** Unlock the custom-domain add-on a paid Razorpay order was for. Shared by the
+    in-browser verify and the Razorpay webhook, so a tab closed after paying
+    still unlocks it; granting is idempotent, so the two together grant once.
+    The caller has already proven the payment genuine (checkout or webhook
+    signature). `gatewayOrder` is Razorpay's own copy of the order: it must be
+    this user's custom-domain order at the add-on price — a genuine signature
+    for some cheaper purchase doesn't unlock it. Throws a TRPCError otherwise. */
+export async function fulfilDomainAddonPayment(
+  db: ReturnType<typeof getDb>,
+  { userId, gatewayOrder }: { userId: number; razorpayOrderId: string; paymentId: string; gatewayOrder: RazorpayOrderFull },
+): Promise<{ granted: boolean }> {
+  const notes = gatewayOrder.notes || {};
+  if (String(notes.userId || "") !== String(userId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "This payment belongs to another account." });
+  }
+  if (notes.addon !== "custom_domain") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "This payment isn't for the custom domain add-on. Contact support with your payment ID." });
+  }
+  if (Number(gatewayOrder.amount) !== DOMAIN_ADDON_PRICE * 100) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "The paid amount doesn't match the add-on price. Contact support with your payment ID." });
+  }
+  return { granted: await grantAddon(db, userId) };
 }
 // Free custom domain = an active Platinum subscription bought on the 3-year term.
 async function freeDomainEligible(db: ReturnType<typeof getDb>, userId: number): Promise<boolean> {
@@ -204,7 +240,7 @@ export const domainRouter = createRouter({
   mine: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
     const access = await domainAccess(db, ctx.user.id, ctx.user.role);
-    const { keyId } = await razorpayCreds(db);
+    const cr = await resolveRazorpay(db);
     let domains: Awaited<ReturnType<typeof enrich>>[] = [];
     try {
       const rows = await db.select().from(customDomains).where(eq(customDomains.userId, ctx.user.id)).orderBy(desc(customDomains.createdAt));
@@ -214,27 +250,32 @@ export const domainRouter = createRouter({
     // their live domain is never hidden behind the add-on offer.
     return {
       eligible: access.eligible || domains.length > 0, freeEligible: access.free, addonPaid: access.paid,
-      addonPrice: DOMAIN_ADDON_PRICE, onlinePay: !!keyId,
+      addonPrice: DOMAIN_ADDON_PRICE, onlinePay: cr.enabled,
       cloudflare: cfEnabled(), cnameTarget: cfEnabled() ? cfFallbackTarget() : CNAME_TARGET, domains,
     };
   }),
 
   // Add-on checkout: free-eligible → grant immediately; else create a Razorpay
   // order (or signal manual/contact when online pay isn't configured yet).
+  // Same Razorpay account as every other checkout, so the payment webhook can
+  // confirm it too.
   addonCheckout: authedQuery.mutation(async ({ ctx }) => {
     const db = getDb();
     const access = await domainAccess(db, ctx.user.id, ctx.user.role);
     if (access.eligible) return { granted: true as const };
-    const { keyId, keySecret } = await razorpayCreds(db);
-    if (!keyId || !keySecret) return { manual: true as const, price: DOMAIN_ADDON_PRICE };
-    const res = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: "Basic " + Buffer.from(`${keyId}:${keySecret}`).toString("base64") },
-      body: JSON.stringify({ amount: DOMAIN_ADDON_PRICE * 100, currency: "INR", receipt: `domain_${ctx.user.id}_${Date.now()}`.slice(0, 40), notes: { userId: String(ctx.user.id), addon: "custom_domain" } }),
-    });
-    if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not start the payment. Please try again." });
-    const order = (await res.json()) as { id: string; amount: number };
-    return { orderId: order.id, amount: order.amount, currency: "INR", keyId };
+    const cr = await resolveRazorpay(db);
+    if (!cr.enabled) return { manual: true as const, price: DOMAIN_ADDON_PRICE };
+    let order;
+    try {
+      order = await createRazorpayOrder({
+        amount: DOMAIN_ADDON_PRICE * 100, currency: "INR",
+        receipt: `domain_${ctx.user.id}_${Date.now()}`.slice(0, 40),
+        notes: { userId: String(ctx.user.id), addon: "custom_domain" },
+      }, cr);
+    } catch {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not start the payment. Please try again." });
+    }
+    return { orderId: order.id, amount: order.amount, currency: "INR", keyId: cr.keyId };
   }),
 
   // Verify a completed Razorpay payment (HMAC of "orderId|paymentId") and grant.
@@ -242,11 +283,19 @@ export const domainRouter = createRouter({
     .input(z.object({ orderId: z.string().min(1), paymentId: z.string().min(1), signature: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      const { keySecret } = await razorpayCreds(db);
-      if (!keySecret) throw new TRPCError({ code: "BAD_REQUEST", message: "Online payment isn't configured." });
-      const expected = crypto.createHmac("sha256", keySecret).update(`${input.orderId}|${input.paymentId}`).digest("hex");
-      if (expected !== input.signature) throw new TRPCError({ code: "BAD_REQUEST", message: "Payment could not be verified." });
-      await grantAddon(db, ctx.user.id);
+      const cr = await resolveRazorpay(db);
+      if (!cr.keySecret) throw new TRPCError({ code: "BAD_REQUEST", message: "Online payment isn't configured." });
+      const ok = verifyRazorpaySignature({ orderId: input.orderId, paymentId: input.paymentId, signature: input.signature }, cr.keySecret);
+      if (!ok) throw new TRPCError({ code: "BAD_REQUEST", message: "Payment could not be verified." });
+      // The signature proves a payment is real, not what it paid for — the
+      // gateway's order says that.
+      let order;
+      try {
+        order = await fetchRazorpayOrder(input.orderId, cr);
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not confirm this payment with the gateway. If you were charged, contact support." });
+      }
+      await fulfilDomainAddonPayment(db, { userId: ctx.user.id, razorpayOrderId: input.orderId, paymentId: input.paymentId, gatewayOrder: order });
       return { ok: true };
     }),
 
