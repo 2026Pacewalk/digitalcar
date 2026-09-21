@@ -45,6 +45,7 @@ const CustomDomain = lazy(() => import("./pages/public/CustomDomain"));
 const Contact = lazy(() => import("./pages/public/Contact"));
 const Privacy = lazy(() => import("./pages/public/Privacy"));
 const RefundPolicy = lazy(() => import("./pages/public/RefundPolicy"));
+const ShippingPolicy = lazy(() => import("./pages/public/ShippingPolicy"));
 const TermsOfService = lazy(() => import("./pages/public/TermsOfService"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminResellers = lazy(() => import("./pages/admin/Resellers"));
@@ -243,6 +244,7 @@ export default function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/refund-policy" element={<RefundPolicy />} />
+          <Route path="/shipping-policy" element={<ShippingPolicy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/sitemap" element={<PublicSitemap />} />
           <Route path="/blog" element={<Blog />} />

@@ -1250,7 +1250,7 @@ app.get("/sitemap.xml", async (c) => {
     // Free tools — canonical URLs only; each has an alias route that deliberately
     // stays out of the sitemap so the two never compete for the same terms.
     "/free-tools", "/email-signature-generator", "/whatsapp-message-templates", "/instagram-bio-templates",
-    "/privacy", "/refund-policy", "/terms-of-service", "/sitemap", "/blog", "/about",
+    "/privacy", "/refund-policy", "/shipping-policy", "/terms-of-service", "/sitemap", "/blog", "/about",
     // Long-form SEO surface added Sept 2026:
     // - the pillar guide for the "digital business card" topic
     // - one page per Tier 1/2 Indian city (data lives in src/data/cities.ts)

@@ -165,7 +165,7 @@ const SSR_PATHS = new Set([
   "/free-tools", "/email-signature-generator", "/email-signature-templates",
   "/whatsapp-message-templates", "/whatsapp-business-messages", "/instagram-bio-templates",
   "/digital-business-cards-templates",
-  "/privacy", "/refund-policy", "/terms-of-service", "/sitemap",
+  "/privacy", "/refund-policy", "/shipping-policy", "/terms-of-service", "/sitemap",
   "/blog", "/about",
   // Long-form SEO pages added Sept 2026 — the pillar guide and the /vs/*
   // comparison pages ship as static content, so SSR gives them crawler-visible

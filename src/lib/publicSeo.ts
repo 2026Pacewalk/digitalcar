@@ -151,6 +151,11 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
     description: "Review our refund policy for subscription plans and digital card services.",
     crumb: "Refund Policy",
   },
+  "/shipping-policy": {
+    title: "Shipping & Delivery Policy - DigitalCarda",
+    description: "How DigitalCarda plans are delivered online, and how NFC cards and standees are shipped free within India in 3–7 working days.",
+    crumb: "Shipping & Delivery",
+  },
   "/free-tools": SEO_FREE_TOOLS,
   "/email-signature-generator": SEO_EMAIL_SIGNATURE,
   "/email-signature-templates": { ...SEO_EMAIL_SIGNATURE, canonicalPath: "/email-signature-generator" },

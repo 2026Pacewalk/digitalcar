@@ -4,19 +4,19 @@ import { Link } from "react-router";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight, ArrowUp, CalendarDays, Check, ChevronDown, Clock, FileText, Link2, Mail, MessageCircle,
-  Phone, Printer, ReceiptIndianRupee, Scale, ShieldCheck,
+  Phone, Printer, ReceiptIndianRupee, Scale, ShieldCheck, Truck,
 } from "lucide-react";
 import { CONTACT } from "@/lib/publicNav";
 
-/* Shared shell for the three legal pages (/privacy, /terms-of-service,
-   /refund-policy): a navy hero with a policy switcher, "in short" highlights,
+/* Shared shell for the legal pages (/privacy, /terms-of-service,
+   /refund-policy, /shipping-policy): a navy hero with a policy switcher, "in short" highlights,
    a sticky table of contents with scroll-spy, numbered clause cards and
    links across to the other two policies.
 
    The clause wording itself lives in each page and is kept as published —
    this layout only changes how it is presented. */
 
-export type LegalKey = "privacy" | "terms" | "refund";
+export type LegalKey = "privacy" | "terms" | "refund" | "shipping";
 
 export type LegalSection = { id: string; title: string; icon: LucideIcon; body: ReactNode };
 export type LegalHighlight = { icon: LucideIcon; title: string; text: string };
@@ -25,9 +25,10 @@ export const POLICIES: Record<LegalKey, { label: string; short: string; href: st
   privacy: { label: "Privacy Policy", short: "Privacy", href: "/privacy", icon: ShieldCheck, blurb: "What we collect, why, and the rights you have over your data.", tint: "#14B8A6" },
   terms: { label: "Terms & Conditions", short: "Terms", href: "/terms-of-service", icon: Scale, blurb: "The rules for using DigitalCarda, your account and your content.", tint: "#6366F1" },
   refund: { label: "Refund Policy", short: "Refunds", href: "/refund-policy", icon: ReceiptIndianRupee, blurb: "The free trial, the 7-day money-back window and how to ask.", tint: "#F7B31C" },
+  shipping: { label: "Shipping & Delivery", short: "Shipping", href: "/shipping-policy", icon: Truck, blurb: "How plans are delivered online and NFC products ship within India.", tint: "#0EA5E9" },
 };
 
-const ORDER: LegalKey[] = ["privacy", "terms", "refund"];
+const ORDER: LegalKey[] = ["privacy", "terms", "refund", "shipping"];
 
 /** Inline link used inside clause text. */
 export function LegalLink({ to, children }: { to: string; children: ReactNode }) {
@@ -163,7 +164,7 @@ export default function LegalLayout({ current, updated, readMinutes, intro, high
             </button>
           </div>
 
-          {/* Policy switcher — the three policies are one set */}
+          {/* Policy switcher — the policies are one set */}
           <nav aria-label="Legal policies" className="dc-enter dc-enter-3 mt-8 print:hidden">
             <div className="inline-flex max-w-full overflow-x-auto scrollbar-none rounded-2xl bg-white/[0.06] border border-white/10 p-1 gap-1">
               {ORDER.map((k) => {

@@ -78,6 +78,7 @@ export const LEGAL_LINKS: NavLink[] = [
   { label: "Privacy policy", href: "/privacy" },
   { label: "Terms & conditions", href: "/terms-of-service" },
   { label: "Refund policy", href: "/refund-policy" },
+  { label: "Shipping policy", href: "/shipping-policy" },
 ];
 
 export const FOOTER_GROUPS: NavGroup[] = [PRODUCT, FREE_TOOLS, BUSINESS, COMPANY];
