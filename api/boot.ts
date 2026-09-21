@@ -7,6 +7,7 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
 import { verifyToken } from "./lib/jwt";
+import { clientIp } from "./lib/rate-limit";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -47,12 +48,12 @@ app.use("/api/trpc/*", async (c) => {
 // ── Lightweight in-memory rate limiter (per client IP + bucket) ───────
 // Single-process (PM2) guard for the public write endpoints — blunts abuse
 // without adding a dependency or external store. Fails OPEN on any error so
-// it can never take the site down. Behind Cloudflare/nginx we trust the
-// forwarded client IP headers.
+// it can never take the site down. The IP comes from clientIp(), which only
+// trusts headers our own proxies wrote.
 const rlBuckets = new Map<string, { count: number; resetAt: number }>();
 let rlLastSweep = Date.now();
 function rateLimit(
-  c: { req: { header: (k: string) => string | undefined } },
+  c: { req: { raw: Request } },
   bucket: string,
   limit: number,
   windowMs: number,
@@ -63,12 +64,7 @@ function rateLimit(
       rlLastSweep = now;
       for (const [k, v] of rlBuckets) if (now > v.resetAt) rlBuckets.delete(k);
     }
-    const ip =
-      c.req.header("cf-connecting-ip") ||
-      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-      c.req.header("x-real-ip") ||
-      "unknown";
-    const key = bucket + ":" + ip;
+    const key = bucket + ":" + clientIp(c.req.raw);
     const b = rlBuckets.get(key);
     if (!b || now > b.resetAt) {
       rlBuckets.set(key, { count: 1, resetAt: now + windowMs });

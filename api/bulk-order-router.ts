@@ -72,9 +72,7 @@ export const bulkOrderRouter = createRouter({
       }
       // Public, and it emails the address typed in, so cap how often one
       // visitor can submit. Far above what a real buyer ever needs.
-      // Cloudflare's own header first: the leftmost X-Forwarded-For entry that
-      // clientIp() reads can be typed by the visitor.
-      enforceRateLimit(`bulk-order:${ctx.req.headers.get("cf-connecting-ip") || clientIp(ctx.req)}`, 5, 10 * 60_000);
+      enforceRateLimit(`bulk-order:${clientIp(ctx.req)}`, 5, 10 * 60_000);
       const db = getDb();
       const userId = (ctx.user?.id as number | undefined) ?? null;
       const [saved] = await db.insert(bulkOrderRequests).values({
