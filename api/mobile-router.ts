@@ -222,7 +222,7 @@ export const mobileRouter = createRouter({
     .input(z.object({ password: z.string().min(1).max(200), reason: z.string().trim().max(500).optional() }))
     .mutation(async ({ ctx, input }) => {
       enforceRateLimit(`app-delete:${ctx.user.id}`, 5, 15 * 60_000);
-      if (ctx.user.role === "super_admin") {
+      if (ctx.user.role === "super_admin" || ctx.user.role === "staff") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin accounts can't be deleted from the app." });
       }
       if (!(await bcrypt.compare(input.password, ctx.user.password))) {

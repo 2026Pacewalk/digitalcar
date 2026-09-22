@@ -11,7 +11,11 @@ import { clientIp } from "./lib/rate-limit";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
-async function requireSuperAdmin(c: { req: { header: (k: string) => string | undefined } }) {
+async function requireSuperAdmin(
+  c: { req: { header: (k: string) => string | undefined } },
+  // Staff may reach these with the matching module (Customers / Leads) at this level.
+  staffNeeds?: { module: "customers" | "leads"; level: "view" | "manage" },
+) {
   const token = c.req.header("x-auth-token") || c.req.header("authorization")?.replace("Bearer ", "");
   const payload = token ? await verifyToken(token) : null;
   if (!payload) return null;
@@ -21,8 +25,13 @@ async function requireSuperAdmin(c: { req: { header: (k: string) => string | und
   const { getDb } = await import("./queries/connection");
   const { users } = await import("@db/schema");
   const { eq } = await import("drizzle-orm");
-  const row = await getDb().select({ role: users.role }).from(users).where(eq(users.id, payload.userId));
-  return row[0]?.role === "super_admin" ? payload : null;
+  const row = await getDb().select({ role: users.role, status: users.status }).from(users).where(eq(users.id, payload.userId));
+  if (row[0]?.role === "super_admin") return payload;
+  if (row[0]?.role === "staff" && row[0].status === "active" && staffNeeds) {
+    const { staffAccessFor, staffMayUse } = await import("./lib/staff-access");
+    if (staffMayUse(await staffAccessFor(payload.userId), staffNeeds.module, staffNeeds.level)) return payload;
+  }
+  return null;
 }
 
 // Local development only: the mobile app's web preview (Expo on localhost)
@@ -917,7 +926,8 @@ async function websiteEnquiries(): Promise<Record<string, unknown>[]> {
 app.get("/api/admin/data/:file", async (c) => {
   const file = c.req.param("file");
   if (!SENSITIVE.has(file)) return c.json({ error: "Not found" }, 404);
-  if (!(await requireSuperAdmin(c))) return c.json({ error: "Unauthorized" }, 401);
+  const staffModule = file === "customers" ? "customers" : file === "enquiries" ? "leads" : undefined;
+  if (!(await requireSuperAdmin(c, staffModule ? { module: staffModule, level: "view" } : undefined))) return c.json({ error: "Unauthorized" }, 401);
   let data = await readPublicJson(file);
   if (file === "enquiries" && Array.isArray(data)) data = [...(await websiteEnquiries()), ...data];
   if ((file === "enquiries" || file === "customers") && Array.isArray(data)) {
@@ -929,11 +939,12 @@ app.get("/api/admin/data/:file", async (c) => {
 
 // Super-admin: persist a delete by hiding record ids from the JSON overlay.
 app.post("/api/admin/hide", async (c) => {
-  if (!(await requireSuperAdmin(c))) return c.json({ error: "Unauthorized" }, 401);
   try {
     const body = await c.req.json<{ file?: string; ids?: (string | number)[] }>();
     const file = String(body.file || "");
     if (file !== "enquiries" && file !== "customers") return c.json({ error: "Invalid file" }, 400);
+    const actor = await requireSuperAdmin(c, { module: file === "customers" ? "customers" : "leads", level: "manage" });
+    if (!actor) return c.json({ error: "Unauthorized" }, 401);
     const ids = (Array.isArray(body.ids) ? body.ids : []).map(String).filter(Boolean);
     if (!ids.length) return c.json({ ok: true, hidden: 0 });
     const total = await addHiddenIds(file, ids);

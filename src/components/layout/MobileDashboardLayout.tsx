@@ -17,7 +17,8 @@ import ProfileMenu from "@/components/ProfileMenu";
 import NotificationBell from "@/components/NotificationBell";
 import AppSheet from "@/components/mobile/AppSheet";
 import { InstallAppBanner, InstallAppRow } from "@/components/mobile/InstallApp";
-import { customerGroups, superAdminGroups, resellerGroups, type NavGroup, type NavLink } from "@/components/layout/Sidebar";
+import { customerGroups, superAdminGroups, resellerGroups, staffGroups, type NavGroup, type NavLink } from "@/components/layout/Sidebar";
+import { useStaffAccess } from "@/hooks/useStaffAccess";
 
 /* ─── Phone shell for the customer, reseller and admin dashboards ───────────
  * Built like a native app: an app bar (back / title / actions), a bottom tab
@@ -158,6 +159,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/payment-orders": "Payment Orders",
   "/admin/settings": "Settings",
   "/admin/profile": "Profile",
+  "/admin/staff": "Staff & Access",
+  "/admin/activity": "Activity Log",
   // Reseller
   "/reseller": "Dashboard",
   "/reseller/customers": "My Customers",
@@ -270,7 +273,11 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
   useEdgeToEdge();
 
   const role = user?.role || "customer";
-  const cfg = NAV[role] || NAV.customer;
+  const access = useStaffAccess();
+  // Staff: the admin shell with only the tabs and menu entries they may open.
+  const cfg: NavConfig = role === "staff"
+    ? { ...NAV.super_admin, home: access.home, tabs: NAV.super_admin.tabs.filter((t) => access.canOpenPath(t.path)), groups: staffGroups(access.canOpenPath) }
+    : NAV[role] || NAV.customer;
   const theme = roleTheme(role);
   const path = location.pathname;
 

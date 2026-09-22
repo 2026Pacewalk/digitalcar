@@ -44,6 +44,22 @@ const ADMIN: RoleTheme = {
   topAccent: "border-[#F43F5E]",
 };
 
+// Staff use the admin console with only the modules they were given — indigo,
+// so a team member (and anyone looking over their shoulder) never mistakes it
+// for the super admin's console.
+const STAFF: RoleTheme = {
+  brandName: "Team Console",
+  badge: "STAFF",
+  Icon: Shield,
+  iconColor: "text-white",
+  brandGrad: "bg-gradient-to-br from-[#6366F1] to-[#4338CA]",
+  toggleBg: "bg-[#6366F1]",
+  activeNav: "bg-[#6366F1]/12 text-[#A5B4FC] border-l-2 border-[#6366F1]",
+  activeIcon: "text-[#A5B4FC]",
+  badgeCls: "bg-[#6366F1] text-white",
+  topAccent: "border-[#6366F1]",
+};
+
 const RESELLER: RoleTheme = {
   brandName: "Reseller",
   badge: "RESELLER",
@@ -59,6 +75,7 @@ const RESELLER: RoleTheme = {
 
 export function roleTheme(role?: string): RoleTheme {
   if (role === "super_admin") return ADMIN;
+  if (role === "staff") return STAFF;
   if (role === "reseller") return RESELLER;
   return CUSTOMER;
 }

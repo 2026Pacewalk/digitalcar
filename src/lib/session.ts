@@ -31,7 +31,7 @@ export function currentSlot(): Slot {
 
 /** The portal a given role signs into. */
 export function slotForRole(role: string): Slot {
-  return role === "super_admin" ? "admin" : "main";
+  return role === "super_admin" || role === "staff" ? "admin" : "main";
 }
 
 export function getToken(slot: Slot = currentSlot()): string {

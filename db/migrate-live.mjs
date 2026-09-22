@@ -105,6 +105,24 @@ const TABLES = {
     user_id BIGINT UNSIGNED NOT NULL, razorpay_payment_id VARCHAR(64) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX rzp_fulfil_user_idx (user_id))`,
+  /* Staff accounts: the admin modules each one may use. */
+  staff_access: `CREATE TABLE IF NOT EXISTS staff_access (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id BIGINT UNSIGNED NOT NULL,
+    job_title VARCHAR(120) NULL, permissions JSON NOT NULL,
+    can_impersonate BOOLEAN NOT NULL DEFAULT FALSE, created_by BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY staff_access_user_unique (user_id))`,
+  /* Who did what in the admin portal (changes, sign-ins, visits, refusals). */
+  admin_activity: `CREATE TABLE IF NOT EXISTS admin_activity (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, actor_id BIGINT UNSIGNED NULL,
+    actor_name VARCHAR(255) NOT NULL, actor_role VARCHAR(20) NOT NULL,
+    module VARCHAR(40) NULL, action VARCHAR(80) NOT NULL, summary VARCHAR(300) NULL,
+    target VARCHAR(191) NULL, status ENUM('ok','denied','error') NOT NULL DEFAULT 'ok',
+    error VARCHAR(300) NULL, ip VARCHAR(64) NULL, user_agent VARCHAR(255) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX admact_created_idx (created_at), INDEX admact_actor_idx (actor_id, created_at),
+    INDEX admact_module_idx (module, created_at), INDEX admact_status_idx (status))`,
   ai_generations: `CREATE TABLE IF NOT EXISTS ai_generations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, business_name VARCHAR(120) NULL, profession VARCHAR(80) NULL,
     city VARCHAR(80) NULL, phone VARCHAR(30) NULL, source VARCHAR(16) NULL, ip VARCHAR(64) NULL,
@@ -116,6 +134,11 @@ for (const [name, sql] of Object.entries(TABLES)) {
   await conn.query(sql);
   log(`✓ table ${name}`);
 }
+
+// Staff accounts: widen users.role to include 'staff'. Idempotent (the same
+// definition again is a no-op) and existing rows keep their role.
+await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin','reseller','customer','staff') NOT NULL DEFAULT 'customer'");
+log("✓ users.role accepts 'staff'");
 
 // Relax leads.card_id to NULL (snapshot cards have no DB card row). Guarded.
 const [col] = await conn.query(

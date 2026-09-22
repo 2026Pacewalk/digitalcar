@@ -2,13 +2,14 @@ import { Link, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
 import { trpc } from "@/providers/trpc";
+import { useStaffAccess } from "@/hooks/useStaffAccess";
 import {
   LayoutDashboard, Palette, Users, UserCircle, Package,
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
   ChevronRight, Store, X, ReceiptText,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
   Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe, MailCheck, MailSearch, PenLine,
-  MessageCircle, Nfc, TicketPercent, Megaphone, BookOpenCheck, Wrench, Instagram, UserX,
+  MessageCircle, Nfc, TicketPercent, Megaphone, BookOpenCheck, Wrench, Instagram, UserX, UserCog, History,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -88,6 +89,10 @@ export const superAdminGroups: NavGroup[] = [
     { label: "Coupons", icon: TicketPercent, path: "/admin/coupons" },
     { label: "Offer Popups", icon: Megaphone, path: "/admin/announcements" },
   ] },
+  { title: "Team", items: [
+    { label: "Staff & Access", icon: UserCog, path: "/admin/staff" },
+    { label: "Activity Log", icon: History, path: "/admin/activity" },
+  ] },
   { title: "System", items: [
     { label: "URL Conflicts", icon: Link2, path: "/admin/url-conflicts" },
     { label: "Custom Domains", icon: Globe, path: "/admin/domains" },
@@ -106,16 +111,27 @@ export const resellerGroups: NavGroup[] = [
   ] },
 ];
 
+/** The admin menu with only the pages this staff member may open. */
+export function staffGroups(canOpenPath: (path: string) => boolean): NavGroup[] {
+  return superAdminGroups
+    .map((g) => ({ ...g, items: g.items.filter((i) => canOpenPath(i.path)) }))
+    .filter((g) => g.items.length > 0);
+}
+
 export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggle }: SidebarProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
 
   const role = user?.role || "customer";
-  const groups = role === "super_admin" ? superAdminGroups : role === "reseller" ? resellerGroups : customerGroups;
+  // Staff see the admin menu trimmed to the modules they were given.
+  const access = useStaffAccess();
+  const groups = role === "super_admin" ? superAdminGroups
+    : role === "staff" ? staffGroups(access.canOpenPath)
+    : role === "reseller" ? resellerGroups : customerGroups;
   const theme = roleTheme(role);
   // Live count of new bulk-order requests → badge on the admin "Bulk Orders" item.
   const { data: bulkNew } = trpc.bulkOrder.newCount.useQuery(undefined, {
-    enabled: role === "super_admin", retry: false, refetchInterval: 60_000,
+    enabled: role === "super_admin" || (role === "staff" && access.can("orders")), retry: false, refetchInterval: 60_000,
   });
   const badgeFor = (path: string): number => (path === "/admin/bulk-orders" ? (bulkNew?.count ?? 0) : 0);
   const BrandIcon = theme.Icon;

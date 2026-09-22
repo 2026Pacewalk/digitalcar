@@ -11,9 +11,9 @@ export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
 
   const role = user?.role || "customer";
-  const base = role === "super_admin" ? "/admin" : role === "reseller" ? "/reseller" : "/dashboard";
+  const base = role === "super_admin" || role === "staff" ? "/admin" : role === "reseller" ? "/reseller" : "/dashboard";
   const profile = `${base}/profile`;
-  const settings = role === "reseller" ? profile : `${base}/settings`;
+  const settings = role === "reseller" || role === "staff" ? profile : `${base}/settings`;
   const initial = (user?.fullName || "U").charAt(0).toUpperCase();
 
   // A super-admin using "Login as Client" keeps their admin session in the admin
@@ -23,7 +23,7 @@ export default function ProfileMenu() {
 
   const items = [
     { icon: User, label: "My Profile", path: profile },
-    ...(role !== "reseller" ? [{ icon: Settings, label: "Account Settings", path: settings }] : []),
+    ...(role !== "reseller" && role !== "staff" ? [{ icon: Settings, label: "Account Settings", path: settings }] : []),
     ...(role === "customer" ? [{ icon: KeyRound, label: "Change Password", path: "/dashboard/settings?tab=password" }] : []),
     { icon: HelpCircle, label: "Help & Support", path: settings },
   ];

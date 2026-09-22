@@ -22,7 +22,9 @@ export const users = mysqlTable("users", {
   fullName: varchar("full_name", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 50 }),
   avatar: varchar("avatar", { length: 500 }),
-  role: mysqlEnum("role", ["super_admin", "reseller", "customer"]).notNull().default("customer"),
+  // "staff" = a team member in the admin portal with only the modules the
+  // super admin granted them (see staff_access).
+  role: mysqlEnum("role", ["super_admin", "reseller", "customer", "staff"]).notNull().default("customer"),
   status: mysqlEnum("status", ["active", "inactive", "suspended"]).notNull().default("active"),
   // Email verification. Defaults true so migrated/existing accounts aren't
   // disrupted; new signups are inserted with false and get a verification email.
@@ -1005,3 +1007,49 @@ export const appWebLinks = mysqlTable("app_web_links", {
 ]);
 
 export type AccountDeletionRequest = typeof accountDeletionRequests.$inferSelect;
+
+// ─── Staff: which admin modules a team member may use ───────────
+// One row per staff account. permissions maps a module key (contracts/staff.ts)
+// to "view" or "manage"; a missing key means no access.
+export const staffAccess = mysqlTable("staff_access", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  jobTitle: varchar("job_title", { length: 120 }),
+  permissions: json("permissions").notNull(),
+  canImpersonate: boolean("can_impersonate").notNull().default(false),
+  createdBy: bigint("created_by", { mode: "number", unsigned: true }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  uniqueIndex("staff_access_user_unique").on(table.userId),
+]);
+
+export type StaffAccess = typeof staffAccess.$inferSelect;
+
+// ─── Admin activity: what happened in the admin portal, and who did it ───
+// Every change made by staff or the super admin, every staff sign-in, page
+// visit and refused attempt. The actor's name is copied in so the history
+// still reads correctly after a staff account is removed. Inputs are stored
+// only as a short, redacted summary — never passwords, tokens or images.
+export const adminActivity = mysqlTable("admin_activity", {
+  id: serial("id").primaryKey(),
+  actorId: bigint("actor_id", { mode: "number", unsigned: true }),
+  actorName: varchar("actor_name", { length: 255 }).notNull(),
+  actorRole: varchar("actor_role", { length: 20 }).notNull(),
+  module: varchar("module", { length: 40 }),
+  action: varchar("action", { length: 80 }).notNull(),
+  summary: varchar("summary", { length: 300 }),
+  target: varchar("target", { length: 191 }),
+  status: mysqlEnum("status", ["ok", "denied", "error"]).notNull().default("ok"),
+  error: varchar("error", { length: 300 }),
+  ip: varchar("ip", { length: 64 }),
+  userAgent: varchar("user_agent", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("admact_created_idx").on(table.createdAt),
+  index("admact_actor_idx").on(table.actorId, table.createdAt),
+  index("admact_module_idx").on(table.module, table.createdAt),
+  index("admact_status_idx").on(table.status),
+]);
+
+export type AdminActivity = typeof adminActivity.$inferSelect;

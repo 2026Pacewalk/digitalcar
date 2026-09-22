@@ -72,7 +72,7 @@ export default function CustomerProfile() {
 
   // A real admin/reseller has no public card — bounce them to their own profile
   // rather than showing the customer card-builder view (card link, edit card, etc.).
-  if (role === "super_admin") return <Navigate to="/admin/profile" replace />;
+  if (role === "super_admin" || role === "staff") return <Navigate to="/admin/profile" replace />;
   if (role === "reseller") return <Navigate to="/reseller/profile" replace />;
 
   return (

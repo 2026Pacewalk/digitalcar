@@ -1,10 +1,19 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Routes, Route, Navigate, useParams } from "react-router";
+import { Routes, Route, Navigate, useParams, useLocation, Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 import { getToken, getSessionUser, setSessionUser, clearSession } from "@/lib/session";
 import PublicLayout from "@/components/layout/PublicLayout";
 import { isStandalone } from "@/lib/nativeApp";
+import { useStaffAccess } from "@/hooks/useStaffAccess";
+import { moduleForAdminPath, moduleLabel } from "@contracts/staff";
+import { superAdminGroups } from "@/components/layout/Sidebar";
+
+/** The name an admin page has in the menu, for the activity log. */
+function adminPageName(pathname: string): string {
+  for (const g of superAdminGroups) for (const i of g.items) if (i.path === pathname) return i.label;
+  return pathname === "/admin/profile" ? "My Profile" : moduleLabel(moduleForAdminPath(pathname)) || pathname;
+}
 const CustomDomainCard = lazy(() => import("@/components/CustomDomainCard"));
 
 // Hosts that are the DigitalCarda app itself (never treated as a custom card domain).
@@ -70,6 +79,8 @@ const AdminReferrals = lazy(() => import("./pages/admin/Referrals"));
 const AdminPaymentOrders = lazy(() => import("./pages/admin/PaymentOrders"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const AdminProfile = lazy(() => import("./pages/admin/Profile"));
+const AdminStaff = lazy(() => import("./pages/admin/Staff"));
+const AdminActivity = lazy(() => import("./pages/admin/Activity"));
 const ResellerDashboard = lazy(() => import("./pages/reseller/Dashboard"));
 const ResellerCustomers = lazy(() => import("./pages/reseller/Customers"));
 const ResellerPaymentOrders = lazy(() => import("./pages/reseller/PaymentOrders"));
@@ -172,12 +183,62 @@ function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allo
 
   // Prefer the server-verified role for the access decision.
   const role = me.data?.role ?? user.role;
+  // Staff work only inside the admin portal, limited to the modules they were given.
+  if (role === "staff") {
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) return <StaffGate>{children}</StaffGate>;
+    return <Navigate to="/admin" replace />;
+  }
   if (!allowedRoles.includes(role)) {
     if (role === "super_admin") return <Navigate to="/admin" replace />;
     if (role === "reseller") return <Navigate to="/reseller" replace />;
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
+}
+
+/* A staff member on an admin page: open it only if their access includes its
+   module, note the visit in the activity log, and say so when it's view-only.
+   The server enforces the same rules on every request. */
+function StaffGate({ children }: { children: React.ReactNode }) {
+  const access = useStaffAccess();
+  const { pathname } = useLocation();
+  const track = trpc.staff.trackPage.useMutation();
+  const allowed = access.canOpenPath(pathname);
+  const module = moduleForAdminPath(pathname);
+  useEffect(() => {
+    if (access.loading || !allowed) return;
+    const t = window.setTimeout(() => track.mutate({ path: pathname, title: adminPageName(pathname).slice(0, 80) }), 800);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, access.loading, allowed]);
+
+  if (access.loading) return <Spinner />;
+  if (!allowed) {
+    if (pathname === "/admin" || pathname === "/admin/") return <Navigate to={access.home} replace />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4">
+        <div className="max-w-sm w-full bg-white rounded-2xl border border-[#E2E8F0] p-6 text-center shadow-sm">
+          <div className="mx-auto w-12 h-12 rounded-2xl bg-[#EEF2FF] text-[#4338CA] flex items-center justify-center text-xl font-bold">!</div>
+          <h1 className="mt-4 text-lg font-bold text-[#0F172A]">You don't have access to this page</h1>
+          <p className="mt-2 text-sm text-[#64748B]">
+            {module ? <>Ask the super admin to give you access to <b className="text-[#0F172A]">{moduleLabel(module)}</b>.</> : "This page is only for the super admin."}
+          </p>
+          <Link to={access.home} className="mt-5 inline-flex h-10 items-center justify-center rounded-xl bg-[#4338CA] px-5 text-sm font-semibold text-white">Go to my pages</Link>
+        </div>
+      </div>
+    );
+  }
+  const viewOnly = !!module && !access.can(module, "manage");
+  return (
+    <>
+      {children}
+      {viewOnly && (
+        <div role="status" className="pointer-events-none fixed z-40 left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom,0px)+76px)] md:bottom-5 rounded-full bg-[#312E81] px-4 py-2 text-[12.5px] font-semibold text-white shadow-lg">
+          View only — you can look, but changes are turned off for you here
+        </div>
+      )}
+    </>
+  );
 }
 
 /* Old product URL /digital-business-cards/:slug → new /digital-business-cards-templates/:slug */
@@ -296,6 +357,8 @@ export default function App() {
         <Route path="/admin/payment-orders" element={<RoleRoute allowedRoles={["super_admin"]}><AdminPaymentOrders /></RoleRoute>} />
         <Route path="/admin/settings" element={<RoleRoute allowedRoles={["super_admin"]}><AdminSettings /></RoleRoute>} />
         <Route path="/admin/profile" element={<RoleRoute allowedRoles={["super_admin"]}><AdminProfile /></RoleRoute>} />
+        <Route path="/admin/staff" element={<RoleRoute allowedRoles={["super_admin"]}><AdminStaff /></RoleRoute>} />
+        <Route path="/admin/activity" element={<RoleRoute allowedRoles={["super_admin"]}><AdminActivity /></RoleRoute>} />
 
         {/* Reseller */}
         <Route path="/reseller" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerDashboard /></RoleRoute>} />

@@ -134,7 +134,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
   }, []);
 
   const routeFor = (role: string) => {
-    if (role === "super_admin") return "/admin";
+    if (role === "super_admin" || role === "staff") return "/admin";
     if (role === "reseller") return "/reseller";
     return "/dashboard";
   };
@@ -143,12 +143,12 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
   // URL is admins-only. Clears the just-set session and blocks navigation on a
   // mismatch. Returns true if the login may proceed.
   const gateOk = (role: string): boolean => {
-    if (!adminMode && role === "super_admin") {
+    if (!adminMode && (role === "super_admin" || role === "staff")) {
       clearSession("main");
       toast.error("Administrator accounts must sign in from the admin portal.");
       return false;
     }
-    if (adminMode && role !== "super_admin") {
+    if (adminMode && role !== "super_admin" && role !== "staff") {
       clearSession("admin");
       toast.error("This is the admin portal. Please use the main sign-in page.");
       setTimeout(() => navigate("/login"), 1400);

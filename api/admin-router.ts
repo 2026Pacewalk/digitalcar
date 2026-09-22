@@ -96,7 +96,7 @@ export async function mergedCustomerCount(db: ReturnType<typeof getDb>): Promise
   ]);
   const legacyEmails = new Set(rows.map((r) => String(r.email || "").toLowerCase().trim()).filter(Boolean));
   const legacyCount = rows.filter((r) => !hiddenCust.has(String((r as { id?: unknown }).id))).length;
-  const newFlow = dbUsers.filter((u) => u.role !== "super_admin" && !hiddenApp.has(Number(u.id)) && !legacyEmails.has(String(u.email).toLowerCase().trim())).length;
+  const newFlow = dbUsers.filter((u) => u.role !== "super_admin" && u.role !== "staff" && !hiddenApp.has(Number(u.id)) && !legacyEmails.has(String(u.email).toLowerCase().trim())).length;
   const superAdmins = dbUsers.filter((u) => u.role === "super_admin").length;
   const resellers = dbUsers.filter((u) => u.role === "reseller").length;
   return { total: legacyCount + newFlow, superAdmins, resellers };
@@ -140,7 +140,7 @@ export const adminRouter = createRouter({
     // email against the legacy list. Each row is wrapped so one bad record can
     // never throw and blank the whole list.
     return allUsers
-      .filter((u) => u.role !== "super_admin" && !hidden.has(Number(u.id)))
+      .filter((u) => u.role !== "super_admin" && u.role !== "staff" && !hidden.has(Number(u.id)))
       .map((u) => {
         try {
           const uid = Number(u.id);
@@ -214,7 +214,7 @@ export const adminRouter = createRouter({
         found: matches.length,
         accounts: matches.map((u) => {
           const inLegacy = legacyEmails.has(String(u.email).toLowerCase().trim());
-          const isSuper = u.role === "super_admin";
+          const isSuper = u.role === "super_admin" || u.role === "staff";
           return {
             id: Number(u.id), email: u.email, name: u.name, phone: u.phone, role: u.role, status: u.status,
             slug: slugBy.get(Number(u.id)) || null, createdAt: day(u.createdAt),

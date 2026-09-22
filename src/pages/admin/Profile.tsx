@@ -1,6 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { useAuth } from "@/hooks/useAuth";
+import { useStaffAccess } from "@/hooks/useStaffAccess";
 import { trpc } from "@/providers/trpc";
 import { getSessionUser, setSessionUser } from "@/lib/session";
 import { useEffect, useState } from "react";
@@ -19,6 +20,8 @@ const LOGIN_ACTIVITY = [
 
 export default function AdminProfile() {
   const { user, refetch } = useAuth();
+  const staffAccess = useStaffAccess();
+  const isStaffUser = user?.role === "staff";
   const [activeTab, setActiveTab] = useState("profile");
   const [showOldPass, setShowOldPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
@@ -84,7 +87,7 @@ export default function AdminProfile() {
 
   return (
     <ResponsiveDashboardLayout>
-      <div className="hidden md:block"><TopBar title="My Profile" subtitle="Super Admin profile and security settings" /></div>
+      <div className="hidden md:block"><TopBar title="My Profile" subtitle={isStaffUser ? "Your team account and password" : "Super Admin profile and security settings"} /></div>
       <div className="p-6">
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="lg:w-64 shrink-0">
@@ -113,8 +116,8 @@ export default function AdminProfile() {
                   <h2 className="text-lg font-bold text-[#0F172A]">{profile.fullName}</h2>
                   <p className="text-xs text-[#94A3B8] mt-0.5">{profile.email}</p>
                   <div className="flex items-center gap-3 mt-2 justify-center sm:justify-start">
-                    <span className="badge-green text-[10px] flex items-center gap-1"><ShieldCheck size={10} /> Super Admin</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#DBEAFE] text-[#1E40AF] font-medium">Full Access</span>
+                    <span className="badge-green text-[10px] flex items-center gap-1"><ShieldCheck size={10} /> {isStaffUser ? (staffAccess.jobTitle || "Staff") : "Super Admin"}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#DBEAFE] text-[#1E40AF] font-medium">{isStaffUser ? "Access set by the super admin" : "Full Access"}</span>
                   </div>
                 </div>
               </div>

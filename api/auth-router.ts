@@ -664,7 +664,7 @@ export const authRouter = createRouter({
       let cardSlug: string | null = null;
 
       if (user) {
-        if (user.role === "super_admin") {
+        if (user.role === "super_admin" || user.role === "staff") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Administrator accounts sign in with a password on the admin portal." });
         }
         // Same rule as password login: only an active account may sign in.
@@ -812,6 +812,10 @@ export const authRouter = createRouter({
         .update(users)
         .set({ lastLoginAt: new Date() })
         .where(eq(users.id, user.id));
+      if (user.role === "staff" || user.role === "super_admin") {
+        const { recordActivity } = await import("./lib/staff-access");
+        recordActivity({ actor: user, module: null, action: "Signed in", req: ctx.req });
+      }
 
       const token = await createToken({
         userId: user.id,
