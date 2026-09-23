@@ -15,6 +15,7 @@ import {
   emailChangedEmail, referralJoinedEmail,
 } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
+import { ipAllowed, loadSettings } from "./lib/app-settings";
 import { verifyGoogleIdToken } from "./lib/google-auth";
 import { TRIAL_COUPON_CODE, evaluateTrialCoupon, recordTrialRedemption } from "./lib/coupons";
 import { randomBytes } from "crypto";
@@ -737,9 +738,10 @@ export const authRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const ip = clientIp(ctx.req);
-      enforceRateLimit(`login:${ip}`, 8, 60_000);
+      const sec = (await loadSettings()).security;
+      enforceRateLimit(`login:${ip}`, sec.attemptsPerIp, 60_000);
       const idKey = String(input.email || "").toLowerCase().trim();
-      if (idKey) enforceRateLimit(`login-id:${idKey}`, 10, 300_000);
+      if (idKey) enforceRateLimit(`login-id:${idKey}`, sec.attemptsPerAccount, 300_000);
       const db = getDb();
 
       const user = await resolveLoginUser(db, input.email);
@@ -817,11 +819,15 @@ export const authRouter = createRouter({
         recordActivity({ actor: user, module: null, action: "Signed in", req: ctx.req });
       }
 
+      // The admin portal may be limited to office IPs. An empty list allows any.
+      if ((user.role === "super_admin" || user.role === "staff") && sec.adminIpAllowlist.length && !ipAllowed(ip, sec.adminIpAllowlist)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "The admin portal is limited to approved locations. Ask the super admin to add this network." });
+      }
       const token = await createToken({
         userId: user.id,
         email: user.email,
         role: user.role,
-      });
+      }, user.role === "super_admin" || user.role === "staff" ? { expiresIn: `${sec.adminSessionDays}d` } : {});
 
       return {
         user: {

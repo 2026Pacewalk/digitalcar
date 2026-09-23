@@ -91,12 +91,15 @@ function previewTransport(): Promise<Transporter | null> {
 import type { Email } from "./email-templates";
 import { leadNotificationEmail, hotLeadEmail, newLeadOwnerEmail } from "./email-templates";
 import { classifyLeadSmart } from "./lead-intel";
+import { alertEnabled, alertRecipients, settings } from "./app-settings";
 
 // The platform's own email — used as the default sender and the fallback address
 // for owner/admin alerts. Override per-environment with MAIL_FROM / LEAD_NOTIFY_TO.
 export const PLATFORM_EMAIL = "hello@digitalcarda.in";
 
-export const ownerAddress = () => process.env.LEAD_NOTIFY_TO || PLATFORM_EMAIL;
+/** Where the platform's own alerts go. Admin → Settings → Alerts wins; the
+    LEAD_NOTIFY_TO env value is the fallback for an untouched install. */
+export const ownerAddress = () => alertRecipients(process.env.LEAD_NOTIFY_TO || PLATFORM_EMAIL).join(", ");
 
 const addressOf = (v: string) => (v.match(/<([^>]+)>/)?.[1] || v).trim().toLowerCase();
 const domainOf = (v: string) => addressOf(v).split("@")[1] || "";
@@ -105,7 +108,9 @@ const domainOf = (v: string) => addressOf(v).split("@")[1] || "";
     front of it, so recipients see "DigitalCarda", not a raw mailbox. */
 export function mailFrom(): string {
   const raw = (process.env.MAIL_FROM || process.env.SMTP_USER || PLATFORM_EMAIL).trim();
-  return raw.includes("<") ? raw : `DigitalCarda <${raw}>`;
+  if (raw.includes("<")) return raw;
+  const name = (settings().email.fromName || settings().business.brandName || "DigitalCarda").trim();
+  return `${name} <${raw}>`;
 }
 
 /** A From address on one domain sent through another provider's SMTP is the
@@ -135,12 +140,19 @@ export async function sendEmail(to: string | undefined | null, email: Email, rep
       void logEmail(to, email, replyTo, "skipped", "Deleted account — no mailbox");
       return { ok: false, error: "Deleted account" };
     }
+    // Alerts the owner switched off in Admin → Settings → Alerts are not sent.
+    // Only the platform's own alerts can be switched off — never customer email.
+    if (!alertEnabled(email.kind)) {
+      void logEmail(to, email, replyTo, "skipped", "This alert is switched off in Settings → Alerts");
+      return { ok: false, error: "Alert switched off" };
+    }
     // Real SMTP when it is configured; outside production, a capture mailbox
     // rather than silently dropping the mail.
     const t = transport() ?? (process.env.NODE_ENV === "production" ? null : await previewTransport());
     if (!t) { void logEmail(to, email, replyTo, "skipped", "SMTP not configured"); return { ok: false, error: "SMTP not configured" }; }
     const from = mailFrom();
-    const info = await t.sendMail({ from, to, replyTo: replyTo || undefined, subject: email.subject, text: email.text, html: email.html });
+    const reply = replyTo || settings().email.replyTo || undefined;
+    const info = await t.sendMail({ from, to, replyTo: reply, subject: email.subject, text: email.text, html: email.html });
     const captured = mode === "preview";
     const preview = captured ? nodemailer.getTestMessageUrl(info) || null : null;
     console.log(`[mail] "${email.subject}" ${captured ? "captured for" : "sent to"} ${to}${preview ? ` — open it: ${preview}` : ""}`);

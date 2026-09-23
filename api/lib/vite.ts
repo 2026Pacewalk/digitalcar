@@ -10,6 +10,10 @@ import { ogSignature } from "./card-og";
 import { blogMeta, BLOG_POST_PATH } from "./blog-meta";
 import { industryMeta, INDUSTRY_PATH } from "./industry-meta";
 import { getIndustry } from "../../src/data/industries";
+import { loadSettings, publicSettings } from "./app-settings";
+
+/** Emptied when settings change, so the next page carries the new details. */
+export let clearHtmlCache: () => void = () => {};
 
 type App = Hono<{ Bindings: HttpBindings }>;
 const SITE = "https://digitalcarda.in";
@@ -276,12 +280,14 @@ export function serveStaticFiles(app: App) {
   // meta build + render work (origin TTFB drops from ~200ms to ~few ms). Bounded
   // and short-lived so content stays fresh.
   const htmlCache = new Map<string, { html: string; at: number }>();
+  clearHtmlCache = () => htmlCache.clear();
   const HTML_TTL = 5 * 60_000;
   const EDGE_CACHE = "public, max-age=0, s-maxage=120, stale-while-revalidate=600";
 
   // Serve index.html with per-page OG/meta + JSON-LD injected (marketing pages,
   // cards, products), and the page itself rendered for the public routes above.
   const serveHtml = async (c: Context<{ Bindings: HttpBindings }>) => {
+    await loadSettings();
     const reqUrl = new URL(c.req.url);
     const pathname = reqUrl.pathname;
     const clean = pathname.replace(/\/+$/, "") || "/";
@@ -355,6 +361,10 @@ export function serveStaticFiles(app: App) {
         content = content.replace(/<div id="root">\s*<\/div>/, () =>
           `<div id="root" data-ssr="1">${ssr.html}</div>\n    <script type="application/json" id="__dc_rq">${ssr.state.replace(/</g, "\\u003c")}</script>`);
       }
+      // Contact details from Admin → Settings, read by src/lib/publicNav.ts.
+      const pub = JSON.stringify(publicSettings()).replace(/</g, "\u003c");
+      content = content.replace("</head>", () => `    <script>window.__dcSettings=${pub}</script>
+  </head>`);
     } catch { /* fall back to plain index.html */ }
     // Only cache real pages (meta matched); never cache arbitrary 404 paths.
     if (cacheable) {

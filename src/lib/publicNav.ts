@@ -16,12 +16,24 @@
 export type NavLink = { label: string; href: string; badge?: string; desc?: string };
 export type NavGroup = { title: string; links: NavLink[] };
 
+/* Contact details shown across the site. The server writes the current values
+   (Admin → Settings → Business) into the page as window.__dcSettings; these
+   literals are the fallback when it hasn't, e.g. the local dev server. */
+type PublicSettings = { brandName?: string; supportEmail?: string; supportPhone?: string; whatsappNumber?: string };
+const injected: PublicSettings =
+  (globalThis as unknown as { __dcSettings?: PublicSettings }).__dcSettings || {};
+
+const phone = injected.supportPhone || "+91 95177 22444";
+const whatsapp = injected.whatsappNumber || "919517722444";
+
 export const CONTACT = {
-  email: "hello@digitalcarda.in",
-  phone: "+91 95177 22444",
-  phoneHref: "tel:+919517722444",
-  whatsappHref: "https://wa.me/919517722444?text=Hi%20DigitalCarda",
+  email: injected.supportEmail || "hello@digitalcarda.in",
+  phone,
+  phoneHref: `tel:${phone.replace(/[^d+]/g, "")}`,
+  whatsappHref: `https://wa.me/${whatsapp}?text=Hi%20DigitalCarda`,
 };
+
+export const BRAND_NAME = injected.brandName || "DigitalCarda";
 
 /** Official profiles only. `icon` is a hosted brand mark (public/sig). Also
  *  feeds the Organization `sameAs` structured data in PublicLayout. */

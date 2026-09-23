@@ -1,59 +1,94 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
-import { sendEmail, smtpConfigured, ownerAddress, mailMode, mailFrom, fromAlignment } from "./lib/mail";
+import { sendEmail, smtpConfigured, ownerAddress, mailMode, mailFrom, fromAlignment, PLATFORM_EMAIL } from "./lib/mail";
 import { smtpTestEmail, marketingIntroEmail } from "./lib/email-templates";
+import { ipAllowed, loadSettings, publicSettings, saveSettings } from "./lib/app-settings";
+import { clientIp } from "./lib/rate-limit";
+import { ALERT_KINDS, isEmail, isIpOrCidr } from "@contracts/settings";
 
-const settingsStore: Record<string, Record<string, unknown>> = {
-  general: {
-    platformName: "DigitalCarda",
-    platformUrl: "https://digitalcarda.com",
-    supportEmail: "hello@digitalcarda.in",
-    defaultLanguage: "en",
-    defaultCurrency: "USD",
-    timezone: "UTC",
-    dateFormat: "MM/DD/YYYY",
-    maintenanceMode: false,
-  },
-  branding: {
-    primaryColor: "#D4AF37",
-    darkThemeColor: "#081828",
-    lightThemeColor: "#FFFFFF",
-    footerText: "Powered by DigitalCarda",
-  },
-  seo: {
-    metaTitle: "DigitalCarda - Create Your Digital Business Card",
-    metaDescription: "Create stunning digital business cards and smart microsites with DigitalCarda.",
-  },
-  ai: {
-    provider: "openai",
-    model: "gpt-4",
-    maxTokens: 500,
-    temperature: 0.7,
-    enabled: true,
-    creditCost: 1,
-  },
-};
+/* Platform settings. Every value here is read by something: the mailer, the
+   website's contact details, the sign-in limits, or new-customer defaults
+   (api/lib/app-settings.ts). SMTP credentials are NOT here — they stay in the
+   server's .env, and this page only reports their status. */
+
+const alertKeys = ALERT_KINDS.map((a) => a.key) as [string, ...string[]];
+
+const business = z.object({
+  brandName: z.string().trim().min(1).max(60),
+  supportEmail: z.string().trim().email().max(120),
+  supportPhone: z.string().trim().max(30),
+  whatsappNumber: z.string().trim().max(20).regex(/^[0-9]*$/, "Digits only, with the country code (e.g. 919517722444)"),
+  legalName: z.string().trim().max(120),
+  address: z.string().trim().max(300),
+  gstin: z.string().trim().max(20),
+});
+
+const alerts = z.object({
+  recipients: z.array(z.string().trim()).max(10),
+  enabled: z.record(z.enum(alertKeys), z.boolean()),
+});
+
+const email = z.object({
+  fromName: z.string().trim().max(60),
+  replyTo: z.union([z.string().trim().email().max(120), z.literal("")]),
+});
+
+const security = z.object({
+  attemptsPerIp: z.number().int().min(3).max(60),
+  attemptsPerAccount: z.number().int().min(3).max(60),
+  adminSessionDays: z.number().int().min(1).max(90),
+  adminIpAllowlist: z.array(z.string().trim()).max(20),
+});
 
 export const settingsRouter = createRouter({
-  get: adminQuery
-    .input(z.object({ section: z.string() }))
-    .query(({ input }) => {
-      return settingsStore[input.section] || {};
-    }),
+  /** Everything the Settings page shows (no secrets). */
+  all: adminQuery.query(async ({ ctx }) => {
+    const s = await loadSettings(true);
+    return {
+      ...s,
+      /** Read-only context the page displays so nobody has to guess. */
+      env: {
+        yourIp: clientIp(ctx.req),
+        platformEmail: PLATFORM_EMAIL,
+        leadNotifyTo: process.env.LEAD_NOTIFY_TO || null,
+        mailFrom: mailFrom(),
+        adminLoginPath: process.env.VITE_ADMIN_LOGIN_SLUG || "control-signin",
+      },
+    };
+  }),
 
-  update: adminQuery
-    .input(
-      z.object({
-        section: z.string(),
-        values: z.record(z.string(), z.any()),
-      })
-    )
-    .mutation(({ input }) => {
-      settingsStore[input.section] = {
-        ...settingsStore[input.section],
-        ...input.values,
-      };
-      return { success: true };
+  save: adminQuery
+    .input(z.discriminatedUnion("section", [
+      z.object({ section: z.literal("business"), values: business }),
+      z.object({ section: z.literal("alerts"), values: alerts }),
+      z.object({ section: z.literal("email"), values: email }),
+      z.object({ section: z.literal("security"), values: security }),
+    ]))
+    .mutation(async ({ ctx, input }) => {
+      if (input.section === "alerts") {
+        const bad = input.values.recipients.find((r) => r && !isEmail(r));
+        if (bad) throw new TRPCError({ code: "BAD_REQUEST", message: `"${bad}" isn't a valid email address.` });
+      }
+      if (input.section === "security") {
+        const list = input.values.adminIpAllowlist.filter(Boolean);
+        const bad = list.find((v) => !isIpOrCidr(v));
+        if (bad) throw new TRPCError({ code: "BAD_REQUEST", message: `"${bad}" isn't an IP address or range (e.g. 49.36.1.20 or 49.36.0.0/16).` });
+        // Saving a list that leaves you out would lock you out of the portal on
+        // your next sign-in, with no way back except editing the database.
+        const you = clientIp(ctx.req);
+        if (list.length && !ipAllowed(you, list)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Add your own address (${you}) to the list first, or you'll be locked out of the admin portal.` });
+        }
+      }
+      const saved = await saveSettings(input.section, input.values as Record<string, unknown>);
+      // Pages are cached with the contact details baked in — drop that cache so
+      // the very next visitor sees the new ones.
+      if (input.section === "business") {
+        const { clearHtmlCache } = await import("./lib/vite");
+        clearHtmlCache();
+      }
+      return { ok: true as const, settings: saved };
     }),
 
   // Admin: is SMTP configured on the server? (read-only — SMTP lives in the
@@ -88,12 +123,9 @@ export const settingsRouter = createRouter({
       return { ...r, to: input.to };
     }),
 
-  getPublic: publicQuery.query(() => {
-    return {
-      platformName: (settingsStore.general?.platformName as string) || "DigitalCarda",
-      logoUrl: (settingsStore.branding?.logoUrl as string) || null,
-      primaryColor: (settingsStore.branding?.primaryColor as string) || "#D4AF37",
-      faviconUrl: (settingsStore.branding?.faviconUrl as string) || null,
-    };
+  /** Contact details the website shows (footer, menus, WhatsApp buttons). */
+  getPublic: publicQuery.query(async () => {
+    await loadSettings();
+    return publicSettings();
   }),
 });
