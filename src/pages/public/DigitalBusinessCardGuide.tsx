@@ -15,6 +15,8 @@ import {
   Languages, Link2, MapPin, MessageCircle, Nfc, Phone, QrCode, Share2, Sparkles, Star, Users, Wallet, X, Zap,
 } from "lucide-react";
 import JsonLd from "@/components/seo/JsonLd";
+import TutorialPlayer from "@/components/TutorialPlayer";
+import { TUTORIAL, tutorialVideoLd } from "@/data/tutorial";
 import { INDUSTRIES, industryPath } from "@/data/industries";
 import { IndustryIcon } from "@/components/industries/IndustryIcon";
 
@@ -406,6 +408,15 @@ export default function DigitalBusinessCardGuide() {
               </li>
             ))}
           </ol>
+          {/* The same three steps, done on screen. */}
+          <div className="mt-8 overflow-hidden rounded-3xl bg-[#0B1120] p-4 ring-1 ring-[#0F172A]/10 sm:p-5">
+            <JsonLd id="dc-tutorial-ld" data={tutorialVideoLd()} />
+            <TutorialPlayer />
+            <p className="mt-3 px-1 text-[13px] text-[#94A3B8]">
+              {TUTORIAL.description}{" "}
+              <a href={TUTORIAL.watchUrl} target="_blank" rel="noreferrer" className="font-semibold text-[#F7B31C] hover:underline">Watch on YouTube</a> ({TUTORIAL.lengthLabel}).
+            </p>
+          </div>
           <p className="mt-5 text-[13.5px] text-[#64748B]">
             Step-by-step: <Link to="/blog/how-to-make-a-digital-visiting-card" className="font-semibold text-[#B45309] underline underline-offset-2">How to make a digital visiting card</Link>.
           </p>

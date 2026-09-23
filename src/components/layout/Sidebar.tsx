@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
@@ -9,8 +10,9 @@ import {
   ChevronRight, Store, X, ReceiptText,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
   Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe, MailCheck, MailSearch, PenLine,
-  MessageCircle, Nfc, TicketPercent, Megaphone, BookOpenCheck, Wrench, Instagram, UserX, UserCog, History,
+  MessageCircle, Nfc, TicketPercent, Megaphone, BookOpenCheck, Wrench, Instagram, UserX, UserCog, History, PlayCircle,
 } from "lucide-react";
+import { TutorialModal } from "@/components/TutorialPlayer";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -121,6 +123,7 @@ export function staffGroups(canOpenPath: (path: string) => boolean): NavGroup[] 
 export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggle }: SidebarProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [watching, setWatching] = useState(false);
 
   const role = user?.role || "customer";
   // Staff see the admin menu trimmed to the modules they were given.
@@ -229,6 +232,16 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
 
         {/* Footer */}
         <div className="shrink-0 p-3 border-t border-[#1E293B]">
+          {role === "customer" && (
+            <button
+              onClick={() => setWatching(true)}
+              title={collapsed ? "Watch tutorial" : undefined}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1E293B] transition-all w-full ${collapsed ? "lg:justify-center lg:px-2" : ""}`}
+            >
+              <PlayCircle size={18} className="shrink-0 text-[#F7B31C]" />
+              {!collapsed && <span>Watch tutorial</span>}
+            </button>
+          )}
           <button
             onClick={logout}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1E293B] transition-all w-full ${collapsed ? "lg:justify-center lg:px-2" : ""}`}
@@ -238,6 +251,8 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
           </button>
         </div>
       </aside>
+
+      {watching && <TutorialModal onClose={() => setWatching(false)} />}
     </>
   );
 }

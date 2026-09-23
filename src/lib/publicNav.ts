@@ -41,6 +41,7 @@ export const SOCIAL_LINKS: { label: string; href: string; icon: string }[] = [
   { label: "Instagram", href: "https://www.instagram.com/digitalcarda/", icon: "/sig/s-instagram.png" },
   { label: "Facebook", href: "https://www.facebook.com/DigitalCarda/", icon: "/sig/s-facebook.png" },
   { label: "Pinterest", href: "https://in.pinterest.com/digitalcarda/", icon: "/sig/s-pinterest.png" },
+  { label: "YouTube", href: "https://www.youtube.com/@DigitalCarda-k9v", icon: "/sig/s-youtube.png" },
 ];
 
 const PRODUCT: NavGroup = {

@@ -20,6 +20,7 @@ import EmailVerifyBanner from "@/components/customer/EmailVerifyBanner";
 import TrialLifecycleBanner from "@/components/customer/TrialLifecycleBanner";
 import LeadReminder from "@/components/customer/LeadReminder";
 import OnboardingGuide, { type GuideStep } from "@/components/customer/OnboardingGuide";
+import TutorialCard from "@/components/customer/TutorialCard";
 
 /* Glass action button for the dark hero card (icon + tiny label) */
 function GlassAction({ icon: Icon, label, onClick, tone = "default", active = false }: {
@@ -274,6 +275,9 @@ export default function CustomerDashboard() {
           onNavigate={navigate}
           onShare={shareWhatsApp}
         />
+
+        {/* ─── Walkthrough video — the first thing a new member needs ─── */}
+        <TutorialCard />
 
         {/* ─── Stats ─── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

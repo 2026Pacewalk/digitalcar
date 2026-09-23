@@ -13,6 +13,8 @@ import TemplateThumb, { THUMB_W, THUMB_H } from "@/components/TemplateThumb";
 import { STANDEE_STYLES, standeeMarkup } from "@/lib/standee";
 import { useReveal, Reveal, SectionHeading } from "@/components/public/Reveal";
 import JsonLd from "@/components/seo/JsonLd";
+import TutorialPlayer from "@/components/TutorialPlayer";
+import { TUTORIAL, tutorialVideoLd } from "@/data/tutorial";
 import { webpFor } from "@/lib/imageSources";
 import { TESTIMONIALS } from "@/data/testimonials";
 
@@ -1433,6 +1435,20 @@ function HowItWorksSection() {
               )}
             </article>
           ))}
+        </Reveal>
+
+        {/* Rather be shown than told — the real product, start to finish. */}
+        <Reveal className="mx-auto mt-10 max-w-3xl">
+          <JsonLd id="dc-tutorial-ld" data={tutorialVideoLd()} />
+          <div className="mb-3.5 flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-center">
+            <p className="text-[15px] font-bold text-white">Rather be shown than told?</p>
+            <p className="text-[14px] text-[#94A3B8]">Watch the whole thing, start to finish.</p>
+          </div>
+          <TutorialPlayer className="shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/10" />
+          <p className="mt-3 text-center text-[13px] text-[#64748B]">
+            {TUTORIAL.lengthLabel} ·{" "}
+            <a href={TUTORIAL.watchUrl} target="_blank" rel="noreferrer" className="font-semibold text-[#F7B31C] hover:underline">Watch on YouTube</a>
+          </p>
         </Reveal>
 
         <Reveal className="mt-8 flex flex-col items-center gap-3.5">

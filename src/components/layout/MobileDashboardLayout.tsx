@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Home, Users, BarChart3, LayoutDashboard, UserCircle, MessageSquare, Wallet, ReceiptText,
   Eye, Share2, Settings, LogOut, ChevronLeft, ChevronRight, Wand2, QrCode, Mail, ArrowLeft,
-  LayoutGrid, MessageCircle, RefreshCw,
+  LayoutGrid, MessageCircle, RefreshCw, PlayCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getToken, clearSession } from "@/lib/session";
@@ -17,6 +17,7 @@ import ProfileMenu from "@/components/ProfileMenu";
 import NotificationBell from "@/components/NotificationBell";
 import AppSheet from "@/components/mobile/AppSheet";
 import { InstallAppBanner, InstallAppRow } from "@/components/mobile/InstallApp";
+import { TutorialModal } from "@/components/TutorialPlayer";
 import { customerGroups, superAdminGroups, resellerGroups, staffGroups, type NavGroup, type NavLink } from "@/components/layout/Sidebar";
 import { useStaffAccess } from "@/hooks/useStaffAccess";
 
@@ -266,6 +267,7 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
   const location = useLocation();
   const queryClient = useQueryClient();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [watching, setWatching] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const [headerAction, setHeaderAction] = useState<ReactNode>(null);
@@ -437,6 +439,14 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
 
             <p className="mb-1.5 mt-5 px-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#94A3B8]">Support</p>
             <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#E7EAF0]">
+              {role === "customer" && (
+                <button type="button" onClick={() => { setMoreOpen(false); setWatching(true); }}
+                  className="flex w-full items-center gap-3 border-b border-[#F1F5F9] px-3 py-3 text-left active:bg-[#F8FAFC]">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FEF3C7] text-[#B45309]"><PlayCircle size={16} /></span>
+                  <span className="flex-1 text-[14px] font-medium text-[#0F172A]">Watch tutorial</span>
+                  <ChevronRight size={16} className="text-[#CBD5E1]" />
+                </button>
+              )}
               <a href={CONTACT.whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-3 py-3 active:bg-[#F8FAFC]">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DCFCE7] text-[#15803D]"><MessageCircle size={16} /></span>
                 <span className="flex-1 text-[14px] font-medium text-[#0F172A]">Chat with support</span>
@@ -457,6 +467,7 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
             </div>
             <p className="mt-4 text-center text-[11px] text-[#94A3B8]">DigitalCarda · digitalcarda.in</p>
           </AppSheet>
+          {watching && <TutorialModal onClose={() => setWatching(false)} />}
         </div>
       </MobileChromeContext.Provider>
     </MobileLayoutContext.Provider>
