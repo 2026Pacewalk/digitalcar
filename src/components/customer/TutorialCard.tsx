@@ -50,7 +50,7 @@ export default function TutorialCard() {
               <button type="button" onClick={() => { markSeen(); setOpen(true); }} className="block w-full text-left">
                 <span className="relative block aspect-video w-full overflow-hidden rounded-2xl bg-black/40 ring-1 ring-white/10">
                   <img src={TUTORIAL.poster} alt="" width={1280} height={720} loading="lazy" decoding="async"
-                    onError={(e) => { const i = e.currentTarget; if (i.src !== TUTORIAL.posterFallback) i.src = TUTORIAL.posterFallback; }}
+                    onError={(e) => { const i = e.currentTarget; if (i.src !== TUTORIAL.posterSmall) i.src = TUTORIAL.posterSmall; }}
                     className="h-full w-full object-cover" />
                   <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-[#0B1120]/35">
                     <span className="flex h-12 w-12 items-center justify-center rounded-full gradient-gold text-[#0F172A] shadow-gold">

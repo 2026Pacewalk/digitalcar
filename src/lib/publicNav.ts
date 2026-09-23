@@ -80,6 +80,7 @@ const COMPANY: NavGroup = {
   links: [
     { label: "About us", href: "/about" },
     { label: "Blog & guides", href: "/blog" },
+    { label: "Digital card guide", href: "/digital-business-card-guide" },
     { label: "Contact us", href: "/contact" },
     { label: "Start free trial", href: "/signup" },
     { label: "Sign in", href: "/login" },

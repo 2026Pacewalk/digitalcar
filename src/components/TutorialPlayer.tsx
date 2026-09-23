@@ -44,7 +44,7 @@ export default function TutorialPlayer({
         decoding="async"
         /* maxresdefault exists for this video; hqdefault is the safety net if a
            future video id is swapped in and YouTube never rendered the big one. */
-        onError={(e) => { const i = e.currentTarget; if (i.src !== TUTORIAL.posterFallback) i.src = TUTORIAL.posterFallback; }}
+        onError={(e) => { const i = e.currentTarget; if (i.src !== TUTORIAL.posterSmall) i.src = TUTORIAL.posterSmall; }}
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
       />
       <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/85 via-[#0B1120]/20 to-transparent" />

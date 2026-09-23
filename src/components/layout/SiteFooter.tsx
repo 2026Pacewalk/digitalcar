@@ -15,9 +15,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   ArrowRight, BarChart3, BookOpen, Check, Globe, IndianRupee, Inbox, LayoutGrid, MessageCircle, Nfc,
-  PenLine, QrCode, Rocket, ShieldCheck, Sparkles, Star, Truck, UserPlus, Wand2, Zap, type LucideIcon,
+  PenLine, Play, QrCode, Rocket, ShieldCheck, Sparkles, Star, Truck, UserPlus, Wand2, Youtube, Zap, type LucideIcon,
 } from "lucide-react";
 import { CONTACT, FOOTER_GROUPS, FOOTER_GUIDES, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicNav";
+import { TUTORIAL } from "@/data/tutorial";
 import { InstallAppRow } from "@/components/mobile/InstallApp";
 
 /** Every feature here is live in the product. */
@@ -313,8 +314,28 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
 
         <Separator />
 
-        {/* ── 4. Guides + NFC ────────────────────────────────────── */}
+        {/* ── 4. Walkthrough, guides + NFC ────────────────────────────────────── */}
         <div>
+          <Link
+            to="/digital-business-card-guide#how-to"
+            className="group mb-8 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3 transition hover:-translate-y-0.5 hover:border-[#F7B31C]/40 hover:bg-white/[0.05] sm:flex-row sm:items-center sm:gap-5 sm:p-4"
+          >
+            <span className="relative block shrink-0 overflow-hidden rounded-xl sm:w-[220px]">
+              <img src={TUTORIAL.posterSmall} alt="" width={480} height={360} loading="lazy" decoding="async" className="aspect-video w-full object-cover" />
+              <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-[#0B1120]/35">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F7B31C] text-[#0B1120] shadow-[0_10px_24px_-10px_rgba(247,179,28,0.9)] transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+                  <Play size={18} className="ml-0.5 fill-current" />
+                </span>
+              </span>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="inline-flex items-center gap-2 text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80"><Youtube size={14} aria-hidden="true" /> Video tutorial</span>
+              <span className="mt-1.5 block font-display text-[17px] font-bold leading-snug text-white">Watch a card being made, start to finish</span>
+              <span className="mt-1 block text-[13px] leading-snug text-[#94A3B8]">{TUTORIAL.tagline} · {TUTORIAL.lengthLabel}</span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-[12.5px] font-bold text-[#F7B31C]">Watch now <ArrowRight size={14} className="transition group-hover:translate-x-0.5" aria-hidden="true" /></span>
+          </Link>
+
           <div className="mb-4 flex items-center justify-between">
             <p className="inline-flex items-center gap-2 text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80"><BookOpen size={14} aria-hidden="true" /> Popular guides</p>
             <Link to="/blog" className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#CBD5E1] hover:text-white">All guides <ArrowRight size={14} aria-hidden="true" /></Link>

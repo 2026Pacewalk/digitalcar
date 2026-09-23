@@ -132,8 +132,21 @@ export default function PublicLayout() {
     setAlt("en-IN", canonicalHref);
     setAlt("x-default", canonicalHref);
 
-    window.scrollTo(0, 0);
-  }, [location.pathname, seo, known]);
+    // A link that names a section (…/digital-business-card-guide#how-to) should
+    // land on that section. On a lazily loaded route the target is a paint or
+    // two late, so we keep looking for it, then give up and go to the top.
+    const id = location.hash.slice(1);
+    if (!id) { window.scrollTo(0, 0); return; }
+    let alive = true, tries = 0;
+    const jump = () => {
+      if (!alive) return;
+      const el = document.getElementById(id);
+      if (el) { el.scrollIntoView(); return; }
+      if (tries++ < 30) requestAnimationFrame(jump); else window.scrollTo(0, 0);
+    };
+    requestAnimationFrame(jump);
+    return () => { alive = false; };
+  }, [location.pathname, location.hash, seo, known]);
 
   /* BreadcrumbList for the current page — the same trail the server writes into
      the raw HTML (api/lib/card-og.ts, same element id), kept in step as people

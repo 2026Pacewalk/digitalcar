@@ -19,7 +19,9 @@ export const TUTORIAL = {
   /** youtube-nocookie + autoplay — only ever loaded after the visitor presses play. */
   embedUrl: `https://www.youtube-nocookie.com/embed/${ID}?autoplay=1&rel=0&playsinline=1&modestbranding=1`,
   poster: `https://i.ytimg.com/vi/${ID}/maxresdefault.jpg`,
-  posterFallback: `https://i.ytimg.com/vi/${ID}/hqdefault.jpg`,
+  /** The 480×360 copy: the fallback when maxres is missing, and all a small
+      thumbnail (the footer strip) needs — a fifth of the bytes. */
+  posterSmall: `https://i.ytimg.com/vi/${ID}/hqdefault.jpg`,
   lengthLabel: "5 min 39 sec",
   lengthShort: "5 min",
   isoDuration: "PT5M39S",
