@@ -5,8 +5,8 @@
  * browse, and it doubles as a crawlable hub linking to every template page.
  *
  * Page groups come from src/lib/publicNav.ts, the same source as the footer,
- * so the two can't list different pages. Industry pages come from
- * src/data/industries, the same data that renders them. Templates come from
+ * so the two can't list different pages. Industry, city and comparison pages
+ * come from src/data, the same data that renders them. Templates come from
  * the live catalogue — the server seeds that query, so all of them are in the
  * raw HTML.
  *
@@ -15,11 +15,13 @@
  * cards are already in sitemap.xml, which is where search engines need them.
  */
 import { Link } from "react-router";
-import { FileCode2, ArrowUpRight, LayoutGrid, BookOpen, Building2 } from "lucide-react";
+import { FileCode2, ArrowUpRight, LayoutGrid, BookOpen, Building2, MapPin, Scale } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { SITEMAP_GROUPS } from "@/lib/publicNav";
 import { BLOG_PATH, BLOG_POSTS, blogPostPath } from "@/data/blog";
 import { INDUSTRIES, INDUSTRIES_PATH, industryPath } from "@/data/industries";
+import { CITIES } from "@/data/cities";
+import { COMPARISONS } from "@/data/comparisons";
 
 export default function Sitemap() {
   const { data: products = [] } = trpc.product.catalogue.useQuery();
@@ -34,10 +36,8 @@ export default function Sitemap() {
             Every page on DigitalCarda
           </h1>
           <p className="mt-3 text-[15px] text-[#64748B] leading-relaxed">
-            {pageCount} site pages
-            {products.length > 0
-              ? `, ${INDUSTRIES.length} industry pages and ${products.length} digital business card templates`
-              : ` and ${INDUSTRIES.length} industry pages`}
+            {pageCount} site pages, {INDUSTRIES.length} industry pages, {CITIES.length} city pages
+            {products.length > 0 ? ` and ${products.length} digital business card templates` : ""}
             , grouped by what you're looking for.
           </p>
         </header>
@@ -88,6 +88,41 @@ export default function Sitemap() {
             {INDUSTRIES.map((i) => (
               <li key={i.slug} className="break-inside-avoid py-1.5">
                 <Link to={industryPath(i.slug)} className="text-sm text-[#475569] transition-colors hover:text-[#B45309]">{i.name}</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* One landing page per city, straight from the city data. */}
+        <section className="mt-5 rounded-2xl border border-[#EEF2F6] bg-white p-6 sm:p-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="inline-flex items-center gap-2 text-sm font-bold text-[#0F172A]">
+              <MapPin size={16} className="text-[#F7B31C]" /> Cities
+            </h2>
+            <Link to="/digital-business-card-guide#cities" className="text-sm font-semibold text-[#B45309] hover:underline">All {CITIES.length} cities</Link>
+          </div>
+          <ul className="mt-5 columns-1 gap-8 sm:columns-2 lg:columns-3">
+            {CITIES.map((c) => (
+              <li key={c.slug} className="break-inside-avoid py-1.5">
+                <Link to={`/digital-visiting-card/${c.slug}`} className="text-sm text-[#475569] transition-colors hover:text-[#B45309]">
+                  Digital visiting card in {c.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* Head-to-head pages, from the same data that renders them. */}
+        <section className="mt-5 rounded-2xl border border-[#EEF2F6] bg-white p-6 sm:p-8">
+          <h2 className="inline-flex items-center gap-2 text-sm font-bold text-[#0F172A]">
+            <Scale size={16} className="text-[#F7B31C]" /> Compared with
+          </h2>
+          <ul className="mt-5 flex flex-wrap gap-x-8 gap-y-2">
+            {COMPARISONS.map((c) => (
+              <li key={c.slug}>
+                <Link to={`/vs/${c.slug}`} className="text-sm text-[#475569] transition-colors hover:text-[#B45309]">
+                  DigitalCarda vs {c.competitor}
+                </Link>
               </li>
             ))}
           </ul>
