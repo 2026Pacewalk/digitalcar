@@ -397,64 +397,39 @@ function FeatureCard({ menu, signupHref }: { menu: HeaderMenu; signupHref: strin
   );
 }
 
-// A 5×5 stand-in QR pattern — decoration only.
-const QR = [1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1];
-
-function MiniCard({ tone, className = "" }: { tone: string; className?: string }) {
-  return (
-    <span className={`block w-[150px] rounded-xl bg-white p-2.5 shadow-xl ${className}`}>
-      <span className="flex items-center gap-2">
-        <span className="h-7 w-7 shrink-0 rounded-full" style={{ background: tone }} />
-        <span className="flex-1 space-y-1">
-          <span className="block h-1.5 w-16 rounded bg-[#0F172A]" />
-          <span className="block h-1 w-10 rounded bg-[#CBD5E1]" />
-        </span>
-      </span>
-      <span className="mt-2 grid grid-cols-3 gap-1">
-        {[0, 1, 2].map((i) => <span key={i} className="h-3 rounded" style={{ background: i === 1 ? tone : "#F1F5F9" }} />)}
-      </span>
-    </span>
-  );
-}
-
 function FeatureArt({ id }: { id: HeaderMenu["id"] }) {
   if (id === "product") {
+    // The real card, photographed — it says more in one glance than the
+    // stand-in ever did. Sized for the menu slot at 3x, so it stays crisp.
     return (
-      <span aria-hidden="true" className="relative mx-auto block w-[190px] -rotate-3 rounded-xl bg-white p-3 text-[#0F172A] shadow-2xl transition-transform duration-500 group-hover:rotate-0 motion-reduce:transition-none">
-        <span className="flex items-center gap-2">
-          <span className="h-8 w-8 rounded-full bg-gradient-to-br from-[#F7B31C] to-[#F59E0B]" />
-          <span className="flex-1 space-y-1">
-            <span className="block h-2 w-20 rounded bg-[#0F172A]" />
-            <span className="block h-1.5 w-14 rounded bg-[#CBD5E1]" />
-          </span>
-        </span>
-        <span className="mt-3 grid grid-cols-3 gap-1.5">
-          {["Call", "WhatsApp", "Save"].map((t) => (
-            <span key={t} className={`rounded-md py-1 text-center text-[8px] font-bold ${t === "WhatsApp" ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#F1F5F9] text-[#334155]"}`}>{t}</span>
-          ))}
-        </span>
-        <span className="mt-2.5 flex items-end justify-between">
-          <span className="space-y-1">
-            <span className="block h-1.5 w-16 rounded bg-[#E2E8F0]" />
-            <span className="block h-1.5 w-12 rounded bg-[#E2E8F0]" />
-            <span className="block h-1.5 w-14 rounded bg-[#E2E8F0]" />
-          </span>
-          <span className="grid grid-cols-5 gap-[2px] rounded bg-white p-0.5 ring-1 ring-[#E2E8F0]">
-            {QR.map((on, i) => <span key={i} className={`h-[5px] w-[5px] ${on ? "bg-[#0F172A]" : "bg-transparent"}`} />)}
-          </span>
-        </span>
-      </span>
+      <img
+        src="/images/header-card-product.webp"
+        alt=""
+        aria-hidden="true"
+        width={640}
+        height={479}
+        loading="lazy"
+        decoding="async"
+        className="relative mx-auto block w-full max-w-[215px] rounded-xl transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+      />
     );
   }
+
   if (id === "templates") {
     return (
-      <span aria-hidden="true" className="relative mx-auto block h-[112px] w-[220px]">
-        <MiniCard tone="#0F766E" className="absolute left-0 top-4 -rotate-12 transition-transform duration-500 group-hover:-translate-x-2 group-hover:-rotate-[16deg] motion-reduce:transition-none" />
-        <MiniCard tone="#BE185D" className="absolute right-0 top-4 rotate-12 transition-transform duration-500 group-hover:translate-x-2 group-hover:rotate-[16deg] motion-reduce:transition-none" />
-        <MiniCard tone="linear-gradient(135deg,#F7B31C,#F59E0B)" className="absolute left-1/2 top-0 -translate-x-1/2" />
-      </span>
+      <img
+        src="/images/header-templates.webp"
+        alt=""
+        aria-hidden="true"
+        width={640}
+        height={464}
+        loading="lazy"
+        decoding="async"
+        className="relative mx-auto block w-full max-w-[215px] transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+      />
     );
   }
+
   if (id === "tools") {
     return (
       <span aria-hidden="true" className="relative mx-auto block w-[210px]">
