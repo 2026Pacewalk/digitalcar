@@ -11,6 +11,7 @@ export const digitalVisitingCardForDoctors: BlogPost = {
   publishedAt: "2026-07-03",
   updatedAt: "2026-09-17",
   cover: { motif: "clinic", tone: "teal" },
+  image: { src: "/blog/digital-visiting-card-for-doctors.jpg", alt: "A phone showing a doctor’s digital visiting card with call, WhatsApp and appointment buttons, beside a clinic QR standee", width: 1600, height: 900 },
   takeaways: [
     "Put clinic timings, location and an appointment button at the top.",
     "Keep it factual: qualifications, registration number, specialities and languages spoken.",

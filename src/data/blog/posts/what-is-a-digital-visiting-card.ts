@@ -11,6 +11,7 @@ export const whatIsADigitalVisitingCard: BlogPost = {
   publishedAt: "2026-08-10",
   updatedAt: "2026-08-10",
   cover: { motif: "card", tone: "gold" },
+  image: { src: "/blog/what-is-a-digital-visiting-card.jpg", alt: "A printed jeweller’s visiting card beside a phone showing the same business as a digital visiting card", width: 1600, height: 900 },
   takeaways: [
     "A digital visiting card is a small web page with your details, opened by a link, a QR code or an NFC tap.",
     "The person receiving it needs no app. It opens in the phone's browser.",

@@ -11,6 +11,7 @@ export const linkInBioVsDigitalBusinessCard: BlogPost = {
   publishedAt: "2026-06-19",
   updatedAt: "2026-06-19",
   cover: { motif: "links", tone: "violet" },
+  image: { src: "/blog/link-in-bio-vs-digital-business-card.jpg", alt: "A link-in-bio page and a digital business card shown side by side on two phones", width: 1600, height: 900 },
   takeaways: [
     "A link-in-bio page is built for social followers: a list of links to your content and profiles.",
     "A digital business card is built for customers: save your contact, call, WhatsApp, pay, enquire, find you.",

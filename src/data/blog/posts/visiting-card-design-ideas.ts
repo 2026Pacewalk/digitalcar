@@ -11,6 +11,7 @@ export const visitingCardDesignIdeas: BlogPost = {
   publishedAt: "2026-07-13",
   updatedAt: "2026-07-13",
   cover: { motif: "palette", tone: "rose" },
+  image: { src: "/blog/visiting-card-design-ideas.jpg", alt: "Three printed visiting card designs for a cafe laid out beside a phone showing the matching digital card", width: 1600, height: 900 },
   takeaways: [
     "Decide the one thing people should remember, and make it the biggest thing on the card.",
     "Use one or two fonts and two or three colours. Restraint looks confident.",

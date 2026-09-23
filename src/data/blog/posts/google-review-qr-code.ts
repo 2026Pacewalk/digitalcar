@@ -11,6 +11,7 @@ export const googleReviewQrCode: BlogPost = {
   publishedAt: "2026-08-21",
   updatedAt: "2026-08-21",
   cover: { motif: "stars", tone: "emerald" },
+  image: { src: "/blog/google-review-qr-code.jpg", alt: "A Google review QR standee beside a phone showing an estate agent’s digital card with call, WhatsApp and review buttons", width: 1600, height: 900 },
   takeaways: [
     "Get your review link from your Google Business Profile — look for \"Ask for reviews\" or \"Get more reviews\".",
     "Turn that link into a QR code with any free generator and place it where every customer sees it at the end of a visit: the billing counter, the table, the delivery bag.",

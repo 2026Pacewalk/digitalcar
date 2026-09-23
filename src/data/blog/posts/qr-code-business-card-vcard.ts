@@ -11,6 +11,7 @@ export const qrCodeBusinessCardVcard: BlogPost = {
   publishedAt: "2026-07-26",
   updatedAt: "2026-07-26",
   cover: { motif: "qr", tone: "navy" },
+  image: { src: "/blog/qr-code-business-card-vcard.jpg", alt: "A printed card carrying a vCard QR code beside a phone showing the same contact as a full digital business card", width: 1600, height: 900 },
   takeaways: [
     "A vCard is a standard contact file (.vcf) that phones understand, so tapping it offers to save the contact.",
     "A vCard QR code stores your details inside the code itself — it can't be changed after printing.",

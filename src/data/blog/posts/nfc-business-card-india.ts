@@ -11,6 +11,7 @@ export const nfcBusinessCardIndia: BlogPost = {
   publishedAt: "2026-09-04",
   updatedAt: "2026-09-04",
   cover: { motif: "nfc", tone: "violet" },
+  image: { src: "/blog/nfc-business-card-india.jpg", alt: "A black NFC business card, a QR standee and a phone showing the same personal trainer’s digital card, together on a desk", width: 1600, height: 900 },
   takeaways: [
     "An NFC business card has a tiny chip that opens a link when tapped on a phone. It doesn't need a battery or an app.",
     "Most recent Android phones and iPhones from the XS/XR onward can read it, but a QR code on the back covers everyone else.",
