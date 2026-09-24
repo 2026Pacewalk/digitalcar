@@ -432,26 +432,19 @@ function FeatureArt({ id }: { id: HeaderMenu["id"] }) {
 
   if (id === "tools") {
     return (
-      <span aria-hidden="true" className="relative mx-auto block w-[210px]">
-        <span className="block rounded-xl bg-white p-3 shadow-2xl">
-          <span className="flex items-center gap-2.5">
-            <span className="h-9 w-9 rounded-lg bg-gradient-to-br from-[#1E3A8A] to-[#0F172A]" />
-            <span className="flex-1 space-y-1">
-              <span className="block h-2 w-20 rounded bg-[#0F172A]" />
-              <span className="block h-1.5 w-16 rounded bg-[#94A3B8]" />
-            </span>
-          </span>
-          <span className="mt-2.5 block h-0.5 w-full rounded bg-gradient-to-r from-[#F7B31C] to-transparent" />
-          <span className="mt-2 flex gap-1.5">
-            {["#0A66C2", "#E1306C", "#25D366", "#0F172A"].map((c) => <span key={c} className="h-3 w-3 rounded-full" style={{ background: c }} />)}
-          </span>
-        </span>
-        <span className="absolute -bottom-3 -right-2 max-w-[150px] rounded-xl rounded-br-sm bg-[#DCF8C6] px-2.5 py-1.5 text-[9px] font-medium leading-snug text-[#14532D] shadow-lg transition-transform duration-500 group-hover:-translate-y-1 motion-reduce:transition-none">
-          Hi! Thanks for messaging us. We'll reply shortly.
-        </span>
-      </span>
+      <img
+        src="/images/header-tools.webp"
+        alt=""
+        aria-hidden="true"
+        width={640}
+        height={295}
+        loading="lazy"
+        decoding="async"
+        className="relative mx-auto block w-full max-w-[215px] transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+      />
     );
   }
+
   return (
     <span aria-hidden="true" className="relative mx-auto flex flex-col items-center">
       <span className="flex -space-x-3">
