@@ -298,6 +298,8 @@ export const userRouter = createRouter({
       const email = input.email.toLowerCase().trim();
       const user = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true, fullName: true, email: true } });
       if (!user) return { ok: false as const, reason: "no_account" as const };
+      const { allows } = await import("./lib/notify-prefs");
+      if (!(await allows(user.id, "tips"))) return { ok: false as const, reason: "opted_out" as const };
       const pub = await db.select({ slug: publishedCards.slug }).from(publishedCards).where(eq(publishedCards.userId, user.id)).limit(1);
       const res = await sendEmail(user.email, featureUpdateEmail({ name: user.fullName, slug: pub[0]?.slug || null }));
       return { ok: res.ok, error: res.error, sentTo: user.email };

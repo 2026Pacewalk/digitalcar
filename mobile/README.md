@@ -10,7 +10,7 @@ The iPhone and Android app for card owners, built with Expo (SDK 57) and React N
 | Edit | Photo and logo (gallery or camera), name, role, business, contact details, address, map link and About — autosaved to the live card. From here: services & offers, photos & videos, payments, social links & reviews, sections on/off, design, and a live preview |
 | Share | QR code (full screen, screen brightened), copy link, send on WhatsApp, system share sheet |
 | Leads | Enquiry inbox with search and status filters; detail with one-tap WhatsApp / call / email, status, follow-up reminders and private notes |
-| More | Insights, enquiry alerts, notifications, refer & earn, plan, account & password, signed-in devices, appearance (phone setting / light / dark), website pages, support, sign out, delete account |
+| More | Insights, alerts (what we tell you about), notifications, refer & earn, plan, account & password, signed-in devices, appearance (phone setting / light / dark), website pages, support, sign out, delete account |
 
 Also: create an account in the app (the starter card goes live on the 30-day trial, then a four-step welcome guide), a design picker (catalogue thumbnails, category filter, live sample, one-tap apply; the ID and Membership designs stay locked unless the add-on is owned), device sessions that renew themselves, and push alerts for new enquiries.
 
@@ -29,6 +29,8 @@ The content editors follow the website's rules exactly (`src/lib/cardContent.ts`
 **Cards on the older system.** Many older accounts still have their card only in customers.json. `mobile.legacyCard` recognises them; the app opens the website dashboard once (signed in), whose auto-publish moves the card into the current format, and checks again when the owner comes back.
 
 Sign-in uses email (or card address / mobile) and password. Account-deletion requests land in the website admin under Account Deletions.
+
+**Alerts.** More → Alerts holds the phone's notification permission and five switches — new enquiries, follow-up reminders, plan and trial, referral rewards, tips and product news. They live on the server (`notification_prefs`, `notification.prefs` / `notification.setPrefs`), so one switch covers the push on every phone and the matching email: enquiry alerts (`api/lib/mail.ts`, the push in `api/boot.ts`), the follow-ups-due job, trial and renewal reminders, the referral-reward email and "what's new". Account, password and payment messages are never affected, and the bell inside the app keeps everything either way. A lead's follow-up date is still saved when reminders are off; only the phone reminder is skipped.
 
 **Store builds.** `eas.json` has three profiles: `development` (a development build, for native work such as NFC), `preview` (internal testing; an APK on Android) and `production` (store). Preview and production set `EXPO_PUBLIC_PURCHASE_LINKS=off`: with no in-app purchase yet, the store rules don't allow the app to send people to pay on the website, so those builds show plan status, usage and payments without prices or upgrade/renew buttons (`PURCHASE_LINKS` in `src/lib/config.ts`). Accounts can be deleted in the app or at digitalcarda.in/account/delete. The listing text, privacy answers, screenshot sizes and submit steps are in [store/STORE.md](store/STORE.md).
 
@@ -73,6 +75,7 @@ npm run typecheck   # includes the server's API types — a wrong input or a rem
 ## Next up (from the PRD)
 
 - Server: photo uploads to file storage (photos live inside the card today), Sign in with Apple and Google.
-- App: NFC tag writing, in-app plan purchase (store rules — see the PRD), notification settings, several cards per account, paper-card scanner (needs a development build).
+- App: NFC tag writing, in-app plan purchase (store rules — see the PRD), several cards per account, paper-card scanner (needs a development build).
+- Web: the same alert switches on digitalcarda.in, for owners who don't use the app (the API is shared — `notification.prefs`).
 - Push: needs an EAS project id (`npx eas init` with the company Expo account) and a development or store build — Expo Go can't receive remote push.
 - Store: the company Expo, Apple Developer and Google Play accounts, then the steps in [store/STORE.md](store/STORE.md) (bundle id `in.digitalcarda.app`).

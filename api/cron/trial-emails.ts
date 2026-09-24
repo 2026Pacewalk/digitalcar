@@ -11,6 +11,7 @@ import { getDb } from "../queries/connection";
 import { subscriptions, users, notifications } from "@db/schema";
 import { and, eq } from "drizzle-orm";
 import { sendEmail } from "../lib/mail";
+import { allows } from "../lib/notify-prefs";
 import { trialEndingEmail, trialEndedEmail } from "../lib/email-templates";
 
 const DAY = 86_400_000;
@@ -41,12 +42,12 @@ export async function runTrialEmails(): Promise<{ scanned: number; ending: numbe
     if (daysLeft <= 0) {
       if (await claim(db, s.userId, ENDED, "Your trial has ended", "Your card is paused — upgrade to bring it back online.")) {
         const u = await db.query.users.findFirst({ where: eq(users.id, s.userId), columns: { email: true, fullName: true } });
-        if (u?.email) { await sendEmail(u.email, trialEndedEmail({ name: u.fullName })); ended++; }
+        if (u?.email && await allows(s.userId, "plan")) { await sendEmail(u.email, trialEndedEmail({ name: u.fullName })); ended++; }
       }
     } else if (daysLeft <= 3) {
       if (await claim(db, s.userId, ENDING, "Trial ending soon", `Only ${daysLeft} day${daysLeft === 1 ? "" : "s"} left — upgrade to keep your card live.`)) {
         const u = await db.query.users.findFirst({ where: eq(users.id, s.userId), columns: { email: true, fullName: true } });
-        if (u?.email) { await sendEmail(u.email, trialEndingEmail({ name: u.fullName, daysLeft })); ending++; }
+        if (u?.email && await allows(s.userId, "plan")) { await sendEmail(u.email, trialEndingEmail({ name: u.fullName, daysLeft })); ending++; }
       }
     }
   }

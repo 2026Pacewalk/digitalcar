@@ -16,6 +16,7 @@ import { cardTrials, users, notifications, publishedCards, cardEvents, funnelEve
 import { and, eq, inArray, sql, gt } from "drizzle-orm";
 import { legacyPaidPlan } from "../lib/entitlement";
 import { sendEmail } from "../lib/mail";
+import { allows } from "../lib/notify-prefs";
 import {
   trialDay1Email, trialDay7Email, trialDay15Email, trialDay21Email, trialDay25Email,
   trialEndingEmail, trialEndedEmail, abandonedPublishEmail, type TrialMetrics,
@@ -101,6 +102,8 @@ export async function runLifecycle(): Promise<{ enabled: boolean; scanned: numbe
 
       const emailUser = async (type: string, title: string, msg: string, email: Parameters<typeof sendEmail>[1]) => {
         if (!(await claim(db, t.userId, type, title, msg))) return;
+        // Owners who turned plan reminders off keep the bell entry, not the email.
+        if (!(await allows(t.userId, "plan"))) return;
         const u = await db.query.users.findFirst({ where: eq(users.id, t.userId), columns: { email: true, fullName: true } });
         if (u?.email) { await sendEmail(u.email, email); sent++; }
       };
@@ -157,6 +160,7 @@ export async function runLifecycle(): Promise<{ enabled: boolean; scanned: numbe
       const u = await db.query.users.findFirst({ where: eq(users.id, uid), columns: { email: true, fullName: true } });
       if (!u?.email) continue;
       await db.insert(notifications).values({ userId: uid, type: "ls_abandoned", title: "Your card is almost ready", message: "Publish it to make it live and start your free trial.", link: "/dashboard/build" });
+      if (!(await allows(uid, "tips"))) continue;   // a nudge, not something they must hear
       await sendEmail(u.email, abandonedPublishEmail({ name: u.fullName, cardUrl: `${SITE}/dashboard/build` }));
       abandoned++;
     }

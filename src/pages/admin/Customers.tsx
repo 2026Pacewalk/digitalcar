@@ -268,7 +268,9 @@ export default function AdminCustomers() {
         ? await sendUpdateMut.mutateAsync({ email: c.email })
         : await sendDetailsMut.mutateAsync({ email: c.email, password: sharePwd || undefined, includePassword: shareIncludePwd });
       if (res.ok) { toast.success(`Email sent to ${res.sentTo || c.email}`); setShareModal(null); }
-      else toast.error(res.reason === "no_account" ? `No live account matched ${c.email}` : (res.error || "Could not send the email."));
+      else if (res.reason === "no_account") toast.error(`No live account matched ${c.email}`);
+      else if (res.reason === "opted_out") toast.error(`${c.name || "This customer"} turned product news off in the app.`);
+      else toast.error(res.error || "Could not send the email.");
     } catch { toast.error("Could not send the email."); }
     finally { setSending(false); }
   };

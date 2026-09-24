@@ -10,7 +10,7 @@ import { useOpenDashboard } from "~/lib/web";
 import { dateLabel } from "~/lib/format";
 import { useAuth } from "~/lib/auth";
 import { trpc } from "~/lib/trpc";
-import { enablePush, pushState, type PushState } from "~/lib/push";
+import { pushState, type PushState } from "~/lib/push";
 import { space, useAppearance, useTheme, type Appearance } from "~/theme";
 
 export default function MoreScreen() {
@@ -27,13 +27,7 @@ export default function MoreScreen() {
   const slug = mine.data?.slug;
 
   const [alerts, setAlerts] = useState<PushState | null>(null);
-  const [alertNote, setAlertNote] = useState<string | null>(null);
   useEffect(() => { void pushState().then(setAlerts); }, []);
-  const turnOnAlerts = async () => {
-    const r = await enablePush();
-    setAlertNote(r.ok ? "Enquiry alerts are on for this phone." : r.message);
-    setAlerts(await pushState());
-  };
 
   const chevron = <ChevronRight color={c.muted} size={18} />;
   const external = <ExternalLink color={c.muted} size={16} />;
@@ -82,9 +76,12 @@ export default function MoreScreen() {
       <SectionTitle>Grow</SectionTitle>
       <Card padded={false}>
         <Row first icon={<BarChart3 color={c.accentText} size={18} />} title="Insights" subtitle="Views, taps and where visitors come from" right={chevron} onPress={() => router.push("/insights")} />
-        {alerts && alerts !== "unsupported" ? (
-          <Row icon={<BellRing color={c.accentText} size={18} />} title="Enquiry alerts" subtitle={alertNote ?? (alerts === "granted" ? "On for this phone" : alerts === "denied" ? "Off — allow notifications in Settings" : "Get a notification the moment someone enquires")} right={alerts === "granted" ? <Chip label="On" tone="good" /> : chevron} onPress={turnOnAlerts} />
-        ) : null}
+        <Row icon={<BellRing color={c.accentText} size={18} />} title="Alerts"
+          subtitle={alerts === "granted" ? "On for this phone · choose what we tell you about"
+            : alerts === "denied" ? "Off — allow notifications in Settings"
+            : alerts === "unsupported" ? "Choose what we tell you about"
+            : "Get a notification the moment someone enquires"}
+          right={alerts === "granted" ? <Chip label="On" tone="good" /> : chevron} onPress={() => router.push("/alerts")} />
         <Row icon={<Bell color={c.accentText} size={18} />} title="Notifications" right={<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>{unread.data?.count ? <Chip label={String(unread.data.count)} tone="accent" /> : null}{chevron}</View>} onPress={() => router.push("/notifications")} />
         <Row icon={<Gift color={c.accentText} size={18} />} title="Refer & earn" subtitle={slug ? `Your code: ${slug}` : "Publish your card to get your code"} right={chevron} onPress={referral} />
       </Card>

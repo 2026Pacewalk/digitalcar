@@ -3,7 +3,7 @@
     "name": "DigitalCarda",
     "slug": "digitalcarda",
     "scheme": "digitalcarda",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

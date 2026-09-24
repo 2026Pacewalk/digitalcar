@@ -31,6 +31,7 @@ export default function LeadDetail() {
   const leadId = Number(id);
   const utils = trpc.useUtils();
   const lead = trpc.lead.getById.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId) });
+  const prefs = trpc.notification.prefs.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const [notes, setNotes] = useState("");
   const [notesSaved, setNotesSaved] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +125,12 @@ export default function LeadDetail() {
               const at = f.at();
               update.mutate({ id: l.id, followUpDate: at, status: l.status === "new" ? "follow_up" : undefined }, {
                 onSuccess: async () => {
+                  // The date is saved either way; the phone reminder follows the
+                  // owner's Alerts choice (More → Alerts).
+                  if (prefs.data && !prefs.data.followUps) {
+                    setReminder(`Saved for ${dateLabel(at)}. Follow-up reminders are switched off in Alerts.`);
+                    return;
+                  }
                   const ok = await scheduleFollowUp({ id: l.id, fullName: l.fullName, message: l.message }, at);
                   setReminder(ok ? `We'll remind you on this phone on ${dateLabel(at)} at 10 am.` : null);
                 },

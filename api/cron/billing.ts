@@ -29,6 +29,7 @@ import { getDb } from "../queries/connection";
 import { subscriptions, subscriptionPackages, users, notifications, publishedCards, appSettings } from "@db/schema";
 import { and, eq, ne, gte, lt, inArray, asc, desc } from "drizzle-orm";
 import { sendEmail } from "../lib/mail";
+import { allows } from "../lib/notify-prefs";
 import { subscriptionRenewalReminderEmail, subscriptionExpiredEmail } from "../lib/email-templates";
 
 type Db = ReturnType<typeof getDb>;
@@ -193,6 +194,8 @@ export async function runBillingEmails(): Promise<BillingEmailsResult> {
       try {
         markerId = await claim(db, d.userId, d.type, d.title, d.message, "/dashboard/subscription");
         if (!markerId) continue;
+        // Plan reminders switched off: the bell entry stays, the email doesn't go.
+        if (!(await allows(d.userId, "plan"))) { markerId = null; continue; }
         attempts++;
         const res = await sendEmail(d.to, d.render());
         if (res.ok) {

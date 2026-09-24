@@ -359,6 +359,8 @@ app.post("/api/enquiry", async (c) => {
     if (pushOwnerId && verdict !== "spam") {
       const ownerId = pushOwnerId;
       void (async () => {
+        const { allows } = await import("./lib/notify-prefs");
+        if (!(await allows(ownerId, "enquiries"))) return;
         const { getDb } = await import("./queries/connection");
         const { leads } = await import("@db/schema");
         const { and, desc, eq } = await import("drizzle-orm");
@@ -542,7 +544,22 @@ if (process.env.NODE_ENV === "production") {
         KEY app_web_links_user_idx (user_id)
       )
     `));
-    console.log("[schema] app_sessions, push_tokens, account_deletion_requests ensured");
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS notification_prefs (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        user_id bigint unsigned NOT NULL,
+        enquiries tinyint(1) NOT NULL DEFAULT 1,
+        follow_ups tinyint(1) NOT NULL DEFAULT 1,
+        plan tinyint(1) NOT NULL DEFAULT 1,
+        rewards tinyint(1) NOT NULL DEFAULT 1,
+        tips tinyint(1) NOT NULL DEFAULT 1,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY notification_prefs_user_unique (user_id)
+      )
+    `));
+    console.log("[schema] app_sessions, push_tokens, account_deletion_requests, notification_prefs ensured");
   } catch (e) {
     console.error("[schema] ensure mobile app tables failed:", (e as Error).message);
   }

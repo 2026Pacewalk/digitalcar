@@ -17,6 +17,7 @@ import { and, eq, gte, lt, inArray, notInArray, asc } from "drizzle-orm";
 import { sendEmail } from "../lib/mail";
 import { leadFollowUpsDueEmail } from "../lib/email-templates";
 import { mailable } from "./billing";
+import { allowedUsers } from "../lib/notify-prefs";
 
 type Db = ReturnType<typeof getDb>;
 type Email = Parameters<typeof sendEmail>[1];
@@ -73,11 +74,14 @@ export async function dueLeadFollowUps(db: Db, now = Date.now()): Promise<{ lead
   const people = await db.select({ id: users.id, email: users.email, fullName: users.fullName, status: users.status })
     .from(users).where(inArray(users.id, [...byOwner.keys()]));
   const ownerOf = new Map(people.map((u) => [u.id, u]));
+  // Owners who turned follow-up reminders off in the app hear nothing today.
+  const wanted = await allowedUsers([...byOwner.keys()], "followUps");
 
   const due: DueFollowUps[] = [];
   for (const [userId, list] of byOwner) {
     const owner = ownerOf.get(userId);
     if (!owner || owner.status !== "active" || !mailable(owner.email)) continue;
+    if (!wanted.has(userId)) continue;
     due.push({
       userId, to: owner.email, count: list.length,
       render: () => leadFollowUpsDueEmail({

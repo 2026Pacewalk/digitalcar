@@ -5,7 +5,7 @@ import { and, eq, inArray, isNull, like, or } from "drizzle-orm";
 import {
   accountDeletionRequests, analyticsEvents, appSessions, appSettings, cardBlocks, cardEvents, cards, cardTrials,
   companies, companyMembers, customDomains, emailLogs, leads, mediaLibrary, notifications, publishedCards,
-  pushTokens, subscriptions, users,
+  notificationPrefs, pushTokens, subscriptions, users,
 } from "@db/schema";
 import type { getDb } from "../queries/connection";
 import { forgetSession } from "../context";
@@ -151,6 +151,7 @@ export async function completeAccountDeletion(
     await tx.delete(companyMembers).where(eq(companyMembers.userId, userId));
     await tx.delete(appSessions).where(eq(appSessions.userId, userId));
     await tx.delete(pushTokens).where(eq(pushTokens.userId, userId));
+    await tx.delete(notificationPrefs).where(eq(notificationPrefs.userId, userId));
     // Rows sent to them, and notices that name them (e.g. the deletion request itself).
     const likeEmail = `%${originalEmail.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
     await tx.delete(emailLogs).where(or(eq(emailLogs.userId, userId), eq(emailLogs.toEmail, originalEmail), like(emailLogs.subject, likeEmail)));

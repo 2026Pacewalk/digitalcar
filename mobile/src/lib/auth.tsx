@@ -15,7 +15,8 @@ export type SessionUser = {
   id: number;
   email: string;
   fullName: string;
-  role: "super_admin" | "reseller" | "customer";
+  // "staff" is a DigitalCarda team account (admin console only), refused at sign-in.
+  role: "super_admin" | "reseller" | "customer" | "staff";
   avatar?: string | null;
 };
 

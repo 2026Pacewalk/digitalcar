@@ -1006,6 +1006,25 @@ export const appWebLinks = mysqlTable("app_web_links", {
   index("app_web_links_user_idx").on(table.userId),
 ]);
 
+// ─── What we're allowed to tell an owner about ──────────────────
+// One row per owner, written from the app's Alerts screen. The same choice
+// governs push and email for that kind of message, so turning "tips" off stops
+// both. A missing row means everything is on (see api/lib/notify-prefs.ts).
+// Account, security and payment-receipt emails are never governed by this.
+export const notificationPrefs = mysqlTable("notification_prefs", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().unique(),
+  enquiries: boolean("enquiries").notNull().default(true),   // a new enquiry on the card
+  followUps: boolean("follow_ups").notNull().default(true),  // follow-up reminders
+  plan: boolean("plan").notNull().default(true),             // trial and plan reminders
+  rewards: boolean("rewards").notNull().default(true),       // referral rewards and payouts
+  tips: boolean("tips").notNull().default(true),             // tips, product news, digests
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type NotificationPrefs = typeof notificationPrefs.$inferSelect;
+
 export type AccountDeletionRequest = typeof accountDeletionRequests.$inferSelect;
 
 // ─── Staff: which admin modules a team member may use ───────────

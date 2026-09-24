@@ -22,7 +22,7 @@ export default function SignIn() {
 
   const login = trpc.auth.login.useMutation({
     onSuccess: async ({ token, user }) => {
-      if (user.role === "super_admin") {
+      if (user.role === "super_admin" || user.role === "staff") {
         setError("This app is for card owners. Admin tools are at digitalcarda.in/admin.");
         haptics.warning();
         return;

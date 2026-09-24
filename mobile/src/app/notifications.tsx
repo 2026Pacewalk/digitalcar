@@ -52,7 +52,7 @@ export default function Notifications() {
         keyExtractor={(n) => String(n.id)}
         contentContainerStyle={{ padding: space.lg, gap: space.sm }}
         refreshControl={<RefreshControl refreshing={refreshing} tintColor={c.accent} colors={[c.accent]} onRefresh={async () => { setRefreshing(true); try { await list.refetch(); } finally { setRefreshing(false); } }} />}
-        ListEmptyComponent={<EmptyState icon={<BellOff color={c.muted} size={32} />} title="You're all caught up" body="Enquiries, rewards and plan reminders appear here." />}
+        ListEmptyComponent={<EmptyState icon={<BellOff color={c.muted} size={32} />} title="You're all caught up" body="Enquiries, rewards and plan reminders appear here, whatever you've chosen in More → Alerts." />}
         renderItem={({ item: n }) => (
           <Pressable
             accessibilityRole="button"

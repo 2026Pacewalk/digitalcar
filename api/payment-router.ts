@@ -8,6 +8,7 @@ import {
 import { eq, desc, and, gt, ne, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
+import { allows } from "./lib/notify-prefs";
 import {
   paymentSubmittedEmail, paymentToVerifyAdminEmail, paymentVerifiedEmail, paymentRejectedEmail, referralRewardEmail, resellerCommissionEmail,
   onlineSaleAdminEmail, paymentSettingsChangedAdminEmail,
@@ -325,7 +326,10 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
           message: `${buyer.fullName} went paid — ₹${reward} added to your wallet.`, link: "/dashboard/refer",
         });
         const rrUser = await db.query.users.findFirst({ where: eq(users.id, buyer.referredById), columns: { email: true, fullName: true } });
-        void sendEmail(rrUser?.email, referralRewardEmail({ name: rrUser?.fullName, refereeName: buyer.fullName, amount: reward, balance: nextBal }));
+        // The wallet entry and the bell stay; only the email follows the switch.
+        if (await allows(buyer.referredById, "rewards")) {
+          void sendEmail(rrUser?.email, referralRewardEmail({ name: rrUser?.fullName, refereeName: buyer.fullName, amount: reward, balance: nextBal }));
+        }
       }
     }
   } catch { /* non-critical */ }

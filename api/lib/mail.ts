@@ -240,6 +240,9 @@ async function emailCardOwner(ownerUserId: number, lead: LeadEmail, hot: boolean
   // Suspended accounts and pending deletions (status "inactive") get nothing.
   if (!owner?.email || owner.status !== "active") return;
   if (addressOf(owner.email) === addressOf(ownerAddress())) return;
+  // The owner can turn enquiry alerts off (app → More → Alerts).
+  const { allows } = await import("./notify-prefs");
+  if (!(await allows(ownerUserId, "enquiries"))) return;
 
   // Snapshot cards have no title column; their business name lives in the
   // published data. Only a nicer label, so a failed lookup just drops it.

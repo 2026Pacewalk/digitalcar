@@ -9,6 +9,7 @@ import {
 import { eq, desc, and, gt, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
+import { allows } from "./lib/notify-prefs";
 import {
   payoutRequestAdminEmail, payoutCompletedEmail, payoutRequestReceivedEmail, payoutRejectedEmail, referralRewardEmail,
 } from "./lib/email-templates";
@@ -126,6 +127,7 @@ async function emailManualReward(db: ReturnType<typeof getDb>, ref: Referral, am
   const referrer = people.find((u) => u.id === ref.referrerId);
   // The friend's name only — never their email. May be unknown (refereeId is nullable).
   const referee = ref.refereeId ? people.find((u) => u.id === ref.refereeId) : undefined;
+  if (ref.referrerId && !(await allows(ref.referrerId, "rewards"))) return;
   await sendEmail(referrer?.email, referralRewardEmail({
     name: referrer?.fullName, refereeName: referee?.fullName, amount, balance, creditedByTeam: true,
   }));

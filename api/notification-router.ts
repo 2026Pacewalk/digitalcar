@@ -50,6 +50,27 @@ export const notificationRouter = createRouter({
     return { ok: true };
   }),
 
+  /* What the owner wants to hear about. One switch per kind of message, for
+     push and email alike (api/lib/notify-prefs.ts); the bell keeps everything
+     either way, and account, security and payment mail is never affected. */
+  prefs: authedQuery.query(async ({ ctx }) => {
+    const { getPrefs } = await import("./lib/notify-prefs");
+    return getPrefs(ctx.user.id);
+  }),
+
+  setPrefs: authedQuery
+    .input(z.object({
+      enquiries: z.boolean().optional(),
+      followUps: z.boolean().optional(),
+      plan: z.boolean().optional(),
+      rewards: z.boolean().optional(),
+      tips: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { setPrefs } = await import("./lib/notify-prefs");
+      return setPrefs(ctx.user.id, input);
+    }),
+
   clearAll: authedQuery.mutation(async ({ ctx }) => {
     const db = getDb();
     // The cron jobs (cron/lifecycle.ts, cron/trial-emails.ts) use rows in THIS
