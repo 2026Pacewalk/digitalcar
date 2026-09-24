@@ -446,16 +446,16 @@ function FeatureArt({ id }: { id: HeaderMenu["id"] }) {
   }
 
   return (
-    <span aria-hidden="true" className="relative mx-auto flex flex-col items-center">
-      <span className="flex -space-x-3">
-        {["#F7B31C", "#14B8A6", "#6366F1", "#F43F5E", "#0EA5E9"].map((c, i) => (
-          <span key={c} className="h-11 w-11 rounded-full border-2 border-[#0B1120] transition-transform duration-500 group-hover:-translate-y-1 motion-reduce:transition-none" style={{ background: c, transitionDelay: `${i * 40}ms` }} />
-        ))}
-      </span>
-      <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/15">
-        <Handshake size={13} className="text-[#F7B31C]" /> 20–30% recurring
-      </span>
-    </span>
+    <img
+      src="/images/header-business.webp"
+      alt=""
+      aria-hidden="true"
+      width={640}
+      height={420}
+      loading="lazy"
+      decoding="async"
+      className="relative mx-auto block w-full max-w-[215px] transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+    />
   );
 }
 

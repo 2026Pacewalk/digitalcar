@@ -180,51 +180,17 @@ const FAQ_LD = {
   })),
 };
 
-/* ── Hero art: the card, with features orbiting it (decorative) ── */
-const ORBIT: { icon: IconT; label: string; tint: string; pos: string; delay: string }[] = [
-  { icon: QrCode, label: "QR scan", tint: "#14B8A6", pos: "left-[-8%] top-[14%]", delay: "0s" },
-  { icon: MessageCircle, label: "WhatsApp", tint: "#22C55E", pos: "right-[-10%] top-[8%]", delay: ".8s" },
-  { icon: Wallet, label: "UPI paid", tint: "#EC4899", pos: "right-[-14%] top-[46%]", delay: "1.6s" },
-  { icon: Sparkles, label: "AI wrote it", tint: "#8B5CF6", pos: "left-[-14%] top-[52%]", delay: "2.4s" },
-  { icon: BarChart3, label: "+38 views", tint: "#3B82F6", pos: "left-[4%] bottom-[2%]", delay: "1.2s" },
-  { icon: UserPlus, label: "New lead", tint: "#F7B31C", pos: "right-[-2%] bottom-[6%]", delay: "2s" },
-];
-
+/* ── Hero art: the card with everything it can do, shown at once ── */
 function HeroArt() {
   return (
-    <div aria-hidden="true" className="relative mx-auto w-[240px] sm:w-[270px] h-[400px] sm:h-[440px]">
-      <span className="absolute inset-[-30%] rounded-full border border-white/[0.06]" />
-      <span className="absolute inset-[-12%] rounded-full border border-dashed border-white/[0.08] dc-feat-spin" />
-      <div className="absolute inset-0 rounded-[2.2rem] bg-[#0B1120] p-2.5 ring-1 ring-white/15 shadow-[0_40px_90px_-30px_rgba(247,179,28,0.45)] dc-feat-float">
-        <div className="h-full rounded-[1.8rem] bg-white overflow-hidden flex flex-col">
-          <div className="h-24 bg-gradient-to-br from-[#F7B31C] to-[#E09A12] relative">
-            <span className="absolute left-1/2 -bottom-8 -translate-x-1/2 w-16 h-16 rounded-2xl bg-[#0F172A] ring-4 ring-white flex items-center justify-center font-display text-lg font-extrabold text-[#F7B31C]">AM</span>
-          </div>
-          <div className="pt-10 px-4 text-center">
-            <p className="font-display text-[15px] font-extrabold text-[#0F172A]">Aarav Mehta</p>
-            <p className="text-[11px] text-[#64748B]">Nayara Interiors</p>
-          </div>
-          <div className="mt-3 px-4 grid grid-cols-3 gap-1.5">
-            {[{ i: Phone, c: "#3B82F6" }, { i: MessageCircle, c: "#22C55E" }, { i: MapPin, c: "#EF4444" }].map(({ i: I, c }, k) => (
-              <span key={k} className="h-9 rounded-xl flex items-center justify-center" style={{ background: `${c}1A`, color: c }}><I size={15} /></span>
-            ))}
-          </div>
-          <div className="mt-3 mx-4 rounded-xl bg-[#F8FAFC] p-2.5 space-y-1.5">
-            <span className="block h-2 w-3/4 rounded-full bg-[#E2E8F0]" />
-            <span className="block h-2 w-1/2 rounded-full bg-[#E2E8F0]" />
-          </div>
-          <div className="mt-auto m-4 h-10 rounded-xl bg-[#0F172A] text-white text-[12px] font-bold flex items-center justify-center gap-1.5"><Download size={13} /> Save contact</div>
-        </div>
-      </div>
-      {ORBIT.map((o) => (
-        <span key={o.label} className={`absolute ${o.pos} dc-feat-bob`} style={{ animationDelay: o.delay }}>
-          <span className="flex items-center gap-1.5 rounded-full bg-white/95 pl-1 pr-2.5 py-1 text-[11px] font-bold text-[#0F172A] shadow-xl whitespace-nowrap">
-            <span className="w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ background: o.tint }}><o.icon size={12} /></span>
-            {o.label}
-          </span>
-        </span>
-      ))}
-    </div>
+    <img
+      src="/images/features-hero.webp"
+      alt=""
+      aria-hidden="true"
+      width={720}
+      height={884}
+      className="mx-auto block w-[280px] max-w-full sm:w-[340px] lg:w-[400px] dc-feat-float"
+    />
   );
 }
 
