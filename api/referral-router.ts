@@ -6,7 +6,7 @@ import {
   users, referrals, walletTransactions, withdrawalRequests, appSettings,
   subscriptions, notifications, publishedCards, type Referral, type WithdrawalRequest,
 } from "@db/schema";
-import { eq, desc, and, gt, inArray, sql } from "drizzle-orm";
+import { eq, ne, desc, and, gt, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { allows } from "./lib/notify-prefs";
@@ -14,6 +14,7 @@ import {
   payoutRequestAdminEmail, payoutCompletedEmail, payoutRequestReceivedEmail, payoutRejectedEmail, referralRewardEmail,
 } from "./lib/email-templates";
 import { enforceRateLimit } from "./lib/rate-limit";
+import { applyWallet, affectedRows } from "./lib/wallet";
 
 const COMMISSION_KEY = "referral_commission_percent";
 const DISCOUNT_KEY = "referral_discount_percent";
@@ -77,35 +78,6 @@ export async function resolveReferrer(db: ReturnType<typeof getDb>, codeIn: stri
   })) ?? null;
 }
 
-/** Apply a signed amount to a user's wallet and record a statement line. */
-async function applyWallet(
-  db: ReturnType<typeof getDb>,
-  userId: number,
-  amount: number, // positive = credit, negative = debit
-  opts: {
-    type: "reward" | "withdrawal" | "adjustment";
-    status?: "pending" | "completed" | "reversed";
-    referralId?: number;
-    withdrawalId?: number;
-    note?: string;
-  }
-): Promise<number> {
-  const user = await db.query.users.findFirst({ where: eq(users.id, userId), columns: { walletBalance: true } });
-  const current = n(user?.walletBalance);
-  const next = Math.round((current + amount) * 100) / 100;
-  await db.update(users).set({ walletBalance: money(next) }).where(eq(users.id, userId));
-  await db.insert(walletTransactions).values({
-    userId,
-    type: opts.type,
-    amount: money(amount),
-    balanceAfter: money(next),
-    status: opts.status ?? "completed",
-    referralId: opts.referralId ?? null,
-    withdrawalId: opts.withdrawalId ?? null,
-    note: opts.note ?? null,
-  });
-  return next;
-}
 
 /* Customer emails for admin wallet actions. Fire-and-forget (the payee lookup
    runs after the response), so an email problem never fails the admin's action. */
@@ -225,21 +197,28 @@ export const referralRouter = createRouter({
       if (input.amount < 1) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum payout is ₹1" });
       }
-      const [ins] = await db.insert(withdrawalRequests).values({
-        userId: ctx.user.id,
-        amount: money(input.amount),
-        method: input.method,
-        destination: input.destination.trim(),
-        accountName: input.accountName?.trim() || null,
-        ifsc: input.ifsc?.trim() || null,
-        status: "pending",
-      });
-      // Hold the funds immediately so the balance can't be double-spent.
-      const balanceAfter = await applyWallet(db, ctx.user.id, -input.amount, {
-        type: "withdrawal",
-        status: "pending",
-        withdrawalId: ins.insertId,
-        note: `Payout request via ${input.method.toUpperCase()}`,
+      // The request and the hold on the funds are one step. The check above is
+      // only a friendly early answer; the real one happens inside applyWallet
+      // with the wallet row locked, so two requests sent at the same moment
+      // can't both spend the same balance — the second is refused and its
+      // request row rolls back with it.
+      const { insertId, balanceAfter } = await db.transaction(async (tx) => {
+        const [ins] = await tx.insert(withdrawalRequests).values({
+          userId: ctx.user.id,
+          amount: money(input.amount),
+          method: input.method,
+          destination: input.destination.trim(),
+          accountName: input.accountName?.trim() || null,
+          ifsc: input.ifsc?.trim() || null,
+          status: "pending",
+        });
+        const bal = await applyWallet(db, ctx.user.id, -input.amount, {
+          type: "withdrawal",
+          status: "pending",
+          withdrawalId: ins.insertId,
+          note: `Payout request via ${input.method.toUpperCase()}`,
+        }, tx);
+        return { insertId: ins.insertId, balanceAfter: bal };
       });
 
       // Alert the owner about the payout request (non-blocking).
@@ -252,10 +231,10 @@ export const referralRouter = createRouter({
       void sendEmail(ctx.user.email, payoutRequestReceivedEmail({
         name: ctx.user.fullName, amount: input.amount, method: input.method,
         destinationMasked: input.destination.trim(), accountName: input.accountName?.trim() || null, ifsc: input.ifsc?.trim() || null,
-        balance: balanceAfter, requestId: ins.insertId, requestedAt: new Date(),
+        balance: balanceAfter, requestId: insertId, requestedAt: new Date(),
       }));
 
-      return { ok: true, id: ins.insertId };
+      return { ok: true, id: insertId };
     }),
 
   // ─── Public: current referral rates (for the marketing page) ───
@@ -396,13 +375,14 @@ export const referralRouter = createRouter({
       const db = getDb();
       const ref = await db.query.referrals.findFirst({ where: eq(referrals.id, input.referralId) });
       if (!ref) throw new TRPCError({ code: "NOT_FOUND", message: "Referral not found" });
-      if (ref.status === "rewarded") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This referral has already been rewarded" });
-      }
-      await db
+      // Claim it, so a double-click (or two admins) can't credit the reward twice.
+      const claimed = await db
         .update(referrals)
         .set({ status: "rewarded", rewardAmount: money(input.amount), rewardedAt: new Date() })
-        .where(eq(referrals.id, input.referralId));
+        .where(and(eq(referrals.id, input.referralId), ne(referrals.status, "rewarded")));
+      if (affectedRows(claimed) === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This referral has already been rewarded" });
+      }
       const balance = await applyWallet(db, ref.referrerId, input.amount, {
         type: "reward",
         referralId: ref.id,
@@ -445,11 +425,14 @@ export const referralRouter = createRouter({
       const db = getDb();
       const wr = await db.query.withdrawalRequests.findFirst({ where: eq(withdrawalRequests.id, input.id) });
       if (!wr) throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
-      if (wr.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
-      await db
+      // Claim it: only one of Pay / Reject can move a request out of 'pending'.
+      // Two admins acting at once used to be able to both succeed — paying the
+      // partner and refunding the same money to their wallet.
+      const claimed = await db
         .update(withdrawalRequests)
         .set({ status: "paid", reference: input.reference?.trim() || null, processedAt: new Date() })
-        .where(eq(withdrawalRequests.id, input.id));
+        .where(and(eq(withdrawalRequests.id, input.id), eq(withdrawalRequests.status, "pending")));
+      if (affectedRows(claimed) === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
       // settle the held transaction
       await db
         .update(walletTransactions)
@@ -477,11 +460,13 @@ export const referralRouter = createRouter({
       const db = getDb();
       const wr = await db.query.withdrawalRequests.findFirst({ where: eq(withdrawalRequests.id, input.id) });
       if (!wr) throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
-      if (wr.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
-      await db
+      // Claim it before refunding — see payWithdrawal. Losing the claim means
+      // someone else already paid or rejected it, so there is nothing to refund.
+      const claimed = await db
         .update(withdrawalRequests)
         .set({ status: "rejected", adminNote: input.note?.trim() || null, processedAt: new Date() })
-        .where(eq(withdrawalRequests.id, input.id));
+        .where(and(eq(withdrawalRequests.id, input.id), eq(withdrawalRequests.status, "pending")));
+      if (affectedRows(claimed) === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
       await db
         .update(walletTransactions)
         .set({ status: "reversed" })

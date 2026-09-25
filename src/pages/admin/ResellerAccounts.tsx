@@ -1,14 +1,19 @@
 /*
- * Admin → Reseller Accounts: card orders resellers place offline and the cash /
- * UPI / bank / cheque payments they make, with each reseller's commission % and
- * a running balance. Amounts are calculated on the server (reseller-ledger-router).
+ * Admin → Resellers: the one reseller module. Every reseller is one row here —
+ * their login (if they have one) with the customers and commission it brings in
+ * online, and their offline book: the card orders they place with you and the
+ * cash / UPI / bank / cheque payments they make, with a running balance.
+ * Applications from the public form are a tab. Amounts are calculated on the
+ * server (reseller-ledger-router).
  */
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import { trpc } from "@/providers/trpc";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
+import ResellerApplicationsPanel from "@/components/admin/ResellerApplicationsPanel";
 import { toast } from "sonner";
 import {
-  BookOpenCheck, Download, IndianRupee, Loader2, Pencil, Plus, Printer, Search, Trash2, Wallet, X,
+  BookOpenCheck, Download, IndianRupee, KeyRound, Loader2, Pencil, Plus, Printer, Search, Trash2, UserCheck, Wallet, X,
 } from "lucide-react";
 
 const inr = (n: number) => (n < 0 ? "−₹" : "₹") + Math.abs(Math.round(n)).toLocaleString("en-IN");
@@ -60,6 +65,11 @@ const errMsg = (e: unknown, fallback: string) => {
 export default function AdminResellerAccounts() {
   const utils = trpc.useUtils();
   const { data: overview, isLoading } = trpc.resellerLedger.overview.useQuery();
+  // Old /admin/reseller-applications links arrive here with ?tab=applications.
+  const [params, setParams] = useSearchParams();
+  const view = params.get("tab") === "applications" ? "applications" : "resellers";
+  const setView = (v: "resellers" | "applications") => setParams(v === "applications" ? { tab: "applications" } : {}, { replace: true });
+  const grantLogin = trpc.reseller.grantLogin.useMutation();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [accountForm, setAccountForm] = useState<AccountForm | null>(null);
@@ -137,6 +147,22 @@ export default function AdminResellerAccounts() {
     } catch (e) { toast.error(errMsg(e, "Could not save the reseller")); }
   };
 
+  // Turn an offline partner into someone who can sign in. They get an email
+  // with a link to set their own password; we never choose one for them.
+  const onGrantLogin = async (a: { id: number; name: string; email: string | null }) => {
+    let email = a.email?.trim() || "";
+    if (!email) {
+      email = (window.prompt(`${a.name} has no email address yet. Enter the one they'll sign in with:`) || "").trim();
+      if (!email) return;
+    }
+    if (!window.confirm(`Create a reseller login for ${a.name} and email a set-password link to ${email}?`)) return;
+    try {
+      const r = await grantLogin.mutateAsync({ accountId: a.id, email });
+      toast.success(r.isNew ? `Login created — ${a.name} has been emailed a link to set their password` : `${a.name}'s existing account is now a reseller login`);
+      await refresh();
+    } catch (e) { toast.error(errMsg(e, "Could not create the login")); }
+  };
+
   const orderPreview = orderForm && account ? (() => {
     const qty = Number(orderForm.quantity) || 0;
     const price = Number(orderForm.unitPrice) || 0;
@@ -198,15 +224,31 @@ export default function AdminResellerAccounts() {
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0F172A] text-[#F7B31C]"><BookOpenCheck size={20} /></span>
             <div>
-              <h1 className="text-xl font-bold text-[#0F172A]">Reseller accounts</h1>
-              <p className="text-[13px] text-[#64748B]">Card orders resellers place with you, the cash / UPI payments they make, and their commission</p>
+              <h1 className="text-xl font-bold text-[#0F172A]">Resellers</h1>
+              <p className="text-[13px] text-[#64748B]">Every partner — their login and online commission, the card orders they place with you, and what they owe</p>
             </div>
           </div>
-          <button type="button" onClick={() => openAccountForm()}
-            className="gradient-gold inline-flex h-10 items-center gap-2 rounded-xl px-4 text-[13.5px] font-bold text-[#0F172A] hover:shadow-gold">
-            <Plus size={16} /> Add reseller
-          </button>
+          {view === "resellers" && (
+            <button type="button" onClick={() => openAccountForm()}
+              className="gradient-gold inline-flex h-10 items-center gap-2 rounded-xl px-4 text-[13.5px] font-bold text-[#0F172A] hover:shadow-gold">
+              <Plus size={16} /> Add reseller
+            </button>
+          )}
         </div>
+
+        <div role="tablist" aria-label="Resellers" className="flex gap-5 border-b border-[#E2E8F0]">
+          {([["resellers", `Resellers (${accounts.length})`], ["applications", "Applications"]] as const).map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)}
+              className={`-mb-px inline-flex items-center gap-1.5 border-b-2 pb-2.5 text-[13.5px] font-semibold transition-colors ${view === k ? "border-[#F7B31C] text-[#0F172A]" : "border-transparent text-[#64748B] hover:text-[#0F172A]"}`}>
+              {label}
+              {k === "applications" && (overview?.pendingApplications ?? 0) > 0 && (
+                <span className="rounded-full bg-[#F7B31C] px-1.5 text-[10.5px] font-bold text-[#0F172A]">{overview?.pendingApplications}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {view === "applications" ? <ResellerApplicationsPanel /> : <>
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
@@ -290,7 +332,10 @@ export default function AdminResellerAccounts() {
                         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${on ? "bg-[#F7B31C] text-[#0F172A]" : "bg-[#FEF3C7] text-[#92400E]"}`}>{a.name.charAt(0).toUpperCase()}</span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13.5px] font-semibold">{a.name}{!a.active && <span className="ml-1 text-[11px] font-normal opacity-60">(inactive)</span>}</span>
-                          <span className={`block text-[11.5px] ${on ? "text-white/70" : "text-[#64748B]"}`}>{a.commissionRate}% · {a.totals.cards} cards</span>
+                          <span className={`flex items-center gap-1 text-[11.5px] ${on ? "text-white/70" : "text-[#64748B]"}`}>
+                            {a.login ? <UserCheck size={12} className={on ? "text-[#86EFAC]" : "text-[#16A34A]"} aria-label="Has a login" /> : null}
+                            {a.commissionRate}% · {a.totals.cards} cards{a.login ? ` · ${a.login.customers} customers` : ""}
+                          </span>
                         </span>
                         <span className={`shrink-0 text-[12.5px] font-bold tabular-nums ${a.totals.outstanding > 0 ? (on ? "text-[#FDE68A]" : "text-[#B45309]") : on ? "text-white/80" : "text-[#16A34A]"}`}>{inr(a.totals.outstanding)}</span>
                       </button>
@@ -311,7 +356,7 @@ export default function AdminResellerAccounts() {
                       <div>
                         <h2 className="text-lg font-bold text-[#0F172A]">{account.name}</h2>
                         <p className="text-[13px] text-[#64748B]">{[account.company, account.phone, account.email].filter(Boolean).join(" · ") || "No contact details"}</p>
-                        <p className="mt-1 text-[12.5px] text-[#475569]">Commission <b>{account.commissionRate}%</b>{account.resellerUserId ? " · linked to a reseller login" : ""}</p>
+                        <p className="mt-1 text-[12.5px] text-[#475569]">Commission <b>{account.commissionRate}%</b></p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => openAccountForm(account)} className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[12.5px] font-semibold text-[#475569] ring-1 ring-[#E2E8F0] hover:bg-[#F8FAFC]"><Pencil size={14} /> Edit</button>
@@ -340,6 +385,45 @@ export default function AdminResellerAccounts() {
                         ))}
                       </dl>
                     )}
+
+                    {/* Online side: the login, and what it has brought in. */}
+                    {(() => {
+                      const row = accounts.find((a) => a.id === account.id);
+                      const login = row?.login;
+                      if (!login) {
+                        return (
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-4 py-3">
+                            <p className="text-[12.5px] text-[#475569]">
+                              <b className="text-[#0F172A]">No login yet.</b> {account.name} can't sign in, add customers or see their commission until they have one.
+                            </p>
+                            <button type="button" onClick={() => onGrantLogin({ id: account.id, name: account.name, email: account.email })} disabled={grantLogin.isPending}
+                              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#0F172A] px-3 text-[12.5px] font-bold text-white disabled:opacity-60">
+                              {grantLogin.isPending ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />} Give them a login
+                            </button>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="mt-4 rounded-xl bg-[#F0FDF4] px-4 py-3">
+                          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-[#166534]">
+                            <UserCheck size={14} /> <b>Signs in as {login.email}</b>
+                            <span className="text-[#15803D]/70">· {login.lastLoginAt ? `last seen ${dayStr(login.lastLoginAt)}` : "hasn't signed in yet"}</span>
+                          </p>
+                          <dl className="mt-2 grid grid-cols-3 gap-3">
+                            {[
+                              { l: "Customers", v: login.customers.toLocaleString("en-IN") },
+                              { l: "Commission earned online", v: inr2(login.commissionEarned) },
+                              { l: "In their wallet", v: inr2(login.walletBalance) },
+                            ].map((x) => (
+                              <div key={x.l}>
+                                <dt className="text-[11px] text-[#15803D]/80">{x.l}</dt>
+                                <dd className="text-[15px] font-extrabold tabular-nums text-[#14532D]">{x.v}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {orderForm && orderPreview && (
@@ -504,6 +588,7 @@ export default function AdminResellerAccounts() {
             </section>
           </div>
         )}
+        </>}
       </div>
     </ResponsiveDashboardLayout>
   );

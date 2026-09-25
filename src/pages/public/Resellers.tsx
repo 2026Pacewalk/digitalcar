@@ -10,8 +10,8 @@
 import { Link } from "react-router";
 import { useEffect, useState } from "react";
 import {
-  Users, CreditCard, BarChart3, Palette, FileText, TrendingUp, ArrowRight,
-  ChevronRight, Check, Clock, Wallet, ShieldCheck, Globe, Rocket, Headphones,
+  Users, CreditCard, FileText, TrendingUp, ArrowRight,
+  ChevronRight, Check, Wallet, ShieldCheck, Globe, Rocket, Headphones,
   Handshake, Printer, Building2, Layers, BadgePercent, Sparkles, IndianRupee,
 } from "lucide-react";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
@@ -21,10 +21,11 @@ import JsonLd from "@/components/seo/JsonLd";
    AVG_PLAN is the yearly value of a typical customer subscription and is
    stated on screen so the estimate is never a black box. */
 const AVG_PLAN = 999;
+/* One standard rate. Rates that rise automatically with volume aren't built, so
+   the page doesn't promise them — bigger partners agree a higher rate one to one.
+   Keep this in step with the default in api/reseller-router.ts (approve). */
 const BANDS = [
-  { name: "Starter", min: 5, max: 24, rate: 20, accent: "#14B8A6", blurb: "Getting your first customers on board." },
-  { name: "Growth", min: 25, max: 99, rate: 25, accent: "#F7B31C", blurb: "A steady book of recurring accounts." },
-  { name: "Elite", min: 100, max: Infinity, rate: 30, accent: "#8B5CF6", blurb: "A full agency operation at the top rate." },
+  { name: "Partner", min: 1, max: Infinity, rate: 20, accent: "#F7B31C", blurb: "On every paid plan your customers buy, renewals included. Partners who bring bigger volumes can agree a higher rate with us." },
 ];
 const bandFor = (n: number) => BANDS.find((b) => n >= b.min && n <= b.max) ?? BANDS[0];
 const inr = (n: number) => "Rs. " + Math.round(n).toLocaleString("en-IN");
@@ -33,20 +34,16 @@ const WA_NUMBER = "919517722444";
 const waLink = (msg: string) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`;
 
 const WHY = [
-  { icon: TrendingUp, accent: "#14B8A6", title: "Recurring, Not One-Off", desc: "Every customer renews yearly, so the book you build this year still pays you next year." },
-  { icon: Palette, accent: "#8B5CF6", title: "Your Brand, Not Ours", desc: "Your logo, your colours, your domain. Customers never see DigitalCarda anywhere." },
+  { icon: TrendingUp, accent: "#14B8A6", title: "Recurring, Not One-Off", desc: "Customers renew every year, and you earn on every renewal — not just the first sale." },
+  { icon: Wallet, accent: "#8B5CF6", title: "Paid When You Ask", desc: "Commission lands in your wallet the moment a customer pays. Withdraw it to your bank or UPI whenever you like." },
   { icon: ShieldCheck, accent: "#F7B31C", title: "No Stock, No Dev Team", desc: "Nothing to print, nothing to host, nothing to maintain. We run the platform, you run the business." },
 ];
 
 const PLATFORM = [
-  { icon: Users, title: "Add Customers", desc: "Create and manage unlimited customer accounts from one dashboard." },
-  { icon: CreditCard, title: "Assign Packages", desc: "Allocate Trial, Gold or Platinum plans to each customer in a click." },
-  { icon: Clock, title: "Track Expiry", desc: "See every renewal date and send reminders before a plan lapses." },
-  { icon: BarChart3, title: "Manage Leads", desc: "Every lead captured across all your customers' cards, in one list." },
-  { icon: Palette, title: "White-Label Branding", desc: "Rebrand the whole platform with your logo, colours and domain." },
-  { icon: Wallet, title: "Commission Reports", desc: "Track earnings, commissions and payouts with a clear statement." },
-  { icon: TrendingUp, title: "Customer Analytics", desc: "Views, clicks and engagement across your entire customer base." },
-  { icon: FileText, title: "Marketing Material", desc: "Ready-made brochures, decks and email templates you can send today." },
+  { icon: Users, title: "Add Customers", desc: "Create accounts for your customers from one dashboard. They're linked to you from day one." },
+  { icon: CreditCard, title: "See Their Payments", desc: "Every plan your customers buy, with the amount and status, in one list you can export." },
+  { icon: FileText, title: "Itemised Statement", desc: "Every commission you earn, with the customer, what they paid and your rate." },
+  { icon: Wallet, title: "Withdraw Any Time", desc: "Request a payout to your bank or UPI whenever you like, and track it until it lands." },
 ];
 
 const AUDIENCE = [
@@ -58,18 +55,18 @@ const AUDIENCE = [
 
 const STEPS = [
   { icon: FileText, num: 1, title: "Apply", desc: "Send the reseller application. Our team reviews and approves your account." },
-  { icon: Palette, num: 2, title: "Brand It", desc: "Add your logo, pick your colours and point your own domain at the platform." },
-  { icon: Users, num: 3, title: "Add Customers", desc: "Create accounts, assign packages and build their cards from your dashboard." },
-  { icon: Wallet, num: 4, title: "Earn Monthly", desc: "Commission accrues on every subscription and is paid out each month." },
+  { icon: ShieldCheck, num: 2, title: "Get Your Login", desc: "Once you're approved, you get an email to set your password and open your partner dashboard." },
+  { icon: Users, num: 3, title: "Add Customers", desc: "Create their accounts from your dashboard. They choose a plan and pay, and you earn on it." },
+  { icon: Wallet, num: 4, title: "Withdraw", desc: "Your commission is ready to withdraw the moment they pay — to your bank or UPI." },
 ];
 
 const FAQS = [
-  { q: "How much commission do resellers earn?", a: "Resellers earn between 20% and 30% recurring commission on every customer subscription. The rate is set by how many active customers you hold, and it applies to renewals as well as new sales, not just the first year." },
-  { q: "Is there a minimum commitment?", a: "There is no lock-in and no minimum spend. The programme starts from five customer accounts, and you can grow at whatever pace suits your business." },
-  { q: "Can I use my own domain and branding?", a: "Yes. Full white-label support means your logo, your colours and your own domain throughout. Your customers sign in to your brand and never see ours." },
-  { q: "How and when do I get paid?", a: "Commissions are calculated monthly and paid by bank transfer or UPI once you cross the minimum payout threshold. Every statement itemises which customer each rupee came from." },
-  { q: "Do I need technical knowledge to resell?", a: "No. There is nothing to host, install or maintain. If you can fill in a form you can create a customer's card, and our team handles the platform, updates and uptime." },
-  { q: "What support do I get as a reseller?", a: "You get onboarding help, ready-made sales material, and a support channel for you rather than a general queue. Elite-tier partners also get a named account manager." },
+  { q: "How much commission do resellers earn?", a: "You earn 20% of every paid plan your customers buy, and it applies to renewals as well as new sales, not just the first year. Partners who bring larger volumes can agree a higher rate with us." },
+  { q: "Is there a minimum commitment?", a: "There is no lock-in and no minimum spend. You can grow at whatever pace suits your business." },
+  { q: "Can I use my own domain and branding?", a: "Not yet — today your customers sign in to DigitalCarda. A white-label option, with your own domain, logo and colours, is on its way. Ask us about it if you'd like to be one of the first." },
+  { q: "How and when do I get paid?", a: "Your commission is credited to your partner wallet the moment a customer's payment clears. Withdraw it to your bank account or UPI whenever you like, and your statement itemises which customer each rupee came from." },
+  { q: "Do I need technical knowledge to resell?", a: "No. There is nothing to host, install or maintain. If you can fill in a form you can add a customer, and our team handles the platform, updates and uptime." },
+  { q: "What support do I get as a reseller?", a: "You get onboarding help and a direct WhatsApp line to our team rather than a general queue." },
 ];
 
 const FAQ_LD = {
@@ -107,7 +104,7 @@ export default function Resellers() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-10 items-center">
             <Reveal stagger>
               <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-white text-[#92400E] shadow-premium ring-1 ring-[#FEF3C7]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C] animate-pulse" /> Reseller programme · 20–30% recurring
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C] animate-pulse" /> Reseller programme · 20% on every plan
               </span>
               <h1 className="mt-6 text-[2.5rem] sm:text-5xl lg:text-[3.5rem] font-extrabold text-[#0F172A] leading-[1.07] tracking-tight">
                 Start Your Own{" "}
@@ -132,9 +129,9 @@ export default function Resellers() {
 
               <div className="mt-8 grid grid-cols-3 gap-3 max-w-md">
                 {[
-                  { v: "30%", label: "Top commission" },
-                  { v: "200+", label: "Active resellers" },
-                  { v: "0", label: "Setup cost" },
+                  { v: "20%", label: "On every plan" },
+                  { v: "Rs. 0", label: "Setup cost" },
+                  { v: "Any time", label: "Withdraw" },
                 ].map((s) => (
                   <div key={s.label} className="rounded-2xl bg-white shadow-premium border border-[#F1F5F9] px-3 py-3 text-center">
                     <p className="text-xl font-extrabold text-gradient-gold">{s.v}</p>
@@ -186,30 +183,8 @@ export default function Resellers() {
                     <span>5</span><span>100</span><span>200</span>
                   </div>
 
-                  {/* band chips */}
-                  <div className="mt-6 grid grid-cols-3 gap-2.5">
-                    {BANDS.map((b) => {
-                      const on = b.name === band.name;
-                      return (
-                        <button
-                          key={b.name}
-                          type="button"
-                          onClick={() => setCustomers(b.min)}
-                          className={`rounded-2xl p-3 text-left transition-all duration-300 ${on ? "ring-2 shadow-premium -translate-y-0.5" : "ring-1 ring-[#E8ECF3] hover:ring-[#CBD5E1]"}`}
-                          style={on ? { borderColor: b.accent, boxShadow: `0 0 0 2px ${b.accent}` } : undefined}
-                        >
-                          <span className="text-[11px] font-bold" style={{ color: on ? b.accent : "#94A3B8" }}>{b.name}</span>
-                          <p className="text-[15px] font-extrabold text-[#0F172A] leading-none mt-1">{b.rate}%</p>
-                          <p className="text-[10px] text-[#94A3B8] mt-1">
-                            {b.max === Infinity ? `${b.min}+ customers` : `${b.min}–${b.max}`}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-
                   <p className="mt-5 text-[11.5px] text-[#94A3B8] leading-relaxed">
-                    Estimated on an average customer plan of {inr(AVG_PLAN)} per year at your {band.rate}% band.
+                    Estimated on an average customer plan of {inr(AVG_PLAN)} per year at the standard {band.rate}% rate.
                     Actual earnings depend on the mix of plans you sell.
                   </p>
                 </div>
@@ -467,7 +442,7 @@ function RevenueVisual() {
           {[
             { icon: Users, label: "Customers", value: "120" },
             { icon: Layers, label: "Cards live", value: "340" },
-            { icon: BadgePercent, label: "Your rate", value: "30%" },
+            { icon: BadgePercent, label: "Your rate", value: "20%" },
           ].map((s) => (
             <div key={s.label} className="rounded-xl bg-[#F8FAFC] ring-1 ring-[#EEF2F7] px-3 py-2.5 text-center">
               <s.icon size={14} className="mx-auto text-[#B45309]" />
@@ -482,7 +457,7 @@ function RevenueVisual() {
       <div className="hidden sm:flex absolute -right-3 -bottom-4 items-center gap-2.5 bg-white rounded-2xl px-4 py-3 shadow-premium-lg ring-1 ring-[#F1F5F9] animate-float">
         <span className="w-9 h-9 rounded-xl bg-[#DCFCE7] flex items-center justify-center"><Wallet size={16} className="text-[#16A34A]" /></span>
         <div>
-          <p className="text-[11px] font-extrabold text-[#0F172A] leading-none">Paid monthly</p>
+          <p className="text-[11px] font-extrabold text-[#0F172A] leading-none">Withdraw any time</p>
           <p className="text-[9.5px] text-[#94A3B8] mt-1">Bank transfer or UPI</p>
         </div>
       </div>

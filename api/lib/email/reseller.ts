@@ -250,6 +250,9 @@ type ApprovedExtras = {
   commissionRate?: number | string | null;
   /** When the application was approved; defaults to now (the email is sent at approval). */
   approvedAt?: Date;
+  /** An offline partner given a login by the admin — they never applied, so the
+      copy says they have been set up rather than that an application was approved. */
+  invited?: boolean;
 };
 
 function firstStepsTail(startAt: number): { html: string; text: string[] } {
@@ -286,7 +289,9 @@ export function resellerApprovedEmail(o: { name?: string; link: string } & Appro
 
   const bodyHtml =
     hi(name) +
-    p("Your application to become a <strong>DigitalCarda reseller partner</strong> is <strong>approved</strong>. Your partner account is ready — set a password to open it.") +
+    p(o.invited
+      ? "You’ve been set up as a <strong>DigitalCarda reseller partner</strong>. Your partner account is ready — set a password to open it."
+      : "Your application to become a <strong>DigitalCarda reseller partner</strong> is <strong>approved</strong>. Your partner account is ready — set a password to open it.") +
     button("Set your password", href) +
     small(`This link works once and for 60 minutes. If it has expired, use ${goldLink(FORGOT, "Forgot password")} with ${email ? `<strong>${esc(email)}</strong>` : "this email address"} and we'll send a fresh one.`) +
     partnerPass({ name, company: o.companyName, email, rate, since: o.approvedAt || new Date() }) +
@@ -301,7 +306,9 @@ export function resellerApprovedEmail(o: { name?: string; link: string } & Appro
   const text = [
     `Hi ${first || "there"},`,
     "",
-    "Your application to become a DigitalCarda reseller partner is approved. Your partner account is ready - set a password to open it:",
+    o.invited
+      ? "You’ve been set up as a DigitalCarda reseller partner. Your partner account is ready - set a password to open it:"
+      : "Your application to become a DigitalCarda reseller partner is approved. Your partner account is ready - set a password to open it:",
     href,
     "",
     `The link works once and for 60 minutes. If it has expired, use Forgot password (${FORGOT}) with ${email || "this email address"} and we'll send a fresh one.`,
@@ -326,11 +333,11 @@ export function resellerApprovedEmail(o: { name?: string; link: string } & Appro
 
   return {
     kind: "resellerApprovedEmail",
-    subject: "You're approved — welcome, partner! 🎉",
+    subject: o.invited ? "Your DigitalCarda partner account is ready 🎉" : "You're approved — welcome, partner! 🎉",
     html: layout({
       preheader: "Set your password within 60 minutes to open your partner dashboard and add your first customer.",
       hero: heroBand({
-        eyebrow: "Partner application approved",
+        eyebrow: o.invited ? "Partner account ready" : "Partner application approved",
         tone: "green",
         icon: "🎉",
         title: first ? `Welcome to the partner programme, ${first}` : "Welcome to the partner programme",

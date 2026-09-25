@@ -128,6 +128,30 @@ const TABLES = {
     city VARCHAR(80) NULL, phone VARCHAR(30) NULL, source VARCHAR(16) NULL, ip VARCHAR(64) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX aigen_created_idx (created_at), INDEX aigen_phone_idx (phone))`,
+  /* The public "become a reseller" form writes here and Admin → Resellers reads
+     it. It existed on production only because an early drizzle push made it —
+     nothing in this repo ever created it, and it has since gone missing from
+     live, which broke the apply form and the approve flow outright. */
+  reseller_applications: `CREATE TABLE IF NOT EXISTS reseller_applications (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    full_name VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, phone VARCHAR(50) NULL,
+    company_name VARCHAR(255) NULL, message TEXT NULL,
+    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    user_id BIGINT UNSIGNED NULL, admin_note TEXT NULL, reviewed_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX ra_status_idx (status), INDEX ra_email_idx (email))`,
+  /* One row per commission a reseller earns — the itemised statement behind the
+     wallet credit, so a reseller can see which customer each rupee came from.
+     UNIQUE on the payment order makes crediting idempotent even if the order is
+     somehow activated twice. */
+  reseller_commissions: `CREATE TABLE IF NOT EXISTS reseller_commissions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    reseller_user_id BIGINT UNSIGNED NOT NULL, customer_user_id BIGINT UNSIGNED NOT NULL,
+    payment_order_id BIGINT UNSIGNED NOT NULL,
+    order_amount DECIMAL(12,2) NOT NULL, rate DECIMAL(5,2) NOT NULL, amount DECIMAL(12,2) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX uq_rc_order (payment_order_id),
+    INDEX rc_reseller_idx (reseller_user_id, created_at))`,
 };
 
 for (const [name, sql] of Object.entries(TABLES)) {
@@ -138,6 +162,32 @@ for (const [name, sql] of Object.entries(TABLES)) {
 // Staff accounts: widen users.role to include 'staff'. Idempotent (the same
 // definition again is a no-op) and existing rows keep their role.
 await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin','reseller','customer','staff') NOT NULL DEFAULT 'customer'");
+
+// Reseller commission is paid through the same wallet + withdrawal rail as
+// referral rewards; 'commission' tells the two apart on a statement. Widening
+// only — existing rows keep their type.
+await conn.query("ALTER TABLE wallet_transactions MODIFY COLUMN type ENUM('reward','withdrawal','adjustment','commission') NOT NULL");
+log("✓ wallet_transactions.type includes 'commission'");
+
+// The reseller's own profile: contact details and where to pay their
+// commission. Each column is guarded — MySQL has no ADD COLUMN IF NOT EXISTS.
+for (const [col, def] of [
+  ["whatsapp", "VARCHAR(30) NULL"],
+  ["address", "VARCHAR(500) NULL"],
+  ["gstin", "VARCHAR(20) NULL"],
+  ["payout_method", "ENUM('bank','upi') NULL"],
+  ["payout_upi", "VARCHAR(120) NULL"],
+  ["payout_account_name", "VARCHAR(160) NULL"],
+  ["payout_account_number", "VARCHAR(40) NULL"],
+  ["payout_ifsc", "VARCHAR(20) NULL"],
+]) {
+  const [cc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='reseller_profiles' AND column_name=?", [col]);
+  if (cc[0].n === 0) {
+    await conn.query(`ALTER TABLE reseller_profiles ADD COLUMN ${col} ${def}`);
+    log(`✓ reseller_profiles.${col} added`);
+  } else { log(`• reseller_profiles.${col} present (skipped)`); }
+}
 log("✓ users.role accepts 'staff'");
 
 // Relax leads.card_id to NULL (snapshot cards have no DB card row). Guarded.

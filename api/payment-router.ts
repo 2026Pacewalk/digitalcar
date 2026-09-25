@@ -3,8 +3,9 @@ import { createRouter, authedQuery, adminQuery, resellerQuery } from "./middlewa
 import { getDb } from "./queries/connection";
 import {
   paymentOrders, appSettings, subscriptionPackages, subscriptions, users, notifications, cardTrials, funnelEvents, resellerProfiles,
-  referrals, walletTransactions,
+  referrals, resellerCommissions,
 } from "@db/schema";
+import { applyWallet, affectedRows } from "./lib/wallet";
 import { eq, desc, and, gt, ne, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendEmail, ownerAddress } from "./lib/mail";
@@ -256,28 +257,53 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
   await db.update(cardTrials).set({ status: "converted" }).where(eq(cardTrials.userId, order.userId));
   db.insert(funnelEvents).values({ stage: "payment", userId: order.userId }).catch(() => {}); // funnel: paid
 
-  // Reseller commission: if this buyer belongs to a reseller, credit them (§55).
+  // Reseller commission: if this buyer belongs to a reseller, credit them.
+  // The statement row, the wallet credit and the lifetime total are one step —
+  // all or nothing. The statement row is unique per order, so an order that is
+  // somehow activated twice pays commission once. The money goes to the
+  // reseller's wallet, the same one referral rewards use, and leaves through
+  // the same withdrawal queue.
   try {
     const rc = await db.query.users.findFirst({ where: eq(users.id, order.userId), columns: { resellerId: true, fullName: true } });
     if (rc?.resellerId) {
-      const profile = await db.query.resellerProfiles.findFirst({ where: eq(resellerProfiles.userId, rc.resellerId) });
+      const resellerId = rc.resellerId;
+      const profile = await db.query.resellerProfiles.findFirst({ where: eq(resellerProfiles.userId, resellerId) });
       const rate = Number(profile?.commissionRate ?? 10);
-      const commission = money((n(order.amount) * rate) / 100);
-      await db.update(resellerProfiles).set({
-        totalEarnings: sql`${resellerProfiles.totalEarnings} + ${commission}`,
-        pendingPayout: sql`${resellerProfiles.pendingPayout} + ${commission}`,
-      }).where(eq(resellerProfiles.userId, rc.resellerId));
-      credited.resellerCommission = n(commission);
-      await db.insert(notifications).values({
-        userId: rc.resellerId, type: "reseller_commission", title: "Commission earned 💰",
-        message: `${rc.fullName} activated a plan — ₹${commission} added to your pending payout.`, link: "/reseller",
+      const orderValue = n(order.amount); // the plan's rupee value
+      const commission = money((orderValue * rate) / 100);
+      const balanceAfter = await db.transaction(async (tx) => {
+        const ins = await tx.insert(resellerCommissions).ignore().values({
+          resellerUserId: resellerId, customerUserId: order.userId, paymentOrderId: order.id,
+          orderAmount: money(orderValue), rate: rate.toFixed(2), amount: commission,
+        });
+        if (affectedRows(ins) === 0) return null; // already credited for this order
+        await tx.update(resellerProfiles).set({
+          totalEarnings: sql`${resellerProfiles.totalEarnings} + ${commission}`,
+        }).where(eq(resellerProfiles.userId, resellerId));
+        return applyWallet(db, resellerId, n(commission), {
+          type: "commission", note: `Commission — ${rc.fullName} (${rate}% of ₹${money(orderValue)})`,
+        }, tx);
       });
-      // Email the reseller their commission (non-blocking).
-      const resellerUser = await db.query.users.findFirst({ where: eq(users.id, rc.resellerId), columns: { email: true, fullName: true } });
-      const pendingAfter = money(n(profile?.pendingPayout) + n(commission));
-      void sendEmail(resellerUser?.email, resellerCommissionEmail({ name: resellerUser?.fullName, customerName: rc.fullName, amount: commission, pendingPayout: pendingAfter }));
+      if (balanceAfter !== null) {
+        credited.resellerCommission = n(commission);
+        await db.insert(notifications).values({
+          userId: resellerId, type: "reseller_commission", title: "Commission earned 💰",
+          message: `${rc.fullName} activated a plan — ₹${commission} added to your wallet.`, link: "/reseller/earnings",
+        });
+        const resellerUser = await db.query.users.findFirst({ where: eq(users.id, resellerId), columns: { email: true, fullName: true } });
+        void sendEmail(resellerUser?.email, resellerCommissionEmail({
+          name: resellerUser?.fullName, customerName: rc.fullName, amount: commission,
+          pendingPayout: money(balanceAfter), rate, planName: pkg?.name ?? null, billingCycle: order.billingCycle,
+          orderAmount: money(orderValue), totalEarnings: money(n(profile?.totalEarnings) + n(commission)),
+          creditedAt: now,
+        }));
+      }
     }
-  } catch { /* non-critical */ }
+  } catch (e) {
+    // The customer's plan is already active; a failed credit must not undo that.
+    // But it must not vanish either — a reseller would silently lose money.
+    console.error(`[reseller-commission] FAILED to credit order ${order.id} (buyer ${order.userId}):`, (e as Error).message);
+  }
 
   // Notify the buyer
   await db.insert(notifications).values({
@@ -313,14 +339,10 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
         const pct = pctRow ? Number(pctRow.value) : 15;
         const reward = money((n(order.amount) * (Number.isFinite(pct) ? pct : 15)) / 100);
         await db.update(referrals).set({ status: "rewarded", rewardAmount: reward, rewardedAt: now }).where(eq(referrals.id, ref.id));
-        const rr = await db.query.users.findFirst({ where: eq(users.id, buyer.referredById), columns: { walletBalance: true } });
-        const nextBal = money(n(rr?.walletBalance) + n(reward));
-        await db.update(users).set({ walletBalance: nextBal }).where(eq(users.id, buyer.referredById));
+        const nextBal = money(await applyWallet(db, buyer.referredById, n(reward), {
+          type: "reward", referralId: ref.id, note: "Referral reward — paid conversion",
+        }));
         credited.referrerReward = n(reward);
-        await db.insert(walletTransactions).values({
-          userId: buyer.referredById, type: "reward", amount: reward, balanceAfter: nextBal,
-          status: "completed", referralId: ref.id, note: "Referral reward — paid conversion",
-        });
         await db.insert(notifications).values({
           userId: buyer.referredById, type: "referral_reward", title: "Referral reward credited 🎉",
           message: `${buyer.fullName} went paid — ₹${reward} added to your wallet.`, link: "/dashboard/refer",

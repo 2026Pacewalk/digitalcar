@@ -67,9 +67,6 @@ const BY_PROCEDURE: Record<string, Grant> = {
 
   "lead.listAll": "leads",
 
-  "user.createReseller": "resellers",
-  "user.listResellers": "resellers",
-
   "payment.adminOrders": "payments",
   "payment.adminStats": "payments",
   "payment.verifyOrder": "payments",
@@ -174,7 +171,6 @@ const ACTION_LABELS: Record<string, string> = {
   "user.deactivateCustomer": "Deactivated a customer",
   "user.sendAccountDetails": "Emailed account details",
   "user.sendFeatureUpdate": "Emailed a feature update",
-  "user.createReseller": "Created a reseller",
   "admin.deleteAppUser": "Removed an account",
   "admin.reslugCard": "Changed a card address",
   "admin.completeDeletion": "Erased a deleted account",
@@ -191,6 +187,7 @@ const ACTION_LABELS: Record<string, string> = {
   "referral.setConfig": "Changed referral settings",
   "reseller.approve": "Approved a reseller application",
   "reseller.reject": "Rejected a reseller application",
+  "reseller.grantLogin": "Gave a reseller a login",
   "settings.update": "Changed site settings",
   "settings.sendTestEmail": "Sent a test email",
   "settings.sendMarketingEmail": "Sent a marketing email",

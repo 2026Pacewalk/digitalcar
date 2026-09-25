@@ -869,6 +869,56 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// ─── Reseller applications, commission statement, profile/payout fields ───
+// Live gets these from db/migrate-live.mjs before the reload; this covers
+// local/dev databases that never ran it. Kept in step with that file.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS reseller_applications (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        full_name varchar(255) NOT NULL, email varchar(255) NOT NULL, phone varchar(50) NULL,
+        company_name varchar(255) NULL, message text NULL,
+        status enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+        user_id bigint unsigned NULL, admin_note text NULL, reviewed_at timestamp NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id), KEY ra_status_idx (status), KEY ra_email_idx (email)
+      )
+    `));
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS reseller_commissions (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        reseller_user_id bigint unsigned NOT NULL, customer_user_id bigint unsigned NOT NULL,
+        payment_order_id bigint unsigned NOT NULL,
+        order_amount decimal(12,2) NOT NULL, rate decimal(5,2) NOT NULL, amount decimal(12,2) NOT NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id), UNIQUE KEY uq_rc_order (payment_order_id),
+        KEY rc_reseller_idx (reseller_user_id, created_at)
+      )
+    `));
+    await db.execute(sql.raw(
+      "ALTER TABLE wallet_transactions MODIFY COLUMN type ENUM('reward','withdrawal','adjustment','commission') NOT NULL"));
+    const cols: [string, string][] = [
+      ["whatsapp", "VARCHAR(30) NULL"], ["address", "VARCHAR(500) NULL"], ["gstin", "VARCHAR(20) NULL"],
+      ["payout_method", "ENUM('bank','upi') NULL"], ["payout_upi", "VARCHAR(120) NULL"],
+      ["payout_account_name", "VARCHAR(160) NULL"], ["payout_account_number", "VARCHAR(40) NULL"],
+      ["payout_ifsc", "VARCHAR(20) NULL"],
+    ];
+    for (const [col, def] of cols) {
+      const rows = await db.execute(sql.raw(
+        `SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='reseller_profiles' AND column_name='${col}'`));
+      const n = Number((rows as unknown as [{ n?: number }[]])[0]?.[0]?.n ?? (rows as unknown as { n?: number }[])[0]?.n ?? 0);
+      if (!n) await db.execute(sql.raw(`ALTER TABLE reseller_profiles ADD COLUMN ${col} ${def}`));
+    }
+    console.log("[schema] reseller_applications, reseller_commissions, reseller profile fields ensured");
+  } catch (e) {
+    console.error("[schema] ensure reseller applications/commissions failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be

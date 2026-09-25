@@ -54,12 +54,24 @@ export const resellerProfiles = mysqlTable("reseller_profiles", {
   commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull().default("10.00"),
   totalCustomers: int("total_customers").notNull().default(0),
   totalEarnings: decimal("total_earnings", { precision: 12, scale: 2 }).notNull().default("0.00"),
+  // Superseded: commission is now credited to users.walletBalance and paid
+  // through the withdrawal queue (see reseller_commissions). Nothing reads this.
   pendingPayout: decimal("pending_payout", { precision: 12, scale: 2 }).notNull().default("0.00"),
+  // Superseded by the white-label portal work; never read or written.
   whiteLabelEnabled: boolean("white_label_enabled").notNull().default(false),
   customDomain: varchar("custom_domain", { length: 255 }),
   brandingLogo: varchar("branding_logo", { length: 500 }),
   brandingColor: varchar("branding_color", { length: 7 }).default("#D4AF37"),
   status: mysqlEnum("status", ["active", "inactive", "suspended"]).notNull().default("active"),
+  whatsapp: varchar("whatsapp", { length: 30 }),
+  address: varchar("address", { length: 500 }),
+  gstin: varchar("gstin", { length: 20 }),
+  // Where to pay their commission — pre-fills the withdrawal form.
+  payoutMethod: mysqlEnum("payout_method", ["bank", "upi"]),
+  payoutUpi: varchar("payout_upi", { length: 120 }),
+  payoutAccountName: varchar("payout_account_name", { length: 160 }),
+  payoutAccountNumber: varchar("payout_account_number", { length: 40 }),
+  payoutIfsc: varchar("payout_ifsc", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -791,7 +803,8 @@ export type Referral = typeof referrals.$inferSelect;
 export const walletTransactions = mysqlTable("wallet_transactions", {
   id: serial("id").primaryKey(),
   userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-  type: mysqlEnum("type", ["reward", "withdrawal", "adjustment"]).notNull(),
+  // "commission" is a reseller's earning; "reward" is a referral's.
+  type: mysqlEnum("type", ["reward", "withdrawal", "adjustment", "commission"]).notNull(),
   // positive = credit into wallet, negative = debit out of wallet
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   balanceAfter: decimal("balance_after", { precision: 12, scale: 2 }).notNull(),
@@ -883,6 +896,26 @@ export const resellerApplications = mysqlTable("reseller_applications", {
 ]);
 
 export type ResellerApplication = typeof resellerApplications.$inferSelect;
+
+// ─── Reseller Commissions (the itemised statement) ──────────────
+// One row per commission earned on a customer's paid plan. The money itself is
+// credited to users.walletBalance; this is the "which customer, which order"
+// record behind it. Unique on the order so a commission can never be paid twice.
+export const resellerCommissions = mysqlTable("reseller_commissions", {
+  id: serial("id").primaryKey(),
+  resellerUserId: bigint("reseller_user_id", { mode: "number", unsigned: true }).notNull(),
+  customerUserId: bigint("customer_user_id", { mode: "number", unsigned: true }).notNull(),
+  paymentOrderId: bigint("payment_order_id", { mode: "number", unsigned: true }).notNull(),
+  orderAmount: decimal("order_amount", { precision: 12, scale: 2 }).notNull(),
+  rate: decimal("rate", { precision: 5, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("uq_rc_order").on(table.paymentOrderId),
+  index("rc_reseller_idx").on(table.resellerUserId, table.createdAt),
+]);
+
+export type ResellerCommission = typeof resellerCommissions.$inferSelect;
 
 // ─── Custom Domains ─────────────────────────────────────────────
 // Maps a customer/reseller domain (e.g. card.acme.com) to a published card

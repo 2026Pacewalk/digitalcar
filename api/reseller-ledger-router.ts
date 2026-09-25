@@ -1,9 +1,12 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { resellerAccounts, resellerOrders, resellerPayments, resellerProfiles, users } from "@db/schema";
+import {
+  resellerAccounts, resellerOrders, resellerPayments, resellerProfiles, users,
+  resellerCommissions, resellerApplications,
+} from "@db/schema";
 
 /* Reseller accounts — the super-admin's book of card orders that resellers
    place offline (phone, WhatsApp, in person) and pay for by cash, UPI, bank
@@ -83,16 +86,45 @@ const paymentInput = z.object({
 });
 
 export const resellerLedgerRouter = createRouter({
-  // Every account with its running totals, plus reseller logins to link to.
+  // Every reseller in one list: their offline book (orders, payments, what they
+  // owe) and, if they have a login, their online side (customers, commission
+  // earned, wallet). Plus reseller logins that aren't linked to anyone yet.
   overview: adminQuery.query(async () => {
     const db = getDb();
     const accounts = await db.select().from(resellerAccounts).orderBy(asc(resellerAccounts.name));
     const totals = await accountTotals(db, accounts.map((a) => a.id));
-    const resellerUsers = await db.select({ id: users.id, fullName: users.fullName, email: users.email }).from(users).where(eq(users.role, "reseller"));
-    const profiles = resellerUsers.length
+    const resellerUsers = await db.select({
+      id: users.id, fullName: users.fullName, email: users.email, status: users.status,
+      lastLoginAt: users.lastLoginAt, walletBalance: users.walletBalance,
+    }).from(users).where(eq(users.role, "reseller"));
+    const ids = resellerUsers.map((u) => u.id);
+    const profiles = ids.length
       ? await db.select({ userId: resellerProfiles.userId, companyName: resellerProfiles.companyName, commissionRate: resellerProfiles.commissionRate })
-        .from(resellerProfiles).where(inArray(resellerProfiles.userId, resellerUsers.map((u) => u.id)))
+        .from(resellerProfiles).where(inArray(resellerProfiles.userId, ids))
       : [];
+    const customers = ids.length
+      ? await db.select({ resellerId: users.resellerId, n: sql<number>`count(*)` }).from(users)
+        .where(inArray(users.resellerId, ids)).groupBy(users.resellerId)
+      : [];
+    const earned = ids.length
+      ? await db.select({ resellerId: resellerCommissions.resellerUserId, total: sql<string>`sum(${resellerCommissions.amount})` })
+        .from(resellerCommissions).where(inArray(resellerCommissions.resellerUserId, ids)).groupBy(resellerCommissions.resellerUserId)
+      : [];
+    const pendingApps = await db.select({ n: sql<number>`count(*)` }).from(resellerApplications)
+      .where(eq(resellerApplications.status, "pending"));
+    const linkedIds = new Set(accounts.map((a) => a.resellerUserId).filter((v): v is number => v != null));
+
+    const online = (userId: number) => {
+      const u = resellerUsers.find((x) => x.id === userId);
+      if (!u) return null;
+      return {
+        userId, email: u.email, status: u.status, lastLoginAt: u.lastLoginAt,
+        walletBalance: num(u.walletBalance),
+        customers: Number(customers.find((c) => c.resellerId === userId)?.n ?? 0),
+        commissionEarned: num(earned.find((e) => e.resellerId === userId)?.total),
+      };
+    };
+
     return {
       accounts: accounts.map((a) => {
         const t = totals.get(a.id)!;
@@ -101,12 +133,15 @@ export const resellerLedgerRouter = createRouter({
           commissionRate: num(a.commissionRate),
           openingBalance: num(a.openingBalance),
           totals: { ...t, outstanding: num(a.openingBalance) + t.due - t.received },
+          login: a.resellerUserId ? online(a.resellerUserId) : null,
         };
       }),
-      resellerUsers: resellerUsers.map((u) => {
+      // Only logins not already linked — those are the ones that can still be.
+      resellerUsers: resellerUsers.filter((u) => !linkedIds.has(u.id)).map((u) => {
         const p = profiles.find((x) => x.userId === u.id);
-        return { ...u, companyName: p?.companyName ?? null, commissionRate: p ? num(p.commissionRate) : null };
+        return { id: u.id, fullName: u.fullName, email: u.email, companyName: p?.companyName ?? null, commissionRate: p ? num(p.commissionRate) : null };
       }),
+      pendingApplications: Number(pendingApps[0]?.n ?? 0),
     };
   }),
 

@@ -9,8 +9,8 @@ import {
   BarChart3, MessageSquare, Settings, LogOut, ChevronLeft,
   ChevronRight, Store, X, ReceiptText,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
-  Star, Layers, Gift, ClipboardList, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe, MailCheck, MailSearch, PenLine,
-  MessageCircle, Nfc, TicketPercent, Megaphone, BookOpenCheck, Wrench, Instagram, UserX, UserCog, History, PlayCircle,
+  Star, Layers, Gift, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe, MailCheck, MailSearch, PenLine,
+  MessageCircle, Nfc, TicketPercent, Megaphone, Wrench, Instagram, UserX, UserCog, History, PlayCircle,
 } from "lucide-react";
 import { TutorialModal } from "@/components/TutorialPlayer";
 
@@ -72,8 +72,6 @@ export const superAdminGroups: NavGroup[] = [
   ] },
   { title: "Manage", items: [
     { label: "Resellers", icon: Store, path: "/admin/resellers" },
-    { label: "Reseller Accounts", icon: BookOpenCheck, path: "/admin/reseller-accounts" },
-    { label: "Applications", icon: ClipboardList, path: "/admin/reseller-applications" },
     { label: "Customers", icon: UserCircle, path: "/admin/customers" },
     { label: "Leads", icon: MessageSquare, path: "/admin/leads" },
     { label: "Bulk Orders", icon: ShoppingCart, path: "/admin/bulk-orders" },
@@ -110,6 +108,12 @@ export const resellerGroups: NavGroup[] = [
   { title: "Manage", items: [
     { label: "My Customers", icon: Users, path: "/reseller/customers" },
     { label: "Payment Orders", icon: ReceiptText, path: "/reseller/payments" },
+  ] },
+  { title: "Money", items: [
+    { label: "Earnings & Payouts", icon: Wallet, path: "/reseller/earnings" },
+  ] },
+  { title: "Account", items: [
+    { label: "My Profile", icon: UserCircle, path: "/reseller/profile" },
   ] },
 ];
 

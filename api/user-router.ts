@@ -3,8 +3,9 @@ import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, authedQuery, resellerQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { users, resellerProfiles, cards, subscriptions, subscriptionPackages, publishedCards, cardTrials } from "@db/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { users, resellerProfiles, resellerCommissions, cards, subscriptions, subscriptionPackages, publishedCards, cardTrials } from "@db/schema";
+import { eq, and, sql, desc, inArray, gt, gte } from "drizzle-orm";
+import { PAID_PACKAGE_IDS } from "./lib/entitlement";
 import { sendEmail } from "./lib/mail";
 import { accountDetailsEmail, featureUpdateEmail, planUpgradedEmail, planExtendedEmail, passwordChangedEmail } from "./lib/email-templates";
 
@@ -495,12 +496,33 @@ export const userRouter = createRouter({
       .from(users)
       .where(and(eq(users.resellerId, resellerId), eq(users.role, "customer")));
 
+    // "Active" = on a paid plan that hasn't ended — not simply "exists".
+    const activeCount = await db.select({ count: sql<number>`count(distinct ${subscriptions.userId})` })
+      .from(subscriptions)
+      .innerJoin(users, eq(users.id, subscriptions.userId))
+      .where(and(
+        eq(users.resellerId, resellerId),
+        eq(subscriptions.status, "active"),
+        inArray(subscriptions.packageId, [...PAID_PACKAGE_IDS]),
+        gt(subscriptions.currentPeriodEnd, new Date()),
+      ));
+
+    const monthStart = new Date();
+    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const thisMonth = await db.select({ total: sql<string>`coalesce(sum(${resellerCommissions.amount}), 0)` })
+      .from(resellerCommissions)
+      .where(and(eq(resellerCommissions.resellerUserId, resellerId), gte(resellerCommissions.createdAt, monthStart)));
+
+    const me = await db.query.users.findFirst({ where: eq(users.id, resellerId), columns: { walletBalance: true } });
+
     return {
-      totalCustomers: customerCount[0]?.count || 0,
-      activeCustomers: customerCount[0]?.count || 0,
-      monthlyEarnings: 0,
+      totalCustomers: Number(customerCount[0]?.count || 0),
+      activeCustomers: Number(activeCount[0]?.count || 0),
+      monthlyEarnings: Number(thisMonth[0]?.total || 0),
       totalEarnings: profile?.totalEarnings || "0.00",
       commissionRate: profile?.commissionRate || "10.00",
+      // Earned commission not yet paid out — what they can withdraw.
+      walletBalance: me?.walletBalance || "0.00",
     };
   }),
 
@@ -545,63 +567,6 @@ export const userRouter = createRouter({
         totalPages: Math.ceil((totalResult[0]?.count || 0) / limit),
       };
     }),
-
-  createReseller: adminQuery
-    .input(
-      z.object({
-        email: z.string().email(),
-        password: z.string().min(6),
-        fullName: z.string(),
-        phone: z.string().optional(),
-        companyName: z.string(),
-        commissionRate: z.number().default(10),
-      })
-    )
-    .mutation(async ({ input }) => {
-      const db = getDb();
-      const hashedPassword = await bcrypt.hash(input.password, 12);
-
-      const userResult = await db.insert(users).values({
-        email: input.email,
-        password: hashedPassword,
-        fullName: input.fullName,
-        phone: input.phone || null,
-        role: "reseller",
-        status: "active",
-      }).$returningId();
-
-      await db.insert(resellerProfiles).values({
-        userId: userResult[0].id,
-        companyName: input.companyName,
-        commissionRate: String(input.commissionRate),
-      });
-
-      return db.query.users.findFirst({
-        where: eq(users.id, userResult[0].id),
-      });
-    }),
-
-  listResellers: adminQuery.query(async () => {
-    const db = getDb();
-    const resellers = await db.query.users.findMany({
-      where: eq(users.role, "reseller"),
-      orderBy: [desc(users.createdAt)],
-    });
-
-    const profiles = await db.query.resellerProfiles.findMany();
-
-    return resellers.map((r) => {
-      const profile = profiles.find((p) => p.userId === r.id);
-      return {
-        ...r,
-        companyName: profile?.companyName,
-        commissionRate: profile?.commissionRate,
-        totalCustomers: profile?.totalCustomers,
-        totalEarnings: profile?.totalEarnings,
-        status: profile?.status || r.status,
-      };
-    });
-  }),
 
   overview: adminQuery.query(async () => {
     const db = getDb();

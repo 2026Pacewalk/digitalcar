@@ -96,7 +96,7 @@ const NAV: Record<string, NavConfig> = {
     tabs: [
       { icon: LayoutDashboard, label: "Home", path: "/reseller", match: (p) => p === "/reseller" },
       { icon: Users, label: "Customers", path: "/reseller/customers", match: under("/reseller/customers") },
-      { icon: Wallet, label: "Payments", path: "/reseller/payments", match: under("/reseller/payments") },
+      { icon: Wallet, label: "Earnings", path: "/reseller/earnings", match: under("/reseller/earnings") },
     ],
     groups: resellerGroups,
   },

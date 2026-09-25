@@ -1,212 +1,177 @@
+import { useEffect, useState } from "react";
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
-import { useAuth } from "@/hooks/useAuth";
-import { useState, useMemo } from "react";
+import { trpc } from "@/providers/trpc";
 import { toast } from "sonner";
-import {
-  User, Camera, Save, Lock, Shield, Eye, EyeOff,
-  Building2, MapPin, Clock, Monitor, Chrome, CheckCircle2, CreditCard, Receipt
-} from "lucide-react";
+import { Building2, Wallet, Lock, Loader2, Percent, CalendarDays, Mail } from "lucide-react";
 
-const LOGIN_ACTIVITY = [
-  { id: 1, device: "Windows 11", browser: "Chrome 120", ip: "103.21.45.78", location: "Mumbai, India", date: "2026-05-08 14:32", status: "current" },
-  { id: 2, device: "iPhone 15 Pro", browser: "Safari 17", ip: "103.21.45.90", location: "Mumbai, India", date: "2026-05-07 09:15", status: "success" },
-  { id: 3, device: "MacBook Pro", browser: "Chrome 119", ip: "103.21.45.12", location: "Pune, India", date: "2026-05-02 16:30", status: "success" },
-];
+/* A reseller's own profile. Everything here is theirs, read from and saved to
+   the server — the page they had before showed made-up details and saved
+   nothing. The payout details pre-fill the withdrawal form on Earnings. */
+
+type Form = {
+  fullName: string; phone: string; companyName: string; whatsapp: string; address: string; gstin: string;
+  payoutMethod: "bank" | "upi" | null; payoutUpi: string; payoutAccountName: string; payoutAccountNumber: string; payoutIfsc: string;
+};
+const EMPTY: Form = {
+  fullName: "", phone: "", companyName: "", whatsapp: "", address: "", gstin: "",
+  payoutMethod: null, payoutUpi: "", payoutAccountName: "", payoutAccountNumber: "", payoutIfsc: "",
+};
+
+const input = "h-10 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C] focus:bg-white transition-colors";
+const fmtDate = (d: unknown) => {
+  const dt = d ? new Date(d as string) : null;
+  return dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+};
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-xs font-medium text-[#0F172A] mb-1.5">{label}</span>
+      {children}
+      {hint && <span className="block text-[11px] text-[#94A3B8] mt-1">{hint}</span>}
+    </label>
+  );
+}
 
 export default function ResellerProfile() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("profile");
-  const [saving, setSaving] = useState(false);
-  const [showOldPass, setShowOldPass] = useState(false);
-  const [showNewPass, setShowNewPass] = useState(false);
-  const [showConfirmPass, setShowConfirmPass] = useState(false);
-  const [avatar, setAvatar] = useState<string | null>(null);
+  const utils = trpc.useUtils();
+  const { data: me, isLoading } = trpc.reseller.me.useQuery();
+  const save = trpc.reseller.saveProfile.useMutation();
+  const changePassword = trpc.auth.changePassword.useMutation();
 
-  const [profile, setProfile] = useState({
-    fullName: user?.fullName || "Amit Khanna",
-    username: "amitkhanna",
-    email: user?.email || "amit@dreamhomes.in",
-    mobile: "+91 98102 33445",
-    whatsapp: "+91 98102 33445",
-    companyName: "DreamHomes Realty",
-    address: "Suite 301, Skyline Towers, Bandra West",
-    city: "Mumbai",
-    website: "www.dreamhomes.in",
-    bankName: "HDFC Bank",
-    accountNumber: "50100345678912",
-    ifsc: "HDFC0001234",
-    upiId: "amit@okhdfcbank",
-    gstNumber: "27AABCU9603R1ZX",
-    whiteLabel: true,
-    customDomain: "cards.dreamhomes.in",
-  });
+  const [form, setForm] = useState<Form>(EMPTY);
+  const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
 
-  const [passwordForm, setPasswordForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
+  // Load once the server answers; after that the form is the user's.
+  useEffect(() => {
+    if (!me) return;
+    setForm({
+      fullName: me.fullName, phone: me.phone, companyName: me.companyName, whatsapp: me.whatsapp,
+      address: me.address, gstin: me.gstin, payoutMethod: me.payoutMethod,
+      payoutUpi: me.payoutUpi, payoutAccountName: me.payoutAccountName,
+      payoutAccountNumber: me.payoutAccountNumber, payoutIfsc: me.payoutIfsc,
+    });
+  }, [me]);
 
-  const completionPercent = useMemo(() => {
-    let filled = 0;
-    const fields = [profile.fullName, profile.email, profile.mobile, profile.whatsapp, profile.companyName, profile.address, profile.city, profile.website, profile.bankName, profile.upiId, profile.gstNumber];
-    fields.forEach((f) => { if (f && f.trim()) filled++; });
-    return Math.round((filled / fields.length) * 100);
-  }, [profile]);
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { toast.error("Only JPG, PNG, WebP allowed"); return; }
-    if (file.size > 2 * 1024 * 1024) { toast.error("Max 2MB"); return; }
-    const reader = new FileReader();
-    reader.onloadend = () => { setAvatar(reader.result as string); toast.success("Logo uploaded!"); };
-    reader.readAsDataURL(file);
+  const onSave = async () => {
+    if (form.fullName.trim().length < 2) return toast.error("Enter your full name");
+    if (form.companyName.trim().length < 2) return toast.error("Enter your business name");
+    try {
+      await save.mutateAsync(form);
+      await utils.reseller.me.invalidate();
+      toast.success("Profile saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save your profile");
+    }
   };
 
-  const tabs = [
-    { id: "profile", label: "My Profile", icon: User },
-    { id: "security", label: "Security", icon: Lock },
-    { id: "activity", label: "Login Activity", icon: Clock },
-  ];
+  const onPassword = async () => {
+    if (!pw.current) return toast.error("Enter your current password");
+    if (pw.next !== pw.confirm) return toast.error("The new passwords don't match");
+    try {
+      await changePassword.mutateAsync({ currentPassword: pw.current, newPassword: pw.next });
+      setPw({ current: "", next: "", confirm: "" });
+      toast.success("Password changed");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not change your password");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <ResponsiveDashboardLayout>
+        <div className="flex items-center justify-center py-24 text-[#94A3B8]"><Loader2 className="animate-spin" size={22} /></div>
+      </ResponsiveDashboardLayout>
+    );
+  }
 
   return (
     <ResponsiveDashboardLayout>
-      <div className="hidden md:block"><TopBar title="My Profile" subtitle="Reseller profile and settings" /></div>
-      <div className="p-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="lg:w-64 shrink-0">
-            <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-2 space-y-1">
-              {tabs.map((tab) => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id ? "bg-[#0F172A] text-white" : "text-[#64748B] hover:bg-[#F8FAFC]"}`}>
-                  <tab.icon size={17} /> {tab.label}
-                </button>
-              ))}
-            </div>
+      <div className="hidden md:block"><TopBar title="My profile" subtitle="Your business details and where we pay your commission" /></div>
+      <div className="p-4 sm:p-6 space-y-4 max-w-4xl mx-auto">
+        {/* Who they are, as the platform sees them */}
+        <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5 flex flex-wrap items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl gradient-gold flex items-center justify-center shrink-0">
+            <span className="text-[#0F172A] text-xl font-bold">{(me?.fullName || "R").charAt(0).toUpperCase()}</span>
           </div>
-          <div className="flex-1 space-y-6">
-            {/* Summary Card */}
-            <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-6">
-              <div className="flex flex-col sm:flex-row items-center gap-5">
-                <div className="relative">
-                  <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gradient-to-br from-[#F7B31C] to-[#D97706] flex items-center justify-center">
-                    {avatar ? <img src={avatar} alt="Logo" className="w-full h-full object-cover" /> : <Building2 size={28} className="text-white" />}
-                  </div>
-                  <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-lg bg-[#0F172A] flex items-center justify-center cursor-pointer border-2 border-white">
-                    <Camera size={12} className="text-white" /><input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarChange} />
-                  </label>
-                </div>
-                <div className="flex-1 text-center sm:text-left">
-                  <h2 className="text-lg font-bold text-[#0F172A]">{profile.fullName}</h2>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">{profile.companyName} &middot; Reseller</p>
-                  <div className="flex items-center gap-3 mt-2 justify-center sm:justify-start">
-                    <span className="badge-green text-[10px]">Active</span>
-                    <span className="badge-gold text-[10px]">Reseller Plan</span>
-                    {profile.whiteLabel && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#DBEAFE] text-[#1E40AF] font-medium">White Label</span>}
-                  </div>
-                </div>
-                <div className="flex flex-col items-center gap-1">
-                  <div className="relative w-14 h-14">
-                    <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-                      <circle cx="28" cy="28" r="24" fill="none" stroke="#F1F5F9" strokeWidth="4" />
-                      <circle cx="28" cy="28" r="24" fill="none" stroke="#F7B31C" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${completionPercent * 1.51} 151`} />
-                    </svg>
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-[#0F172A]">{completionPercent}%</span>
-                  </div>
-                  <p className="text-[10px] text-[#94A3B8]">Complete</p>
-                </div>
-              </div>
-            </div>
-
-            {/* PROFILE TAB */}
-            {activeTab === "profile" && (
-              <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-6 space-y-6">
-                <h3 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2"><User size={16} className="text-[#F7B31C]" /> Reseller Information</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Reseller Name *</label><input value={profile.fullName} onChange={(e) => setProfile({ ...profile, fullName: e.target.value })} className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Username</label><input value={profile.username} disabled className="input-premium w-full bg-[#F8FAFC] cursor-not-allowed opacity-60" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Email *</label>
-                    <div className="flex gap-2"><input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} className="input-premium w-full" /><button onClick={() => toast.success("Verification email sent!")} className="h-10 px-3 text-[10px] font-semibold gradient-gold text-[#0F172A] rounded-xl shrink-0">Verify</button></div>
-                  </div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Mobile Number *</label><input value={profile.mobile} onChange={(e) => setProfile({ ...profile, mobile: e.target.value })} className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">WhatsApp</label><input value={profile.whatsapp} onChange={(e) => setProfile({ ...profile, whatsapp: e.target.value })} className="input-premium w-full" /></div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Company Name *</label><input value={profile.companyName} onChange={(e) => setProfile({ ...profile, companyName: e.target.value })} className="input-premium w-full" /></div>
-                </div>
-                <div className="border-t border-[#F1F5F9] pt-4">
-                  <h3 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2 mb-3"><MapPin size={16} className="text-[#F7B31C]" /> Contact Details</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Address</label><input value={profile.address} onChange={(e) => setProfile({ ...profile, address: e.target.value })} className="input-premium w-full" /></div>
-                    <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">City</label><input value={profile.city} onChange={(e) => setProfile({ ...profile, city: e.target.value })} className="input-premium w-full" /></div>
-                    <div className="sm:col-span-2"><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Website</label><input value={profile.website} onChange={(e) => setProfile({ ...profile, website: e.target.value })} className="input-premium w-full" /></div>
-                  </div>
-                </div>
-                <div className="border-t border-[#F1F5F9] pt-4">
-                  <h3 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2 mb-3"><CreditCard size={16} className="text-[#F7B31C]" /> Bank & Payment Details</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Bank Name</label><input value={profile.bankName} onChange={(e) => setProfile({ ...profile, bankName: e.target.value })} className="input-premium w-full" /></div>
-                    <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Account Number</label><input value={profile.accountNumber} onChange={(e) => setProfile({ ...profile, accountNumber: e.target.value })} className="input-premium w-full" /></div>
-                    <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">IFSC Code</label><input value={profile.ifsc} onChange={(e) => setProfile({ ...profile, ifsc: e.target.value })} className="input-premium w-full" /></div>
-                    <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">UPI ID</label><input value={profile.upiId} onChange={(e) => setProfile({ ...profile, upiId: e.target.value })} className="input-premium w-full" /></div>
-                  </div>
-                </div>
-                <div className="border-t border-[#F1F5F9] pt-4">
-                  <h3 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2 mb-3"><Receipt size={16} className="text-[#F7B31C]" /> Business Details</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">GST Number</label><input value={profile.gstNumber} onChange={(e) => setProfile({ ...profile, gstNumber: e.target.value })} className="input-premium w-full" /></div>
-                    <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Custom Domain</label><input value={profile.customDomain} onChange={(e) => setProfile({ ...profile, customDomain: e.target.value })} className="input-premium w-full" /></div>
-                    <div className="sm:col-span-2"><label className="flex items-center gap-3 p-4 rounded-xl bg-[#F8FAFC] cursor-pointer"><input type="checkbox" checked={profile.whiteLabel} onChange={(e) => setProfile({ ...profile, whiteLabel: e.target.checked })} className="rounded border-[#E2E8F0] w-5 h-5 accent-[#F7B31C]" /><div><p className="text-sm font-medium text-[#0F172A]">White Label Branding</p><p className="text-xs text-[#94A3B8]">Enable custom branding for your customers</p></div></label></div>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <button onClick={() => { setSaving(true); setTimeout(() => { setSaving(false); toast.success("Profile saved!"); }, 600); }} disabled={saving} className="h-11 px-8 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-50"><Save size={16} /> {saving ? "Saving..." : "Save Changes"}</button>
-                </div>
-              </div>
-            )}
-
-            {/* SECURITY TAB */}
-            {activeTab === "security" && (
-              <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-6 space-y-6">
-                <h3 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2"><Shield size={16} className="text-[#F7B31C]" /> Change Password</h3>
-                <div className="space-y-4 max-w-md">
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Current Password *</label>
-                    <div className="relative"><input type={showOldPass ? "text" : "password"} value={passwordForm.oldPassword} onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })} className="input-premium w-full pr-10" placeholder="Enter current password" /><button onClick={() => setShowOldPass(!showOldPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8]">{showOldPass ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>
-                  </div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">New Password *</label>
-                    <div className="relative"><input type={showNewPass ? "text" : "password"} value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} className="input-premium w-full pr-10" placeholder="Min 8 characters" /><button onClick={() => setShowNewPass(!showNewPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8]">{showNewPass ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>
-                  </div>
-                  <div><label className="block text-xs font-medium text-[#0F172A] mb-1.5">Confirm New Password *</label>
-                    <div className="relative"><input type={showConfirmPass ? "text" : "password"} value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} className="input-premium w-full pr-10" placeholder="Re-enter password" /><button onClick={() => setShowConfirmPass(!showConfirmPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8]">{showConfirmPass ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>
-                  </div>
-                  <button onClick={() => { if (passwordForm.newPassword !== passwordForm.confirmPassword) { toast.error("Passwords do not match"); return; } toast.success("Password updated!"); }} className="h-11 px-8 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2"><Lock size={16} /> Update Password</button>
-                </div>
-              </div>
-            )}
-
-            {/* ACTIVITY TAB */}
-            {activeTab === "activity" && (
-              <div className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-6">
-                <h3 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2 mb-4"><Clock size={16} className="text-[#F7B31C]" /> Login Activity</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead><tr className="bg-[#F8FAFC]">
-                      {["Device", "Browser", "IP", "Location", "Date & Time", "Status"].map((h) => (<th key={h} className="text-left text-[10px] font-semibold text-[#64748B] uppercase px-4 py-3">{h}</th>))}
-                    </tr></thead>
-                    <tbody className="divide-y divide-[#F1F5F9]">
-                      {LOGIN_ACTIVITY.map((a) => (
-                        <tr key={a.id} className="hover:bg-[#F8FAFC]">
-                          <td className="px-4 py-3"><div className="flex items-center gap-2"><Monitor size={14} className="text-[#64748B]" /><span className="text-xs text-[#0F172A]">{a.device}</span></div></td>
-                          <td className="px-4 py-3"><div className="flex items-center gap-2"><Chrome size={14} className="text-[#64748B]" /><span className="text-xs text-[#0F172A]">{a.browser}</span></div></td>
-                          <td className="px-4 py-3 text-xs text-[#64748B] font-mono">{a.ip}</td>
-                          <td className="px-4 py-3 text-xs text-[#0F172A]">{a.location}</td>
-                          <td className="px-4 py-3 text-xs text-[#64748B]">{a.date}</td>
-                          <td className="px-4 py-3">{a.status === "current" ? <span className="badge-green text-[10px] flex items-center gap-1 w-fit"><CheckCircle2 size={10} /> Current</span> : <span className="text-[10px] px-2 py-1 rounded-full bg-[#F8FAFC] text-[#64748B]">Success</span>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold text-[#0F172A] truncate">{me?.fullName}</p>
+            <p className="text-sm text-[#64748B] truncate">{me?.companyName}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-1.5 text-[#334155]"><Mail size={13} /> {me?.email}</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FEF3C7] px-3 py-1.5 font-semibold text-[#92400E]"><Percent size={13} /> {me?.commissionRate}% commission</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-1.5 text-[#334155]"><CalendarDays size={13} /> Partner since {fmtDate(me?.memberSince)}</span>
           </div>
         </div>
+
+        {/* Business details */}
+        <section className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5 sm:p-6">
+          <h2 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2 mb-4"><Building2 size={16} className="text-[#F7B31C]" /> Business details</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Your name"><input className={input} value={form.fullName} onChange={(e) => set("fullName", e.target.value)} /></Field>
+            <Field label="Business name"><input className={input} value={form.companyName} onChange={(e) => set("companyName", e.target.value)} /></Field>
+            <Field label="Phone"><input className={input} inputMode="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} /></Field>
+            <Field label="WhatsApp"><input className={input} inputMode="tel" value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} /></Field>
+            <div className="sm:col-span-2">
+              <Field label="Address"><input className={input} value={form.address} onChange={(e) => set("address", e.target.value)} /></Field>
+            </div>
+            <Field label="GSTIN" hint="Optional — 15 letters and numbers"><input className={`${input} uppercase`} value={form.gstin} onChange={(e) => set("gstin", e.target.value)} /></Field>
+          </div>
+        </section>
+
+        {/* Payout details */}
+        <section className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5 sm:p-6">
+          <h2 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2 mb-1"><Wallet size={16} className="text-[#F7B31C]" /> Where we pay your commission</h2>
+          <p className="text-xs text-[#64748B] mb-4">Saved here so you don't retype it every time you withdraw. You can still change it on each request.</p>
+          <div role="radiogroup" aria-label="Payout method" className="inline-flex rounded-xl bg-[#F1F5F9] p-1 mb-4">
+            {(["upi", "bank"] as const).map((m) => (
+              <button key={m} type="button" role="radio" aria-checked={form.payoutMethod === m} onClick={() => set("payoutMethod", m)}
+                className={`h-8 px-4 rounded-lg text-xs font-semibold transition-colors ${form.payoutMethod === m ? "bg-white text-[#0F172A] shadow-sm" : "text-[#64748B] hover:text-[#0F172A]"}`}>
+                {m === "upi" ? "UPI" : "Bank transfer"}
+              </button>
+            ))}
+          </div>
+          {form.payoutMethod === "upi" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="UPI ID" hint="e.g. yourname@okhdfcbank"><input className={input} value={form.payoutUpi} onChange={(e) => set("payoutUpi", e.target.value)} /></Field>
+            </div>
+          )}
+          {form.payoutMethod === "bank" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Account holder name"><input className={input} value={form.payoutAccountName} onChange={(e) => set("payoutAccountName", e.target.value)} /></Field>
+              <Field label="Account number"><input className={input} inputMode="numeric" value={form.payoutAccountNumber} onChange={(e) => set("payoutAccountNumber", e.target.value.replace(/\D/g, ""))} /></Field>
+              <Field label="IFSC" hint="e.g. HDFC0001234"><input className={`${input} uppercase`} value={form.payoutIfsc} onChange={(e) => set("payoutIfsc", e.target.value)} /></Field>
+            </div>
+          )}
+          {!form.payoutMethod && <p className="text-xs text-[#94A3B8]">Choose UPI or bank transfer.</p>}
+        </section>
+
+        <div className="flex justify-end">
+          <button onClick={onSave} disabled={save.isPending}
+            className="h-11 px-8 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-50">
+            {save.isPending && <Loader2 size={15} className="animate-spin" />} Save profile
+          </button>
+        </div>
+
+        {/* Password — the real one, checked against the current password on the server */}
+        <section className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5 sm:p-6">
+          <h2 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2 mb-4"><Lock size={16} className="text-[#F7B31C]" /> Change password</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Current password"><input type="password" autoComplete="current-password" className={input} value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></Field>
+            <Field label="New password" hint="8+ characters, with a capital, a number and a symbol"><input type="password" autoComplete="new-password" className={input} value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></Field>
+            <Field label="Confirm new password"><input type="password" autoComplete="new-password" className={input} value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} /></Field>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button onClick={onPassword} disabled={changePassword.isPending}
+              className="h-10 px-6 rounded-xl bg-[#0F172A] text-white text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-50">
+              {changePassword.isPending && <Loader2 size={15} className="animate-spin" />} Change password
+            </button>
+          </div>
+        </section>
       </div>
     </ResponsiveDashboardLayout>
   );

@@ -2,6 +2,7 @@ import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLa
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import { Search, Users, UserPlus, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,7 +16,9 @@ export default function ResellerCustomers() {
   const { data, isLoading } = trpc.user.resellerCustomers.useQuery({ page: 1, limit: 100 });
   const utils = trpc.useUtils();
   const createCustomer = trpc.reseller.createCustomer.useMutation();
-  const [open, setOpen] = useState(false);
+  // The dashboard's "Add a customer" arrives with ?add=1 — open straight onto the form.
+  const [params] = useSearchParams();
+  const [open, setOpen] = useState(() => params.get("add") === "1");
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", password: "" });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const add = async () => {
