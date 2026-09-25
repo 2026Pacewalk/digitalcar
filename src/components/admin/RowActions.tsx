@@ -7,8 +7,8 @@ import { MoreVertical, X } from "lucide-react";
 
 export type ActionItem = { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean; hidden?: boolean };
 
-export function AdminModal({ children, onClose, icon, iconBg, title, subtitle, wide }: {
-  children: React.ReactNode; onClose: () => void; icon: React.ReactNode; iconBg: string; title: string; subtitle?: string; wide?: boolean;
+export function AdminModal({ children, onClose, icon, iconBg, title, subtitle, wide, large }: {
+  children: React.ReactNode; onClose: () => void; icon: React.ReactNode; iconBg: string; title: string; subtitle?: string; wide?: boolean; large?: boolean;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -18,7 +18,7 @@ export function AdminModal({ children, onClose, icon, iconBg, title, subtitle, w
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-[#0F172A]/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${wide ? "max-w-md" : "max-w-sm"} max-h-[calc(100vh-2rem)] overflow-y-auto p-6 animate-scale-in`}>
+      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${large ? "max-w-lg" : wide ? "max-w-md" : "max-w-sm"} max-h-[calc(100vh-2rem)] overflow-y-auto p-6 animate-scale-in`}>
         <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 w-8 h-8 rounded-lg text-[#94A3B8] hover:bg-[#F1F5F9] flex items-center justify-center transition-colors"><X size={16} /></button>
         <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center mb-4`}>{icon}</div>
         <h3 className="text-lg font-bold text-[#0F172A]">{title}</h3>

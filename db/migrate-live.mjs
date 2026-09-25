@@ -166,6 +166,15 @@ const TABLES = {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX uq_rc_order (payment_order_id),
     INDEX rc_reseller_idx (reseller_user_id, created_at))`,
+  // Admin links/moves/unlinks of a customer to a reseller (Admin → Customers).
+  reseller_assignments: `CREATE TABLE IF NOT EXISTS reseller_assignments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    customer_user_id BIGINT UNSIGNED NOT NULL,
+    from_reseller_id BIGINT UNSIGNED NULL, to_reseller_id BIGINT UNSIGNED NULL,
+    assigned_by BIGINT UNSIGNED NULL, note VARCHAR(255) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX rasg_customer_idx (customer_user_id, created_at),
+    INDEX rasg_to_idx (to_reseller_id))`,
 };
 
 for (const [name, sql] of Object.entries(TABLES)) {

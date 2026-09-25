@@ -5,7 +5,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLogs, emailLogBodies, accountDeletionRequests, leads } from "@db/schema";
+import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLogs, emailLogBodies, accountDeletionRequests, leads, resellerAccounts } from "@db/schema";
 import { eq, and, desc, like, or, sql, gte, inArray } from "drizzle-orm";
 import { legacySlugSet, legacySlugOwners, slugTakenByOther } from "./publish-router";
 import { cancelAccountDeletion, completeAccountDeletion } from "./lib/account-deletion";
@@ -118,7 +118,7 @@ export const adminRouter = createRouter({
     const legacyEmails = legacyEmailSet();
     const hidden = await hiddenAppUserIds(db);
     const [allUsers, pubs, subs, trials] = await Promise.all([
-      db.select({ id: users.id, email: users.email, name: users.fullName, phone: users.phone, status: users.status, role: users.role, createdAt: users.createdAt }).from(users).orderBy(desc(users.createdAt)),
+      db.select({ id: users.id, email: users.email, name: users.fullName, phone: users.phone, status: users.status, role: users.role, createdAt: users.createdAt, resellerId: users.resellerId }).from(users).orderBy(desc(users.createdAt)),
       db.select({ userId: publishedCards.userId, slug: publishedCards.slug }).from(publishedCards),
       db.select({ userId: subscriptions.userId, packageId: subscriptions.packageId, status: subscriptions.status, currentPeriodEnd: subscriptions.currentPeriodEnd, currentPeriodStart: subscriptions.currentPeriodStart, billingCycle: subscriptions.billingCycle }).from(subscriptions).orderBy(desc(subscriptions.createdAt)),
       db.select({ userId: cardTrials.userId, startedAt: cardTrials.startedAt, endsAt: cardTrials.endsAt }).from(cardTrials),
@@ -129,6 +129,12 @@ export const adminRouter = createRouter({
     for (const s of subs) if (!subBy.has(Number(s.userId))) subBy.set(Number(s.userId), s); // latest (desc order)
     const trialBy = new Map<number, (typeof trials)[number]>();
     for (const t of trials) trialBy.set(Number(t.userId), t);
+    // The reseller each customer belongs to (users.reseller_id), by their ledger name.
+    const resellerBy = new Map<number, { accountId: number | null; name: string }>();
+    for (const u of allUsers) if (u.role === "reseller") resellerBy.set(Number(u.id), { accountId: null, name: u.name || u.email });
+    for (const a of await db.select({ id: resellerAccounts.id, uid: resellerAccounts.resellerUserId, name: resellerAccounts.name }).from(resellerAccounts)) {
+      if (a.uid) resellerBy.set(Number(a.uid), { accountId: a.id, name: a.name });
+    }
     const now = Date.now();
     // Crash-proof: a bad/zero date must never throw and kill the whole list.
     const iso = (d: unknown) => {
@@ -160,6 +166,10 @@ export const adminRouter = createRouter({
             slug: slugBy.get(uid) || "",
             package_id: subActive && sub?.packageId ? Number(sub.packageId) : 7,
             admin_id: 0, // new-flow signups = Website
+            // Set when the customer belongs to a reseller (they added them, or an admin linked them).
+            resellerUserId: u.resellerId ? Number(u.resellerId) : null,
+            resellerAccountId: u.resellerId ? resellerBy.get(Number(u.resellerId))?.accountId ?? null : null,
+            resellerName: u.resellerId ? resellerBy.get(Number(u.resellerId))?.name ?? `Reseller #${u.resellerId}` : null,
             activated_on: sub?.currentPeriodStart ? iso(sub.currentPeriodStart) : (trial?.startedAt ? iso(trial.startedAt) : iso(u.createdAt)),
             expired_on: subActive && sub?.currentPeriodEnd ? iso(sub.currentPeriodEnd) : (trial?.endsAt ? iso(trial.endsAt) : null),
             status: u.status === "active" ? 1 : 0,

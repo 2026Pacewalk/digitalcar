@@ -934,6 +934,24 @@ export const resellerCommissions = mysqlTable("reseller_commissions", {
 
 export type ResellerCommission = typeof resellerCommissions.$inferSelect;
 
+/* Every time an admin links a customer to a reseller, moves them to another,
+   or removes the link (users.reseller_id). The latest row for a customer and
+   their current reseller is the link date: the reseller sees that customer's
+   plan payments from then on, and earns commission from then on. Customers a
+   reseller created themselves have no row (they see everything). */
+export const resellerAssignments = mysqlTable("reseller_assignments", {
+  id: serial("id").primaryKey(),
+  customerUserId: bigint("customer_user_id", { mode: "number", unsigned: true }).notNull(),
+  fromResellerId: bigint("from_reseller_id", { mode: "number", unsigned: true }),
+  toResellerId: bigint("to_reseller_id", { mode: "number", unsigned: true }),   // null = link removed
+  assignedBy: bigint("assigned_by", { mode: "number", unsigned: true }),
+  note: varchar("note", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("rasg_customer_idx").on(table.customerUserId, table.createdAt),
+  index("rasg_to_idx").on(table.toResellerId),
+]);
+
 // ─── Custom Domains ─────────────────────────────────────────────
 // Maps a customer/reseller domain (e.g. card.acme.com) to a published card
 // (userId + owner-local cardId → published_cards.slug). One authoritative table

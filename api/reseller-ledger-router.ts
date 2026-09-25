@@ -104,7 +104,7 @@ export const resellerLedgerRouter = createRouter({
       : [];
     const customers = ids.length
       ? await db.select({ resellerId: users.resellerId, n: sql<number>`count(*)` }).from(users)
-        .where(inArray(users.resellerId, ids)).groupBy(users.resellerId)
+        .where(and(inArray(users.resellerId, ids), eq(users.role, "customer"))).groupBy(users.resellerId)
       : [];
     const earned = ids.length
       ? await db.select({ resellerId: resellerCommissions.resellerUserId, total: sql<string>`sum(${resellerCommissions.amount})` })

@@ -105,7 +105,7 @@ const SECTIONS: LegalSection[] = [
   },
   {
     id: "resellers", title: "Resellers and agencies", icon: Handshake,
-    body: <p>Some cards are created and managed by DigitalCarda resellers. Resellers are independent businesses, not our employees or agents. If a reseller set up your card, they can manage it, and pricing or support they offer is agreed between you and them. <LegalLink to="/resellers">Learn about the reseller programme</LegalLink>.</p>,
+    body: <p>Some customers come to us through DigitalCarda resellers. Resellers are independent businesses, not our employees or agents. If a reseller set up your card or introduced you to DigitalCarda, you may be listed as their customer: they can see your contact details, account status and plan payments. If a reseller created your account, they can manage it until you change your password. Pricing or support they offer is agreed between you and them. <LegalLink to="/resellers">Learn about the reseller programme</LegalLink>.</p>,
   },
   {
     id: "availability", title: "Availability and changes to the service", icon: ServerCog,
@@ -137,7 +137,7 @@ export default function TermsOfService() {
   return (
     <LegalLayout
       current="terms"
-      updated="September 16, 2026"
+      updated="September 25, 2026"
       readMinutes={8}
       intro="The ground rules for using DigitalCarda — your account, your card, payments and what each of us can expect from the other."
       highlights={HIGHLIGHTS}

@@ -7,6 +7,7 @@
  *            -> resellerApprovedExistingEmail      (existing account upgraded)
  *            -> resellerRejectedEmail              (applicant)
  *   earning  -> resellerCommissionEmail            (a customer they added paid for a plan)
+ *   linked   -> resellerCustomerLinkedEmail        (the team added an existing customer to them)
  *
  * Design idea: joining a business programme, not signing up for an app. The
  * approval emails carry a "partner pass" (a membership-card panel with the
@@ -705,6 +706,87 @@ export function resellerCommissionEmail(o: {
       }),
       bodyHtml,
       accent: TONE.green.solid,
+      footer: PARTNER_FOOTER,
+    }),
+    text,
+  };
+}
+
+/**
+ * The DigitalCarda team linked an existing customer to this reseller
+ * (Admin → Customers → Assign to reseller) — typically someone the partner
+ * brought in by word of mouth who signed up on their own.
+ * Audience: the reseller the customer now belongs to.
+ * Facts (api/reseller-router.ts assignCustomer, api/payment-router.ts):
+ * - commission is credited on every plan payment verified from now on, at the
+ *   reseller's profile rate; nothing for payments confirmed before today;
+ * - the reseller sees the customer in My Customers and their plan payments
+ *   from the link date in Payment Orders — read-only, no access to the card.
+ * - customerName: the customer's name. business: their company, if known.
+ * - rate: the reseller's commission rate (percent). linkedAt: when it happened.
+ */
+export function resellerCustomerLinkedEmail(o: {
+  name?: string;
+  customerName?: string | null;
+  business?: string | null;
+  rate?: number | string | null;
+  linkedAt?: Date;
+}): Email {
+  const who = clean(o.customerName) || "A customer";
+  const business = clean(o.business);
+  const rate = pct(o.rate);
+  const on = dateIst(o.linkedAt ?? new Date());
+  const rateHtml = rate ? `<strong style="color:${BRAND.ink}">${esc(rate)}</strong> commission` : "commission";
+  const rateText = rate ? `${rate} commission` : "commission";
+
+  const bodyHtml =
+    hi(o.name) +
+    p(`The DigitalCarda team has added <strong style="color:${BRAND.ink}">${esc(who)}</strong>${business ? ` (${esc(business)})` : ""} to your partner account. From today you earn ${rateHtml} each time they pay for a plan — a new plan, a renewal or an upgrade.`) +
+    button("Open My Customers", PARTNER_CUSTOMERS) +
+    sectionLabel("Your new customer") +
+    infoGrid([
+      ["Customer", esc(who)],
+      ["Business", business ? esc(business) : null],
+      ["Added on", esc(on)],
+      ["Your rate", rate ? esc(rate) : null],
+    ]) +
+    callout("blue", "What changes from today",
+      `${esc(who)} now shows in ${inkLink(PARTNER_CUSTOMERS, "My Customers")}, and their plan payments from today appear in ${inkLink(PARTNER_PAYMENTS, "Payment Orders")}. Payments we confirmed before today don't earn commission; any payment we confirm from today does.`) +
+    spacer(20) +
+    helpStrip();
+
+  const text = [
+    `Hi ${firstName(o.name) || "there"},`,
+    "",
+    `The DigitalCarda team has added ${who}${business ? ` (${business})` : ""} to your partner account. From today you earn ${rateText} each time they pay for a plan - a new plan, a renewal or an upgrade.`,
+    "",
+    `Open My Customers: ${PARTNER_CUSTOMERS}`,
+    "",
+    `  Customer: ${who}`,
+    ...(business ? [`  Business: ${business}`] : []),
+    `  Added on: ${on}`,
+    ...(rate ? [`  Your rate: ${rate}`] : []),
+    "",
+    `Their plan payments from today appear in Payment Orders (${PARTNER_PAYMENTS}). Payments we confirmed before today don't earn commission; any payment we confirm from today does.`,
+    "",
+    `Need a hand? Reply to this email or WhatsApp us on ${SUPPORT_WHATSAPP.display} (https://wa.me/${SUPPORT_WHATSAPP.wa}).`,
+  ].join("\n");
+
+  return {
+    kind: "resellerCustomerLinkedEmail",
+    subject: `${who} is now your customer`,
+    html: layout({
+      preheader: `From today you earn ${rateText} on ${who}'s plan payments.`,
+      hero: heroBand({
+        eyebrow: "Customer added",
+        tone: "blue",
+        title: `${who} is now your customer`,
+        sub: "Added to your partner account by the DigitalCarda team.",
+        aside: rate ? { label: "You earn", value: rate, sub: "on each plan payment" } : undefined,
+        chips: [darkChip(`Added ${esc(on)}`)],
+      }),
+      bodyHtml,
+      accent: TONE.blue.solid,
       footer: PARTNER_FOOTER,
     }),
     text,

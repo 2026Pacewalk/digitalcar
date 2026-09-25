@@ -18,6 +18,7 @@ import { getUpgradeOfferPercent } from "./lib/pricing";
 import { evaluateCoupon, recordRedemption, recordPaidCoupon, completeRedemptionForOrder, cancelRedemptionForOrder } from "./lib/coupons";
 import { envRazorpayCreds, credsComplete, inferMode, createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder } from "./lib/razorpay";
 import { clientIp } from "./lib/rate-limit";
+import { linkedSince, visibleSinceLink } from "./lib/reseller-links";
 
 type Order = typeof paymentOrders.$inferSelect;
 type RazorpayPayment = { userId: number; packageId: number; planName: string; billingCycle: "monthly" | "yearly" | "triennial"; amountRupees: number; paymentId: string; couponCode?: string; couponDiscount?: number };
@@ -632,7 +633,9 @@ export const paymentRouter = createRouter({
       where: inArray(paymentOrders.userId, ids), orderBy: [desc(paymentOrders.createdAt)], limit: 500,
     });
     const map = new Map(custs.map((u) => [u.id, u]));
-    return rows.map((r) => ({
+    // A customer the team linked to this reseller: payments from the link date only.
+    const since = await linkedSince(db, ctx.user.id, ids);
+    return rows.filter((r) => visibleSinceLink(r, since.get(r.userId))).map((r) => ({
       ...r, amount: n(r.amount),
       user: map.get(r.userId) ? { name: map.get(r.userId)!.fullName, email: map.get(r.userId)!.email, phone: map.get(r.userId)!.phone } : null,
     }));

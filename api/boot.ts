@@ -908,6 +908,17 @@ if (process.env.NODE_ENV === "production") {
         KEY rc_reseller_idx (reseller_user_id, created_at)
       )
     `));
+    // Admin links/moves/unlinks of a customer to a reseller (db/migrate-live.mjs is the authority).
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS reseller_assignments (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        customer_user_id bigint unsigned NOT NULL,
+        from_reseller_id bigint unsigned NULL, to_reseller_id bigint unsigned NULL,
+        assigned_by bigint unsigned NULL, note varchar(255) NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id), KEY rasg_customer_idx (customer_user_id, created_at), KEY rasg_to_idx (to_reseller_id)
+      )
+    `));
     await db.execute(sql.raw(
       "ALTER TABLE wallet_transactions MODIFY COLUMN type ENUM('reward','withdrawal','adjustment','commission') NOT NULL"));
     const cols: [string, string][] = [

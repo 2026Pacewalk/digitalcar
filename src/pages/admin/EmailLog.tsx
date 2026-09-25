@@ -80,6 +80,7 @@ const KIND_LABEL: Record<string, string> = {
   resellerLoginDetailsEmail: "Reseller sign-in details",
   resellerRejectedEmail: "Reseller rejected",
   resellerCommissionEmail: "Reseller commission",
+  resellerCustomerLinkedEmail: "Customer linked to reseller",
   // Owner alerts
   newSignupAdminEmail: "New signup (admin)",
   referralSignupAdminEmail: "Referral signup (admin)",

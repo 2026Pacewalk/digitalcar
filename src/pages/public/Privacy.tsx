@@ -107,7 +107,7 @@ const SECTIONS: LegalSection[] = [
         <p><strong className="text-[#0F172A]">We do not sell or rent personal data.</strong> We share it only with:</p>
         <ul className="mt-3 space-y-2">
           <Item label="Service providers">companies that help us run DigitalCarda — server hosting, email delivery, Razorpay for payments, Google for sign-in and Anthropic for AI writing. They may use the data only to provide their service to us.</Item>
-          <Item label="Resellers">if your card was set up through a DigitalCarda reseller or agency, they can see and manage the cards and account they created for you.</Item>
+          <Item label="Resellers">if a DigitalCarda reseller or agency set up your card or introduced you to us, they can see your name, contact details, account status and the plan payments you make while you're their customer. If a reseller created your account for you, they chose its first password and can sign in and manage your card until you change it in your dashboard settings.</Item>
           <Item label="The public">content you publish on your card is visible to anyone with the link or QR code.</Item>
           <Item label="Legal requirements">authorities, when the law requires it, or to protect the rights and safety of our users and DigitalCarda.</Item>
         </ul>
@@ -192,7 +192,7 @@ export default function Privacy() {
   return (
     <LegalLayout
       current="privacy"
-      updated="September 18, 2026"
+      updated="September 25, 2026"
       readMinutes={8}
       intro="What we collect, why we collect it and the control you have — written in plain English, for card owners and the people who visit their cards."
       highlights={HIGHLIGHTS}

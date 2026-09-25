@@ -10,6 +10,7 @@ import {
   resellerLoginDetailsEmail,
   resellerRejectedEmail,
   resellerCommissionEmail,
+  resellerCustomerLinkedEmail,
 } from "../reseller";
 
 const MODULE = "reseller";
@@ -139,5 +140,21 @@ export const previews: {
       name: HOSTILE, customerName: HOSTILE, amount: "299.70", pendingPayout: "not-a-number",
       rate: "abc", planName: `<b>Gold</b> & "Plus"`, billingCycle: "triennial", orderAmount: "2997.00",
     }),
+  },
+
+  /* ── An existing customer linked to the partner by the team ── */
+  {
+    name: "resellerCustomerLinkedEmail", module: MODULE, audience: "reseller", variant: "full",
+    render: () => resellerCustomerLinkedEmail({
+      name: "Aarav Mehta", customerName: "Rohan Kapoor", business: "Kapoor Interiors", rate: "20.00", linkedAt: APPROVED_AT,
+    }),
+  },
+  {
+    name: "resellerCustomerLinkedEmail", module: MODULE, audience: "reseller", variant: "minimal",
+    render: () => resellerCustomerLinkedEmail({}),
+  },
+  {
+    name: "resellerCustomerLinkedEmail", module: MODULE, audience: "reseller", variant: "hostile-input",
+    render: () => resellerCustomerLinkedEmail({ name: HOSTILE, customerName: HOSTILE, business: HOSTILE, rate: "abc" }),
   },
 ];

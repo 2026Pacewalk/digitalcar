@@ -653,7 +653,10 @@ export default function AdminResellerAccounts() {
                           </td>
                           <td className="px-4 py-3 text-right text-[13px] font-semibold tabular-nums text-[#0F172A]">{a.commissionRate}%</td>
                           <td className="px-4 py-3 text-right tabular-nums">
-                            <span className="text-[13px] font-semibold text-[#0F172A]">{a.login ? a.login.customers.toLocaleString("en-IN") : "—"}</span>
+                            {a.login ? (
+                              <button type="button" title="See their customers" onClick={(e) => { e.stopPropagation(); navigate(`/admin/customers?reseller=${a.login!.userId}`); }}
+                                className="text-[13px] font-semibold text-[#0F766E] underline decoration-[#99F6E4] underline-offset-2 hover:decoration-[#0F766E]">{a.login.customers.toLocaleString("en-IN")}</button>
+                            ) : <span className="text-[13px] font-semibold text-[#0F172A]">—</span>}
                             <p className="text-[11px] text-[#94A3B8]">{a.totals.cards} cards ordered</p>
                           </td>
                           <td className="px-4 py-3 text-right tabular-nums">
@@ -803,13 +806,15 @@ export default function AdminResellerAccounts() {
                         </div>
                         <dl className="mt-2 grid grid-cols-3 gap-3">
                           {[
-                            { l: "Customers", v: login.customers.toLocaleString("en-IN") },
+                            { l: "Customers", v: login.customers.toLocaleString("en-IN"), to: `/admin/customers?reseller=${login.userId}` },
                             { l: "Commission earned online", v: inr2(login.commissionEarned) },
                             { l: "In their wallet", v: inr2(login.walletBalance) },
                           ].map((x) => (
                             <div key={x.l}>
                               <dt className={`text-[11px] ${off ? "text-[#991B1B]/70" : "text-[#15803D]/80"}`}>{x.l}</dt>
-                              <dd className={`text-[15px] font-extrabold tabular-nums ${off ? "text-[#7F1D1D]" : "text-[#14532D]"}`}>{x.v}</dd>
+                              <dd className={`text-[15px] font-extrabold tabular-nums ${off ? "text-[#7F1D1D]" : "text-[#14532D]"}`}>
+                                {x.to ? <button type="button" onClick={() => navigate(x.to!)} title="See their customers" className="underline decoration-dotted underline-offset-2 hover:decoration-solid">{x.v}</button> : x.v}
+                              </dd>
                             </div>
                           ))}
                         </dl>

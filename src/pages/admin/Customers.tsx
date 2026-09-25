@@ -5,7 +5,7 @@ import {
   Search, Plus, Eye, Lock, LogIn, Database, ChevronLeft, ChevronRight,
   X, ExternalLink, Users, UserCheck, Clock, Building2, KeyRound, Globe,
   CalendarPlus, Trash2, AlertTriangle, Mail, Phone,
-  LayoutGrid, List, Download, ArrowUpDown, Activity, Layers, Send, Copy,
+  LayoutGrid, List, Download, ArrowUpDown, Activity, Layers, Send, Copy, Handshake,
 } from "lucide-react";
 import { toast } from "sonner";
 import { imgUrl, decodeSpecialities, loadCustomerContent, loadMySnapshot } from "@/lib/cardContent";
@@ -17,8 +17,13 @@ import { accountDetailsWhatsApp, featureUpdateWhatsApp, whatsappLink } from "@/l
 import { scopedKey } from "@/hooks/useCustomer";
 import { setSession, okToReplaceMainSession } from "@/lib/session";
 import { ActionMenu, AdminModal as Modal, type ActionItem } from "@/components/admin/RowActions";
+import AssignResellerModal from "@/components/admin/AssignResellerModal";
+import { useSessionRole } from "@/hooks/useAuth";
+import { readableError } from "@/lib/errors";
 
-/* Retailer (admin_id) → name, from superadmin table */
+/* Retailer (admin_id) → name, from the old PHP superadmin table. Display only:
+   these old attributions earn nothing. A customer's real reseller today is
+   users.reseller_id (resellerUserId / resellerName below), which wins. */
 const RETAILERS: Record<number, string> = {
   0: "Website", 1: "DigitalCarda", 2: "Sunny", 3: "Raman Kumar", 10: "Onkar Singh",
   11: "Vijay", 12: "Kiran", 13: "Ankush", 14: "Mohit Bhatia", 15: "Vishu",
@@ -41,7 +46,16 @@ type Customer = {
   password: string; company_name?: string; designation?: string; views?: number;
   isNew?: boolean; dbId?: number; // isNew = new-flow DB account (not in legacy customers.json)
   billing_cycle?: "monthly" | "yearly" | "triennial" | null; // term of the active DB plan, when known
+  // The reseller the account belongs to (users.reseller_id), when it has one.
+  resellerUserId?: number | null; resellerAccountId?: number | null; resellerName?: string | null;
 };
+
+/* Who the customer came through: their reseller when they have one, otherwise
+   the old retailer attribution ("Website" for everyone who signed up online). */
+const retailerOf = (c: Customer): { key: string; label: string; partner: boolean } =>
+  c.resellerUserId
+    ? { key: `r:${c.resellerUserId}`, label: c.resellerName || `Reseller #${c.resellerUserId}`, partner: true }
+    : { key: `l:${c.admin_id}`, label: retailerName(c.admin_id), partner: false };
 
 
 const fmtDate = (s: string | null) => {
@@ -101,7 +115,13 @@ export default function AdminCustomers() {
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") || "");
-  const [retailer, setRetailer] = useState<number | "all">("all");
+  // "r:<userId>" = a reseller, "l:<admin_id>" = an old retailer. ?reseller=<userId>
+  // comes from Admin → Resellers ("N customers").
+  const [retailer, setRetailer] = useState<string>(() => {
+    const r = Number(searchParams.get("reseller"));
+    return Number.isInteger(r) && r > 0 ? `r:${r}` : "all";
+  });
+  const isSuper = useSessionRole() === "super_admin";
   const [pkg, setPkg] = useState("all");
   const [status, setStatus] = useState<"all" | "active" | "expired" | "inactive">("all");
   const [sortBy, setSortBy] = useState<"recent" | "oldest" | "name" | "name_desc" | "expiry">("recent");
@@ -124,12 +144,13 @@ export default function AdminCustomers() {
   const [limitModal, setLimitModal] = useState<Customer | null>(null);
   const [limitValue, setLimitValue] = useState<number>(3);
   const [delModal, setDelModal] = useState<Customer | null>(null);
+  const [assignModal, setAssignModal] = useState<Customer | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [pwdValue, setPwdValue] = useState("");
   const [pkgValue, setPkgValue] = useState("Trial");
   const [pkgCycle, setPkgCycle] = useState<"monthly" | "yearly" | "triennial">("yearly");
   const [expDays, setExpDays] = useState(30);
-  const [addForm, setAddForm] = useState({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", admin_id: 0 });
+  const [addForm, setAddForm] = useState({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", partner: 0 });
 
   useEffect(() => {
     // Merge the legacy customers.json list with NEW-FLOW DB accounts (which the
@@ -152,9 +173,11 @@ export default function AdminCustomers() {
       const dbByEmail = new Map(db.map((u) => [(u.email || "").toLowerCase().trim(), u]));
       const legacyCurrent = legacy.map((c) => {
         const live = dbByEmail.get((c.email || "").toLowerCase().trim());
+        // The live account's reseller always applies, plan or no plan.
+        const partner = live ? { resellerUserId: live.resellerUserId ?? null, resellerAccountId: live.resellerAccountId ?? null, resellerName: live.resellerName ?? null } : {};
         return live?.subActive
-          ? { ...c, package_id: live.package_id, expired_on: live.expired_on ?? c.expired_on, billing_cycle: live.billing_cycle ?? null }
-          : c;
+          ? { ...c, ...partner, package_id: live.package_id, expired_on: live.expired_on ?? c.expired_on, billing_cycle: live.billing_cycle ?? null }
+          : { ...c, ...partner };
       });
       // New-flow ids are offset high, so they naturally sort newest-first with the rest.
       const merged = [...extra, ...legacyCurrent].sort((a, b) => Number(b.id) - Number(a.id));
@@ -192,15 +215,17 @@ export default function AdminCustomers() {
     return () => { cancelled = true; };
   }, [cardModal]);
 
+  // Resellers first, then the old retailers — each once, by name.
   const retailerOptions = useMemo(() => {
-    const ids = [...new Set(rows.map((r) => r.admin_id))].sort((a, b) => a - b);
-    return ids;
+    const seen = new Map<string, { key: string; label: string; partner: boolean }>();
+    for (const r of rows) { const o = retailerOf(r); if (!seen.has(o.key)) seen.set(o.key, o); }
+    return [...seen.values()].sort((a, b) => Number(b.partner) - Number(a.partner) || a.label.localeCompare(b.label));
   }, [rows]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     const out = rows.filter((c) => {
-      if (retailer !== "all" && c.admin_id !== retailer) return false;
+      if (retailer !== "all" && retailerOf(c).key !== retailer) return false;
       if (pkg !== "all" && packageName(c.package_id) !== pkg) return false;
       if (status !== "all" && statusKey(c) !== status) return false;
       if (!q) return true;
@@ -233,7 +258,7 @@ export default function AdminCustomers() {
     total: rows.length,
     active: rows.filter((r) => r.status === 1 && !isExpired(r.expired_on)).length,
     expired: rows.filter((r) => isExpired(r.expired_on)).length,
-    retailers: new Set(rows.map((r) => r.admin_id).filter((id) => id !== 0 && id !== 1)).size,
+    retailers: new Set(rows.map(retailerOf).filter((o) => o.key !== "l:0" && o.key !== "l:1").map((o) => o.key)).size,
   }), [rows]);
 
   const impersonate = trpc.auth.impersonate.useMutation();
@@ -274,6 +299,8 @@ export default function AdminCustomers() {
     finally { setSending(false); }
   };
   const deactivateMut = trpc.user.deactivateCustomer.useMutation();
+  const assignMut = trpc.reseller.assignCustomer.useMutation();
+  const partnerTargets = trpc.reseller.assignTargets.useQuery(undefined, { enabled: isSuper && (addOpen || retailer.startsWith("r:")), refetchOnWindowFocus: false });
   const setLimitMut = trpc.user.setCardLimit.useMutation();
   const deleteAppUserMut = trpc.admin.deleteAppUser.useMutation();
   const saveLimit = async (limit: number | null) => {
@@ -457,17 +484,30 @@ export default function AdminCustomers() {
         toast.error(why);
         return;
       }
+      // Put them straight into the chosen reseller's account, if any.
+      let partner: Pick<Customer, "resellerUserId" | "resellerAccountId" | "resellerName"> = {};
+      let partnerFailed: string | null = null;
+      if (addForm.partner) {
+        try {
+          const a = await assignMut.mutateAsync({ email: addForm.email.trim(), accountId: addForm.partner, expectFrom: null, note: "Added by the team" });
+          if (a.ok) partner = { resellerUserId: a.resellerUserId, resellerAccountId: a.resellerAccountId, resellerName: a.resellerName };
+          else partnerFailed = "no live account matched";
+        } catch (e) {
+          partnerFailed = readableError(e, "please try again");
+        }
+      }
       const now = new Date();
       setRows((r) => [{
         id: Math.max(0, ...r.map((x) => x.id)) + 1,
         name: addForm.name, username: addForm.username || slug, email: addForm.email,
-        mobile1: addForm.mobile1, slug: res.slug, package_id: pid, admin_id: Number(addForm.admin_id),
+        mobile1: addForm.mobile1, slug: res.slug, package_id: pid, admin_id: 0, ...partner,
         activated_on: now.toISOString().slice(0, 10), expired_on: res.expiredOn,
         status: 1, password: res.password,
       }, ...r]);
-      toast.success(`${addForm.name} created — card live at digitalcarda.in/${res.slug}`);
+      if (partnerFailed) toast.warning(`${addForm.name} created (digitalcarda.in/${res.slug}) but NOT added to the reseller: ${partnerFailed}. Use ⋮ → Assign to reseller.`, { duration: 10000 });
+      else toast.success(`${addForm.name} created — card live at digitalcarda.in/${res.slug}${partner.resellerName ? `, in ${partner.resellerName}'s account` : ""}`);
       setAddOpen(false);
-      setAddForm({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", admin_id: 0 });
+      setAddForm({ name: "", username: "", email: "", mobile1: "", slug: "", pkg: "Trial", partner: 0 });
     } catch {
       toast.error("Could not create the customer.");
     } finally { setSending(false); }
@@ -482,7 +522,7 @@ export default function AdminCustomers() {
     for (const c of filtered) {
       lines.push([
         c.id, c.name, c.username, c.email, c.mobile1,
-        c.slug ? `https://digitalcarda.in/${c.slug}` : "", retailerName(c.admin_id),
+        c.slug ? `https://digitalcarda.in/${c.slug}` : "", retailerOf(c).label,
         packageName(c.package_id), rowStatus(c).label,
         fmtDate(c.activated_on), fmtDate(c.expired_on),
       ].map(esc).join(","));
@@ -506,6 +546,8 @@ export default function AdminCustomers() {
     { icon: <Send size={15} className="text-[#0EA5E9]" />, label: "Share with Customer", onClick: () => { setShareModal(c); setShareKind("welcome"); setSharePwd(c.password || ""); setShareIncludePwd(false); } },
     { icon: <Database size={15} className="text-[#2563EB]" />, label: "Change Package", onClick: () => { setPkgModal(c); setPkgValue(packageName(c.package_id)); setPkgCycle(c.package_id !== 7 && c.billing_cycle ? c.billing_cycle : "yearly"); } },
     { icon: <Layers size={15} className="text-[#7C3AED]" />, label: "Card Limit", onClick: () => { setLimitModal(c); setLimitValue(3); } },
+    // Super admin only: it decides which reseller earns commission on them.
+    { icon: <Handshake size={15} className="text-[#0F766E]" />, label: c.resellerUserId ? "Change reseller" : "Assign to reseller", onClick: () => setAssignModal(c), hidden: !isSuper || !c.email },
     { icon: <Trash2 size={15} className="text-[#DC2626]" />, label: "Delete Customer", onClick: () => setDelModal(c), danger: true },
   ];
 
@@ -541,7 +583,8 @@ export default function AdminCustomers() {
           <a href={`mailto:${c.email}`} className="flex items-center gap-2 text-[#475569] min-w-0"><Mail size={13} className="text-[#94A3B8] shrink-0" /><span className="truncate">{c.email || "—"}</span></a>
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-2 text-[#475569]"><Phone size={13} className="text-[#94A3B8]" />{c.mobile1 || "—"}</span>
-            <button onClick={() => setRetailer(c.admin_id)} className="text-[10px] font-semibold text-[#0F766E] bg-[#CCFBF1] px-2 py-0.5 rounded-full">{retailerName(c.admin_id)}</button>
+            <button onClick={() => setRetailer(retailerOf(c).key)} title={retailerOf(c).partner ? "Reseller — show all their customers" : "Show everyone from here"}
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${retailerOf(c).partner ? "text-white bg-[#0F766E]" : "text-[#0F766E] bg-[#CCFBF1]"}`}>{retailerOf(c).label}</button>
           </div>
           <div className="flex items-center justify-between gap-2">
             {c.slug
@@ -595,9 +638,13 @@ export default function AdminCustomers() {
                 {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
-            <select value={retailer} onChange={(e) => setRetailer(e.target.value === "all" ? "all" : Number(e.target.value))} className="h-10 bg-white rounded-lg px-3 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
+            <select value={retailer} onChange={(e) => setRetailer(e.target.value)} aria-label="Retailer or reseller" className="h-10 bg-white rounded-lg px-3 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
               <option value="all">All Retailers</option>
-              {retailerOptions.map((id) => <option key={id} value={id}>{retailerName(id)}</option>)}
+              {retailerOptions.map((o) => <option key={o.key} value={o.key}>{o.partner ? `${o.label} (reseller)` : o.label}</option>)}
+              {/* A reseller from ?reseller= with no customers yet still shows as chosen. */}
+              {retailer !== "all" && !retailerOptions.some((o) => o.key === retailer) && (
+                <option value={retailer}>{(partnerTargets.data ?? []).find((r) => `r:${r.userId}` === retailer)?.name ?? "This reseller"} (reseller)</option>
+              )}
             </select>
             <select value={pkg} onChange={(e) => setPkg(e.target.value)} className="h-10 bg-white rounded-lg px-3 text-sm border border-[#E2E8F0] outline-none focus:border-[#F7B31C]">
               <option value="all">All Plans</option>
@@ -715,7 +762,8 @@ export default function AdminCustomers() {
                         </td>
                         {/* Retailer */}
                         <td className="px-4 py-3">
-                          <button onClick={() => setRetailer(c.admin_id)} className="text-[11px] font-semibold text-[#0F766E] bg-[#CCFBF1] px-2.5 py-1 rounded-full hover:bg-[#99F6E4] transition-colors whitespace-nowrap">{retailerName(c.admin_id)}</button>
+                          <button onClick={() => setRetailer(retailerOf(c).key)} title={retailerOf(c).partner ? "Reseller — show all their customers" : "Show everyone from here"}
+                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap ${retailerOf(c).partner ? "text-white bg-[#0F766E] hover:bg-[#115E59]" : "text-[#0F766E] bg-[#CCFBF1] hover:bg-[#99F6E4]"}`}>{retailerOf(c).label}</button>
                         </td>
                         {/* Plan + status */}
                         <td className="px-4 py-3">
@@ -939,6 +987,16 @@ export default function AdminCustomers() {
         </div>
       </Modal>}
 
+      {/* Assign to reseller (super admin) */}
+      {assignModal && (
+        <AssignResellerModal customer={assignModal} onClose={() => setAssignModal(null)}
+          onDone={(r) => {
+            const email = (assignModal.email || "").toLowerCase().trim();
+            setRows((rs) => rs.map((x) => ((x.email || "").toLowerCase().trim() === email ? { ...x, ...r } : x)));
+            setAssignModal(null);
+          }} />
+      )}
+
       {/* Delete confirm modal */}
       {delModal && <Modal onClose={() => setDelModal(null)} icon={<AlertTriangle size={20} className="text-[#DC2626]" />} iconBg="bg-[#FEE2E2]" title="Delete customer?" subtitle={delModal.name}>
         <p className="text-[13px] text-[#475569] leading-relaxed">This removes <b className="text-[#0F172A]">{delModal.name}</b> from your list and <b className="text-[#0F172A]">deactivates their account</b> — their public card will be paused. It stays in the database, so it can be restored if needed.</p>
@@ -961,12 +1019,15 @@ export default function AdminCustomers() {
             <label className="block text-xs font-semibold text-[#334155] mb-1.5">Package</label>
             <select value={addForm.pkg} onChange={(e) => setAddForm((f) => ({ ...f, pkg: e.target.value }))} className="h-10 w-full rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]">{pkgOptions.map((p) => <option key={p}>{p}</option>)}</select>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-[#334155] mb-1.5">Retailer</label>
-            <select value={addForm.admin_id} onChange={(e) => setAddForm((f) => ({ ...f, admin_id: Number(e.target.value) }))} className="h-10 w-full rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]">
-              {Object.entries(RETAILERS).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
-            </select>
-          </div>
+          {isSuper && (
+            <div>
+              <label htmlFor="add-partner" className="block text-xs font-semibold text-[#334155] mb-1.5">Reseller (optional)</label>
+              <select id="add-partner" value={addForm.partner} onChange={(e) => setAddForm((f) => ({ ...f, partner: Number(e.target.value) }))} className="h-10 w-full rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] px-3 text-sm outline-none focus:border-[#F7B31C]">
+                <option value={0}>None — direct customer</option>
+                {(partnerTargets.data ?? []).map((r) => <option key={r.accountId} value={r.accountId}>{r.name} · {r.rate}%</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div className="flex gap-3 mt-6">
           <button onClick={() => setAddOpen(false)} className="flex-1 h-11 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]">Cancel</button>

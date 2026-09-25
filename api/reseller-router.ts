@@ -5,9 +5,10 @@ import { createRouter, publicQuery, adminQuery, superAdminQuery, resellerQuery }
 import { getDb } from "./queries/connection";
 import {
   resellerApplications, users, resellerProfiles, resellerAccounts, resellerCommissions,
-  walletTransactions, withdrawalRequests,
+  walletTransactions, withdrawalRequests, resellerAssignments, paymentOrders, subscriptions,
+  subscriptionPackages, referrals, notifications, publishedCards, accountDeletionRequests,
 } from "@db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createResetToken, createToken } from "./lib/jwt";
 import { provisionStarterCard } from "./auth-router";
@@ -18,7 +19,7 @@ import { affectedRows } from "./lib/wallet";
 import {
   resellerApplicationAdminEmail, resellerApplicationReceivedEmail,
   resellerApprovedEmail, resellerApprovedExistingEmail, resellerRejectedEmail, resellerLoginDetailsEmail,
-  passwordChangedEmail,
+  passwordChangedEmail, resellerCustomerLinkedEmail,
 } from "./lib/email-templates";
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
@@ -41,6 +42,61 @@ async function linkedLogin(db: Db, accountId: number) {
 async function setPasswordLink(user: { id: number; password: string }) {
   const token = await createResetToken(user.id, (user.password || "").slice(-12));
   return `${PUBLIC_BASE_URL}/reset-password?token=${encodeURIComponent(token)}&for=partner`;
+}
+
+/** Why this customer can't be put in a reseller's account (null = they can). */
+async function customerBlock(db: Db, cust: { id: number; status: string; email: string }): Promise<string | null> {
+  if (cust.status === "inactive") return "This account is closed.";
+  if (/@deleted\.digitalcarda\.in$/i.test(cust.email)) return "This account was erased.";
+  const [leaving] = await db.select({ id: accountDeletionRequests.id }).from(accountDeletionRequests)
+    .where(and(eq(accountDeletionRequests.userId, cust.id), eq(accountDeletionRequests.status, "pending"))).limit(1);
+  return leaving ? "This customer has asked for their account to be deleted." : null;
+}
+
+/** Resellers a customer can be put with: an active ledger account with an
+    active reseller login (commission needs a login to pay into). */
+async function pickableResellers(db: Db) {
+  const accs = await db.select({
+    accountId: resellerAccounts.id, name: resellerAccounts.name, company: resellerAccounts.company, userId: resellerAccounts.resellerUserId,
+  }).from(resellerAccounts).where(and(eq(resellerAccounts.active, true), isNotNull(resellerAccounts.resellerUserId)));
+  const ids = accs.map((a) => Number(a.userId));
+  if (!ids.length) return [];
+  const [logins, profiles, counts] = await Promise.all([
+    db.select({ id: users.id, email: users.email, role: users.role, status: users.status, lastLoginAt: users.lastLoginAt }).from(users).where(inArray(users.id, ids)),
+    db.select({ userId: resellerProfiles.userId, rate: resellerProfiles.commissionRate }).from(resellerProfiles).where(inArray(resellerProfiles.userId, ids)),
+    db.select({ r: users.resellerId, n: sql<number>`count(*)` }).from(users)
+      .where(and(inArray(users.resellerId, ids), eq(users.role, "customer"))).groupBy(users.resellerId),
+  ]);
+  return accs.flatMap((a) => {
+    const u = logins.find((l) => l.id === Number(a.userId));
+    if (!u || u.role !== "reseller" || u.status !== "active") return [];
+    return [{
+      accountId: a.accountId, userId: u.id, name: a.name, company: a.company, email: u.email,
+      rate: num(profiles.find((p) => p.userId === u.id)?.rate ?? 10),
+      customers: Number(counts.find((c) => Number(c.r) === u.id)?.n || 0),
+      invited: !u.lastLoginAt,
+    }];
+  }).sort((x, y) => x.name.localeCompare(y.name));
+}
+
+/** A reseller login's display name: their ledger account name when they have one. */
+async function resellerLabel(db: Db, userId: number) {
+  const acc = await db.query.resellerAccounts.findFirst({ where: eq(resellerAccounts.resellerUserId, userId) });
+  if (acc) return { userId, accountId: acc.id, name: acc.name, company: acc.company };
+  const u = await db.query.users.findFirst({ where: eq(users.id, userId), columns: { fullName: true } });
+  return { userId, accountId: null, name: u?.fullName || `#${userId}`, company: null };
+}
+
+/** users.id → name (a reseller's ledger name wins), for the link history. */
+async function nameMap(db: Db, ids: (number | null)[]) {
+  const want = [...new Set(ids.filter((x): x is number => !!x))];
+  const out = new Map<number, string>();
+  if (!want.length) return out;
+  for (const u of await db.select({ id: users.id, name: users.fullName }).from(users).where(inArray(users.id, want))) out.set(u.id, u.name);
+  for (const a of await db.select({ uid: resellerAccounts.resellerUserId, name: resellerAccounts.name }).from(resellerAccounts).where(inArray(resellerAccounts.resellerUserId, want))) {
+    if (a.uid) out.set(Number(a.uid), a.name);
+  }
+  return out;
 }
 
 /* ── Making someone a reseller ─────────────────────────────────────────────
@@ -354,6 +410,149 @@ export const resellerRouter = createRouter({
       }
       recordActivity({ actor: ctx.user, module: "resellers", action: "Made a reseller set-password link", target: user.email, req: ctx.req });
       return { link: await setPasswordLink(user), minutes: 60 };
+    }),
+
+  /* ── Admin: put an existing customer in a reseller's account ──────────────
+     For a customer the reseller brought in by word of mouth who signed up on
+     their own. Super admin only: it decides who is paid commission.
+     - The reseller earns on plan payments verified from now on (commission is
+       worked out at verification, api/payment-router.ts), never on past ones.
+     - They see the customer in My Customers, and the customer's payments from
+       the link date only (api/lib/reseller-links.ts) — read-only, no card access.
+     - Every link, move and removal is kept in reseller_assignments. */
+
+  // The resellers a customer can be put with (active, with a login).
+  assignTargets: superAdminQuery.query(async () => pickableResellers(getDb())),
+
+  // Everything the admin needs to decide, before linking.
+  assignPreview: superAdminQuery
+    .input(z.object({ email: z.string().email() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const cust = await db.query.users.findFirst({ where: eq(users.email, input.email.trim().toLowerCase()) });
+      if (!cust) return { ok: false as const, reason: "no_account" as const };
+      if (cust.role !== "customer") return { ok: false as const, reason: "not_customer" as const };
+      const blocked = await customerBlock(db, cust);
+
+      const [paid] = await db.select({ n: sql<number>`count(*)`, total: sql<string>`coalesce(sum(${paymentOrders.amount}), 0)` })
+        .from(paymentOrders).where(and(eq(paymentOrders.userId, cust.id), eq(paymentOrders.status, "verified")));
+      const [pending] = await db.select({ n: sql<number>`count(*)` })
+        .from(paymentOrders).where(and(eq(paymentOrders.userId, cust.id), eq(paymentOrders.status, "pending")));
+      const [plan] = await db.select({ name: subscriptionPackages.name, until: subscriptions.currentPeriodEnd })
+        .from(subscriptions).innerJoin(subscriptionPackages, eq(subscriptionPackages.id, subscriptions.packageId))
+        .where(and(eq(subscriptions.userId, cust.id), eq(subscriptions.status, "active"), sql`(${subscriptions.currentPeriodEnd} IS NULL OR ${subscriptions.currentPeriodEnd} > NOW())`))
+        .orderBy(desc(subscriptions.createdAt)).limit(1);
+
+      // Referred by another customer: their first paid plan pays the referral
+      // reward as well as the reseller's commission.
+      let referral: { by: string; rewarded: boolean } | null = null;
+      if (cust.referredById) {
+        const by = await db.query.users.findFirst({ where: eq(users.id, cust.referredById), columns: { fullName: true } });
+        const [r] = await db.select({ status: referrals.status }).from(referrals)
+          .where(and(eq(referrals.referrerId, cust.referredById), eq(referrals.refereeId, cust.id))).limit(1);
+        referral = { by: by?.fullName || "another customer", rewarded: r?.status === "rewarded" };
+      }
+
+      const current = cust.resellerId ? await resellerLabel(db, cust.resellerId) : null;
+      const history = await db.select().from(resellerAssignments)
+        .where(eq(resellerAssignments.customerUserId, cust.id)).orderBy(desc(resellerAssignments.createdAt)).limit(5);
+      const names = await nameMap(db, history.flatMap((h) => [h.fromResellerId, h.toResellerId, h.assignedBy]));
+
+      return {
+        ok: true as const,
+        blocked,
+        customer: {
+          userId: cust.id, name: cust.fullName, email: cust.email, phone: cust.phone,
+          status: cust.status, joinedAt: cust.createdAt,
+          plan: plan ? { name: plan.name, until: plan.until } : null,
+        },
+        current,
+        paid: { count: Number(paid?.n || 0), total: num(paid?.total) },
+        pending: Number(pending?.n || 0),
+        referral,
+        history: history.map((h) => ({
+          at: h.createdAt,
+          from: h.fromResellerId ? names.get(h.fromResellerId) ?? `#${h.fromResellerId}` : null,
+          to: h.toResellerId ? names.get(h.toResellerId) ?? `#${h.toResellerId}` : null,
+          by: h.assignedBy ? names.get(h.assignedBy) ?? null : null,
+          note: h.note,
+        })),
+      };
+    }),
+
+  // Link, move or remove. `expectFrom` is the reseller (users.id) the admin was
+  // looking at, so two people changing it at once can't overwrite each other.
+  assignCustomer: superAdminQuery
+    .input(z.object({
+      email: z.string().email(),
+      accountId: z.number().int().positive().nullable(),     // null = remove the link
+      expectFrom: z.number().int().positive().nullable(),
+      note: z.string().trim().max(255).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const cust = await db.query.users.findFirst({ where: eq(users.email, input.email.trim().toLowerCase()) });
+      if (!cust) return { ok: false as const, reason: "no_account" as const };
+      if (cust.role !== "customer") throw new TRPCError({ code: "BAD_REQUEST", message: "Only customer accounts can be put in a reseller's account." });
+      const why = await customerBlock(db, cust);
+      if (why && input.accountId) throw new TRPCError({ code: "BAD_REQUEST", message: why });
+
+      let target: Awaited<ReturnType<typeof linkedLogin>> | null = null;
+      if (input.accountId) {
+        target = await linkedLogin(db, input.accountId);
+        if (!target.acc.active || target.user.status !== "active") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `${target.acc.name} is deactivated — reactivate them in Resellers first.` });
+        }
+        if (target.user.id === cust.id) throw new TRPCError({ code: "BAD_REQUEST", message: "A reseller can't be their own customer." });
+      }
+      const to = target?.user.id ?? null;
+      const from = cust.resellerId ?? null;
+      if (from !== input.expectFrom) {
+        throw new TRPCError({ code: "CONFLICT", message: "This customer's reseller was just changed by someone else. Close this and open it again." });
+      }
+      if (from === to) return { ok: true as const, unchanged: true, resellerUserId: to, resellerAccountId: target?.acc.id ?? null, resellerName: target?.acc.name ?? null, emailed: false };
+
+      const note = input.note?.trim() || null;
+      const done = await db.transaction(async (tx) => {
+        const res = await tx.update(users).set({ resellerId: to })
+          .where(and(eq(users.id, cust.id), from === null ? isNull(users.resellerId) : eq(users.resellerId, from)));
+        if (affectedRows(res) !== 1) return false;
+        await tx.insert(resellerAssignments).values({ customerUserId: cust.id, fromResellerId: from, toResellerId: to, assignedBy: ctx.user.id, note });
+        return true;
+      });
+      if (!done) throw new TRPCError({ code: "CONFLICT", message: "This customer's reseller was just changed by someone else. Close this and open it again." });
+
+      const fromName = from ? (await resellerLabel(db, from))?.name ?? `#${from}` : null;
+      const action = !to ? "Removed a customer's reseller" : from ? "Moved a customer to another reseller" : "Put a customer in a reseller's account";
+      recordActivity({
+        actor: ctx.user, module: "customers", action, target: cust.email, req: ctx.req,
+        summary: `${fromName ?? "No reseller"} → ${target?.acc.name ?? "No reseller"}${note ? ` · ${note}` : ""}`,
+      });
+
+      // Tell the reseller who now has them: in the portal and by email.
+      let emailed = false;
+      if (target) {
+        try {
+          await db.insert(notifications).values({
+            userId: target.user.id, type: "reseller_customer_linked",
+            title: "New customer in your account",
+            message: `${cust.fullName} is now your customer. You earn commission on their plan payments from today.`,
+            link: "/reseller/customers",
+          });
+          const profile = await db.query.resellerProfiles.findFirst({ where: eq(resellerProfiles.userId, target.user.id), columns: { commissionRate: true } });
+          const pub = await db.select({ data: publishedCards.data }).from(publishedCards).where(eq(publishedCards.userId, cust.id)).limit(1);
+          const card = ((pub[0]?.data as { customer?: Record<string, unknown> })?.customer) || {};
+          const res = await sendEmail(target.user.email, resellerCustomerLinkedEmail({
+            name: target.user.fullName, customerName: cust.fullName,
+            business: typeof card.company_name === "string" ? card.company_name : null,
+            rate: profile?.commissionRate ?? null, linkedAt: new Date(),
+          }));
+          emailed = res.ok;
+        } catch (e) {
+          console.error("[reseller] link notice not sent:", (e as Error).message);
+        }
+      }
+      return { ok: true as const, unchanged: false, resellerUserId: to, resellerAccountId: target?.acc.id ?? null, resellerName: target?.acc.name ?? null, emailed };
     }),
 
   // ── Reseller: their own profile ──
