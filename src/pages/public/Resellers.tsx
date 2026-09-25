@@ -63,7 +63,7 @@ const STEPS = [
 const FAQS = [
   { q: "How much commission do resellers earn?", a: "You earn 20% of every paid plan your customers buy, and it applies to renewals as well as new sales, not just the first year. Partners who bring larger volumes can agree a higher rate with us." },
   { q: "Is there a minimum commitment?", a: "There is no lock-in and no minimum spend. You can grow at whatever pace suits your business." },
-  { q: "Can I use my own domain and branding?", a: "Not yet — today your customers sign in to DigitalCarda. A white-label option, with your own domain, logo and colours, is on its way. Ask us about it if you'd like to be one of the first." },
+  { q: "Can I use my own domain and branding?", a: "Yes, with the white-label option: your own domain, logo and colours, so your customers see your brand instead of ours. It's a one-time fee of Rs. 50,000 (US$499). Talk to us and we'll set it up for you." },
   { q: "How and when do I get paid?", a: "Your commission is credited to your partner wallet the moment a customer's payment clears. Withdraw it to your bank account or UPI whenever you like, and your statement itemises which customer each rupee came from." },
   { q: "Do I need technical knowledge to resell?", a: "No. There is nothing to host, install or maintain. If you can fill in a form you can add a customer, and our team handles the platform, updates and uptime." },
   { q: "What support do I get as a reseller?", a: "You get onboarding help and a direct WhatsApp line to our team rather than a general queue." },
@@ -116,7 +116,7 @@ export default function Resellers() {
                 </span>
               </h1>
               <p className="mt-6 text-base sm:text-lg text-[#64748B] leading-relaxed max-w-lg">
-                Sell digital cards under your own brand, on your own domain. We build and run the platform — you keep the customer and a recurring share of every subscription.
+                Sell digital business cards to your clients — under the DigitalCarda name, or under your own brand with our white-label option. We build and run the platform; you keep the customer and a recurring share of every subscription.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
                 <Link to="/become-reseller" className="btn-gold h-12 px-7 flex items-center justify-center gap-2 text-base">
@@ -126,6 +126,9 @@ export default function Resellers() {
                   <IndianRupee size={17} /> See What You'd Earn
                 </a>
               </div>
+              <p className="mt-4 text-sm text-[#64748B]">
+                Already a partner? <Link to="/resellers-login" className="font-semibold text-[#B45309] hover:text-[#92400E]">Sign in to your partner portal</Link>
+              </p>
 
               <div className="mt-8 grid grid-cols-3 gap-3 max-w-md">
                 {[

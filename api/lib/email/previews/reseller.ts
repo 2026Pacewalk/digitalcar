@@ -7,6 +7,7 @@ import {
   resellerApplicationReceivedEmail,
   resellerApprovedEmail,
   resellerApprovedExistingEmail,
+  resellerLoginDetailsEmail,
   resellerRejectedEmail,
   resellerCommissionEmail,
 } from "../reseller";
@@ -76,6 +77,26 @@ export const previews: {
   {
     name: "resellerApprovedExistingEmail", module: MODULE, audience: "reseller", variant: "as-called-today",
     render: () => resellerApprovedExistingEmail({ name: "Priya Sharma" }),
+  },
+
+  /* ── Login details, sent again from admin → Share with reseller ── */
+  {
+    name: "resellerLoginDetailsEmail", module: MODULE, audience: "reseller", variant: "never-signed-in",
+    render: () => resellerLoginDetailsEmail({
+      name: "Aarav Mehta", link: DEMO_RESET_LINK, email: "aarav.mehta@example.com", companyName: "Mehta Interiors",
+      commissionRate: 20, approvedAt: APPROVED_AT, signedInBefore: false,
+    }),
+  },
+  {
+    name: "resellerLoginDetailsEmail", module: MODULE, audience: "reseller", variant: "returning",
+    render: () => resellerLoginDetailsEmail({
+      name: "Priya Sharma", link: DEMO_RESET_LINK, email: "priya.sharma@example.com", companyName: "Sharma Print Studio",
+      commissionRate: 20, approvedAt: APPROVED_AT, signedInBefore: true,
+    }),
+  },
+  {
+    name: "resellerLoginDetailsEmail", module: MODULE, audience: "reseller", variant: "hostile-input",
+    render: () => resellerLoginDetailsEmail({ name: HOSTILE, link: "javascript:alert(1)", email: "x@example.com", companyName: HOSTILE }),
   },
 
   /* ── Rejected ── */

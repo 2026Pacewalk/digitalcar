@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { gunzipSync } from "node:zlib";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLogs, accountDeletionRequests, leads } from "@db/schema";
+import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLogs, emailLogBodies, accountDeletionRequests, leads } from "@db/schema";
 import { eq, and, desc, like, or, sql, gte, inArray } from "drizzle-orm";
 import { legacySlugSet, legacySlugOwners, slugTakenByOther } from "./publish-router";
 import { cancelAccountDeletion, completeAccountDeletion } from "./lib/account-deletion";
@@ -140,7 +141,9 @@ export const adminRouter = createRouter({
     // email against the legacy list. Each row is wrapped so one bad record can
     // never throw and blank the whole list.
     return allUsers
-      .filter((u) => u.role !== "super_admin" && u.role !== "staff" && !hidden.has(Number(u.id)))
+      // Customers only. Partners are listed under Admin → Resellers; listing them
+      // here made them look like customers with no card (a broken "/" link).
+      .filter((u) => u.role === "customer" && !hidden.has(Number(u.id)))
       .map((u) => {
         try {
           const uid = Number(u.id);
@@ -295,8 +298,8 @@ export const adminRouter = createRouter({
      Every outbound email, newest first. Answers the support question the admin
      actually asks — "did their login/invoice/reset actually go out?" — without
      logging into the SMTP provider. The envelope only: recipient, subject,
-     which template, and whether it left the building. Bodies are never stored
-     (a welcome mail carries a plaintext password). */
+     which template, and whether it left the building. Since 26 Sept 2026 the
+     body is kept too (redacted — see api/lib/mail.ts); emailLogBody reads it. */
   emailLogs: adminQuery
     .input(z.object({
       q: z.string().max(200).optional(),
@@ -330,11 +333,22 @@ export const adminRouter = createRouter({
           .from(emailLogs).where(gte(emailLogs.createdAt, since)).groupBy(emailLogs.status),
       ]);
 
+      // Which of these rows have a saved body (emails before 26 Sept 2026 don't).
+      let withBody: number[] = [];
+      try {
+        const ids = rows.map((r) => r.id);
+        if (ids.length) {
+          withBody = (await db.select({ id: emailLogBodies.emailLogId }).from(emailLogBodies)
+            .where(inArray(emailLogBodies.emailLogId, ids))).map((b) => b.id);
+        }
+      } catch { /* table not created yet on this database */ }
+
       const byStatus = { sent: 0, failed: 0, skipped: 0 };
       for (const t of totals) byStatus[t.status as keyof typeof byStatus] = Number(t.n) || 0;
 
       return {
         rows,
+        withBody,
         total: Number(counted[0]?.n) || 0,
         page: input.page,
         perPage: input.perPage,
@@ -344,6 +358,24 @@ export const adminRouter = createRouter({
           .map((k) => ({ kind: k.kind as string, n: Number(k.n) || 0 }))
           .sort((a, b) => b.n - a.n),
       };
+    }),
+
+  /* One logged email as the recipient saw it: the HTML and plain-text parts,
+     with one-time link tokens and flagged passwords already blanked. */
+  emailLogBody: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const [log] = await db.select().from(emailLogs).where(eq(emailLogs.id, input.id));
+      if (!log) throw new TRPCError({ code: "NOT_FOUND", message: "That email isn't in the log any more." });
+      let body: { htmlGz: string | null; text: string | null } | undefined;
+      try {
+        [body] = await db.select({ htmlGz: emailLogBodies.htmlGz, text: emailLogBodies.text })
+          .from(emailLogBodies).where(eq(emailLogBodies.emailLogId, input.id));
+      } catch { body = undefined; }
+      let html: string | null = null;
+      try { html = body?.htmlGz ? gunzipSync(Buffer.from(body.htmlGz, "base64")).toString("utf8") : null; } catch { html = null; }
+      return { log, html, text: body?.text ?? null };
     }),
 
   /* Housekeeping: the log grows with every lead alert, so let the admin drop

@@ -82,7 +82,12 @@ export default function ResellerApplicationsPanel() {
                   {a.companyName && <span className="inline-flex items-center gap-1 rounded-lg bg-[#F1F5F9] px-2 py-1 text-[11px] text-[#334155]"><Building2 size={11} /> {a.companyName}</span>}
                 </div>
 
-                {a.message && <p className="mt-3 rounded-lg bg-[#F8FAFC] p-3 text-xs leading-relaxed text-[#475569]">{a.message}</p>}
+                {/* The application page folds the business type and the
+                    white-label box into the message, one part per paragraph. */}
+                {a.message?.includes("Interested in white-label") && (
+                  <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2.5 py-1 text-[11px] font-semibold text-[#92400E]"><Store size={11} /> Wants white-label</span>
+                )}
+                {a.message && <p className="mt-3 whitespace-pre-line rounded-lg bg-[#F8FAFC] p-3 text-xs leading-relaxed text-[#475569]">{a.message}</p>}
 
                 {a.status === "pending" && (
                   <div className="mt-4 flex flex-wrap items-end gap-2">

@@ -7,8 +7,8 @@ import {
   LayoutGrid, MessageCircle, RefreshCw, PlayCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getToken, clearSession } from "@/lib/session";
-import { useAuth } from "@/hooks/useAuth";
+import { getToken, clearSession, adminReturnPath } from "@/lib/session";
+import { useAuth, useSessionRole, roleForPath } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
 import { readCustomer } from "@/hooks/useCustomer";
 import { CONTACT } from "@/lib/publicNav";
@@ -166,7 +166,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/reseller": "Dashboard",
   "/reseller/customers": "My Customers",
   "/reseller/payments": "Payment Orders",
-  "/reseller/profile": "Profile",
+  "/reseller/profile": "My Profile",
+  "/reseller/earnings": "Earnings & Payouts",
 };
 
 /* Icon tints per menu section, so a long list scans like a phone's settings. */
@@ -274,12 +275,13 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
   const typing = useKeyboardOpen();
   useEdgeToEdge();
 
-  const role = user?.role || "customer";
+  // Never "customer" by default — see useSessionRole.
+  const role = useSessionRole(location.pathname);
   const access = useStaffAccess();
   // Staff: the admin shell with only the tabs and menu entries they may open.
   const cfg: NavConfig = role === "staff"
     ? { ...NAV.super_admin, home: access.home, tabs: NAV.super_admin.tabs.filter((t) => access.canOpenPath(t.path)), groups: staffGroups(access.canOpenPath) }
-    : NAV[role] || NAV.customer;
+    : NAV[role] ?? NAV[roleForPath(location.pathname)] ?? NAV.customer;
   const theme = roleTheme(role);
   const path = location.pathname;
 
@@ -387,7 +389,8 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
           {/* ─── Screen ─── */}
           <main className="dc-screen-in mx-auto w-full max-w-lg">{children}</main>
 
-          <InstallAppBanner hidden={typing || moreOpen} />
+          {/* The installed app opens the customer dashboard, so only card owners are offered it. */}
+          {role === "customer" && <InstallAppBanner hidden={typing || moreOpen} />}
 
           {/* ─── Bottom tab bar ─── */}
           <nav aria-label="Main"
@@ -431,7 +434,7 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
               </div>
             )}
 
-            <div className="mt-3"><InstallAppRow /></div>
+            {role === "customer" && <div className="mt-3"><InstallAppRow /></div>}
 
             {cfg.groups.map((g) => (
               <MenuGroup key={g.title} group={g} path={path} search={location.search} onGo={go} />
@@ -453,7 +456,7 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
                 <ChevronRight size={16} className="text-[#CBD5E1]" />
               </a>
               {impersonating && (
-                <button type="button" onClick={() => { clearSession("main"); window.location.href = "/admin/customers"; }}
+                <button type="button" onClick={() => { const to = adminReturnPath(); clearSession("main"); window.location.href = to; }}
                   className="flex w-full items-center gap-3 border-t border-[#F1F5F9] px-3 py-3 text-left active:bg-[#F8FAFC]">
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FEF3C7] text-[#B45309]"><ArrowLeft size={16} /></span>
                   <span className="flex-1 text-[14px] font-semibold text-[#0F172A]">Return to admin</span>

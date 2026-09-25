@@ -253,6 +253,7 @@ export const SEARCH_PAGES: NavLink[] = [
   { label: "Reseller program", href: "/resellers", desc: "Resell and earn 20% commission" },
   { label: "Refer & earn", href: "/refer-earn", desc: "Give 15%, get 15% cash" },
   { label: "Sign in", href: "/login", desc: "Customer, reseller and admin login" },
+  { label: "Partner sign in", href: "/resellers-login", desc: "Reseller partner portal login" },
   { label: "Sitemap", href: "/sitemap", desc: "Every page on DigitalCarda" },
   ...LEGAL_LINKS.map((l) => ({ ...l, desc: "Policies" })),
   ...INDUSTRY_SEARCH,

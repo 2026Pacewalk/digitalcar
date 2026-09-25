@@ -80,6 +80,7 @@ const BY_PROCEDURE: Record<string, Grant> = {
   "admin.slugConflicts": "system",
   "admin.reslugCard": "system",
   "admin.emailLogs": "system",
+  "admin.emailLogBody": "system",
   "admin.pruneEmailLogs": "system",
   "admin.deletionRequests": "system",
   "admin.completeDeletion": "system",
@@ -151,6 +152,10 @@ export async function staffAccountViolation(path: string, input: unknown): Promi
   const row = (await (await getDb()).select({ role: users.role }).from(users)
     .where(id ? eq(users.id, id) : eq(users.email, email)).limit(1))[0];
   if (row && (row.role === "super_admin" || row.role === "staff")) return "Staff can't change admin or staff accounts.";
+  // A partner login can request payouts, so its password and details are the
+  // super admin's to change (Admin → Resellers), never staff through the
+  // customer tools.
+  if (row && row.role === "reseller") return "Partner accounts are managed by the super admin in Resellers.";
   return null;
 }
 
@@ -188,6 +193,8 @@ const ACTION_LABELS: Record<string, string> = {
   "reseller.approve": "Approved a reseller application",
   "reseller.reject": "Rejected a reseller application",
   "reseller.grantLogin": "Gave a reseller a login",
+  "reseller.setActive": "Deactivated or reactivated a reseller",
+  "reseller.sendLoginEmail": "Emailed a reseller their sign-in details",
   "settings.update": "Changed site settings",
   "settings.sendTestEmail": "Sent a test email",
   "settings.sendMarketingEmail": "Sent a marketing email",

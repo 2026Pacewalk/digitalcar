@@ -90,7 +90,7 @@ export default function AdminTemplates() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-[#0F172A]">{list.length} prebuilt templates</p>
-            <p className="text-[12px] text-[#64748B]">Each is a distinct design. Users pick from these; the default (★) applies to anyone who hasn't chosen.</p>
+            <p className="text-[12px] text-[#64748B]">Each is a distinct design. New customers start on the default (★); they can switch any time.</p>
           </div>
           <button onClick={() => setDraft({ ...NEW })} className="h-10 px-4 gradient-gold text-[#0F172A] rounded-xl text-sm font-semibold flex items-center gap-2 hover:shadow-gold transition-all shrink-0"><Plus size={16} /> New template</button>
         </div>

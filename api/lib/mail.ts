@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { gzipSync } from "node:zlib";
 import type { Transporter } from "nodemailer";
 
 /*
@@ -125,31 +126,36 @@ export function fromAlignment(): { aligned: boolean; from: string; via: string |
 /** Send a rendered Email template to a recipient. Never throws — returns a
     status so callers (e.g. the admin test tool) can report success/failure.
     Existing callers that ignore the return value are unaffected. */
-export async function sendEmail(to: string | undefined | null, email: Email, replyTo?: string | null): Promise<{ ok: boolean; error?: string }> {
+/** `secrets`: values the email carries that must never be stored — e.g. a
+    password the admin chose to include. The copy kept for Admin → Email Log has
+    them blanked (see redactForLog); the recipient gets the real email. */
+export type SendOptions = { secrets?: (string | null | undefined)[] };
+
+export async function sendEmail(to: string | undefined | null, email: Email, replyTo?: string | null, opts: SendOptions = {}): Promise<{ ok: boolean; error?: string }> {
   try {
     if (!to) return { ok: false, error: "No recipient" };
     // Accounts created for a client whose email we didn't have get a stand-in
     // login on this domain. It has no mailbox, so mail to it would only bounce
     // and hurt the sender reputation of every real email.
     if (/@clients\.digitalcarda\.in$/i.test(to.trim())) {
-      void logEmail(to, email, replyTo, "skipped", "Placeholder login — no mailbox; add the client's real email");
+      void logEmail(to, email, replyTo, "skipped", "Placeholder login — no mailbox; add the client's real email", opts);
       return { ok: false, error: "Placeholder address" };
     }
     // An erased account's login is rewritten to this domain (api/lib/account-deletion.ts).
     if (/@deleted\.digitalcarda\.in$/i.test(to.trim())) {
-      void logEmail(to, email, replyTo, "skipped", "Deleted account — no mailbox");
+      void logEmail(to, email, replyTo, "skipped", "Deleted account — no mailbox", opts);
       return { ok: false, error: "Deleted account" };
     }
     // Alerts the owner switched off in Admin → Settings → Alerts are not sent.
     // Only the platform's own alerts can be switched off — never customer email.
     if (!alertEnabled(email.kind)) {
-      void logEmail(to, email, replyTo, "skipped", "This alert is switched off in Settings → Alerts");
+      void logEmail(to, email, replyTo, "skipped", "This alert is switched off in Settings → Alerts", opts);
       return { ok: false, error: "Alert switched off" };
     }
     // Real SMTP when it is configured; outside production, a capture mailbox
     // rather than silently dropping the mail.
     const t = transport() ?? (process.env.NODE_ENV === "production" ? null : await previewTransport());
-    if (!t) { void logEmail(to, email, replyTo, "skipped", "SMTP not configured"); return { ok: false, error: "SMTP not configured" }; }
+    if (!t) { void logEmail(to, email, replyTo, "skipped", "SMTP not configured", opts); return { ok: false, error: "SMTP not configured" }; }
     const from = mailFrom();
     const reply = replyTo || settings().email.replyTo || undefined;
     const info = await t.sendMail({ from, to, replyTo: reply, subject: email.subject, text: email.text, html: email.html });
@@ -159,26 +165,43 @@ export async function sendEmail(to: string | undefined | null, email: Email, rep
     // Logged as "skipped", because the log answers one question — did the
     // customer get it? In dev capture mode the honest answer is no.
     void logEmail(to, email, replyTo, captured ? "skipped" : "sent",
-      captured ? "Captured in the dev preview mailbox — not delivered" : null);
+      captured ? "Captured in the dev preview mailbox — not delivered" : null, opts);
     return { ok: true };
   } catch (e) {
     const why = (e as Error).message;
     console.error(`[mail] failed to send "${email.subject}":`, why);
-    if (to) void logEmail(to, email, replyTo, "failed", why);
+    if (to) void logEmail(to, email, replyTo, "failed", why, opts);
     return { ok: false, error: why };
   }
 }
 
-/* Record the send so the super-admin can answer "did they get it?".
-   Fire-and-forget and swallowed: a logging problem must never turn into a
-   failed email. Only the envelope is stored, never the body — welcome mails
-   carry a plaintext password. */
+/* The copy of an email kept for Admin → Email Log, with its secrets blanked:
+   every one-time link token (set-password, verify-email, app sign-in links —
+   whoever holds one can take over the account) and any value the sender
+   flagged in `secrets` (a password the admin included). Both the raw and the
+   HTML-escaped spelling of each secret are replaced. */
+const HIDDEN = "••••••••";
+const escHtml = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+export function redactForLog(body: string, secrets: (string | null | undefined)[] = []): string {
+  let out = body.replace(/((?:[?&]|&amp;)token=)[^&"'\s<>]+/gi, "$1hidden");
+  for (const raw of secrets) {
+    const v = String(raw ?? "");
+    if (v.length < 4) continue; // too short to replace safely without mangling the email
+    for (const form of new Set([v, escHtml(v), encodeURIComponent(v)])) out = out.split(form).join(HIDDEN);
+  }
+  return out;
+}
+
+/* Record the send so the super-admin can answer "did they get it?" — and, since
+   26 Sept 2026, "what exactly did they get?": the body is kept too, redacted
+   (above), gzipped, and deleted with its log row. Fire-and-forget and
+   swallowed: a logging problem must never turn into a failed email. */
 async function logEmail(
   to: string, email: Email, replyTo: string | null | undefined,
-  status: "sent" | "failed" | "skipped", error: string | null,
+  status: "sent" | "failed" | "skipped", error: string | null, opts: SendOptions = {},
 ): Promise<void> {
   try {
-    const [{ getDb }, { emailLogs, users }, { eq }] = await Promise.all([
+    const [{ getDb }, { emailLogs, emailLogBodies, users }, { eq }] = await Promise.all([
       import("../queries/connection"),
       import("@db/schema"),
       import("drizzle-orm"),
@@ -187,7 +210,7 @@ async function logEmail(
     const addr = to.toLowerCase().trim().slice(0, 255);
     const owner = email.userId ? { id: email.userId }
       : await db.query.users.findFirst({ where: eq(users.email, addr), columns: { id: true } });
-    await db.insert(emailLogs).values({
+    const [row] = await db.insert(emailLogs).values({
       toEmail: addr,
       subject: String(email.subject || "").slice(0, 300),
       kind: email.kind ? String(email.kind).slice(0, 64) : null,
@@ -195,7 +218,16 @@ async function logEmail(
       status,
       error: error ? error.slice(0, 500) : null,
       userId: owner?.id ?? null,
-    });
+    }).$returningId();
+    if (row?.id && (email.html || email.text)) {
+      try {
+        await db.insert(emailLogBodies).values({
+          emailLogId: row.id,
+          htmlGz: email.html ? gzipSync(Buffer.from(redactForLog(email.html, opts.secrets), "utf8")).toString("base64") : null,
+          text: email.text ? redactForLog(email.text, opts.secrets) : null,
+        });
+      } catch { /* the envelope is logged even if the body can't be (table missing on an old DB) */ }
+    }
   } catch { /* logging is best-effort by design */ }
 }
 

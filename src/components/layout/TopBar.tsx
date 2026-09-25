@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useSessionRole } from "@/hooks/useAuth";
 import { useSidebar } from "./SidebarContext";
-import { Menu, Search, Settings, LogOut, User, Lock, Activity, ChevronDown } from "lucide-react";
+import { Menu, Search, Settings, LogOut, User, Lock, Activity, ChevronDown, Wallet } from "lucide-react";
 import { useNavigate } from "react-router";
 import NotificationBell from "@/components/NotificationBell";
 import CardSwitcher from "@/components/customer/CardSwitcher";
@@ -19,7 +19,25 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const theme = roleTheme(user?.role);
+  const role = useSessionRole();
+  const theme = roleTheme(role);
+
+  // Each portal's own account pages. (It used to build "/<role>/settings" etc.,
+  // which sent partners to a page that doesn't exist and admins to /dashboard.)
+  const go = (to: string) => { setProfileOpen(false); navigate(to); };
+  const menu = role === "reseller" ? [
+    { icon: User, label: "My Profile", action: () => go("/reseller/profile") },
+    { icon: Lock, label: "Change Password", action: () => go("/reseller/profile#password") },
+    { icon: Wallet, label: "Earnings & Payouts", action: () => go("/reseller/earnings") },
+  ] : role === "super_admin" || role === "staff" ? [
+    { icon: User, label: "My Profile", action: () => go("/admin/profile") },
+    ...(role === "super_admin" ? [{ icon: Settings, label: "Settings", action: () => go("/admin/settings") }] : []),
+  ] : [
+    { icon: User, label: "My Profile", action: () => go("/dashboard/profile") },
+    { icon: Settings, label: "Account Settings", action: () => go("/dashboard/settings") },
+    { icon: Lock, label: "Change Password", action: () => go("/dashboard/profile?tab=security") },
+    { icon: Activity, label: "Login Activity", action: () => go("/dashboard/profile?tab=activity") },
+  ];
 
   return (
     <header className={`sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-[#F1F5F9] ${theme.badge ? "border-t-2 " + theme.topAccent : ""}`}>
@@ -45,14 +63,14 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
         </div>
 
         {/* Multi-card switcher (customers) */}
-        {(user as unknown as { role?: string })?.role === "customer" && (
+        {role === "customer" && (
           <div className="shrink-0 mr-2"><CardSwitcher /></div>
         )}
 
         {/* Right Actions */}
         <div className="flex items-center gap-1">
           {/* Search */}
-          <div className="relative hidden sm:block">
+          <div className={`relative hidden ${role === "reseller" ? "" : "sm:block"}`}>
             {searchOpen ? (
               <div className="flex items-center bg-[#F1F5F9] rounded-lg px-3 h-9 w-52">
                 <Search size={14} className="text-[#94A3B8] shrink-0" />
@@ -99,16 +117,11 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
                   <div className="px-3 py-3 border-b border-[#F1F5F9]">
                     <p className="text-sm font-semibold text-[#0F172A]">{user?.fullName || "User"}</p>
                     <p className="text-[10px] text-[#94A3B8] mt-0.5">{user?.email || ""}</p>
-                    <span className="inline-block mt-1.5 text-[9px] px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] font-semibold capitalize">{(user as any)?.role || "customer"}</span>
+                    <span className="inline-block mt-1.5 text-[9px] px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] font-semibold capitalize">{role.replace("_", " ")}</span>
                   </div>
                   {/* Menu Items */}
                   <div className="py-1">
-                    {[
-                      { icon: User, label: "My Profile", action: () => { setProfileOpen(false); navigate(`/${(user as any)?.role === "admin" ? "admin" : (user as any)?.role === "reseller" ? "reseller" : "dashboard"}/profile`); } },
-                      { icon: Settings, label: "Account Settings", action: () => { setProfileOpen(false); navigate(`/${(user as any)?.role === "admin" ? "admin" : (user as any)?.role === "reseller" ? "reseller" : "dashboard"}/settings`); } },
-                      { icon: Lock, label: "Change Password", action: () => { setProfileOpen(false); navigate(`/${(user as any)?.role === "admin" ? "admin" : (user as any)?.role === "reseller" ? "reseller" : "dashboard"}/profile?tab=security`); } },
-                      { icon: Activity, label: "Login Activity", action: () => { setProfileOpen(false); navigate(`/${(user as any)?.role === "admin" ? "admin" : (user as any)?.role === "reseller" ? "reseller" : "dashboard"}/profile?tab=activity`); } },
-                    ].map((item) => (
+                    {menu.map((item) => (
                       <button
                         key={item.label}
                         onClick={item.action}

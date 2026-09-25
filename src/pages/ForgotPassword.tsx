@@ -21,6 +21,8 @@ export default function ForgotPassword() {
   // Prefilled from the sign-in page's "Reset password" shortcut (?email=), or
   // from the email this browser remembered at sign-in.
   const [params] = useSearchParams();
+  // Opened from the partner sign-in page: send "Back to sign in" there.
+  const signInTo = params.get("for") === "partner" ? "/resellers-login" : "/login";
   const [email, setEmail] = useState(() => {
     const e = (params.get("email") || "").trim();
     return EMAIL_RE.test(e) ? e.slice(0, 254) : readRemembered();
@@ -119,7 +121,7 @@ export default function ForgotPassword() {
         </div>
 
         <p className="mt-6 text-center text-sm text-[#64748B]">
-          Remembered it? <Link to="/login" className="font-semibold text-[#B45309] hover:text-[#92400E]">Back to sign in</Link>
+          Remembered it? <Link to={signInTo} className="font-semibold text-[#B45309] hover:text-[#92400E]">Back to sign in</Link>
         </p>
       </RecoveryLayout>
     );
@@ -177,7 +179,7 @@ export default function ForgotPassword() {
       </form>
 
       <p className="mt-6 text-center text-sm text-[#64748B]">
-        Remembered it? <Link to="/login" className="font-semibold text-[#B45309] hover:text-[#92400E]">Back to sign in</Link>
+        Remembered it? <Link to={signInTo} className="font-semibold text-[#B45309] hover:text-[#92400E]">Back to sign in</Link>
       </p>
     </RecoveryLayout>
   );

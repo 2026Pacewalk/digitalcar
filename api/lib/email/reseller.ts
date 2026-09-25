@@ -18,7 +18,7 @@
  * - Applications are reviewed by hand in /admin/reseller-applications; the
  *   public page promises a decision "usually within 1-2 business days".
  * - The set-password link is a 1-hour reset token (api/lib/jwt.ts), used once;
- *   saving the password sends the user to /login, and a reseller lands on /reseller.
+ *   saving the password sends a new partner to /resellers-login, and a reseller lands on /reseller.
  * - The reseller sidebar is Dashboard, My Customers (with "Add Customer") and
  *   Payment Orders (read-only list of their customers' payments, CSV export).
  * - Commission is credited in activateVerifiedOrder on EVERY verified plan order
@@ -40,7 +40,7 @@ import {
 const PARTNER_HOME = `${SITE}/reseller`;
 const PARTNER_CUSTOMERS = `${SITE}/reseller/customers`;
 const PARTNER_PAYMENTS = `${SITE}/reseller/payments`;
-const LOGIN = `${SITE}/login`;
+const LOGIN = `${SITE}/resellers-login`; // the partner sign-in page (/login works too)
 const FORGOT = `${SITE}/forgot-password`;
 const APPLY = `${SITE}/become-reseller`;
 const SIGNUP = `${SITE}/signup`;
@@ -298,7 +298,7 @@ export function resellerApprovedEmail(o: { name?: string; link: string } & Appro
     sectionLabel("Your first steps") +
     stepRow(1, "Set your password", "Use the button above. Once it's saved, you'll be taken to the sign-in page.") +
     stepRow(2, "Sign in to your partner dashboard",
-      `Sign in at ${inkLink(LOGIN, "digitalcarda.in/login")}${email ? ` with ${strong(email)}` : ""}. You'll land on your partner dashboard, with your customers, earnings and commission rate.`) +
+      `Sign in at ${inkLink(LOGIN, "digitalcarda.in/resellers-login")}${email ? ` with ${strong(email)}` : ""}. You'll land on your partner dashboard, with your customers, earnings and commission rate.`) +
     tail.html +
     helpStrip() +
     signoff("The DigitalCarda partner team");
@@ -368,13 +368,13 @@ export function resellerApprovedExistingEmail(o: { name?: string } & ApprovedExt
 
   const bodyHtml =
     hi(name) +
-    p("Your application to become a <strong>DigitalCarda reseller partner</strong> is <strong>approved</strong>, and your existing account is now a reseller account. There's nothing new to set up — sign in with your usual email and password.") +
+    p("Your application to become a <strong>DigitalCarda reseller partner</strong> is <strong>approved</strong>, and your existing account is now a reseller account. There's nothing new to set up — sign in the way you always do, with your password or with Google.") +
     button("Open your partner dashboard", PARTNER_HOME) +
-    small("Anything you've already set up, like your own card, stays as it is.") +
+    small("If you have a card with us, it stays live at the same link. Your sign-in now opens the partner dashboard.") +
     partnerPass({ name, company: o.companyName, email, rate, since: o.approvedAt || new Date() }) +
     sectionLabel("Your first steps") +
     stepRow(1, "Sign in as usual",
-      `Sign in at ${inkLink(LOGIN, "digitalcarda.in/login")}${email ? ` with ${strong(email)}` : ""} and your usual password. You'll land on your partner dashboard, with your customers, earnings and commission rate.`) +
+      `Sign in at ${inkLink(LOGIN, "digitalcarda.in/resellers-login")}${email ? ` as ${strong(email)}` : ""}, with your usual password or with Google. You'll land on your partner dashboard, with your customers, earnings and commission rate.`) +
     tail.html +
     helpStrip() +
     signoff("The DigitalCarda partner team");
@@ -382,10 +382,10 @@ export function resellerApprovedExistingEmail(o: { name?: string } & ApprovedExt
   const text = [
     `Hi ${first || "there"},`,
     "",
-    "Your application to become a DigitalCarda reseller partner is approved, and your existing account is now a reseller account. There's nothing new to set up - sign in with your usual email and password.",
+    "Your application to become a DigitalCarda reseller partner is approved, and your existing account is now a reseller account. There's nothing new to set up - sign in the way you always do, with your password or with Google.",
     "",
     `Open your partner dashboard: ${PARTNER_HOME}`,
-    "Anything you've already set up, like your own card, stays as it is.",
+    "If you have a card with us, it stays live at the same link. Your sign-in now opens the partner dashboard.",
     "",
     "Your partner account:",
     `  Partner: ${name || "DigitalCarda partner"}`,
@@ -395,7 +395,7 @@ export function resellerApprovedExistingEmail(o: { name?: string } & ApprovedExt
     `  Partner since: ${dateIst(o.approvedAt || new Date())}`,
     "",
     "Your first steps:",
-    `1. Sign in as usual at ${LOGIN}${email ? ` with ${email}` : ""} and your usual password. You'll land on your partner dashboard, with your customers, earnings and commission rate.`,
+    `1. Sign in as usual at ${LOGIN}${email ? ` as ${email}` : ""}, with your usual password or with Google. You'll land on your partner dashboard, with your customers, earnings and commission rate.`,
     ...tail.text,
     "",
     `Need a hand? Reply to this email or WhatsApp us on ${SUPPORT_WHATSAPP.display} (https://wa.me/${SUPPORT_WHATSAPP.wa}).`,
@@ -414,8 +414,87 @@ export function resellerApprovedExistingEmail(o: { name?: string } & ApprovedExt
         tone: "green",
         icon: "🎉",
         title: first ? `Welcome to the partner programme, ${first}` : "Welcome to the partner programme",
-        sub: "Your existing account is now a reseller account — same email, same password.",
+        sub: "Your existing account is now a reseller account — same email, same sign-in.",
         chips: [darkChip("Account upgraded"), darkChip("Partner dashboard unlocked", BRAND.gold)],
+      }),
+      bodyHtml,
+      accent: TONE.green.solid,
+      footer: PARTNER_FOOTER,
+    }),
+    text,
+  };
+}
+
+/* ── 3b. Login details, sent again by the admin ─────────────────────────── */
+
+/**
+ * Audience: a reseller who already has a login.
+ * Trigger: admin "Share with reseller" → Email (reseller.sendLoginEmail in
+ *   api/reseller-router.ts). Used for a partner who lost the welcome email, whose
+ *   set-password link expired, or who was set up while email was down.
+ * Fields:
+ * - link: a FRESH set-password URL (1-hour, single-use reset token), minted at
+ *   send time. Falls back to the Forgot password page if it isn't http(s).
+ * - signedInBefore: false → lead with "set your password"; true → lead with
+ *   "sign in", and offer the link only as the way to reset.
+ */
+export function resellerLoginDetailsEmail(o: { name?: string; link: string; signedInBefore?: boolean } & ApprovedExtras): Email {
+  const name = clean(o.name);
+  const first = firstName(name);
+  const email = clean(o.email);
+  const rate = pct(o.commissionRate);
+  const href = safeUrl(o.link) || FORGOT;
+  const returning = !!o.signedInBefore;
+
+  const bodyHtml =
+    hi(name) +
+    p(returning
+      ? "Here are your <strong>DigitalCarda partner</strong> sign-in details. Sign in to add customers, see the commission each one earns you, and request payouts."
+      : "Here are your <strong>DigitalCarda partner</strong> sign-in details. Set a password to open your partner dashboard.") +
+    (returning ? button("Open the partner sign-in", LOGIN) : button("Set your password", href)) +
+    (returning
+      ? small(`Forgotten your password? ${goldLink(href, "Set a new one here")} — the link works once and for 60 minutes.`)
+      : small(`This link works once and for 60 minutes. If it has expired, use ${goldLink(FORGOT, "Forgot password")} with ${email ? `<strong>${esc(email)}</strong>` : "this email address"}.`)) +
+    partnerPass({ name, company: o.companyName, email, rate, since: o.approvedAt || new Date() }) +
+    sectionLabel("Signing in") +
+    stepRow(1, "Go to the partner sign-in", `${inkLink(LOGIN, "digitalcarda.in/resellers-login")}${email ? ` — sign in as ${strong(email)}` : ""}, with your password or with Google.`) +
+    stepRow(2, "You'll land on your partner dashboard", "Your customers, earnings and commission rate, with Add customer one tap away.") +
+    helpStrip() +
+    signoff("The DigitalCarda partner team");
+
+  const text = [
+    `Hi ${first || "there"},`,
+    "",
+    returning
+      ? "Here are your DigitalCarda partner sign-in details."
+      : "Here are your DigitalCarda partner sign-in details. Set a password to open your partner dashboard:",
+    ...(returning ? [] : [href, "The link works once and for 60 minutes."]),
+    "",
+    `Sign in: ${LOGIN}`,
+    ...(email ? [`Sign-in email: ${email}`] : []),
+    ...(rate ? [`Commission: ${rate} of each paid plan`] : []),
+    ...(returning ? ["", `Forgotten your password? Set a new one (works once, for 60 minutes): ${href}`] : []),
+    "",
+    `Need a hand? Reply to this email or WhatsApp us on ${SUPPORT_WHATSAPP.display} (https://wa.me/${SUPPORT_WHATSAPP.wa}).`,
+    "",
+    "Warm regards,",
+    "The DigitalCarda partner team",
+  ].join("\n");
+
+  return {
+    kind: "resellerLoginDetailsEmail",
+    subject: "Your DigitalCarda partner sign-in",
+    html: layout({
+      preheader: returning
+        ? "Your partner sign-in link and details, plus a way to reset your password."
+        : "Set your password within 60 minutes to open your partner dashboard.",
+      hero: heroBand({
+        eyebrow: "Partner sign-in",
+        tone: "green",
+        icon: "🔑",
+        title: first ? `Your partner sign-in, ${first}` : "Your partner sign-in",
+        sub: returning ? "Everything you need to get back into your partner dashboard." : "Your reseller account is ready. Set a password to open it.",
+        chips: [darkChip("digitalcarda.in/resellers-login"), darkChip("Link valid for 60 minutes", BRAND.gold)],
       }),
       bodyHtml,
       accent: TONE.green.solid,

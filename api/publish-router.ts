@@ -9,6 +9,25 @@ import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEven
 import { legacyPaidPlan } from "./lib/entitlement";
 import { sendEmail } from "./lib/mail";
 import { cardPublishedEmail } from "./lib/email-templates";
+import { getDefaultDesign } from "./template-router";
+
+/* A save that carries no design must not wipe the card's template. A card
+   record seeded in the browser before it knew a design (signup, a partner's
+   new customer, an extra card) used to publish with no theme at all — so the
+   public page fell back to the old classic layout while the owner's dashboard
+   showed the default. Keep the live card's design, or start a new card on the
+   admin's default. A theme the client actually sends is never changed. */
+async function keepDesign(db: ReturnType<typeof getDb>, data: unknown, prev: unknown): Promise<void> {
+  const cust = (data as { customer?: Record<string, unknown> } | null)?.customer;
+  if (!cust || typeof cust !== "object" || String(cust.theme ?? "").trim()) return;
+  const was = (prev as { customer?: Record<string, unknown> } | null | undefined)?.customer;
+  const from = was && String(was.theme ?? "").trim()
+    ? { theme: was.theme, color: was.color, color2: was.color2 }
+    : await getDefaultDesign(db);
+  cust.theme = from.theme;
+  if (!String(cust.color ?? "").trim() && from.color) cust.color = from.color;
+  if (!String(cust.color2 ?? "").trim() && from.color2) cust.color2 = from.color2;
+}
 import { eq, desc, and } from "drizzle-orm";
 
 const DAY = 86_400_000;
@@ -151,6 +170,7 @@ export const publishRouter = createRouter({
       const data = sanitizeSnapshot(input.data);
       const owner = and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId));
       const existing = await db.select().from(publishedCards).where(owner);
+      await keepDesign(db, data, existing[0]?.data);
       if (existing[0]) {
         if (input.baseTs) {
           const rowTs = existing[0].updatedAt ? new Date(existing[0].updatedAt).getTime() : 0;

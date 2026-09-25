@@ -11,6 +11,7 @@ import { Link, useLocation } from "react-router";
 import { toast } from "sonner";
 import { Check, Copy, Megaphone, PartyPopper, Sparkles, X, type LucideIcon } from "lucide-react";
 import { trpc } from "@/providers/trpc";
+import { getAuthUser } from "@/hooks/useCustomer";
 
 export type AnnouncementTheme = "diwali" | "holi" | "newyear" | "festive" | "brand" | "dark";
 
@@ -235,7 +236,8 @@ export function AnnouncementCard({ a, audience = "public", onClose, onCta, previ
 export default function AnnouncementPopup({ audience }: { audience: "public" | "dashboard" }) {
   const { pathname } = useLocation();
   // Admin screens are for running the business, not for being sold to.
-  const skip = audience === "dashboard" && pathname.startsWith("/admin");
+  // Dashboard offers are card-owner offers (plans, coupons): not for the admin or partner portals.
+  const skip = audience === "dashboard" && (pathname.startsWith("/admin") || pathname.startsWith("/reseller") || getAuthUser()?.role !== "customer");
   const { data } = trpc.announcement.current.useQuery(
     { audience },
     { enabled: !skip, staleTime: 5 * 60_000, retry: false, refetchOnWindowFocus: false },

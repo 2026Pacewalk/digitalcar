@@ -5,13 +5,14 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Mail, Search, RefreshCw, Loader2, CheckCircle2, XCircle, MinusCircle,
-  ChevronLeft, ChevronRight, Download, Trash2, Inbox,
+  ChevronLeft, ChevronRight, Download, Trash2, Inbox, Eye,
 } from "lucide-react";
+import EmailBodyViewer from "@/components/admin/EmailBodyViewer";
 
 /* Every outbound email, so support can answer "did they actually get it?"
-   without logging into the SMTP provider. Bodies are deliberately not stored —
-   a welcome email carries a plaintext password — so this shows the envelope:
-   who, what, which template, and whether it left the building. */
+   without logging into the SMTP provider — and, from 26 Sept 2026, "what did
+   it say?": View opens the email as the recipient saw it. The saved copy has
+   one-time link tokens and flagged passwords blanked (api/lib/mail.ts). */
 
 type Status = "all" | "sent" | "failed" | "skipped";
 
@@ -75,6 +76,7 @@ const KIND_LABEL: Record<string, string> = {
   resellerApplicationReceivedEmail: "Reseller application received",
   resellerApprovedEmail: "Reseller approved",
   resellerApprovedExistingEmail: "Reseller approved (existing)",
+  resellerLoginDetailsEmail: "Reseller sign-in details",
   resellerRejectedEmail: "Reseller rejected",
   resellerCommissionEmail: "Reseller commission",
   // Owner alerts
@@ -125,6 +127,7 @@ export default function AdminEmailLog() {
   const [kind, setKind] = useState<string>("");
   const [days, setDays] = useState(30);
   const [page, setPage] = useState(1);
+  const [viewing, setViewing] = useState<number | null>(null);
   const perPage = 50;
 
   const { data, isLoading, isFetching, refetch } = trpc.admin.emailLogs.useQuery(
@@ -134,6 +137,7 @@ export default function AdminEmailLog() {
   const prune = trpc.admin.pruneEmailLogs.useMutation();
 
   const rows = data?.rows ?? [];
+  const withBody = useMemo(() => new Set(data?.withBody ?? []), [data]);
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / perPage));
   const counts = data?.byStatus ?? { sent: 0, failed: 0, skipped: 0 };
@@ -275,6 +279,7 @@ export default function AdminEmailLog() {
                       <th className="text-left font-bold px-4 py-3">Subject</th>
                       <th className="text-left font-bold px-4 py-3 whitespace-nowrap">Template</th>
                       <th className="text-left font-bold px-4 py-3">Status</th>
+                      <th className="px-4 py-3"><span className="sr-only">View</span></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -294,6 +299,16 @@ export default function AdminEmailLog() {
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11.5px] font-bold ${st.chip}`}>
                               <Icon size={12} /> {st.label}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {withBody.has(r.id) ? (
+                              <button type="button" onClick={() => setViewing(r.id)}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#E2E8F0] px-3 text-[12px] font-semibold text-[#334155] hover:border-[#F7B31C] hover:bg-[#FFFBEB]">
+                                <Eye size={13} /> View
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-[#CBD5E1]" title="Email contents are kept from 26 Sept 2026 onwards">—</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -319,6 +334,11 @@ export default function AdminEmailLog() {
                       {r.error && <p className="text-[11.5px] text-[#B91C1C] mt-1 break-words">{r.error}</p>}
                       <div className="flex items-center gap-2 mt-2 text-[11.5px] text-[#94A3B8]">
                         <span>{kindLabel(r.kind)}</span><span>·</span><span className="tabular-nums">{when(r.createdAt)}</span>
+                        {withBody.has(r.id) && (
+                          <button type="button" onClick={() => setViewing(r.id)} className="ml-auto inline-flex items-center gap-1 font-semibold text-[#B45309]">
+                            <Eye size={12} /> View email
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -349,10 +369,12 @@ export default function AdminEmailLog() {
         </div>
 
         <p className="text-[11.5px] text-[#94A3B8] leading-relaxed">
-          Only the envelope is recorded — recipient, subject, template and outcome. Message bodies are never stored,
-          because welcome emails contain a customer's password.
+          Every email is recorded with its recipient, subject, template and outcome. From 26 Sept 2026 the message itself is
+          kept too — open it with View. One-time sign-in and password links, and any password we included, are blanked in
+          the saved copy; the recipient got the real email.
         </p>
       </div>
+      {viewing !== null && <EmailBodyViewer id={viewing} onClose={() => setViewing(null)} kindLabel={kindLabel} />}
     </ResponsiveDashboardLayout>
   );
 }

@@ -8,6 +8,7 @@ import { eq, and, sql, desc, inArray, gt, gte } from "drizzle-orm";
 import { PAID_PACKAGE_IDS } from "./lib/entitlement";
 import { sendEmail } from "./lib/mail";
 import { accountDetailsEmail, featureUpdateEmail, planUpgradedEmail, planExtendedEmail, passwordChangedEmail } from "./lib/email-templates";
+import { getDefaultDesign } from "./template-router";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -287,7 +288,7 @@ export const userRouter = createRouter({
         password: input.includePassword ? (input.password || null) : null,
         slug: pub[0]?.slug || null,
         company: (cust.company_name as string) || null,
-      }));
+      }), undefined, { secrets: [input.password] }); // never kept in the Email Log copy
       return { ok: res.ok, error: res.error, sentTo: user.email };
     }),
 
@@ -384,7 +385,9 @@ export const userRouter = createRouter({
       });
 
       // Publish a starter card so the URL works the moment it is shared. The
-      // customer fills in the rest from their dashboard.
+      // customer fills in the rest from their dashboard. It starts on the admin's
+      // default template (Admin → Templates ★).
+      const design = await getDefaultDesign(db);
       const publicId = Math.random().toString(36).slice(2, 12);
       await db.insert(publishedCards).values({
         userId, cardId: 1, slug, publicId,
@@ -394,7 +397,7 @@ export const userRouter = createRouter({
             email, mobile1: input.phone?.trim() || "", mobile2: input.phone?.trim() || "",
             company_name: input.company?.trim() || "",
             package_id: input.packageId, expired_on: expiredOn,
-            theme: "1", published: 1, status: 1,
+            theme: String(design.theme), color: design.color, color2: design.color2, published: 1, status: 1,
             about_on: 1, product_on: 1, payment_on: 1, gallery_on: 1,
             video_on: 1, enquiry_on: 1, cardqr_on: 1,
           },
@@ -529,8 +532,10 @@ export const userRouter = createRouter({
   resellerCustomers: resellerQuery
     .input(
       z.object({
-        page: z.number().default(1),
-        limit: z.number().default(25),
+        // Whole, positive, bounded: page 0 or 1.5 made a negative/fractional
+        // OFFSET (a 500 carrying raw SQL), and an unbounded limit returned everything.
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(25),
         search: z.string().optional(),
         status: z.string().optional(),
       }).optional()

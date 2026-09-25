@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
-import { createRouter, publicQuery, adminQuery, resellerQuery } from "./middleware";
+import { createRouter, publicQuery, adminQuery, superAdminQuery, resellerQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   resellerApplications, users, resellerProfiles, resellerAccounts, resellerCommissions,
@@ -9,19 +9,39 @@ import {
 } from "@db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { createResetToken } from "./lib/jwt";
+import { createResetToken, createToken } from "./lib/jwt";
+import { provisionStarterCard } from "./auth-router";
+import { recordActivity } from "./lib/staff-access";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { affectedRows } from "./lib/wallet";
 import {
   resellerApplicationAdminEmail, resellerApplicationReceivedEmail,
-  resellerApprovedEmail, resellerApprovedExistingEmail, resellerRejectedEmail,
+  resellerApprovedEmail, resellerApprovedExistingEmail, resellerRejectedEmail, resellerLoginDetailsEmail,
+  passwordChangedEmail,
 } from "./lib/email-templates";
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://digitalcarda.in";
 
 type Db = ReturnType<typeof getDb>;
 const num = (v: unknown) => Number(v ?? 0) || 0;
+
+/** The reseller login linked to a ledger row, or a clear error for the admin. */
+async function linkedLogin(db: Db, accountId: number) {
+  const acc = await db.query.resellerAccounts.findFirst({ where: eq(resellerAccounts.id, accountId) });
+  if (!acc) throw new TRPCError({ code: "NOT_FOUND", message: "Reseller not found." });
+  if (!acc.resellerUserId) throw new TRPCError({ code: "BAD_REQUEST", message: `${acc.name} has no login yet — give them one first.` });
+  const user = await db.query.users.findFirst({ where: eq(users.id, acc.resellerUserId) });
+  if (!user || user.role !== "reseller") throw new TRPCError({ code: "NOT_FOUND", message: `${acc.name}'s linked account isn't a reseller login.` });
+  return { acc, user };
+}
+
+/** A 60-minute, single-use set-password link that lands on the partner sign-in.
+    Keyed to the current password hash, so it dies once a password is saved. */
+async function setPasswordLink(user: { id: number; password: string }) {
+  const token = await createResetToken(user.id, (user.password || "").slice(-12));
+  return `${PUBLIC_BASE_URL}/reset-password?token=${encodeURIComponent(token)}&for=partner`;
+}
 
 /* ── Making someone a reseller ─────────────────────────────────────────────
    This is the only code that creates a reseller login. Approving an
@@ -102,7 +122,8 @@ async function grantResellerLogin(db: Db, o: {
     void sendEmail(email, resellerApprovedExistingEmail({ name: fullName, email, companyName: company, commissionRate: rate }));
   } else {
     const token = await createResetToken(result.userId, (randomHash || "").slice(-12));
-    const link = `${PUBLIC_BASE_URL}/reset-password?token=${encodeURIComponent(token)}`;
+    // &for=partner: once the password is saved, that page sends them to the partner sign-in.
+    const link = `${PUBLIC_BASE_URL}/reset-password?token=${encodeURIComponent(token)}&for=partner`;
     void sendEmail(email, resellerApprovedEmail({ name: fullName, link, email, companyName: company, commissionRate: rate, invited: o.invited }));
   }
   return { ...result, isNew: !existing };
@@ -227,6 +248,114 @@ export const resellerRouter = createRouter({
       return { ok: true, isNew: r.isNew, userId: r.userId };
     }),
 
+  /* ── Admin: act on a reseller's login ─────────────────────────────────────
+     The admin list is keyed by the ledger row (reseller_accounts); these act on
+     the login linked to it. */
+
+  // See the partner portal exactly as the reseller does. Super admin only, never
+  // staff: a reseller session can request a payout to any UPI ID. Short-lived,
+  // so it can't turn into a standing second key to their account.
+  loginAs: superAdminQuery
+    .input(z.object({ accountId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { user } = await linkedLogin(getDb(), input.accountId);
+      if (user.status !== "active") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `${user.fullName}'s login is deactivated — reactivate it first.` });
+      }
+      const token = await createToken({ userId: user.id, email: user.email, role: user.role }, { expiresIn: "2h" });
+      // Super-admin-only procedures skip the staff activity middleware, so these
+      // three sensitive ones are recorded by hand.
+      recordActivity({ actor: ctx.user, module: "resellers", action: "Signed in as a reseller", target: user.email, req: ctx.req });
+      return { token, user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role } };
+    }),
+
+  // Deactivate or reactivate a reseller. Deactivating stops sign-in at once —
+  // api/context.ts re-checks the account on every request, so an open session
+  // loses access on its next click — and marks the ledger row inactive. Their
+  // customers, cards and ledger history are untouched.
+  setActive: adminQuery
+    .input(z.object({ accountId: z.number().int().positive(), active: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const acc = await db.query.resellerAccounts.findFirst({ where: eq(resellerAccounts.id, input.accountId) });
+      if (!acc) throw new TRPCError({ code: "NOT_FOUND", message: "Reseller not found." });
+      const user = acc.resellerUserId
+        ? await db.query.users.findFirst({ where: eq(users.id, acc.resellerUserId) })
+        : undefined;
+      if (input.active && user && user.status === "inactive") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `${acc.name}'s login was closed (account deletion), so it can't be reactivated here. Give them a new login instead.` });
+      }
+      await db.transaction(async (tx) => {
+        await tx.update(resellerAccounts).set({ active: input.active }).where(eq(resellerAccounts.id, acc.id));
+        // Only ever flip active <-> suspended. An "inactive" account was closed
+        // (deletion request), and reactivating a reseller must not reopen it.
+        if (user && user.role === "reseller" && user.status !== "inactive") {
+          const status = input.active ? "active" : "suspended";
+          await tx.update(users).set({ status }).where(eq(users.id, user.id));
+          await tx.update(resellerProfiles).set({ status }).where(eq(resellerProfiles.userId, user.id));
+        }
+      });
+      return { ok: true, hadLogin: !!user };
+    }),
+
+  // Email the reseller their sign-in details, with a fresh set-password link —
+  // for a lost welcome email, an expired link, or a login made while email was down.
+  sendLoginEmail: adminQuery
+    .input(z.object({ accountId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const { acc, user } = await linkedLogin(db, input.accountId);
+      if (user.status !== "active") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `${user.fullName}'s login is deactivated — reactivate it before sending sign-in details.` });
+      }
+      const profile = await db.query.resellerProfiles.findFirst({ where: eq(resellerProfiles.userId, user.id) });
+      const r = await sendEmail(user.email, resellerLoginDetailsEmail({
+        name: user.fullName, link: await setPasswordLink(user), email: user.email,
+        companyName: profile?.companyName || acc.company, commissionRate: profile?.commissionRate ?? acc.commissionRate,
+        approvedAt: profile?.createdAt ?? user.createdAt, signedInBefore: !!user.lastLoginAt,
+      }));
+      return { ok: r.ok, sentTo: user.email, error: r.ok ? undefined : r.error || "The email could not be sent." };
+    }),
+
+  // Set a new password for the admin to hand over (Share → "Include the
+  // password"). Super admin only — the password is a key to their payouts. The
+  // reseller is emailed that our team changed it, and the shared message asks
+  // them to change it after signing in. Only the bcrypt hash is stored.
+  setPassword: superAdminQuery
+    .input(z.object({
+      accountId: z.number().int().positive(),
+      password: z.string()
+        .min(8, "Password must be at least 8 characters").max(200)
+        .regex(/[A-Z]/, "Password must include an uppercase letter")
+        .regex(/[a-z]/, "Password must include a lowercase letter")
+        .regex(/\d/, "Password must include a number")
+        .regex(/[^A-Za-z0-9]/, "Password must include a special character"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const { user } = await linkedLogin(db, input.accountId);
+      if (user.status !== "active") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `${user.fullName}'s login is deactivated — reactivate it first.` });
+      }
+      await db.update(users).set({ password: await bcrypt.hash(input.password, 12) }).where(eq(users.id, user.id));
+      recordActivity({ actor: ctx.user, module: "resellers", action: "Set a reseller's password", target: user.email, req: ctx.req });
+      void sendEmail(user.email, passwordChangedEmail({ name: user.fullName, byTeam: true, at: new Date() }));
+      return { ok: true };
+    }),
+
+  // A set-password link to paste into WhatsApp yourself. Super admin only:
+  // whoever holds the link can choose this reseller's password.
+  passwordLink: superAdminQuery
+    .input(z.object({ accountId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { user } = await linkedLogin(getDb(), input.accountId);
+      if (user.status !== "active") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `${user.fullName}'s login is deactivated — reactivate it first.` });
+      }
+      recordActivity({ actor: ctx.user, module: "resellers", action: "Made a reseller set-password link", target: user.email, req: ctx.req });
+      return { link: await setPasswordLink(user), minutes: 60 };
+    }),
+
   // ── Reseller: their own profile ──
   me: resellerQuery.query(async ({ ctx }) => {
     if (ctx.user.role !== "reseller") throw new TRPCError({ code: "FORBIDDEN" });
@@ -335,13 +464,19 @@ export const resellerRouter = createRouter({
       const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
       if (existing) throw new TRPCError({ code: "BAD_REQUEST", message: "That email is already registered." });
       const password = await bcrypt.hash(input.password, 12);
+      const fullName = input.fullName.trim();
+      const phone = input.phone?.trim() || null;
       const [ins] = await db.insert(users).values({
-        email, password, fullName: input.fullName.trim(), phone: input.phone?.trim() || null,
+        email, password, fullName, phone,
         role: "customer", status: "active", resellerId: ctx.user.id,
       }).$returningId();
       await db.update(resellerProfiles)
         .set({ totalCustomers: sql`${resellerProfiles.totalCustomers} + 1` })
         .where(eq(resellerProfiles.userId, ctx.user.id));
-      return { ok: true, id: ins.id };
+      // A live card and trial, exactly as a normal signup gets — on the admin's
+      // default template. It used to create the account only, so the customer
+      // had no card and no link ("/" in Admin → Customers).
+      const starter = await provisionStarterCard(db, { id: ins.id, email, fullName, phone });
+      return { ok: true, id: ins.id, slug: starter?.slug ?? null };
     }),
 });

@@ -140,6 +140,21 @@ async function defaultPresetId(db: ReturnType<typeof getDb>): Promise<number> {
   return raw ? Number(raw) || 1 : 1;
 }
 
+/** The design every new card starts on: the template the admin starred as
+    Default in Admin → Templates. Used by signup (email + Google), admin Add New,
+    a partner's Add Customer, and any save that arrives without a design.
+    It used to be read only for display, while cards were created with a
+    hard-coded theme 1 — so new customers never got the chosen default. */
+export async function getDefaultDesign(db: ReturnType<typeof getDb>): Promise<{ theme: number; color: string; color2: string }> {
+  try {
+    const list = await loadPresets(db);
+    const did = await defaultPresetId(db);
+    const def = list.find((p) => p.id === did) || list[0];
+    if (def) return { theme: def.style, color: def.primary || "#F7B31C", color2: def.secondary || "" };
+  } catch { /* fall through to the built-in design */ }
+  return { theme: 1, color: "#F7B31C", color2: "" };
+}
+
 const presetInput = z.object({
   id: z.number().optional(),
   name: z.string().min(1),
@@ -160,11 +175,8 @@ export const templateRouter = createRouter({
 
   // ─── The default template's style+colours (consumed by every card) ───
   siteConfig: publicQuery.query(async () => {
-    const db = getDb();
-    const list = await loadPresets(db);
-    const did = await defaultPresetId(db);
-    const def = list.find((p) => p.id === did) || list[0];
-    return { defaultId: def?.style ?? 1, defaultColor: def?.primary ?? "#F7B31C", defaultSecondary: def?.secondary ?? "", disabled: [] as number[] };
+    const def = await getDefaultDesign(getDb());
+    return { defaultId: def.theme, defaultColor: def.color, defaultSecondary: def.color2, disabled: [] as number[] };
   }),
 
   // ─── Super-admin: create / update a prebuilt template ───

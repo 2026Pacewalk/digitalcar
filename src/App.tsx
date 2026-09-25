@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { Routes, Route, Navigate, useParams, useLocation, Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
@@ -133,6 +133,15 @@ const Spinner = () => (
   </div>
 );
 
+/* Where a signed-out visitor is sent. The partner area has its own sign-in
+   page, and it brings them back to the page they asked for. */
+function signInPath(): string {
+  if (typeof window === "undefined") return "/login";
+  const { pathname, search } = window.location;
+  if (!/^\/reseller(\/|$)/.test(pathname)) return "/login";
+  return `/resellers-login?next=${encodeURIComponent(pathname + search)}`;
+}
+
 function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
   const { user, isLoading } = useAuth();
   const hasToken = typeof window !== "undefined" && !!getToken();
@@ -141,6 +150,19 @@ function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allo
   // user-editable, so access is gated on the role the backend reports for the
   // JWT — a hand-edited role can't unlock an area the account isn't allowed in.
   const me = trpc.auth.me.useQuery(undefined, { enabled: hasToken, retry: false, staleTime: 60_000 });
+
+  // Does the session stored NOW disagree with the server's (possibly cached)
+  // answer? That happens when "Login as Reseller/Client" swaps the session in
+  // this tab, or another tab signs in as someone else. Re-ask the server once;
+  // if it still disagrees, the reconcile effect below corrects and reloads.
+  const storedNow = getSessionUser() as { id?: number; role?: string } | null;
+  const idDrift = !!(me.data && storedNow && (storedNow.id !== me.data.id || storedNow.role !== me.data.role));
+  const reasked = useRef(false);
+  useEffect(() => {
+    if (idDrift && hasToken && !reasked.current) { reasked.current = true; void me.refetch(); }
+    if (!idDrift) reasked.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idDrift, user?.id]);
 
   // Reconcile the cached user with the server truth so the whole shell (sidebar,
   // top bar) reflects the real role. Only reloads when it was actually wrong.
@@ -167,17 +189,20 @@ function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allo
   const errData = me.error?.data as { code?: string; httpStatus?: number } | null | undefined;
   if (hasToken && me.error && (errData?.code === "UNAUTHORIZED" || errData?.httpStatus === 401)) {
     clearSession();
-    return <Navigate to="/login" replace />;
+    return <Navigate to={signInPath()} replace />;
   }
 
   if (isLoading || (hasToken && me.isLoading)) return <Spinner />;
+  // Stored session and server disagree: wait for the re-ask (or the reload)
+  // rather than mount a portal on the wrong identity for a moment.
+  if (idDrift) return <Spinner />;
   if (!user) {
     // The home-screen app always opens /dashboard; someone signed in only to the
     // admin portal belongs on /admin, not the login screen.
     const fromApp = typeof window !== "undefined"
       && (new URLSearchParams(window.location.search).get("source") === "app" || isStandalone());
     if (fromApp && !window.location.pathname.startsWith("/admin") && getToken("admin")) return <Navigate to="/admin" replace />;
-    return <Navigate to="/login" replace />;
+    return <Navigate to={signInPath()} replace />;
   }
 
   // Prefer the server-verified role for the access decision.
@@ -190,9 +215,34 @@ function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allo
   if (!allowedRoles.includes(role)) {
     if (role === "super_admin") return <Navigate to="/admin" replace />;
     if (role === "reseller") return <Navigate to="/reseller" replace />;
+    // A partner page, but this browser's session is now a customer's — e.g.
+    // "Login as Client" in another tab replaced it (both use the one main
+    // session). Say so, rather than quietly turning into the customer portal.
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/reseller")) {
+      return <WrongPortal name={me.data?.fullName ?? user.fullName} email={me.data?.email ?? user.email} />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
+}
+
+function WrongPortal({ name, email }: { name?: string; email?: string }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-4">
+      <div className="w-full max-w-md rounded-2xl border border-[#E2E8F0] bg-white p-6 text-center shadow-premium">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#B45309]">Partner portal</p>
+        <h1 className="mt-2 text-xl font-extrabold text-[#0F172A]">This browser is signed in to a customer account</h1>
+        <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
+          {name || email ? <>It's signed in as <b className="text-[#0F172A]">{name || email}</b>{name && email ? ` (${email})` : ""}, which isn't a partner login. </> : null}
+          Sign in with your partner account to open the partner portal.
+        </p>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <Link to="/resellers-login?next=%2Freseller" className="gradient-gold inline-flex h-11 items-center justify-center rounded-xl text-sm font-bold text-[#0F172A]">Partner sign in</Link>
+          <Link to="/dashboard" className="inline-flex h-11 items-center justify-center rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]">Customer dashboard</Link>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* A staff member on an admin page: open it only if their access includes its
@@ -313,9 +363,13 @@ export default function App() {
         </Route>
 
         {/* Auth */}
-        <Route path="/login" element={<Login />} />
+        {/* The keys make moving between the sign-in doors a fresh page, not the
+            same form carrying over what was typed on the other one. */}
+        <Route path="/login" element={<Login key="customer" />} />
+        <Route path="/resellers-login" element={<Login key="partner" resellerMode />} />
+        <Route path="/reseller-login" element={<Navigate to="/resellers-login" replace />} />
         {/* Unadvertised admin login — set VITE_ADMIN_LOGIN_SLUG in .env to your own secret slug */}
-        <Route path={`/${import.meta.env.VITE_ADMIN_LOGIN_SLUG || "control-signin"}`} element={<Login adminMode />} />
+        <Route path={`/${import.meta.env.VITE_ADMIN_LOGIN_SLUG || "control-signin"}`} element={<Login key="admin" adminMode />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -368,44 +422,44 @@ export default function App() {
         <Route path="/reseller/earnings" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerEarnings /></RoleRoute>} />
 
         {/* Customer */}
-        <Route path="/dashboard" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerDashboard /></RoleRoute>} />
+        <Route path="/dashboard" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerDashboard /></RoleRoute>} />
         {/* Old block builder retired — creating goes through the template editor. */}
         <Route path="/dashboard/builder" element={<Navigate to="/dashboard/cards" replace />} />
-        <Route path="/dashboard/builder/:cardId" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardTemplateEditor /></RoleRoute>} />
-        <Route path="/dashboard/templates" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerTemplates /></RoleRoute>} />
-        <Route path="/dashboard/cards" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerCards /></RoleRoute>} />
-        <Route path="/dashboard/bulk" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerBulkCreate /></RoleRoute>} />
-        <Route path="/dashboard/refer" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerReferEarn /></RoleRoute>} />
-        <Route path="/dashboard/analytics" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerAnalytics /></RoleRoute>} />
-        <Route path="/dashboard/leads" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerLeads /></RoleRoute>} />
-        <Route path="/dashboard/subscription" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSubscription /></RoleRoute>} />
-        <Route path="/dashboard/billing" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerBilling /></RoleRoute>} />
-        <Route path="/dashboard/settings" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSettings /></RoleRoute>} />
-        <Route path="/dashboard/profile" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerProfile /></RoleRoute>} />
-        <Route path="/dashboard/qr" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerQR /></RoleRoute>} />
-        <Route path="/dashboard/signature" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSignature /></RoleRoute>} />
-        <Route path="/dashboard/whatsapp" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerWhatsAppMessage /></RoleRoute>} />
-        <Route path="/dashboard/instagram" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerInstagramBio /></RoleRoute>} />
-        <Route path="/dashboard/tools" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerFreeTools /></RoleRoute>} />
-        <Route path="/dashboard/domain" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerCustomDomain /></RoleRoute>} />
-        <Route path="/dashboard/nfc" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerNfcOrder /></RoleRoute>} />
-        <Route path="/dashboard/ai" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><AITools /></RoleRoute>} />
-        <Route path="/dashboard/build" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CardStudio /></RoleRoute>} />
-        <Route path="/dashboard/home" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerHome /></RoleRoute>} />
-        <Route path="/dashboard/about" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerAbout /></RoleRoute>} />
-        <Route path="/dashboard/products" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerProducts /></RoleRoute>} />
-        <Route path="/dashboard/payments" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerPayments /></RoleRoute>} />
-        <Route path="/dashboard/media" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerMedia /></RoleRoute>} />
-        <Route path="/dashboard/social" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerSocial /></RoleRoute>} />
-        <Route path="/dashboard/uploads" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerUploads /></RoleRoute>} />
+        <Route path="/dashboard/builder/:cardId" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CardTemplateEditor /></RoleRoute>} />
+        <Route path="/dashboard/templates" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerTemplates /></RoleRoute>} />
+        <Route path="/dashboard/cards" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerCards /></RoleRoute>} />
+        <Route path="/dashboard/bulk" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerBulkCreate /></RoleRoute>} />
+        <Route path="/dashboard/refer" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerReferEarn /></RoleRoute>} />
+        <Route path="/dashboard/analytics" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerAnalytics /></RoleRoute>} />
+        <Route path="/dashboard/leads" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerLeads /></RoleRoute>} />
+        <Route path="/dashboard/subscription" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerSubscription /></RoleRoute>} />
+        <Route path="/dashboard/billing" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerBilling /></RoleRoute>} />
+        <Route path="/dashboard/settings" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerSettings /></RoleRoute>} />
+        <Route path="/dashboard/profile" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerProfile /></RoleRoute>} />
+        <Route path="/dashboard/qr" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerQR /></RoleRoute>} />
+        <Route path="/dashboard/signature" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerSignature /></RoleRoute>} />
+        <Route path="/dashboard/whatsapp" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerWhatsAppMessage /></RoleRoute>} />
+        <Route path="/dashboard/instagram" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerInstagramBio /></RoleRoute>} />
+        <Route path="/dashboard/tools" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerFreeTools /></RoleRoute>} />
+        <Route path="/dashboard/domain" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerCustomDomain /></RoleRoute>} />
+        <Route path="/dashboard/nfc" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerNfcOrder /></RoleRoute>} />
+        <Route path="/dashboard/ai" element={<RoleRoute allowedRoles={["super_admin","customer"]}><AITools /></RoleRoute>} />
+        <Route path="/dashboard/build" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CardStudio /></RoleRoute>} />
+        <Route path="/dashboard/home" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerHome /></RoleRoute>} />
+        <Route path="/dashboard/about" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerAbout /></RoleRoute>} />
+        <Route path="/dashboard/products" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerProducts /></RoleRoute>} />
+        <Route path="/dashboard/payments" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerPayments /></RoleRoute>} />
+        <Route path="/dashboard/media" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerMedia /></RoleRoute>} />
+        <Route path="/dashboard/social" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerSocial /></RoleRoute>} />
+        <Route path="/dashboard/uploads" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerUploads /></RoleRoute>} />
         {/* Enquiries merged into the Leads CRM — keep the old URL working. */}
         <Route path="/dashboard/enquiry" element={<Navigate to="/dashboard/leads" replace />} />
-        <Route path="/dashboard/view" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerViewCard /></RoleRoute>} />
+        <Route path="/dashboard/view" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerViewCard /></RoleRoute>} />
         {/* QR code is now part of the Payments module */}
         <Route path="/dashboard/qrcode" element={<Navigate to="/dashboard/payments" replace />} />
         {/* Offers / Deals is now the offers tab of the Products module */}
         <Route path="/dashboard/offers" element={<Navigate to="/dashboard/products?tab=offers" replace />} />
-        <Route path="/dashboard/reviews" element={<RoleRoute allowedRoles={["super_admin","reseller","customer"]}><CustomerReviews /></RoleRoute>} />
+        <Route path="/dashboard/reviews" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerReviews /></RoleRoute>} />
 
         {/* Backward-compat: old printed cards used digitalcarda.in/<slug> (no /c/).
             Kept last so every named route above wins first. */}

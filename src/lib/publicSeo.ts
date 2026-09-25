@@ -136,6 +136,16 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
     description: "Sign in to your DigitalCarda account. Access your dashboard, cards, analytics, leads, and reseller tools.",
     crumb: "Login",
   },
+  "/become-reseller": {
+    title: "Apply to Become a DigitalCarda Reseller Partner",
+    description: "Apply to the DigitalCarda reseller partner programme. Earn 20% on every plan your customers buy, renewals included. Rs. 0 to join, reviewed within 1–2 business days.",
+    crumb: "Apply",
+  },
+  "/resellers-login": {
+    title: "Partner Login - DigitalCarda Reseller Portal",
+    description: "Sign in to the DigitalCarda partner portal to add customers, track the commission each one earns you, and request payouts to your bank or UPI.",
+    crumb: "Partner Login",
+  },
   "/signup": {
     title: "Sign Up - DigitalCarda | Create Your Free Digital Card",
     description: "Start a 30-day free trial with no card details upfront. Create a digital business card with AI tools, QR codes and lead tracking.",

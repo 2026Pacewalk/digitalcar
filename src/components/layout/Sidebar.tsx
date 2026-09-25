@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useSessionRole } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
 import { trpc } from "@/providers/trpc";
 import { useStaffAccess } from "@/hooks/useStaffAccess";
@@ -125,11 +125,13 @@ export function staffGroups(canOpenPath: (path: string) => boolean): NavGroup[] 
 }
 
 export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggle }: SidebarProps) {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const location = useLocation();
   const [watching, setWatching] = useState(false);
 
-  const role = user?.role || "customer";
+  // Never "customer" by default: an unknown role used to show resellers the
+  // customer menu. See useSessionRole.
+  const role = useSessionRole(location.pathname);
   // Staff see the admin menu trimmed to the modules they were given.
   const access = useStaffAccess();
   const groups = role === "super_admin" ? superAdminGroups

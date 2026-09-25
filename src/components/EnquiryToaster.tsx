@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Mail } from "lucide-react";
 import { NEW_ENQ_KEY, ENQ_PING_KEY, ENQ_EVENT, loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
-import { scopedKey } from "@/hooks/useCustomer";
+import { scopedKey, getAuthUser } from "@/hooks/useCustomer";
 
 /* Mount once (in App). Watches localStorage for freshly-submitted card enquiries
    and raises a toast alert. Reacts across tabs (storage event) and within the
@@ -17,6 +17,9 @@ export default function EnquiryToaster() {
     known.current = new Set(loadNewEnquiries().map((e) => e.id));
 
     const check = () => {
+      // Card enquiries are for the card owner. Read the role when the event fires:
+      // the session can change (another tab signs in) without a remount.
+      if (getAuthUser()?.role !== "customer") return;
       const slug = currentSlug();
       const list = loadNewEnquiries();
       for (const e of list as Enq[]) {

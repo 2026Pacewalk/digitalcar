@@ -51,9 +51,11 @@ export function useGoogleClientId(): string | null {
   return data?.clientId ?? null;
 }
 
-export default function GoogleSignInButton({ clientId, mode, referralCode, promo, card, onSignedIn }: {
+export default function GoogleSignInButton({ clientId, mode, referralCode, promo, card, existingOnly, onSignedIn }: {
   clientId: string;
   mode: "signup" | "signin";
+  /** Only sign in accounts that already exist (the partner sign-in page). */
+  existingOnly?: boolean;
   referralCode?: string;
   /** Free-trial voucher to record for a brand-new account (server-validated). */
   promo?: string;
@@ -66,8 +68,8 @@ export default function GoogleSignInButton({ clientId, mode, referralCode, promo
   const google = trpc.auth.google.useMutation();
 
   // Google keeps the callback from the first render; read current props from here.
-  const latest = useRef({ referralCode, promo, card, onSignedIn, mutate: google.mutateAsync });
-  latest.current = { referralCode, promo, card, onSignedIn, mutate: google.mutateAsync };
+  const latest = useRef({ referralCode, promo, card, existingOnly, onSignedIn, mutate: google.mutateAsync });
+  latest.current = { referralCode, promo, card, existingOnly, onSignedIn, mutate: google.mutateAsync };
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +91,7 @@ export default function GoogleSignInButton({ clientId, mode, referralCode, promo
                 // Loosely typed here; the server validates every key and drops
                 // anything invalid rather than failing the sign-in.
                 card: (latest.current.card || undefined) as never,
+                ...(latest.current.existingOnly ? { existingOnly: true } : {}),
               });
               latest.current.onSignedIn(res);
             } catch (err) {

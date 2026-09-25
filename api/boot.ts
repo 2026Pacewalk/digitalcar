@@ -919,6 +919,26 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// Email bodies for Admin → Email Log (db/migrate-live.mjs is the production authority).
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS email_log_bodies (
+        email_log_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+        html_gz MEDIUMTEXT NULL, text_body MEDIUMTEXT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_elb_log FOREIGN KEY (email_log_id) REFERENCES email_logs(id) ON DELETE CASCADE
+      )
+    `));
+    console.log("[schema] email_log_bodies ensured");
+  } catch (e) {
+    console.error("[schema] ensure email_log_bodies failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be

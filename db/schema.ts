@@ -4,6 +4,7 @@ import {
   serial,
   varchar,
   text,
+  mediumtext,
   timestamp,
   int,
   boolean,
@@ -961,6 +962,17 @@ export const emailLogs = mysqlTable("email_logs", {
 ]);
 
 export type EmailLog = typeof emailLogs.$inferSelect;
+
+/* The rendered body of a logged email, for "what did they actually get?" in
+   Admin → Email Log. One-time link tokens and any password the sender flagged
+   are blanked before storing (api/lib/mail.ts). A row goes when its log row
+   goes (FK ON DELETE CASCADE): the 180-day clear and account erasure. */
+export const emailLogBodies = mysqlTable("email_log_bodies", {
+  emailLogId: bigint("email_log_id", { mode: "number", unsigned: true }).primaryKey(),
+  htmlGz: mediumtext("html_gz"),   // gzip, then base64, of the HTML part
+  text: mediumtext("text_body"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 // ─── Mobile app: signed-in devices ──────────────────────────────
 // One row per app sign-in. The refresh token itself is never stored — only a

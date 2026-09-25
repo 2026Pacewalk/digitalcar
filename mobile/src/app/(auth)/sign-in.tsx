@@ -27,6 +27,12 @@ export default function SignIn() {
         haptics.warning();
         return;
       }
+      // The app is the card-owner's toolkit; partners have their own portal on the web.
+      if (user.role === "reseller") {
+        setError("This app is for card owners. Partners manage customers and commission at digitalcarda.in/resellers-login.");
+        haptics.warning();
+        return;
+      }
       haptics.success();
       await completeSignIn(token, { id: user.id, email: user.email, fullName: user.fullName, role: user.role, avatar: user.avatar });
     },

@@ -19,6 +19,8 @@ type View = "form" | "done" | "badLink";
 export default function ResetPassword() {
   const [params] = useSearchParams();
   const token = params.get("token") || "";
+  // A new partner's set-password link carries for=partner (api/reseller-router.ts).
+  const signInTo = params.get("for") === "partner" ? "/resellers-login" : "/login";
   const navigate = useNavigate();
   const [pwd, setPwd] = useState("");
   const [show, setShow] = useState(false);
@@ -35,10 +37,10 @@ export default function ResetPassword() {
   // After success, head to sign-in on our own — but show it, and let them go now.
   useEffect(() => {
     if (view !== "done") return;
-    if (countdown <= 0) { navigate("/login"); return; }
+    if (countdown <= 0) { navigate(signInTo); return; }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
-  }, [view, countdown, navigate]);
+  }, [view, countdown, navigate, signInTo]);
 
   const checks = passwordChecks(pwd);
   const passed = checks.filter((c) => c.ok).length;
@@ -105,7 +107,7 @@ export default function ResetPassword() {
             Sign in with your new password. We&apos;ve also emailed you a confirmation — if you didn&apos;t make this change, reply to it straight away.
           </p>
         </div>
-        <Link to="/login" className="group mt-6 w-full h-[52px] rounded-2xl gradient-gold text-[#0F172A] font-bold text-[15px] flex items-center justify-center gap-2 hover:shadow-gold active:scale-[0.98] transition-all">
+        <Link to={signInTo} className="group mt-6 w-full h-[52px] rounded-2xl gradient-gold text-[#0F172A] font-bold text-[15px] flex items-center justify-center gap-2 hover:shadow-gold active:scale-[0.98] transition-all">
           Sign in now <ArrowRight size={18} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
         </Link>
         <p className="mt-3 text-center text-[12px] text-[#94A3B8]">Taking you to sign in in {countdown}s…</p>

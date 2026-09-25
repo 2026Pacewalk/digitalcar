@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { User, Settings, KeyRound, HelpCircle, LogOut, ArrowLeft } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { getToken, clearSession } from "@/lib/session";
+import { User, Settings, KeyRound, HelpCircle, LogOut, ArrowLeft, Wallet } from "lucide-react";
+import { useAuth, useSessionRole } from "@/hooks/useAuth";
+import { getToken, clearSession, adminReturnPath } from "@/lib/session";
 
 /* Role-aware profile / account dropdown — used in the desktop header and the mobile app bar. */
 export default function ProfileMenu() {
@@ -10,7 +10,7 @@ export default function ProfileMenu() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  const role = user?.role || "customer";
+  const role = useSessionRole();
   const base = role === "super_admin" || role === "staff" ? "/admin" : role === "reseller" ? "/reseller" : "/dashboard";
   const profile = `${base}/profile`;
   const settings = role === "reseller" || role === "staff" ? profile : `${base}/settings`;
@@ -19,11 +19,17 @@ export default function ProfileMenu() {
   // A super-admin using "Login as Client" keeps their admin session in the admin
   // slot while viewing the customer portal — offer a clean way back.
   const impersonating = typeof window !== "undefined" && !window.location.pathname.startsWith("/admin") && !!getToken("admin");
-  const returnToAdmin = () => { clearSession("main"); window.location.href = "/admin/customers"; };
+  const returnToAdmin = () => { const to = adminReturnPath(); clearSession("main"); window.location.href = to; };
 
-  const items = [
+  // A partner gets partner pages only: profile, money, and the real support page.
+  const items = role === "reseller" ? [
+    { icon: User, label: "My Profile", path: "/reseller/profile" },
+    { icon: KeyRound, label: "Change Password", path: "/reseller/profile#password" },
+    { icon: Wallet, label: "Earnings & Payouts", path: "/reseller/earnings" },
+    { icon: HelpCircle, label: "Help & Support", path: "/contact" },
+  ] : [
     { icon: User, label: "My Profile", path: profile },
-    ...(role !== "reseller" && role !== "staff" ? [{ icon: Settings, label: "Account Settings", path: settings }] : []),
+    ...(role !== "staff" ? [{ icon: Settings, label: "Account Settings", path: settings }] : []),
     ...(role === "customer" ? [{ icon: KeyRound, label: "Change Password", path: "/dashboard/settings?tab=password" }] : []),
     { icon: HelpCircle, label: "Help & Support", path: settings },
   ];

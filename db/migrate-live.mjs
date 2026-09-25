@@ -39,6 +39,13 @@ const TABLES = {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX emlog_created_idx (created_at), INDEX emlog_to_idx (to_email),
     INDEX emlog_status_idx (status), INDEX emlog_kind_idx (kind))`,
+  // What each logged email actually said (Admin → Email Log → view). Secrets are
+  // blanked before storing (api/lib/mail.ts); rows go with their log row.
+  email_log_bodies: `CREATE TABLE IF NOT EXISTS email_log_bodies (
+    email_log_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    html_gz MEDIUMTEXT NULL, text_body MEDIUMTEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_elb_log FOREIGN KEY (email_log_id) REFERENCES email_logs(id) ON DELETE CASCADE)`,
   products: `CREATE TABLE IF NOT EXISTS products (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     slug VARCHAR(191) NOT NULL UNIQUE, name VARCHAR(255) NOT NULL, tagline VARCHAR(255) NULL,

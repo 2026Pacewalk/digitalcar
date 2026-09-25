@@ -5,9 +5,12 @@ import { toast } from "sonner";
 import {
   Mail, Lock, Eye, EyeOff, LogIn, Loader2, ArrowLeft, AlertCircle, Phone,
   ChevronDown, MessageCircle, WifiOff, ShieldCheck, Check, KeyRound, Link2, QrCode, Inbox, Sparkles,
+  Store, UserPlus, Wallet, ArrowRight, Info,
 } from "lucide-react";
 import SignInPanel from "@/components/auth/SignInPanel";
 import AdminPanel from "@/components/auth/AdminPanel";
+import ResellerPanel from "@/components/auth/ResellerPanel";
+import { seoForPath } from "@/lib/publicSeo";
 import { SUPPORT, AUTH_TRUST } from "@/components/auth/authMockData";
 import { DEMO_USERS } from "@/hooks/useAuth";
 import { getToken, getSessionUser, setSession, clearSession } from "@/lib/session";
@@ -22,6 +25,10 @@ const REMEMBER_NAME_KEY = "dc_login_name";
 /* How this browser last signed in ("google" | "password"), so a Google user
    isn't left guessing which button they used. Not personal data. */
 const LAST_METHOD_KEY = "dc_login_method";
+/* The partner door remembers its own ID, so a card owner remembered on /login
+   is never pre-filled on /resellers-login (and the other way round). */
+const PARTNER_REMEMBER_KEY = "dc_partner_login_id";
+const PARTNER_REMEMBER_NAME_KEY = "dc_partner_login_name";
 
 const inputBase =
   "h-12 w-full rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] pl-10 pr-3 text-[16px] sm:text-sm text-[#0F172A] outline-none focus:border-[#F7B31C] focus:ring-2 focus:ring-[#F7B31C]/25 focus:bg-white transition-all placeholder:text-[#94A3B8]";
@@ -72,24 +79,68 @@ function identifierKind(v: string): "email" | "phone" | "empty" | "other" {
 
 const readLS = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 
-export default function Login({ adminMode = false }: { adminMode?: boolean }) {
+/* ?next= may only name a page on this site. "//evil.com" and "/\evil.com" are
+   protocol-relative — they start with "/" yet leave the site — and so is
+   "/<tab>/evil.com": browsers strip tabs and newlines from URLs, so it becomes
+   "//evil.com" at navigation time. Refuse control characters and backslashes
+   outright, then let the URL parser confirm the result stays on this origin. */
+/* ?next= only counts when it belongs to the account's own portal: a partner
+   is never sent into the customer area, nor a customer into the partner one. */
+function nextFits(role: string, path: string): boolean {
+  const partnerPath = /^\/reseller(\/|\?|#|$)/.test(path);
+  if (role === "reseller") return partnerPath;
+  if (role === "customer") return !partnerPath && !/^\/admin(\/|\?|#|$)/.test(path);
+  return true;
+}
+
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "";
+  for (const ch of raw) {
+    const c = ch.charCodeAt(0);
+    if (c < 0x20 || c === 0x7f || ch === "\\") return "";
+  }
+  if (typeof window === "undefined") return "";
+  try {
+    const u = new URL(raw, window.location.origin);
+    return u.origin === window.location.origin ? u.pathname + u.search + u.hash : "";
+  } catch {
+    return "";
+  }
+}
+
+/* Three doors, one form:
+   - /login            customers (partners can sign in here too)
+   - /resellers-login  the partner portal: partner copy and panel. Google stays:
+                       a customer who signed up with Google and was later
+                       approved as a partner has no password to type.
+   - admin slug        staff only, its own session slot
+   The partner page shares the customer session slot, so it is a front door,
+   not a security boundary — access is still decided by the role on the server.
+   It only lets partner logins through: anyone else is signed straight back out
+   and pointed at the right door. */
+export default function Login({ adminMode = false, resellerMode = false }: { adminMode?: boolean; resellerMode?: boolean }) {
+  const partner = resellerMode && !adminMode;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const nextPath = searchParams.get("next");
-  // Only same-site paths. "//evil.com" and "/\evil.com" are browser-protocol
-  // relative URLs — they start with "/" but navigate OFF-SITE, so a crafted
-  // ?next= could bounce a freshly-authenticated user to an attacker's page.
-  const next =
-    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") && !nextPath.startsWith("/\\")
-      ? nextPath : "";
+  const next = safeNext(searchParams.get("next"));
   const loginMut = trpc.auth.login.useMutation();
   const googleClientId = useGoogleClientId();
   const slot = adminMode ? "admin" : "main"; // this login page's portal
 
-  // Already signed in and sent here to reactivate → go straight to the target.
+  // Already signed in and sent here to reactivate → go straight to the target,
+  // if the target belongs to that account's portal (a customer session must not
+  // bounce between /resellers-login and a partner page).
   useEffect(() => {
-    if (next && getToken(slot) && getSessionUser(slot)) navigate(next);
+    const u = getSessionUser<{ role?: string }>(slot);
+    if (next && getToken(slot) && u && nextFits(u.role || "", next)) navigate(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // This page renders outside PublicLayout, so arriving by an in-app link (say
+  // from /resellers) would otherwise keep the previous page's tab title.
+  useEffect(() => {
+    const seo = seoForPath(window.location.pathname);
+    if (seo) document.title = seo.title;
   }, []);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -104,6 +155,9 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
   const [lastMethod] = useState(() => (adminMode ? "" : readLS(LAST_METHOD_KEY)));
   const [helpOpen, setHelpOpen] = useState(false);
   const [failures, setFailures] = useState(0);
+  const [notPartner, setNotPartner] = useState<{ name: string; email: string } | null>(null);
+  const rememberKey = partner ? PARTNER_REMEMBER_KEY : REMEMBER_KEY;
+  const rememberNameKey = partner ? PARTNER_REMEMBER_NAME_KEY : REMEMBER_NAME_KEY;
   const [offline, setOffline] = useState(typeof navigator !== "undefined" && navigator.onLine === false);
 
   const idRef = useRef<HTMLInputElement>(null);
@@ -111,10 +165,10 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
 
   // Restore a remembered identifier and send focus straight to the password.
   useEffect(() => {
-    const saved = adminMode ? "" : readLS(REMEMBER_KEY);
+    const saved = adminMode ? "" : readLS(rememberKey);
     if (saved) {
       setEmail(saved); setSavedId(saved); setRemember(true);
-      setSavedName(readLS(REMEMBER_NAME_KEY));
+      setSavedName(readLS(rememberNameKey));
     }
     // Desktop only: focusing an input on mobile throws up the keyboard and hides
     // the page before the user has read a word of it.
@@ -157,16 +211,36 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     return true;
   };
 
-  const rememberId = (mail: string, fullName?: string) => {
+  /* The partner door is for partner logins only. Anyone else — a card owner,
+     an application still under review — is signed straight back out and told
+     where to go, instead of landing in the customer dashboard from here. */
+  // Checked BEFORE the session is written, so a refused attempt never replaces
+  // (or signs out) a session already open in this browser. Admin accounts are
+  // left to gateOk, which has its own message.
+  const partnerOk = (u: { role: string; fullName?: string; email?: string }): boolean => {
+    if (!partner || u.role === "reseller" || u.role === "super_admin" || u.role === "staff") return true;
+    setNotPartner({ name: String(u.fullName || ""), email: String(u.email || "") });
+    return false;
+  };
+
+  /* Where a successful sign-in goes: ?next= when it belongs to this account's
+     portal, otherwise the portal's home. */
+  const arrive = (role: string, fullName?: string, demo = false) => {
+    const first = String(fullName || "").trim().split(/\s+/)[0];
+    toast.success(demo ? "Welcome back! (demo mode)" : first && !adminMode ? `Welcome back, ${first}!` : "Welcome back!");
+    navigate(next && nextFits(role, next) ? next : routeFor(role));
+  };
+
+  const rememberId =(mail: string, fullName?: string) => {
     if (adminMode) return; // staff sign-ins are never remembered on shared machines
     try {
       if (remember) {
-        localStorage.setItem(REMEMBER_KEY, mail.trim());
+        localStorage.setItem(rememberKey, mail.trim());
         const first = String(fullName || "").trim().split(/\s+/)[0] || "";
-        if (first) localStorage.setItem(REMEMBER_NAME_KEY, first.slice(0, 40));
+        if (first) localStorage.setItem(rememberNameKey, first.slice(0, 40));
       } else {
-        localStorage.removeItem(REMEMBER_KEY);
-        localStorage.removeItem(REMEMBER_NAME_KEY);
+        localStorage.removeItem(rememberKey);
+        localStorage.removeItem(rememberNameKey);
       }
     } catch { /* storage blocked — sign-in still works */ }
   };
@@ -183,10 +257,10 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     if (!import.meta.env.DEV) return false;
     const entry = DEMO_USERS[mail.toLowerCase().trim()];
     if (!entry || entry.password !== pass) return false;
+    if (!partnerOk(entry.user)) return true;
     setSession("demo_token_" + entry.user.id, entry.user, slot);
     if (!gateOk(entry.user.role)) return true; // handled (rejected) — don't fall through
-    toast.success("Welcome back! (demo mode)");
-    navigate(next || routeFor(entry.user.role));
+    arrive(entry.user.role, entry.user.fullName, true);
     return true;
   };
 
@@ -194,6 +268,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     setLoading(true);
     try {
       const res = await loginMut.mutateAsync({ email: mail.trim(), password: pass });
+      if (!partnerOk(res.user)) { setLoading(false); return; }
       setSession(res.token, res.user, slot);
       // gateOk rejecting does NOT navigate, so the spinner has to be released
       // here — otherwise a super-admin who signs in at /login is left staring at
@@ -201,9 +276,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
       if (!gateOk(res.user.role)) { setLoading(false); return; }
       rememberId(mail, res.user.fullName);
       noteMethod("password");
-      const first = String(res.user.fullName || "").trim().split(/\s+/)[0];
-      toast.success(first && !adminMode ? `Welcome back, ${first}!` : "Welcome back!");
-      navigate(next || routeFor(res.user.role));
+      arrive(res.user.role, res.user.fullName);
     } catch (err) {
       if (demoLogin(mail, pass)) { setLoading(false); return; }
       const msg = err instanceof Error ? err.message : "";
@@ -224,6 +297,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
     // (auth-router.ts:326,328). A double Enter must not burn two attempts.
     if (loading) return;
     setFormError(null);
+    setNotPartner(null);
     if (!email || !password) {
       toast.error("Please fill in all fields");
       setFormError({ title: "Please fill in all fields", hint: "Enter your email or mobile number, then your password." });
@@ -250,7 +324,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
   };
 
   const forgetMe = () => {
-    try { localStorage.removeItem(REMEMBER_KEY); localStorage.removeItem(REMEMBER_NAME_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(rememberKey); localStorage.removeItem(rememberNameKey); } catch { /* ignore */ }
     setSavedId(""); setSavedName(""); setRemember(false); setEmail(""); setPassword("");
     idRef.current?.focus();
   };
@@ -258,17 +332,25 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
   /* Signed in with Google. The server refuses administrator accounts, and a
      first-time Google user gets a new account and lands in the card builder. */
   const handleGoogle = (res: GoogleSignInResult) => {
+    if (!partnerOk(res.user)) return;
     setSession(res.token, res.user, slot);
     if (!gateOk(res.user.role)) return;
     noteMethod("google");
-    toast.success(res.created ? "Account created! Welcome to DigitalCarda." : "Welcome back!");
-    navigate(res.created ? "/dashboard/build" : next || routeFor(res.user.role));
+    if (res.created) {
+      toast.success("Account created! Welcome to DigitalCarda.");
+      navigate("/dashboard/build");
+      return;
+    }
+    arrive(res.user.role, res.user.fullName);
   };
 
   const kind = identifierKind(email);
   const suggestion = kind === "email" ? emailSuggestion(email) : "";
   const IdIcon = kind === "phone" ? Phone : Mail;
-  const resetHref = `/forgot-password${EMAIL_RE.test(email.trim()) ? `?email=${encodeURIComponent(email.trim())}` : ""}`;
+  const resetQs = new URLSearchParams();
+  if (EMAIL_RE.test(email.trim())) resetQs.set("email", email.trim());
+  if (partner) resetQs.set("for", "partner"); // its "Back to sign in" returns here
+  const resetHref = `/forgot-password${resetQs.toString() ? `?${resetQs}` : ""}`;
   const firstName = savedName;
 
   return (
@@ -280,14 +362,14 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
         Skip to sign in
       </a>
 
-      {adminMode ? <AdminPanel /> : <SignInPanel firstName={firstName} />}
+      {adminMode ? <AdminPanel /> : partner ? <ResellerPanel /> : <SignInPanel firstName={firstName} />}
 
       <div className="flex-1 min-w-0">
         {/* ── Branded header for phones & tablets (the desktop panel is hidden there) ── */}
         <header className="lg:hidden relative overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] px-4 sm:px-8 pt-4 pb-24">
           <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-40" />
-          {!adminMode && <div aria-hidden="true" className="absolute -top-20 -right-16 w-72 h-72 rounded-full blur-3xl bg-[#F7B31C]/20" />}
-          {!adminMode && <div aria-hidden="true" className="absolute -bottom-24 -left-16 w-64 h-64 rounded-full blur-3xl bg-[#14B8A6]/15" />}
+          {!adminMode && <div aria-hidden="true" className={`absolute -top-20 -right-16 w-72 h-72 rounded-full blur-3xl bg-[#F7B31C]/20`} />}
+          {!adminMode && <div aria-hidden="true" className={`absolute -bottom-24 -left-16 w-64 h-64 rounded-full blur-3xl bg-[#14B8A6]/15`} />}
 
           <div className="relative max-w-[460px] mx-auto">
             <div className="flex items-center justify-between">
@@ -299,10 +381,28 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
               </Link>
               {adminMode
                 ? <span className="w-[52px]" aria-hidden="true" />
-                : <Link to="/signup" className="text-[13px] font-semibold text-[#FCD34D] hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">Join free</Link>}
+                : partner
+                  ? <Link to="/become-reseller" className="text-[13px] font-semibold text-[#FCD34D] hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">Apply</Link>
+                  : <Link to="/signup" className="text-[13px] font-semibold text-[#FCD34D] hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">Join free</Link>}
             </div>
 
-            {adminMode ? (
+            {partner ? (
+              <>
+                <p className="dc-enter mt-6 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#FCD34D]">
+                  <Store size={14} aria-hidden="true" /> {firstName ? `Welcome back, ${firstName}` : "Partner portal"}
+                </p>
+                <p className="dc-enter dc-enter-1 font-display mt-1.5 text-[1.7rem] sm:text-[2rem] leading-[1.1] font-extrabold text-white tracking-tight">
+                  Your customers and commission, <span className="text-gradient-gold">in one place.</span>
+                </p>
+                <ul className="dc-enter dc-enter-2 mt-4 flex flex-wrap gap-2">
+                  {[{ i: UserPlus, t: "Customers" }, { i: Check, t: "Commission" }, { i: Wallet, t: "Payouts" }].map((c) => (
+                    <li key={c.t} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.07] border border-white/10 px-3 py-1.5 text-[12px] font-medium text-[#E2E8F0]">
+                      <c.i size={12} className="text-[#FCD34D]" aria-hidden="true" /> {c.t}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : adminMode ? (
               <div className="mt-7 flex items-center gap-3">
                 <span className="w-11 h-11 rounded-2xl bg-[#334155] flex items-center justify-center shrink-0"><ShieldCheck size={21} className="text-[#CBD5E1]" aria-hidden="true" /></span>
                 <div>
@@ -340,7 +440,9 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
             <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#64748B] hover:text-[#0F172A] transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
               <ArrowLeft size={16} aria-hidden="true" /> Home
             </Link>
-            {!adminMode && (
+            {partner ? (
+              <p className="text-sm text-[#64748B]">Not a partner yet? <Link to="/become-reseller" className="font-semibold text-[#B45309] hover:text-[#92400E]">Apply now</Link></p>
+            ) : !adminMode && (
               <p className="text-sm text-[#64748B]">New here? <Link to="/signup" className="font-semibold text-[#B45309] hover:text-[#92400E]">Create a free card</Link></p>
             )}
           </div>
@@ -353,17 +455,28 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
               <div className="p-5 sm:p-8">
                 <div className="flex items-start gap-3 mb-6">
                   <span className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${adminMode ? "bg-[#0F172A]" : "gradient-gold shadow-gold"}`}>
-                    {adminMode ? <ShieldCheck size={20} className="text-white" aria-hidden="true" /> : <KeyRound size={20} className="text-[#0F172A]" aria-hidden="true" />}
+                    {adminMode ? <ShieldCheck size={20} className="text-white" aria-hidden="true" />
+                      : partner ? <Store size={20} className="text-[#0F172A]" aria-hidden="true" />
+                      : <KeyRound size={20} className="text-[#0F172A]" aria-hidden="true" />}
                   </span>
                   <div className="min-w-0">
                     <h1 className="font-display text-[1.45rem] sm:text-[1.6rem] font-extrabold text-[#0F172A] tracking-tight leading-tight">
-                      {adminMode ? "Admin sign in" : "Sign in to your account"}
+                      {adminMode ? "Admin sign in" : partner ? "Partner sign in" : "Sign in to your account"}
                     </h1>
                     <p className="text-sm text-[#64748B] mt-0.5">
-                      {adminMode ? "Restricted area — authorised staff only" : "Manage your card, leads and analytics"}
+                      {adminMode ? "Restricted area — authorised staff only" : partner ? "Your customers, commission and payouts" : "Manage your card, leads and analytics"}
                     </p>
                   </div>
                 </div>
+
+                {/* Partner logins are made by us, so a partner's very first visit
+                    comes with no password yet — say where it is. */}
+                {partner && !savedId && (
+                  <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] px-3.5 py-2.5">
+                    <Info size={15} className="text-[#B45309] mt-0.5 shrink-0" aria-hidden="true" />
+                    <p className="text-[12.5px] leading-snug text-[#92400E]">New to DigitalCarda? Set your password from the link in your partner welcome email. Already had an account with us? Sign in the way you always have.</p>
+                  </div>
+                )}
 
                 {adminMode && (
                   <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-[#F1F5F9] border border-[#E2E8F0] px-3.5 py-2.5">
@@ -372,7 +485,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
                   </div>
                 )}
 
-                {!adminMode && next && (
+                {!adminMode && !partner && next && (
                   <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] px-3.5 py-2.5">
                     <Check size={15} className="text-[#B45309] mt-0.5 shrink-0" aria-hidden="true" />
                     <p className="text-[12.5px] leading-snug text-[#92400E]">Sign in to reactivate this card — your link and QR stay exactly the same.</p>
@@ -409,7 +522,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
                         <Sparkles size={12} aria-hidden="true" /> You last signed in with Google
                       </p>
                     )}
-                    <GoogleSignInButton clientId={googleClientId} mode="signin" onSignedIn={handleGoogle} />
+                    <GoogleSignInButton clientId={googleClientId} mode="signin" existingOnly={partner} onSignedIn={handleGoogle} />
                     <div className="mt-5 flex items-center gap-3">
                       <span className="h-px flex-1 bg-[#E2E8F0]" />
                       <span className="text-xs text-[#94A3B8]">or sign in with email or mobile</span>
@@ -493,7 +606,7 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
                     <label className="flex items-center gap-2.5 cursor-pointer w-fit">
                       <input
                         type="checkbox" checked={remember}
-                        onChange={(e) => { setRemember(e.target.checked); if (!e.target.checked) { try { localStorage.removeItem(REMEMBER_KEY); localStorage.removeItem(REMEMBER_NAME_KEY); } catch { /* ignore */ } setSavedId(""); setSavedName(""); } }}
+                        onChange={(e) => { setRemember(e.target.checked); if (!e.target.checked) { try { localStorage.removeItem(rememberKey); localStorage.removeItem(rememberNameKey); } catch { /* ignore */ } setSavedId(""); setSavedName(""); } }}
                         className="rounded border-[#CBD5E1] accent-[#F7B31C] w-4 h-4"
                       />
                       <span className="text-[12.5px] text-[#475569]">
@@ -505,6 +618,22 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
                   {/* Persistent, two-part error: the title is what went wrong, the
                       hint is what to do about it. Deliberately NO shake — the form
                       holds the focused input, and shaking delays the re-read. */}
+                  {notPartner && (
+                    <div role="alert" className="dc-rise rounded-xl bg-[#FFFBEB] border border-[#FDE68A] px-3.5 py-3">
+                      <p className="text-[13px] font-semibold text-[#92400E] flex items-start gap-2">
+                        <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                        <span>{notPartner.email || "This account"} isn&apos;t a partner login.</span>
+                      </p>
+                      <p className="text-[12px] text-[#92400E] mt-1.5 pl-6 leading-snug">
+                        It&apos;s a DigitalCarda customer account, so it signs in on the customer page. If you&apos;re an approved partner, use the email we set your partner login up with.
+                      </p>
+                      <div className="mt-2.5 pl-6 flex flex-wrap gap-2">
+                        <Link to="/login" className="rounded-lg bg-[#0F172A] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[#1E293B]">Customer sign in</Link>
+                        <Link to="/become-reseller" className="rounded-lg border border-[#FDE68A] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#92400E] hover:bg-[#FEF3C7]">Apply to become a partner</Link>
+                      </div>
+                    </div>
+                  )}
+
                   {formError && (
                     <div role="alert" className="dc-rise rounded-xl bg-[#FEF2F2] border border-[#FECACA] px-3.5 py-3">
                       <p className="text-[13px] font-semibold text-[#991B1B] flex items-start gap-2">
@@ -538,7 +667,9 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
 
                   <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 pt-1 text-[11.5px] text-[#64748B]">
                     <span className="inline-flex items-center gap-1"><ShieldCheck size={13} className="text-[#16A34A]" aria-hidden="true" /> Secure encrypted sign-in</span>
-                    {!adminMode && <span className="inline-flex items-center gap-1"><Check size={13} className="text-[#16A34A]" aria-hidden="true" /> Your link &amp; QR never change</span>}
+                    {partner
+                      ? <span className="inline-flex items-center gap-1"><Store size={13} className="text-[#16A34A]" aria-hidden="true" /> For approved partners</span>
+                      : !adminMode && <span className="inline-flex items-center gap-1"><Check size={13} className="text-[#16A34A]" aria-hidden="true" /> Your link &amp; QR never change</span>}
                   </div>
                 </form>
               </div>
@@ -557,11 +688,19 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
                 <div className="overflow-hidden">
                   <div className={helpOpen ? "pt-3" : "pt-3 invisible"} {...(helpOpen ? {} : { inert: true })}>
                     <p className="text-[12px] font-semibold text-[#334155]">Any of these works as your sign-in ID</p>
-                    <ul className="mt-2 space-y-1.5 text-[12.5px] text-[#64748B]">
-                      <li className="flex gap-2"><span className="text-[#F7B31C]" aria-hidden="true">•</span> The email address you registered with</li>
-                      <li className="flex gap-2"><span className="text-[#F7B31C]" aria-hidden="true">•</span> Your registered mobile number</li>
-                      <li className="flex gap-2"><span className="text-[#F7B31C]" aria-hidden="true">•</span> Long-standing customers can also use their username or card link</li>
-                    </ul>
+                    {partner ? (
+                      <ul className="mt-2 space-y-1.5 text-[12.5px] text-[#64748B]">
+                        <li className="flex gap-2"><span className="text-[#F7B31C]" aria-hidden="true">•</span> The email address your partner account was set up with</li>
+                        <li className="flex gap-2"><span className="text-[#F7B31C]" aria-hidden="true">•</span> Your registered mobile number</li>
+                        <li className="flex gap-2"><span className="text-[#F7B31C]" aria-hidden="true">•</span> No password yet, or the welcome link has expired? Use Reset password below</li>
+                      </ul>
+                    ) : (
+                      <ul className="mt-2 space-y-1.5 text-[12.5px] text-[#64748B]">
+                        <li className="flex gap-2"><span className="text-[#F7B31C]" aria-hidden="true">•</span> The email address you registered with</li>
+                        <li className="flex gap-2"><span className="text-[#F7B31C]" aria-hidden="true">•</span> Your registered mobile number</li>
+                        <li className="flex gap-2"><span className="text-[#F7B31C]" aria-hidden="true">•</span> Long-standing customers can also use their username or card link</li>
+                      </ul>
+                    )}
                     {adminMode ? (
                       <p className="text-[12.5px] text-[#64748B] mt-3 leading-snug">
                         Staff accounts: reset your password or email <a href={`mailto:${SUPPORT.email}`} className="font-semibold text-[#B45309] hover:text-[#92400E]">{SUPPORT.email}</a>.
@@ -581,25 +720,46 @@ export default function Login({ adminMode = false }: { adminMode?: boolean }) {
               </div>
             </div>
 
-            {!adminMode && (
+            {partner && (
+              <p className="dc-enter dc-enter-2 lg:hidden mt-6 text-center text-sm text-[#64748B]">
+                Want to resell DigitalCarda? <Link to="/become-reseller" className="text-[#B45309] hover:text-[#92400E] font-semibold">Apply to become a partner</Link>
+              </p>
+            )}
+
+            {!adminMode && !partner && (
               <p className="dc-enter dc-enter-2 lg:hidden mt-6 text-center text-sm text-[#64748B]">
                 New here? <Link to="/signup" className="text-[#B45309] hover:text-[#92400E] font-semibold">Create a free card</Link>
               </p>
             )}
 
-            {!adminMode && (
+            {!adminMode && !partner && (
               <p className="dc-enter dc-enter-2 lg:hidden mt-3 text-center text-[11.5px] text-[#94A3B8]">
                 Trusted by <span className="font-semibold text-[#475569]">{AUTH_TRUST.businesses}</span> businesses · ★ {AUTH_TRUST.rating}
+              </p>
+            )}
+
+            {/* The other door. Each page points at the one it isn't, so nobody is
+                stuck on the wrong one — /login keeps working for partners too. */}
+            {!adminMode && (
+              <p className="dc-enter dc-enter-2 mt-4 text-center text-[12.5px] text-[#64748B]">
+                {partner ? (
+                  <>Signing in to your own card? <Link to="/login" className="inline-flex items-center gap-1 font-semibold text-[#334155] hover:text-[#0F172A]">Customer sign in <ArrowRight size={13} aria-hidden="true" /></Link></>
+                ) : (
+                  <>Reseller partner? <Link to="/resellers-login" className="inline-flex items-center gap-1 font-semibold text-[#B45309] hover:text-[#92400E]">Partner sign in <ArrowRight size={13} aria-hidden="true" /></Link></>
+                )}
               </p>
             )}
 
             {import.meta.env.DEV && !adminMode && (
               <button
                 type="button"
-                onClick={() => { setEmail("demo@digitalcarda.com"); setPassword("demo123"); }}
+                onClick={() => {
+                  const [id, pw] = partner ? ["reseller@digitalcarda.com", "reseller123"] : ["demo@digitalcarda.com", "demo123"];
+                  setEmail(id); setPassword(pw);
+                }}
                 className="mt-6 w-full text-[11px] font-medium text-[#94A3B8] hover:text-[#64748B] border border-dashed border-[#E2E8F0] rounded-lg py-2"
               >
-                Dev only — fill demo customer account
+                Dev only — fill demo {partner ? "reseller" : "customer"} account
               </button>
             )}
           </div>

@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Home as HomeIcon, LayoutGrid, Tag, Menu, LayoutDashboard } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { getToken } from "@/lib/session";
+import { getToken, getSessionUser } from "@/lib/session";
 import { haptic } from "@/lib/nativeApp";
 
 /* Motion for the tab bar. Everything moves with transform and opacity only, so
@@ -75,7 +75,9 @@ export default function PublicTabBar({ signupHref }: { signupHref: string }) {
   // Read after mount: the server renders the signed-out bar, so hydration matches.
   const [home, setHome] = useState<string | null>(null);
   useEffect(() => {
-    setHome(getToken("main") ? "/dashboard" : getToken("admin") ? "/admin" : null);
+    // A partner goes back to the partner portal, not the customer dashboard.
+    const mainRole = getSessionUser<{ role?: string }>("main")?.role;
+    setHome(getToken("main") ? (mainRole === "reseller" ? "/reseller" : "/dashboard") : getToken("admin") ? "/admin" : null);
   }, []);
 
   const designs = ["/digital-business-cards-templates", "/templates", "/card-designs", "/digital-business-cards", "/demo", "/industries"]

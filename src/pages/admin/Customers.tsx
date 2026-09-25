@@ -1,11 +1,10 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import {
   Search, Plus, Eye, Lock, LogIn, Database, ChevronLeft, ChevronRight,
   X, ExternalLink, Users, UserCheck, Clock, Building2, KeyRound, Globe,
-  CalendarPlus, Trash2, AlertTriangle, Mail, Phone, MoreVertical,
+  CalendarPlus, Trash2, AlertTriangle, Mail, Phone,
   LayoutGrid, List, Download, ArrowUpDown, Activity, Layers, Send, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -16,7 +15,8 @@ import { fetchAdminData, hideAdminRecords } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import { accountDetailsWhatsApp, featureUpdateWhatsApp, whatsappLink } from "@/lib/shareTemplates";
 import { scopedKey } from "@/hooks/useCustomer";
-import { setSession } from "@/lib/session";
+import { setSession, okToReplaceMainSession } from "@/lib/session";
+import { ActionMenu, AdminModal as Modal, type ActionItem } from "@/components/admin/RowActions";
 
 /* Retailer (admin_id) → name, from superadmin table */
 const RETAILERS: Record<number, string> = {
@@ -43,7 +43,6 @@ type Customer = {
   billing_cycle?: "monthly" | "yearly" | "triennial" | null; // term of the active DB plan, when known
 };
 
-type ActionItem = { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean };
 
 const fmtDate = (s: string | null) => {
   if (!s || s === "0000-00-00") return "—";
@@ -288,6 +287,7 @@ export default function AdminCustomers() {
     } catch { toast.error("Could not update the card limit"); }
   };
   const loginAsClient = async (c: Customer) => {
+    if (!okToReplaceMainSession(c.email || "")) return;
     const rec = { ...c, specialities: decodeSpecialities((c as Record<string, unknown>).specialities), logo: imgUrl("home", (c as Record<string, unknown>).logo) };
     // Mint a REAL token for the customer (if they have a DB account) so authed
     // features — Refer & Earn, analytics, leads — work during the preview.
@@ -482,7 +482,7 @@ export default function AdminCustomers() {
     for (const c of filtered) {
       lines.push([
         c.id, c.name, c.username, c.email, c.mobile1,
-        `https://digitalcarda.in/${c.slug}`, retailerName(c.admin_id),
+        c.slug ? `https://digitalcarda.in/${c.slug}` : "", retailerName(c.admin_id),
         packageName(c.package_id), rowStatus(c).label,
         fmtDate(c.activated_on), fmtDate(c.expired_on),
       ].map(esc).join(","));
@@ -544,7 +544,9 @@ export default function AdminCustomers() {
             <button onClick={() => setRetailer(c.admin_id)} className="text-[10px] font-semibold text-[#0F766E] bg-[#CCFBF1] px-2 py-0.5 rounded-full">{retailerName(c.admin_id)}</button>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <a href={`/${c.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[#3B82F6] min-w-0"><Globe size={13} className="shrink-0" /><span className="truncate">/{c.slug}</span></a>
+            {c.slug
+              ? <a href={`/${c.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[#3B82F6] min-w-0"><Globe size={13} className="shrink-0" /><span className="truncate">/{c.slug}</span></a>
+              : <span className="text-[12px] font-semibold text-[#92400E]">No card yet</span>}
             <span className={`text-[11px] font-medium ${expired ? "text-[#EF4444]" : "text-[#64748B]"} whitespace-nowrap`}>till {fmtDate(c.expired_on)}</span>
           </div>
         </div>
@@ -703,9 +705,13 @@ export default function AdminCustomers() {
                         </td>
                         {/* Card URL */}
                         <td className="px-4 py-3">
-                          <a href={`/${c.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[#3B82F6] hover:underline max-w-[150px]">
-                            <Globe size={12} className="shrink-0" /> <span className="truncate">/{c.slug}</span>
-                          </a>
+                          {c.slug ? (
+                            <a href={`/${c.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[#3B82F6] hover:underline max-w-[150px]">
+                              <Globe size={12} className="shrink-0" /> <span className="truncate">/{c.slug}</span>
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[11px] font-semibold text-[#92400E]" title="This account has no published card, so there is no link to open">No card yet</span>
+                          )}
                         </td>
                         {/* Retailer */}
                         <td className="px-4 py-3">
@@ -972,85 +978,3 @@ export default function AdminCustomers() {
 }
 
 /* Reusable centered modal */
-function Modal({ children, onClose, icon, iconBg, title, subtitle, wide }: {
-  children: React.ReactNode; onClose: () => void; icon: React.ReactNode; iconBg: string; title: string; subtitle?: string; wide?: boolean;
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-[#0F172A]/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${wide ? "max-w-md" : "max-w-sm"} max-h-[calc(100vh-2rem)] overflow-y-auto p-6 animate-scale-in`}>
-        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-lg text-[#94A3B8] hover:bg-[#F1F5F9] flex items-center justify-center transition-colors"><X size={16} /></button>
-        <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center mb-4`}>{icon}</div>
-        <h3 className="text-lg font-bold text-[#0F172A]">{title}</h3>
-        {subtitle && <p className="text-sm text-[#64748B] mt-0.5 mb-4">{subtitle}</p>}
-        <div className={subtitle ? "" : "mt-4"}>{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/* 3-dots (kebab) action menu — portal-rendered so the dropdown never gets
-   clipped by the table's scroll container; flips up near the viewport bottom. */
-function ActionMenu({ items }: { items: ActionItem[] }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const W = 200;
-
-  const toggle = () => {
-    if (open) { setOpen(false); return; }
-    const r = btnRef.current?.getBoundingClientRect();
-    if (r) {
-      const h = items.length * 40 + 14;
-      let top = r.bottom + 6;
-      if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
-      let left = r.right - W;
-      if (left < 8) left = 8;
-      setPos({ top, left });
-    }
-    setOpen(true);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node) && !btnRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onScroll = () => setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [open]);
-
-  return (
-    <>
-      <button ref={btnRef} onClick={toggle} aria-label="Actions" aria-haspopup="menu"
-        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors active:scale-95 ${open ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0] hover:text-[#0F172A]"}`}>
-        <MoreVertical size={16} />
-      </button>
-      {open && pos && createPortal(
-        <div ref={menuRef} role="menu" style={{ position: "fixed", top: pos.top, left: pos.left, width: W }}
-          className="z-[90] bg-white rounded-xl shadow-premium-lg border border-[#F1F5F9] p-1.5 animate-scale-in">
-          {items.map((it, i) => (
-            <button key={i} role="menuitem" onClick={() => { setOpen(false); it.onClick(); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-left transition-colors ${it.danger ? "text-[#DC2626] hover:bg-[#FEE2E2] mt-0.5 border-t border-[#F1F5F9] pt-2.5 rounded-t-none" : "text-[#334155] hover:bg-[#F8FAFC]"}`}>
-              <span className="shrink-0">{it.icon}</span> {it.label}
-            </button>
-          ))}
-        </div>,
-        document.body
-      )}
-    </>
-  );
-}

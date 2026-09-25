@@ -54,6 +54,25 @@ export function setSession(token: string, user: unknown, slot: Slot): void {
   } catch { /* ignore */ }
 }
 
+/** "Login as Client / Reseller" writes into the one MAIN slot that customers and
+    partners share, so it replaces whoever is signed in there — in every open tab
+    of this browser. Ask first when that is someone else. */
+export function okToReplaceMainSession(targetEmail: string): boolean {
+  const cur = getSessionUser<{ email?: string; fullName?: string; role?: string }>("main");
+  if (!getToken("main") || !cur?.email || cur.email.toLowerCase() === targetEmail.toLowerCase()) return true;
+  if (typeof window === "undefined") return true;
+  return window.confirm(
+    `This browser is signed in as ${cur.fullName || cur.email} (${cur.email}${cur.role ? `, ${cur.role}` : ""}).\n\n` +
+    "Continuing signs that session out here and in every other open tab of this browser. Continue?",
+  );
+}
+
+/** Where "Return to admin" goes after the admin signed in as someone: the list
+    they came from. Read it BEFORE clearing the main session. */
+export function adminReturnPath(): string {
+  return getSessionUser<{ role?: string }>("main")?.role === "reseller" ? "/admin/resellers" : "/admin/customers";
+}
+
 /** Update just the cached user for a slot (e.g. server reconciliation). */
 export function setSessionUser(user: unknown, slot: Slot = currentSlot()): void {
   try { localStorage.setItem(KEYS[slot].user, JSON.stringify(user)); } catch { /* ignore */ }

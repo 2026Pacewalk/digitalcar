@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { users, referrals, notifications, cards, publishedCards, cardTrials, appSettings, products } from "@db/schema";
+import { getDefaultDesign } from "./template-router";
 import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { slugTakenByOther } from "./publish-router";
 import { resolveReferrer } from "./referral-router";
@@ -85,7 +86,7 @@ type StarterCard = z.infer<typeof starterCardInput>;
 /* On signup, give every new account its OWN live card URL + start the trial, so
    the card link is never empty and never falls back to a leftover/other slug.
    Best-effort: any failure here must never block registration. */
-async function provisionStarterCard(
+export async function provisionStarterCard(
   db: ReturnType<typeof getDb>,
   user: { id: number; email: string; fullName: string; phone: string | null },
   companyName?: string,
@@ -99,12 +100,16 @@ async function provisionStarterCard(
     // the owner saw in their dashboard silently disagreed.
     const base = cardSlugBase(companyName, user.fullName, user.email);
     const slug = await firstFreeCardSlug(db, base, user.id, user.email);
-    // A simple starter card — they fill in the details from the dashboard.
+    // A simple starter card — they fill in the details from the dashboard. It
+    // starts on the admin's default template (Admin → Templates ★); a design the
+    // visitor picked before signing up (a product, a gallery link, an AI draft)
+    // still wins, with that template's own colours if they didn't pick any.
+    const design = card?.theme ? { theme: card.theme, color: "#F7B31C", color2: "" } : await getDefaultDesign(db);
     const starter = {
       customer: {
         id: user.id, name: user.fullName, slug, username: slug,
         email: user.email, mobile1: user.phone || "", company_name: companyName || "",
-        designation: "", nature: "", about_us: "", theme: 1, color: "#F7B31C", color2: "",
+        designation: "", nature: "", about_us: "", theme: design.theme, color: design.color, color2: design.color2,
         // The design / content chosen before signup. Identity fields above
         // (id, name, slug, email, phone, company) are never overridden by it.
         ...(card || {}),
@@ -644,6 +649,9 @@ export const authRouter = createRouter({
       companyName: z.string().max(255).optional(),
       promo: z.string().max(40).optional(),
       card: starterCardInput.optional().catch(undefined),
+      // The partner sign-in page: sign in an existing account, never create a
+      // new (customer) one for an email nobody has registered.
+      existingOnly: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       enforceRateLimit(`google:${clientIp(ctx.req)}`, 10, 60_000);
@@ -682,6 +690,11 @@ export const authRouter = createRouter({
           ...(user.emailVerified ? {} : { emailVerified: true, emailVerifiedAt: new Date() }),
           ...(!user.avatar && profile.picture ? { avatar: profile.picture } : {}),
         }).where(eq(users.id, user.id));
+      } else if (input.existingOnly) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "There's no DigitalCarda partner account for this Google email. Sign in with the email we set you up with, or apply to become a partner.",
+        });
       } else {
         // An email that exists only in the pre-migration customer list belongs
         // to an existing card — never create a second, empty identity for it.
@@ -1014,7 +1027,8 @@ export const authRouter = createRouter({
       const user = await db.query.users.findFirst({ where: eq(users.email, email) });
       if (user) {
         const token = await createResetToken(user.id, user.password.slice(-12));
-        const link = `${PUBLIC_BASE_URL}/reset-password?token=${encodeURIComponent(token)}`;
+        // A partner's reset ends on the partner sign-in page (ResetPassword.tsx reads for=partner).
+        const link = `${PUBLIC_BASE_URL}/reset-password?token=${encodeURIComponent(token)}${user.role === "reseller" ? "&for=partner" : ""}`;
         void sendEmail(user.email, passwordResetEmail({ name: user.fullName, link }));
       }
       // Always succeed — never reveal whether an email is registered.

@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router";
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { toast } from "sonner";
+import { readableError } from "@/lib/errors";
+import { passwordProblems } from "@/lib/password";
 import { Building2, Wallet, Lock, Loader2, Percent, CalendarDays, Mail } from "lucide-react";
 
 /* A reseller's own profile. Everything here is theirs, read from and saved to
@@ -54,29 +57,50 @@ export default function ResellerProfile() {
     });
   }, [me]);
 
+  // "Change password" in the header menus links to #password. Go there once the
+  // page is on screen — also when the profile was already open or its data was
+  // cached (the layout shows a spinner first, so wait a frame for the section).
+  const { hash, key } = useLocation();
+  useEffect(() => {
+    if (isLoading || hash !== "#password") return;
+    let tries = 0;
+    const go = () => {
+      const el = document.getElementById("password");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      else if (tries++ < 20) setTimeout(go, 100);
+    };
+    go();
+  }, [isLoading, hash, key]);
+
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const onSave = async () => {
     if (form.fullName.trim().length < 2) return toast.error("Enter your full name");
     if (form.companyName.trim().length < 2) return toast.error("Enter your business name");
+    // The server's own rules (api/reseller-router.ts profileInput), said here in words.
+    if (form.gstin.trim() && !/^[0-9A-Z]{15}$/i.test(form.gstin.trim())) return toast.error("A GSTIN is 15 letters and numbers");
+    if (form.payoutAccountNumber.trim() && !/^[0-9]{6,20}$/.test(form.payoutAccountNumber.trim())) return toast.error("Account numbers are 6–20 digits");
+    if (form.payoutIfsc.trim() && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(form.payoutIfsc.trim())) return toast.error("An IFSC looks like HDFC0001234");
     try {
       await save.mutateAsync(form);
       await utils.reseller.me.invalidate();
       toast.success("Profile saved");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save your profile");
+      toast.error(readableError(e, "Could not save your profile"));
     }
   };
 
   const onPassword = async () => {
     if (!pw.current) return toast.error("Enter your current password");
     if (pw.next !== pw.confirm) return toast.error("The new passwords don't match");
+    const missing = passwordProblems(pw.next);
+    if (missing.length) return toast.error(`Your new password needs ${missing.join(", ")}`);
     try {
       await changePassword.mutateAsync({ currentPassword: pw.current, newPassword: pw.next });
       setPw({ current: "", next: "", confirm: "" });
       toast.success("Password changed");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not change your password");
+      toast.error(readableError(e, "Could not change your password"));
     }
   };
 
@@ -158,7 +182,7 @@ export default function ResellerProfile() {
         </div>
 
         {/* Password — the real one, checked against the current password on the server */}
-        <section className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5 sm:p-6">
+        <section id="password" className="bg-white rounded-2xl shadow-premium border border-[#F1F5F9] p-5 sm:p-6 scroll-mt-20">
           <h2 className="text-sm font-semibold text-[#0F172A] flex items-center gap-2 mb-4"><Lock size={16} className="text-[#F7B31C]" /> Change password</h2>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Current password"><input type="password" autoComplete="current-password" className={input} value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></Field>

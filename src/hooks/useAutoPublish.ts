@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { trpc } from "@/providers/trpc";
-import { readCustomer, scopedKey, getActiveCardId } from "@/hooks/useCustomer";
+import { readCustomer, scopedKey, getActiveCardId, getAuthUser } from "@/hooks/useCustomer";
 import { healUploadUrl } from "@/lib/img";
 import { loadMySnapshot } from "@/lib/cardContent";
 
@@ -67,6 +67,9 @@ export function useAutoPublish(): void {
     };
 
     const run = async () => {
+      // Only a card owner publishes a card. A partner (or an admin) who was once a
+      // customer in this browser can still hold that card in storage — never push it.
+      if (getAuthUser()?.role !== "customer") return;
       // Don't publish until first-load hydration has SETTLED. useCardHydration
       // sets this marker when it finishes (or when it deliberately skips because
       // a local card already exists). Publishing before then can snapshot a

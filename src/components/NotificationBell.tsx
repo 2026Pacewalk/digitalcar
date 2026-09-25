@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { useEnquiryNotifications } from "@/hooks/useEnquiryNotifications";
+import { useSessionRole } from "@/hooks/useAuth";
 import { readCustomer, scopedKey } from "@/hooks/useCustomer";
 import { trpc } from "@/providers/trpc";
 
@@ -83,21 +84,37 @@ const groupFor = (type: string): FilterId => {
   return "system";
 };
 
-export default function NotificationBell() {
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState<FilterId>("all");
-  const utils = trpc.useUtils();
+/* Where a notification opens, for this portal. Server rows with no link, and
+   rows written with customer links (payout notices link to /dashboard/refer),
+   open the partner's own pages instead of the customer area. */
+function linkFor(role: string, link: string | null | undefined): string {
+  const home = role === "reseller" ? "/reseller" : role === "super_admin" || role === "staff" ? "/admin" : "/dashboard";
+  const l = link || home;
+  if (role === "reseller" && l.startsWith("/dashboard")) return l.startsWith("/dashboard/refer") ? "/reseller/earnings" : "/reseller";
+  return l;
+}
 
+/* Card-owner signals: live card enquiries, the plan-expiry alert and view
+   milestones. Only customers own a card, so only they mount these hooks — for a
+   partner or an admin they used to seed a placeholder customer card in the
+   browser and poll views for a card that doesn't exist. */
+type CardSignals = {
+  enqUnread: number;
+  enqRecent: ReturnType<typeof useEnquiryNotifications>["recent"];
+  markEnqRead: () => void;
+  expiryAlert: FeedItem | null;
+  milestoneAlert: FeedItem | null;
+  markMilestoneSeen: () => void;
+};
+
+export default function NotificationBell() {
+  const role = useSessionRole();
+  return role === "customer" ? <CustomerBell /> : <BellMenu role={role} card={null} />;
+}
+
+function CustomerBell() {
   // Local card enquiries (live, cross-tab)
   const { unreadCount: enqUnread, recent: enqRecent, markAllRead: markEnqRead } = useEnquiryNotifications();
-
-  // Backend notifications — referral, payouts, plan, welcome (30s polling)
-  const { data: backendList } = trpc.notification.list.useQuery(undefined, { refetchInterval: 30_000, retry: false });
-  const { data: backendUnread } = trpc.notification.unreadCount.useQuery(undefined, { refetchInterval: 30_000, retry: false });
-  const markAllReadMut = trpc.notification.markAllRead.useMutation();
-  const markReadMut = trpc.notification.markRead.useMutation();
-  const clearAllMut = trpc.notification.clearAll.useMutation();
 
   // Smart local alert: plan expiring within 7 days
   const expiryAlert = useMemo((): FeedItem | null => {
@@ -119,8 +136,8 @@ export default function NotificationBell() {
     } catch { return null; }
   }, []);
 
-  // New: celebrate card-view milestones (100, 500, 1k, 5k, 10k…). Uses the real
-  // live view count; fires once per milestone (remembered per-user) so it never nags.
+  // Celebrate card-view milestones (100, 500, 1k, 5k, 10k…). Uses the real live
+  // view count; fires once per milestone (remembered per-user) so it never nags.
   const [views, setViews] = useState<number | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -147,43 +164,61 @@ export default function NotificationBell() {
     };
   }, [reachedMs]);
 
+  return <BellMenu role="customer" card={{ enqUnread, enqRecent, markEnqRead, expiryAlert, milestoneAlert, markMilestoneSeen }} />;
+}
+
+function BellMenu({ role, card }: { role: string; card: CardSignals | null }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState<FilterId>("all");
+  const utils = trpc.useUtils();
+
+  // Backend notifications — referral, payouts, commission, plan, welcome (30s polling)
+  const { data: backendList } = trpc.notification.list.useQuery(undefined, { refetchInterval: 30_000, retry: false });
+  const { data: backendUnread } = trpc.notification.unreadCount.useQuery(undefined, { refetchInterval: 30_000, retry: false });
+  const markAllReadMut = trpc.notification.markAllRead.useMutation();
+  const markReadMut = trpc.notification.markRead.useMutation();
+  const clearAllMut = trpc.notification.clearAll.useMutation();
+
   /* Merge every source into one feed, newest first (local alerts pinned) */
   const feed = useMemo((): FeedItem[] => {
     const items: FeedItem[] = [];
     for (const n of backendList || []) {
       items.push({
         key: `b-${n.id}`, type: n.type, title: n.title, message: n.message,
-        time: n.createdAt, unread: !n.isRead, link: n.link || "/dashboard", backendId: n.id,
+        time: n.createdAt, unread: !n.isRead, link: linkFor(role, n.link), backendId: n.id,
       });
     }
-    for (const e of enqRecent) {
+    for (const e of card?.enqRecent ?? []) {
       items.push({
         key: `e-${e.id}`, type: "enquiry",
         title: `New enquiry from ${e.name || "Someone"}`,
         message: e.description || e.contact || "",
-        time: e.created_on, unread: true, link: "/dashboard/enquiry",
+        time: e.created_on ?? null, unread: true, link: "/dashboard/enquiry",
       });
     }
     items.sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
-    const pinned = [expiryAlert, milestoneAlert].filter(Boolean) as FeedItem[];
+    const pinned = [card?.expiryAlert, card?.milestoneAlert].filter(Boolean) as FeedItem[];
     return [...pinned, ...items];
-  }, [backendList, enqRecent, expiryAlert, milestoneAlert]);
+  }, [backendList, card, role]);
 
+  // No card, no leads: partners and admins don't get the Leads chip.
+  const filters = card ? FILTERS : FILTERS.filter((f) => f.id !== "leads");
   const visible = filter === "all" ? feed : feed.filter((i) => groupFor(i.type) === filter);
-  const badge = enqUnread + (backendUnread?.count ?? 0) + (expiryAlert ? 1 : 0) + (milestoneAlert ? 1 : 0);
+  const badge = (card?.enqUnread ?? 0) + (backendUnread?.count ?? 0) + (card?.expiryAlert ? 1 : 0) + (card?.milestoneAlert ? 1 : 0);
 
   const markAll = () => {
-    markEnqRead(); markMilestoneSeen();
+    card?.markEnqRead(); card?.markMilestoneSeen();
     markAllReadMut.mutate(undefined, { onSuccess: () => { utils.notification.list.invalidate(); utils.notification.unreadCount.invalidate(); } });
   };
   const clearAll = () => {
-    markEnqRead(); markMilestoneSeen();
+    card?.markEnqRead(); card?.markMilestoneSeen();
     clearAllMut.mutate(undefined, { onSuccess: () => { utils.notification.list.invalidate(); utils.notification.unreadCount.invalidate(); } });
   };
   const openItem = (i: FeedItem) => {
     if (i.backendId) markReadMut.mutate({ id: i.backendId }, { onSuccess: () => { utils.notification.list.invalidate(); utils.notification.unreadCount.invalidate(); } });
-    if (i.type === "enquiry") markEnqRead();
-    if (i.type === "milestone") markMilestoneSeen();
+    if (i.type === "enquiry") card?.markEnqRead();
+    if (i.type === "milestone") card?.markMilestoneSeen();
     setOpen(false);
     navigate(i.link);
   };
@@ -214,7 +249,7 @@ export default function NotificationBell() {
 
             {/* Filter chips */}
             <div className="flex gap-1.5 px-3 py-2 border-b border-[#F8FAFC]">
-              {FILTERS.map((f) => (
+              {filters.map((f) => (
                 <button key={f.id} onClick={() => setFilter(f.id)}
                   className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${filter === f.id ? "bg-[#0F172A] text-white" : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"}`}>
                   {f.label}
@@ -228,7 +263,9 @@ export default function NotificationBell() {
                 <div className="px-4 py-10 text-center">
                   <Inbox size={24} className="mx-auto text-[#CBD5E1] mb-2" />
                   <p className="text-xs text-[#94A3B8]">You're all caught up</p>
-                  <p className="text-[10px] text-[#CBD5E1] mt-1">Enquiries, rewards & updates appear here.</p>
+                  <p className="text-[10px] text-[#CBD5E1] mt-1">
+                    {role === "reseller" ? "Commission, payouts & updates appear here." : card ? "Enquiries, rewards & updates appear here." : "Updates appear here."}
+                  </p>
                 </div>
               ) : visible.slice(0, 15).map((i) => {
                 const st = styleFor(i.type);

@@ -25,8 +25,8 @@ export default function ResellerCustomers() {
     if (!form.fullName.trim() || !form.email.trim()) return toast.error("Name and email are required");
     if (form.password.length < 6) return toast.error("Password must be at least 6 characters");
     try {
-      await createCustomer.mutateAsync(form);
-      toast.success(`${form.fullName} added to your customers`);
+      const r = await createCustomer.mutateAsync(form);
+      toast.success(r.slug ? `${form.fullName} added — their card is live at digitalcarda.in/${r.slug}` : `${form.fullName} added to your customers`);
       setOpen(false); setForm({ fullName: "", email: "", phone: "", password: "" });
       utils.user.resellerCustomers.invalidate(); utils.user.resellerStats.invalidate();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not add customer"); }
@@ -74,7 +74,7 @@ export default function ResellerCustomers() {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={4} className="px-4 py-16 text-center">
                     <Users size={28} className="mx-auto text-[#CBD5E1] mb-2" />
-                    <p className="text-sm text-[#94A3B8]">{search ? "No customers match your search." : "No customers yet — share your referral link to onboard customers."}</p>
+                    <p className="text-sm text-[#94A3B8]">{search ? "No customers match your search." : "No customers yet — use “Add Customer” to add your first one."}</p>
                   </td></tr>
                 ) : (
                   filtered.map((c) => (
