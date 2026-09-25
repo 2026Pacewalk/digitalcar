@@ -482,9 +482,9 @@ const FEATURE_TILES: FeatureTile[] = [
     ],
   },
   {
-    id: "resell", title: "Sell it under your brand", accent: "#F7B31C", icon: Building2,
-    text: "White-label cards for your own clients, with commission reports built in.",
-    items: [{ icon: Users, label: "White-label" }, { icon: Shield, label: "Custom branding" }, { icon: BarChart3, label: "Commission reports" }, { icon: Eye, label: "Customer analytics" }],
+    id: "resell", title: "Resell it to your clients", accent: "#F7B31C", icon: Building2,
+    text: "Earn 20% on every plan your clients buy, with an itemised commission statement.",
+    items: [{ icon: Users, label: "Add your customers" }, { icon: BarChart3, label: "Commission statement" }, { icon: Wallet, label: "Withdraw any time" }, { icon: FileText, label: "Their payment history" }],
   },
 ];
 
@@ -2147,7 +2147,7 @@ const FAQS = [
   },
   {
     q: "Can I use my own domain and branding?",
-    a: "Yes. You can connect your own domain or subdomain, apply your brand colours and logo, and remove template styling so the card looks like part of your own website. Agencies and resellers can also white-label the whole platform for their clients.",
+    a: "Yes. You can connect your own domain or subdomain, apply your brand colours and logo, and remove template styling so the card looks like part of your own website.",
   },
   {
     q: "Can I see who viewed my digital card?",

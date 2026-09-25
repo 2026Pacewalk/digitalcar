@@ -113,7 +113,7 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
   },
   "/resellers": {
     title: "Digital Business Card Reseller & White-Label Program",
-    description: "Sell digital business cards under your own brand. Add customers, assign plans, manage leads and earn 20–30% recurring commission.",
+    description: "Resell DigitalCarda digital business cards. Add customers from your own dashboard, earn 20% on every plan they buy, and withdraw to your bank or UPI any time.",
     crumb: "Reseller Program",
   },
   "/refer-earn": {
