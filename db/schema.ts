@@ -236,6 +236,22 @@ export const coupons = mysqlTable("coupons", {
 
 export type Coupon = typeof coupons.$inferSelect;
 
+/* A coupon one customer was personally offered, and until when — EARLY20 in
+   the day-2 trial email (api/lib/offer-grants.ts). A code with grants works only
+   for a customer holding one, between sent_at and expires_at. */
+export const couponGrants = mysqlTable("coupon_grants", {
+  id: serial("id").primaryKey(),
+  couponId: bigint("coupon_id", { mode: "number", unsigned: true }).notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  source: varchar("source", { length: 40 }).notNull(),
+  sentAt: timestamp("sent_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("uq_cg_coupon_user").on(table.couponId, table.userId),
+  index("cg_user_idx").on(table.userId),
+]);
+
 // One row per order that used a coupon: pending (manual payment awaiting
 // verification), completed (paid) or cancelled (payment rejected).
 export const couponRedemptions = mysqlTable("coupon_redemptions", {

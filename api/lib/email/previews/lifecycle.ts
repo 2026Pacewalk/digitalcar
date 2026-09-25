@@ -6,7 +6,7 @@
 import type { Email } from "../kit";
 import {
   trialDay1Email, trialDay7Email, trialDay15Email, trialDay21Email, trialDay25Email,
-  trialEndingEmail, trialEndedEmail, abandonedPublishEmail,
+  trialEndingEmail, trialEndedEmail, abandonedPublishEmail, trialOfferEmail,
   cardPublishedEmail, monthlyDigestEmail, dormantCardEmail, cardLinkChangedEmail,
   type TrialMetrics,
 } from "../lifecycle";
@@ -27,7 +27,23 @@ const GOOD: TrialMetrics = { views: 318, saves: 41, whatsapp: 27, calls: 9, lead
 const EARLY: TrialMetrics = { views: 64, saves: 7, whatsapp: 5, calls: 2, leads: 0 };
 const HOSTILE = `<b>Aarav</b> & "Mehta" <script>alert('x')</script>`;
 
+const OFFER_PRICES = [{ plan: "Gold", cycle: "1 year", usual: 999, withCode: 799 }, { plan: "Gold", cycle: "3 years", usual: 2499, withCode: 1999 }, { plan: "Gold", cycle: "monthly", usual: 99, withCode: 79 }, { plan: "Platinum", cycle: "1 year", usual: 1999, withCode: 1599 }, { plan: "Platinum", cycle: "3 years", usual: 4999, withCode: 3999 }, { plan: "Platinum", cycle: "monthly", usual: 199, withCode: 159 }];
+
 export const previews: Preview[] = [
+  /* ── trialOfferEmail (day-2 EARLY20 offer) ── */
+  {
+    name: "trialOfferEmail", module: MODULE, audience: "customer", variant: "full",
+    render: () => trialOfferEmail({ name: "Aarav Mehta", cardUrl: CARD, code: "EARLY20", percent: 20, endsAt: at("2026-10-01T12:30:00Z"), prices: OFFER_PRICES }),
+  },
+  {
+    name: "trialOfferEmail", module: MODULE, audience: "customer", variant: "no-card-no-prices",
+    render: () => trialOfferEmail({ name: "Aarav Mehta", cardUrl: "https://digitalcarda.in/dashboard", code: "EARLY20", percent: 20, endsAt: at("2026-10-01T12:30:00Z"), prices: [] }),
+  },
+  {
+    name: "trialOfferEmail", module: MODULE, audience: "customer", variant: "hostile-input",
+    render: () => trialOfferEmail({ name: HOSTILE, cardUrl: CARD, code: "EARLY20", percent: 20, endsAt: at("2026-10-01T12:30:00Z"), prices: OFFER_PRICES }),
+  },
+
   /* ── trialDay1Email ── */
   {
     name: "trialDay1Email", module: MODULE, audience: "customer", variant: "as-sent-today",

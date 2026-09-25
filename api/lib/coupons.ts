@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { coupons, couponRedemptions, subscriptionPackages, type Coupon } from "@db/schema";
 import type { getDb } from "../queries/connection";
+import { EARLY_COUPON_CODE, earlyGrantReason, exactPercentDiscount } from "./offer-grants";
 
 /* Discount coupons for PLAN purchases only.
 
@@ -46,6 +47,12 @@ export async function evaluateCoupon(
   const now = ctx.now ?? new Date();
   if (c.validFrom && now < c.validFrom) return { ok: false, reason: `This coupon can be used from ${day(c.validFrom)}.` };
   if (c.validUntil && now > c.validUntil) return { ok: false, reason: "This coupon has expired." };
+  // EARLY20 works only for a trial customer the day-2 offer email went to, until
+  // their deadline (api/lib/offer-grants.ts).
+  if (code === EARLY_COUPON_CODE) {
+    const why = await earlyGrantReason(db, c.id, ctx.userId, now);
+    if (why) return { ok: false, reason: why };
+  }
 
   const plans = csv(c.planIds).map(Number);
   if (plans.length && !plans.includes(ctx.packageId)) return { ok: false, reason: "This coupon isn't valid for this plan." };
@@ -67,13 +74,20 @@ export async function evaluateCoupon(
   if (c.usageLimit && total >= c.usageLimit) return { ok: false, reason: "This coupon has reached its usage limit." };
   if (c.perUserLimit && mine >= c.perUserLimit) return { ok: false, reason: "You've already used this coupon." };
 
-  let discount = c.discountType === "percent"
-    ? (ctx.amount * Number(c.discountValue)) / 100
-    : Number(c.discountValue);
+  // EARLY20 is exactly its percentage off the plan's FULL price — never on top
+  // of the referral or upgrade discounts already in `amount`.
+  const exact = code === EARLY_COUPON_CODE && c.discountType === "percent";
+  let discount = exact
+    ? await exactPercentDiscount(db, ctx, Number(c.discountValue))
+    : c.discountType === "percent"
+      ? (ctx.amount * Number(c.discountValue)) / 100
+      : Number(c.discountValue);
   if (c.maxDiscount && discount > Number(c.maxDiscount)) discount = Number(c.maxDiscount);
   // Always leave at least ₹1 to pay — the payment gateway can't take ₹0.
   discount = Math.min(Math.round(discount), Math.max(0, Math.round(ctx.amount) - 1));
-  if (discount <= 0) return { ok: false, reason: "This coupon doesn't apply to this amount." };
+  if (discount <= 0) {
+    return { ok: false, reason: exact ? `Your price already includes more than ${Number(c.discountValue)}% off, so ${code} adds nothing more.` : "This coupon doesn't apply to this amount." };
+  }
 
   return { ok: true, coupon: c, discount };
 }

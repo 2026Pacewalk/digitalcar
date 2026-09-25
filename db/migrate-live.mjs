@@ -39,6 +39,13 @@ const TABLES = {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX emlog_created_idx (created_at), INDEX emlog_to_idx (to_email),
     INDEX emlog_status_idx (status), INDEX emlog_kind_idx (kind))`,
+  // Coupons offered to one customer until a deadline (EARLY20, day-2 trial email).
+  coupon_grants: `CREATE TABLE IF NOT EXISTS coupon_grants (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    coupon_id BIGINT UNSIGNED NOT NULL, user_id BIGINT UNSIGNED NOT NULL,
+    source VARCHAR(40) NOT NULL, sent_at TIMESTAMP NULL, expires_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX uq_cg_coupon_user (coupon_id, user_id), INDEX cg_user_idx (user_id))`,
   // What each logged email actually said (Admin → Email Log → view). Secrets are
   // blanked before storing (api/lib/mail.ts); rows go with their log row.
   email_log_bodies: `CREATE TABLE IF NOT EXISTS email_log_bodies (

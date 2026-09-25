@@ -4,12 +4,13 @@ import { toast } from "sonner";
 import {
   Save, Building2, Mail, Shield, BellRing, CreditCard, Palette, CheckCircle2, XCircle, Send, Loader2,
   AlertTriangle, Plus, X, Undo2, Phone, MessageCircle, Receipt, KeyRound, Timer, Globe2,
-  Lock, Sparkles, ArrowRight,
+  Lock, Sparkles, ArrowRight, BadgePercent,
 } from "lucide-react";
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import PaymentSettingsPanel from "@/components/admin/PaymentSettingsPanel";
+import TemplateThumb from "@/components/TemplateThumb";
 import {
   ALERT_KINDS, DEFAULT_SETTINGS, isEmail, isIpOrCidr,
   type AlertKind, type PlatformSettings, type SettingsSection,
@@ -473,6 +474,65 @@ function TestEmail({ defaultTo }: { defaultTo: string }) {
 }
 
 /* ── Card defaults: trial length + the design new cards start on ───────── */
+/* The day-2 upgrade email (EARLY20). Off until the admin switches it on, so
+   nothing goes to customers before the owner has seen it. */
+function TrialOfferPanel() {
+  const utils = trpc.useUtils();
+  const { data } = trpc.trial.offerConfig.useQuery();
+  const setOffer = trpc.trial.setOffer.useMutation();
+  const [holidays, setHolidays] = useState<string | null>(null);
+  const holidayValue = holidays ?? data?.holidays ?? "";
+  // The switch saves only on/off; the holiday list goes only when it was edited.
+  const save = async (enabled: boolean, msg: string, withHolidays = false) => {
+    try {
+      await setOffer.mutateAsync({ enabled, ...(withHolidays ? { holidays: holidayValue } : {}) });
+      await utils.trial.offerConfig.invalidate();
+      setHolidays(null);
+      toast.success(msg);
+    } catch (e) { toast.error((e as Error).message); }
+  };
+  const pct = data?.coupon.percent ?? 20;
+  const code = data?.coupon.code ?? "EARLY20";
+  return (
+    <Panel title="Day-2 upgrade email"
+      description={`On day 2–3 of a free trial, customers who have never paid get one email: ${pct}% off a paid plan with code ${code}, for 24 working hours (Mon–Sat, 10 am–6 pm IST). The code works only for them, once, and never adds on top of other discounts.`}
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <a href="/admin/email-previews?id=lifecycle.trialOfferEmail.full" className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#B45309] hover:text-[#92400E]">Preview the email <ArrowRight size={13} /></a>
+          {holidays !== null && holidays !== (data?.holidays ?? "") && (
+            <button onClick={() => save(!!data?.enabled, "Holidays saved", true)} disabled={setOffer.isPending || !data}
+              className="h-10 rounded-xl gradient-gold px-5 text-[13px] font-bold text-[#0F172A] inline-flex items-center gap-2 disabled:opacity-45">
+              {setOffer.isPending ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save holidays
+            </button>
+          )}
+        </div>
+      }>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FEF3C7] text-[#B45309]"><BadgePercent size={18} /></span>
+          <div>
+            <p className="text-[13.5px] font-bold text-[#0F172A]">{data?.enabled ? "On — sending each morning" : "Off"}</p>
+            <p className="mt-0.5 text-[12.5px] text-[#64748B]">
+              {data ? <>{data.sent} sent · {data.open} offers open now · {data.used} used</> : "Loading…"}
+            </p>
+            {data?.problem && (
+              <p className="mt-1 text-[12px] font-semibold text-[#B45309]">{data.problem}</p>
+            )}
+          </div>
+        </div>
+        <Switch on={!!data?.enabled} label="Day-2 upgrade email"
+          onChange={(v) => { if (data && !setOffer.isPending) void save(v, v ? "Day-2 upgrade email is on — the next run is tomorrow morning" : "Day-2 upgrade email is off"); }} />
+      </div>
+      <div className="mt-5 border-t border-[#F1F5F9] pt-4">
+        <Field label="Holidays (optional)" hint="India-time dates that don't count as working days, e.g. 2026-10-02, 2026-10-20. Sundays never count.">
+          <input value={holidayValue} onChange={(e) => setHolidays(e.target.value)} placeholder="2026-10-02, 2026-10-20"
+            className="mt-1 h-10 w-full rounded-xl border border-[#E2E8F0] bg-white px-3 text-[13px] outline-none focus:border-[#F7B31C]" />
+        </Field>
+      </div>
+    </Panel>
+  );
+}
+
 function CardDefaults() {
   const utils = trpc.useUtils();
   const { data: trial } = trpc.trial.config.useQuery();
@@ -524,6 +584,8 @@ function CardDefaults() {
         )}
       </Panel>
 
+      <TrialOfferPanel />
+
       <Panel title="Starting design" description="The design a brand-new card opens with. Customers can change it any time.">
         {!presets?.list?.length ? (
           <p className="text-[13px] text-[#64748B]">No saved designs yet — create one in <b>Admin → Templates</b>.</p>
@@ -532,16 +594,22 @@ function CardDefaults() {
             {presets.list.map((p) => {
               const on = presets.defaultId === p.id;
               return (
-                <button key={p.id} onClick={() => choose(p.id, p.name)} disabled={setDefault.isPending}
-                  className={`rounded-2xl border p-4 text-left transition-all ${on ? "border-[#F7B31C] bg-[#FFFBEB] shadow-[0_10px_24px_-20px_rgba(247,179,28,.9)]" : "border-[#E9EDF4] bg-white hover:border-[#CBD5E1]"}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="h-6 w-6 rounded-lg" style={{ background: `linear-gradient(135deg, ${p.primary || "#F7B31C"}, ${p.secondary || "#0F172A"})` }} />
-                    <span className="text-[13.5px] font-bold text-[#0F172A]">{p.name}</span>
-                  </div>
-                  <p className="mt-1 text-[12px] text-[#94A3B8]">Design #{p.style}{p.category ? ` · ${p.category}` : ""}</p>
-                  <p className={`mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold ${on ? "text-[#B45309]" : "text-[#64748B]"}`}>
-                    {on ? <>In use <CheckCircle2 size={12} /></> : <>Use this <ArrowRight size={12} /></>}
-                  </p>
+                <button key={p.id} onClick={() => choose(p.id, p.name)} disabled={setDefault.isPending} aria-pressed={on}
+                  className={`group flex items-stretch gap-3.5 rounded-2xl border p-3 text-left transition-all ${on ? "border-[#F7B31C] bg-[#FFFBEB] shadow-[0_10px_24px_-20px_rgba(247,179,28,.9)]" : "border-[#E9EDF4] bg-white hover:border-[#CBD5E1]"}`}>
+                  {/* The card front itself, small — the same render customers see in the marketplace. */}
+                  <span className={`block w-[76px] shrink-0 overflow-hidden rounded-xl border bg-white ${on ? "border-[#F7B31C]" : "border-[#E2E8F0] group-hover:border-[#CBD5E1]"}`}>
+                    <TemplateThumb style={p.style} primary={p.primary} secondary={p.secondary} category={p.category} name={p.name} />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col py-1">
+                    <span className="flex items-center gap-2">
+                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: `linear-gradient(135deg, ${p.primary || "#F7B31C"}, ${p.secondary || "#0F172A"})` }} />
+                      <span className="truncate text-[13.5px] font-bold text-[#0F172A]">{p.name}</span>
+                    </span>
+                    <span className="mt-1 text-[12px] text-[#94A3B8]">Design #{p.style}{p.category ? ` · ${p.category}` : ""}</span>
+                    <span className={`mt-auto inline-flex items-center gap-1 pt-2 text-[11.5px] font-bold ${on ? "text-[#B45309]" : "text-[#64748B]"}`}>
+                      {on ? <>In use <CheckCircle2 size={12} /></> : <>Use this <ArrowRight size={12} /></>}
+                    </span>
+                  </span>
                 </button>
               );
             })}

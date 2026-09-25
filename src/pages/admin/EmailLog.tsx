@@ -33,6 +33,7 @@ const KIND_LABEL: Record<string, string> = {
   accountRestoredEmail: "Account restored",
   // Trial & card lifecycle
   trialDay1Email: "Trial day 1",
+  trialOfferEmail: "Trial offer (EARLY20)",
   trialDay7Email: "Trial day 7",
   trialDay15Email: "Trial day 15",
   trialDay21Email: "Trial day 21",

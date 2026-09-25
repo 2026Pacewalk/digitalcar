@@ -195,6 +195,7 @@ const ACTION_LABELS: Record<string, string> = {
   "reseller.grantLogin": "Gave a reseller a login",
   "reseller.setActive": "Deactivated or reactivated a reseller",
   "reseller.sendLoginEmail": "Emailed a reseller their sign-in details",
+  "trial.setOffer": "Changed the day-2 trial offer email",
   "settings.update": "Changed site settings",
   "settings.sendTestEmail": "Sent a test email",
   "settings.sendMarketingEmail": "Sent a marketing email",

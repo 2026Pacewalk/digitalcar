@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { cardTrials, appSettings } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { cardTrials, appSettings, coupons, couponGrants, couponRedemptions } from "@db/schema";
+import { and, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
+import { EARLY_COUPON_CODE, EARLY_PERCENT, earlyCouponState } from "./lib/offer-grants";
 
 /* Backend-authoritative 30-day trial engine + optional grace period (§5–6, §10).
    - Trial STARTS on first publish, never at registration.
@@ -127,6 +128,46 @@ export const trialRouter = createRouter({
   setExpiryMode: adminQuery.input(z.object({ mode: z.enum(["deactivate", "limited", "basic"]) })).mutation(async ({ input }) => {
     await setSetting(getDb(), "expiry_mode", input.mode);
     return { ok: true, mode: input.mode };
+  }),
+
+  // Admin: the day-2 upgrade email (EARLY20) — is it on, and how is it doing?
+  offerConfig: adminQuery.query(async () => {
+    const db = getDb();
+    const [c] = await db.select().from(coupons).where(eq(coupons.code, EARLY_COUPON_CODE)).limit(1);
+    let sent = 0, open = 0, used = 0;
+    let problem: string | null = c ? null : `The ${EARLY_COUPON_CODE} coupon is created automatically the first time it runs.`;
+    if (c) {
+      const now = new Date();
+      const state = await earlyCouponState(db, c.id, now);
+      if (!state.usable) problem = state.reason;
+      const [s1] = await db.select({ n: sql<number>`count(*)` }).from(couponGrants).where(and(eq(couponGrants.couponId, c.id), isNotNull(couponGrants.sentAt)));
+      const [s2] = await db.select({ n: sql<number>`count(*)` }).from(couponGrants).where(and(eq(couponGrants.couponId, c.id), gt(couponGrants.expiresAt, now)));
+      const [s3] = await db.select({ n: sql<number>`count(*)` }).from(couponRedemptions).where(and(eq(couponRedemptions.couponId, c.id), inArray(couponRedemptions.status, ["pending", "completed"])));
+      sent = Number(s1?.n || 0); open = Number(s2?.n || 0); used = Number(s3?.n || 0);
+    }
+    return {
+      enabled: (await getSetting(db, "trial_offer_enabled")) === "1",
+      hours: Number(await getSetting(db, "trial_offer_hours")) || 24,
+      holidays: (await getSetting(db, "offer_holidays")) || "",
+      coupon: c ? { code: c.code, active: !!c.active, percent: c.discountType === "percent" ? Number(c.discountValue) : null } : { code: EARLY_COUPON_CODE, active: false, percent: EARLY_PERCENT, missing: true },
+      // Why nothing would be sent right now (null = ready).
+      problem,
+      sent, open, used,
+    };
+  }),
+
+  setOffer: adminQuery.input(z.object({
+    enabled: z.boolean(),
+    // IST dates that don't count as working days, e.g. "2026-10-02, 2026-10-20".
+    holidays: z.string().max(1000).optional(),
+  })).mutation(async ({ input }) => {
+    const db = getDb();
+    await setSetting(db, "trial_offer_enabled", input.enabled ? "1" : "0");
+    if (input.holidays !== undefined) {
+      const days = input.holidays.split(/[\s,]+/).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+      await setSetting(db, "offer_holidays", days.join(","));
+    }
+    return { ok: true, enabled: input.enabled };
   }),
 
   // Admin: master on/off for the trial lifecycle emails (§68).

@@ -265,6 +265,108 @@ export function trialDay1Email(o: {
   };
 }
 
+/* ── Day-2 upgrade offer (EARLY20) ───────────────────────────────────────── */
+
+/** One plan row in the offer email: the real price and the price with the code. */
+export type OfferPriceRow = { plan: string; cycle: string; usual: number; withCode: number };
+
+const TUTORIAL = { url: "https://youtu.be/7d0G0Hu4x7o", thumb: "https://img.youtube.com/vi/7d0G0Hu4x7o/hqdefault.jpg", title: "How to make a digital business card with a QR code", length: "5:39" };
+const rupee = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
+const deadlineText = (d: Date) =>
+  d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
+
+/**
+ * Day 2 of the trial: 20% off a paid plan with code EARLY20, for 24 working
+ * hours (Mon–Sat, 10 am–6 pm IST) from when this email is sent.
+ * Audience: customer on a free trial. Trigger: runLifecycle (api/cron/lifecycle.ts),
+ * stage ls_offer, when the admin has switched the offer on.
+ * - code / percent / endsAt: the grant this customer holds (api/lib/offer-grants.ts);
+ *   the code works only for them, only until endsAt.
+ * - prices: real plan prices from subscription_packages and the price with the code.
+ * - cardUrl / slug: their live card (optional).
+ */
+export function trialOfferEmail(o: {
+  name?: string | null; cardUrl?: string; slug?: string | null;
+  code: string; percent: number; endsAt: Date; prices: OfferPriceRow[];
+}): Email {
+  const card = cardOf(o);
+  const code = String(o.code || "").trim().toUpperCase();
+  const pct = Math.round(Number(o.percent)) || 20;
+  const ends = deadlineText(o.endsAt);
+  const url = `${PLANS}?coupon=${encodeURIComponent(code)}`;
+  const hero = heroBand({
+    tone: "gold", eyebrow: "Early-bird offer · for you",
+    title: `Upgrade now and save ${pct}%`,
+    sub: "A thank-you for getting your card live so quickly. Choose a plan before the offer ends and keep your card live after your trial.",
+    aside: { label: "Your code", value: code },
+    chips: [darkChip(`Ends ${esc(ends)} IST`, BRAND.gold), card ? darkChip(esc(hostOf(card.url))) : ""].filter(Boolean),
+  });
+  const priceRows = o.prices.map((r) =>
+    `<tr>
+      <td style="padding:10px 12px;border-top:1px solid #EEF1F5;font-family:${FONT};font-size:14px;color:#0F172A"><strong>${esc(r.plan)}</strong> <span style="color:#64748B">· ${esc(r.cycle)}</span></td>
+      <td align="right" style="padding:10px 12px;border-top:1px solid #EEF1F5;font-family:${FONT};font-size:13px;color:#94A3B8;text-decoration:line-through">${esc(rupee(r.usual))}</td>
+      <td align="right" style="padding:10px 12px;border-top:1px solid #EEF1F5;font-family:${FONT};font-size:15px;font-weight:800;color:${BRAND.goldDark}">${esc(rupee(r.withCode))}</td>
+    </tr>`).join("");
+  const priceTable = o.prices.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 6px;border:1px solid #E2E8F0;border-radius:14px;border-collapse:separate;overflow:hidden">
+        <tr><td style="padding:10px 12px;background:#F8FAFC;font-family:${FONT};font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#64748B">Plan</td>
+          <td align="right" style="padding:10px 12px;background:#F8FAFC;font-family:${FONT};font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#64748B">Usually</td>
+          <td align="right" style="padding:10px 12px;background:#F8FAFC;font-family:${FONT};font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#64748B">With ${esc(code)}</td></tr>
+        ${priceRows}
+      </table>`
+    : "";
+  const video = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:10px 0 4px">
+      <tr><td align="center">
+        <a href="${esc(TUTORIAL.url)}" target="_blank" style="text-decoration:none">
+          <img src="${esc(TUTORIAL.thumb)}" width="480" alt="Play: ${esc(TUTORIAL.title)} (${TUTORIAL.length})" style="display:block;width:100%;max-width:480px;height:auto;border-radius:14px;border:0" />
+        </a>
+        <div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#475569;padding-top:10px">&#9654;&nbsp; ${inkLink(TUTORIAL.url, `${TUTORIAL.title} (${TUTORIAL.length})`)}</div>
+      </td></tr>
+    </table>`;
+  const bodyHtml =
+    hi(o.name) +
+    p(`You made your DigitalCarda a couple of days ago — thank you for moving fast. As a thank-you, you get <strong style="color:${BRAND.goldDark}">${pct}% off any paid plan</strong> if you choose one before <strong>${esc(ends)}</strong> (India time).`) +
+    callout("gold", `${pct}% off with code ${esc(code)}`,
+      `Use ${codeValue(code)} at checkout — the button below adds it for you. It works for your account only, once, until ${esc(ends)} IST: 24 working hours (Monday–Saturday, 10 am–6 pm) from when we sent this.`) +
+    priceTable +
+    button(`Upgrade with ${pct}% off`, url) +
+    sectionLabel("What you get on a paid plan") +
+    iconGrid([
+      { icon: glyph("&#10003;"), title: "Your card stays live", body: "The same link and QR after your trial, so there is nothing to re-share or reprint." },
+      { icon: glyph("&#9733;"), title: "Leads and analytics", body: "See every view, contact save and enquiry, and follow up from your Leads list." },
+      { icon: glyph("&#9638;"), title: "Platinum: up to 3 cards", body: "A card for you and two more people on your team, from one account." },
+      { icon: glyph("@"), title: "Platinum: your own domain", body: "Your card on a link like card.yourbrand.com. The setup is free on the 3-year plan." },
+    ]) +
+    sectionLabel("New to it? Watch the walkthrough") +
+    video +
+    note(`Already have a bigger discount, like a referral discount? You keep whichever is better — ${esc(code)} never adds on top.`) +
+    ending();
+  return {
+    kind: "trialOfferEmail",
+    subject: `${pct}% off your DigitalCarda plan — until ${ends}`,
+    html: layout({
+      preheader: `Use code ${code} before ${ends} IST to get ${pct}% off any paid plan. Plus a 5-minute walkthrough.`,
+      hero, bodyHtml, accent: BRAND.gold,
+    }),
+    text: lines([
+      greet(o.name), "",
+      `You made your DigitalCarda a couple of days ago. As a thank-you, you get ${pct}% off any paid plan if you choose one before ${ends} (India time).`, "",
+      `Your code: ${code} — for your account only, once, until ${ends} IST (24 working hours: Monday–Saturday, 10 am–6 pm, from when we sent this).`,
+      `Upgrade with ${pct}% off: ${url}`, "",
+      o.prices.length ? "Prices with your code:" : null,
+      ...o.prices.map((r) => `- ${r.plan} (${r.cycle}): ${rupee(r.usual)} → ${rupee(r.withCode)}`),
+      o.prices.length ? "" : null,
+      "What you get on a paid plan:",
+      "- Your card stays live: the same link and QR after your trial",
+      "- Leads and analytics: every view, contact save and enquiry",
+      "- Platinum: up to 3 cards, and your card on your own domain (free setup on the 3-year plan)", "",
+      `Watch the walkthrough: ${TUTORIAL.title} (${TUTORIAL.length}) — ${TUTORIAL.url}`, "",
+      `Already have a bigger discount, like a referral discount? You keep whichever is better — ${code} never adds on top.`, "",
+      HELP_TEXT, "", SIGN_TEXT,
+    ]),
+  };
+}
+
 /**
  * Day 7: fill the card out so visitors find what they came for.
  * Audience: customer. Trigger: runLifecycle, milestone ls_d7.

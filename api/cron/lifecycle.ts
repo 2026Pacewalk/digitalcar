@@ -12,15 +12,22 @@
  * Never throws per-user — one bad row can't stop the batch.
  */
 import { getDb } from "../queries/connection";
-import { cardTrials, users, notifications, publishedCards, cardEvents, funnelEvents, appSettings } from "@db/schema";
-import { and, eq, inArray, sql, gt } from "drizzle-orm";
+import {
+  cardTrials, users, notifications, publishedCards, cardEvents, funnelEvents, appSettings,
+  subscriptions, paymentOrders, subscriptionPackages, accountDeletionRequests,
+} from "@db/schema";
+import { and, eq, inArray, sql, gt, or } from "drizzle-orm";
 import { legacyPaidPlan } from "../lib/entitlement";
 import { sendEmail } from "../lib/mail";
 import { allows } from "../lib/notify-prefs";
 import {
   trialDay1Email, trialDay7Email, trialDay15Email, trialDay21Email, trialDay25Email,
-  trialEndingEmail, trialEndedEmail, abandonedPublishEmail, type TrialMetrics,
+  trialEndingEmail, trialEndedEmail, abandonedPublishEmail, trialOfferEmail, type TrialMetrics, type OfferPriceRow,
 } from "../lib/email-templates";
+import {
+  ensureEarlyCoupon, earlyCouponState, releaseStaleClaims, claimGrant, startGrant, releaseGrant,
+  addWorkingHours, EARLY_COUPON_CODE, EARLY_PERCENT,
+} from "../lib/offer-grants";
 
 const DAY = 86_400_000;
 const SITE = "https://digitalcarda.in";
@@ -53,9 +60,9 @@ const MILESTONES = [
   { key: "ls_d25", day: 25, needsMetrics: true },
 ] as const;
 
-export async function runLifecycle(): Promise<{ enabled: boolean; scanned: number; sent: number; abandoned: number }> {
+export async function runLifecycle(): Promise<{ enabled: boolean; scanned: number; sent: number; abandoned: number; offers: number }> {
   const db = getDb();
-  if ((await getSetting(db, "lifecycle_enabled")) === "0") return { enabled: false, scanned: 0, sent: 0, abandoned: 0 };
+  if ((await getSetting(db, "lifecycle_enabled")) === "0") return { enabled: false, scanned: 0, sent: 0, abandoned: 0, offers: 0 };
 
   const now = Date.now();
   const graceEnabled = (await getSetting(db, "grace_enabled")) === "1";
@@ -82,6 +89,70 @@ export async function runLifecycle(): Promise<{ enabled: boolean; scanned: numbe
   for (const u of trialUsers) {
     if (legacyPaidPlan(u.email, now)) paidUids.add(u.id);
   }
+
+  // ── Day-2 upgrade offer (EARLY20) ──────────────────────────────────────
+  // Off unless the admin switched it on (Admin → Settings → Trial). Sent once,
+  // on day 2–3 of the trial, to customers who have never paid; the code then
+  // works for them for 24 working hours (api/lib/offer-grants.ts).
+  let offers = 0;
+  const offerOn = (await getSetting(db, "trial_offer_enabled")) === "1";
+  const early = offerOn ? await ensureEarlyCoupon(db) : null;
+  // Only while checkout will actually accept the code (active, in date, uses left).
+  const state = early ? await earlyCouponState(db, early.id, new Date(now)) : null;
+  const offerLive = !!early && !!state?.usable;
+  const offerHours = Math.max(1, Number(await getSetting(db, "trial_offer_hours")) || 24);
+  const holidays = String((await getSetting(db, "offer_holidays")) || "").split(/[\s,]+/).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+  const offerPct = state?.usable ? state.percent : EARLY_PERCENT;
+  const offerUntil = state?.usable ? state.validUntil : null;
+  const prices: OfferPriceRow[] = [];
+  if (early && offerLive) {
+    await releaseStaleClaims(db, early.id);
+    const pkgs = await db.select().from(subscriptionPackages).where(inArray(subscriptionPackages.id, [5, 6]));
+    for (const pk of pkgs.sort((a, b) => a.id - b.id)) {
+      // Same rounding as checkout (exactPercentDiscount), so the email's price is the price they pay.
+      for (const [label, v] of [["1 year", pk.yearlyPrice], ["3 years", pk.threeYearPrice], ["monthly", pk.monthlyPrice]] as const) {
+        const usual = Math.round(Number(v));
+        if (usual > 0) prices.push({ plan: pk.name, cycle: label, usual, withCode: Math.round(usual * (1 - offerPct / 100)) });
+      }
+    }
+  }
+  /** Send the offer if this trial customer qualifies. "skip" = not eligible (or
+      already offered); "sent" / "failed" = they were this run's email. */
+  const tryOffer = async (userId: number, cardUrl: string): Promise<"skip" | "sent" | "failed"> => {
+    if (!early || !offerLive) return "skip";
+    const u = await db.query.users.findFirst({ where: eq(users.id, userId), columns: { email: true, fullName: true, role: true, status: true, resellerId: true } });
+    // Customers only; a partner's client is the partner's to discount.
+    if (!u?.email || u.role !== "customer" || u.status !== "active" || u.resellerId) return "skip";
+    if (/@(clients|deleted)\.digitalcarda\.in$/i.test(u.email)) return "skip";
+    // Never paid, and not on a plan an admin set (a comp or a manual paid plan).
+    const [sub] = await db.select({ id: subscriptions.id }).from(subscriptions)
+      .where(and(eq(subscriptions.userId, userId), or(gt(subscriptions.amount, "0"), inArray(subscriptions.packageId, [5, 6])))).limit(1);
+    if (sub) return "skip";
+    // Pending counts too: a UPI/bank payment waiting for the team to verify it.
+    const [paid] = await db.select({ id: paymentOrders.id }).from(paymentOrders)
+      .where(and(eq(paymentOrders.userId, userId), inArray(paymentOrders.status, ["pending", "verified"]))).limit(1);
+    if (paid) return "skip";
+    const [leaving] = await db.select({ id: accountDeletionRequests.id }).from(accountDeletionRequests)
+      .where(and(eq(accountDeletionRequests.userId, userId), eq(accountDeletionRequests.status, "pending"))).limit(1);
+    if (leaving) return "skip";
+    if (!(await allows(userId, "plan"))) return "skip";
+    const sentAt = new Date();
+    const endsAt = addWorkingHours(sentAt, offerHours, holidays);
+    // The coupon itself must outlast their deadline, or the promise can't be kept.
+    if (offerUntil && endsAt > offerUntil) return "skip";
+    // One grant per customer, ever (unique on coupon + user).
+    if (!(await claimGrant(db, early.id, userId))) return "skip";
+    const res = await sendEmail(u.email, trialOfferEmail({ name: u.fullName, cardUrl, code: EARLY_COUPON_CODE, percent: offerPct, endsAt, prices }));
+    if (!res.ok) { await releaseGrant(db, early.id, userId); return "failed"; } // tomorrow's run retries (day 3)
+    await startGrant(db, early.id, userId, sentAt, endsAt);
+    await db.insert(notifications).values({
+      userId, type: "ls_offer", title: `${offerPct}% off — code ${EARLY_COUPON_CODE}`,
+      message: `Choose a paid plan before ${endsAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true })} IST.`,
+      link: `/dashboard/subscription?coupon=${EARLY_COUPON_CODE}`,
+    });
+    offers++;
+    return "sent";
+  };
 
   let sent = 0;
   for (const t of trials) {
@@ -120,11 +191,17 @@ export async function runLifecycle(): Promise<{ enabled: boolean; scanned: numbe
         await emailUser("ls_ending", "Trial ending soon", `Only ${Math.max(daysLeft, 1)} day(s) left — keep your card live.`, trialEndingEmail({ name: u?.fullName, daysLeft: Math.max(daysLeft, 1) }));
         continue;
       }
+      const slug = slugOf.get(t.userId);
+      const cardUrl = slug ? `${SITE}/${slug}` : `${SITE}/dashboard`;
+      // Day 2–3: the upgrade offer, once. It takes this run's email slot; a
+      // failed send also waits for tomorrow rather than sending something else.
+      if (elapsed >= 2 && elapsed <= 3) {
+        const r = await tryOffer(t.userId, cardUrl);
+        if (r !== "skip") continue;
+      }
       // Otherwise the current milestone (largest reached).
       const m = [...MILESTONES].reverse().find((x) => elapsed >= x.day);
       if (!m) continue;
-      const slug = slugOf.get(t.userId);
-      const cardUrl = slug ? `${SITE}/${slug}` : `${SITE}/dashboard`;
       const u = await db.query.users.findFirst({ where: eq(users.id, t.userId), columns: { email: true, fullName: true } });
       const name = u?.fullName;
       const metrics = m.needsMetrics && slug ? await metricsFor(db, slug) : { views: 0, saves: 0, whatsapp: 0, calls: 0, leads: 0 };
@@ -168,5 +245,5 @@ export async function runLifecycle(): Promise<{ enabled: boolean; scanned: numbe
     console.error("[lifecycle] abandoned sweep error:", (e as Error).message);
   }
 
-  return { enabled: true, scanned: trials.length, sent, abandoned };
+  return { enabled: true, scanned: trials.length, sent, abandoned, offers };
 }

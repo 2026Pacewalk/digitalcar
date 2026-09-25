@@ -762,6 +762,15 @@ if (process.env.NODE_ENV === "production") {
         PRIMARY KEY (id)
       )
     `));
+    // Coupons offered to one customer until a deadline (EARLY20, day-2 trial email).
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS coupon_grants (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        coupon_id BIGINT UNSIGNED NOT NULL, user_id BIGINT UNSIGNED NOT NULL,
+        source VARCHAR(40) NOT NULL, sent_at TIMESTAMP NULL, expires_at TIMESTAMP NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE INDEX uq_cg_coupon_user (coupon_id, user_id), INDEX cg_user_idx (user_id))
+    `));
     console.log("[schema] coupons, coupon_redemptions, announcements ensured");
     // The FREE30D free-trial voucher, created once. An admin can then edit or
     // switch it off in Admin → Coupons; this never overwrites their settings.
