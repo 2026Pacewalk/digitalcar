@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth, useSessionRole } from "@/hooks/useAuth";
 import { useSidebar } from "./SidebarContext";
-import { Menu, Search, Settings, LogOut, User, Lock, Activity, ChevronDown, Wallet } from "lucide-react";
+import { Menu, Search, Settings, LogOut, User, Lock, Activity, ChevronDown, Wallet, FileText } from "lucide-react";
 import { useNavigate } from "react-router";
 import NotificationBell from "@/components/NotificationBell";
 import CardSwitcher from "@/components/customer/CardSwitcher";
@@ -29,6 +29,7 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
     { icon: User, label: "My Profile", action: () => go("/reseller/profile") },
     { icon: Lock, label: "Change Password", action: () => go("/reseller/profile#password") },
     { icon: Wallet, label: "Earnings & Payouts", action: () => go("/reseller/earnings") },
+    { icon: FileText, label: "Account statement", action: () => go("/reseller/statement") },
   ] : role === "super_admin" || role === "staff" ? [
     { icon: User, label: "My Profile", action: () => go("/admin/profile") },
     ...(role === "super_admin" ? [{ icon: Settings, label: "Settings", action: () => go("/admin/settings") }] : []),
@@ -40,7 +41,7 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
   ];
 
   return (
-    <header className={`sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-[#F1F5F9] ${theme.badge ? "border-t-2 " + theme.topAccent : ""}`}>
+    <header className={`sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-[#F1F5F9] print:hidden ${theme.badge ? "border-t-2 " + theme.topAccent : ""}`}>
       <div className="h-14 flex items-center px-3 lg:px-5">
         {/* Menu Button */}
         <button

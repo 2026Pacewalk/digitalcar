@@ -171,6 +171,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/reseller/payments": "Payment Orders",
   "/reseller/profile": "My Profile",
   "/reseller/earnings": "Earnings & Payouts",
+  "/reseller/statement": "Account statement",
 };
 
 /* Icon tints per menu section, so a long list scans like a phone's settings. */
@@ -343,11 +344,11 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
   return (
     <MobileLayoutContext.Provider value={{ openDrawer: () => setMoreOpen(true), closeDrawer: () => setMoreOpen(false), isDrawerOpen: moreOpen }}>
       <MobileChromeContext.Provider value={{ setTitle: setPageTitle, setAction: setHeaderAction }}>
-        <div className="min-h-screen bg-[#F4F6F9] pb-[calc(env(safe-area-inset-bottom,0px)+84px)]">
+        <div className="min-h-screen bg-[#F4F6F9] pb-[calc(env(safe-area-inset-bottom,0px)+84px)] print:bg-white print:pb-0">
 
-          {/* ─── App bar ─── */}
+          {/* ─── App bar ─── (bars are print:hidden: a printed statement is just the page) */}
           <header
-            className={`sticky top-0 z-40 bg-white/90 pt-safe backdrop-blur-xl transition-shadow duration-200 ${theme.badge ? `border-t-2 ${theme.topAccent}` : ""} ${
+            className={`sticky top-0 z-40 bg-white/90 pt-safe backdrop-blur-xl transition-shadow duration-200 print:hidden ${theme.badge ? `border-t-2 ${theme.topAccent}` : ""} ${
               scrolled ? "shadow-[0_1px_0_0_#E2E8F0,0_6px_18px_-12px_rgba(15,23,42,0.25)]" : "shadow-[0_1px_0_0_#EEF1F5]"}`}
           >
             <div className="flex h-14 items-center gap-1 pl-1.5 pr-2">
@@ -379,7 +380,7 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
 
           {/* ─── Pull-to-refresh indicator ─── */}
           {(pull > 0 || refreshing) && (
-            <div className="pointer-events-none fixed inset-x-0 z-30 flex justify-center"
+            <div className="pointer-events-none fixed inset-x-0 z-30 flex justify-center print:hidden"
               style={{ top: `calc(env(safe-area-inset-top, 0px) + 56px + ${pull - 44}px)` }}>
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_6px_18px_-6px_rgba(15,23,42,0.35)] ring-1 ring-[#EEF1F5]">
                 <RefreshCw size={18}
@@ -390,14 +391,14 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
           )}
 
           {/* ─── Screen ─── */}
-          <main className="dc-screen-in mx-auto w-full max-w-lg">{children}</main>
+          <main className="dc-screen-in mx-auto w-full max-w-lg print:max-w-none">{children}</main>
 
           {/* The installed app opens the customer dashboard, so only card owners are offered it. */}
           {role === "customer" && <InstallAppBanner hidden={typing || moreOpen} />}
 
           {/* ─── Bottom tab bar ─── */}
           <nav aria-label="Main"
-            className={`dc-bar fixed inset-x-0 bottom-0 z-50 border-t border-[#E9EDF2] bg-white/95 backdrop-blur-xl ${typing ? "dc-bar-hidden" : ""}`}>
+            className={`dc-bar fixed inset-x-0 bottom-0 z-50 border-t border-[#E9EDF2] bg-white/95 backdrop-blur-xl print:hidden ${typing ? "dc-bar-hidden" : ""}`}>
             <div className="mx-auto flex h-[62px] max-w-lg items-stretch px-1">
               {cfg.tabs.map((t, i) => (
                 <TabButton key={t.path} icon={t.icon} label={t.label} active={activeTab === i}

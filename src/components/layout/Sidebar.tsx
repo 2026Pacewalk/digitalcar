@@ -10,7 +10,7 @@ import {
   ChevronRight, Store, X, ReceiptText,
   Info, ShoppingBag, Wallet, Image as ImageIcon, Share2, Upload, Eye, Mail,
   Star, Layers, Gift, Wand2, QrCode, CreditCard, ShoppingCart, Link2, Globe, MailCheck, MailSearch, PenLine,
-  MessageCircle, Nfc, TicketPercent, Megaphone, Wrench, Instagram, UserX, UserCog, History, PlayCircle,
+  MessageCircle, Nfc, TicketPercent, Megaphone, Wrench, Instagram, UserX, UserCog, History, PlayCircle, FileText,
 } from "lucide-react";
 import { TutorialModal } from "@/components/TutorialPlayer";
 
@@ -111,6 +111,7 @@ export const resellerGroups: NavGroup[] = [
   ] },
   { title: "Money", items: [
     { label: "Earnings & Payouts", icon: Wallet, path: "/reseller/earnings" },
+    { label: "Account statement", icon: FileText, path: "/reseller/statement" },
   ] },
   { title: "Account", items: [
     { label: "My Profile", icon: UserCircle, path: "/reseller/profile" },
@@ -180,11 +181,12 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileToggl
   return (
     <>
       {mobileOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden" onClick={onMobileToggle} />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden print:hidden" onClick={onMobileToggle} />
       )}
 
+      {/* print:hidden — a printed statement is the page, not the app around it. */}
       <aside
-        className={`fixed top-0 left-0 h-screen bg-[#0F172A] z-50 transition-all duration-300 flex flex-col
+        className={`fixed top-0 left-0 h-screen bg-[#0F172A] z-50 transition-all duration-300 flex flex-col print:hidden
           ${mobileOpen ? "translate-x-0 w-[260px]" : "-translate-x-full w-[260px]"}
           lg:translate-x-0 ${collapsed ? "lg:w-[72px]" : "lg:w-[260px]"}
         `}

@@ -85,6 +85,7 @@ const ResellerCustomers = lazy(() => import("./pages/reseller/Customers"));
 const ResellerPaymentOrders = lazy(() => import("./pages/reseller/PaymentOrders"));
 const ResellerProfile = lazy(() => import("./pages/reseller/Profile"));
 const ResellerEarnings = lazy(() => import("./pages/reseller/Earnings"));
+const ResellerStatement = lazy(() => import("./pages/reseller/Statement"));
 const CustomerDashboard = lazy(() => import("./pages/customer/Dashboard"));
 const CardTemplateEditor = lazy(() => import("./pages/customer/CardTemplateEditor"));
 const CustomerTemplates = lazy(() => import("./pages/customer/Templates"));
@@ -423,6 +424,7 @@ export default function App() {
         <Route path="/reseller/payments" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerPaymentOrders /></RoleRoute>} />
         <Route path="/reseller/profile" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerProfile /></RoleRoute>} />
         <Route path="/reseller/earnings" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerEarnings /></RoleRoute>} />
+        <Route path="/reseller/statement" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerStatement /></RoleRoute>} />
         <Route path="/reseller/notifications" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><NotificationsPage key="reseller" /></RoleRoute>} />
 
         {/* Customer */}

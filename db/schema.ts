@@ -158,14 +158,18 @@ export const cardAddons = mysqlTable("card_addons", {
 export type CardAddon = typeof cardAddons.$inferSelect;
 
 // One row per Razorpay order whose purchase has been fulfilled, for purchases
-// with no order table of their own (card add-ons). The in-browser verify and
-// the Razorpay webhook both claim the order here first, so one payment grants
-// once however many times either arrives. Created at boot by api/boot.ts if missing.
+// with no order table of their own (card add-ons, the custom-domain add-on).
+// The in-browser verify and the Razorpay webhook both claim the order here
+// first, so one payment grants once however many times either arrives. It is
+// also the revenue record for those sales (the admin dashboard).
+// Created at boot by api/boot.ts if missing.
 export const razorpayFulfilments = mysqlTable("razorpay_fulfilments", {
   razorpayOrderId: varchar("razorpay_order_id", { length: 64 }).primaryKey(),
-  kind: varchar("kind", { length: 32 }).notNull(),
+  kind: varchar("kind", { length: 32 }).notNull(),   // card_addon | domain_addon
   userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 64 }).notNull(),
+  // Rupees paid. NULL on rows from before it was recorded.
+  amount: decimal("amount", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("rzp_fulfil_user_idx").on(table.userId),

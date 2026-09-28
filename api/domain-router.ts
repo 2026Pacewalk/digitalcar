@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { customDomains, publishedCards, users, appSettings, subscriptions } from "@db/schema";
+import { customDomains, publishedCards, users, appSettings, subscriptions, razorpayFulfilments } from "@db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { promises as dns } from "node:dns";
@@ -61,7 +61,7 @@ async function grantAddon(db: ReturnType<typeof getDb>, userId: number): Promise
     for some cheaper purchase doesn't unlock it. Throws a TRPCError otherwise. */
 export async function fulfilDomainAddonPayment(
   db: ReturnType<typeof getDb>,
-  { userId, gatewayOrder, paymentId }: { userId: number; razorpayOrderId: string; paymentId: string; gatewayOrder: RazorpayOrderFull },
+  { userId, razorpayOrderId, gatewayOrder, paymentId }: { userId: number; razorpayOrderId: string; paymentId: string; gatewayOrder: RazorpayOrderFull },
 ): Promise<{ granted: boolean }> {
   const notes = gatewayOrder.notes || {};
   if (String(notes.userId || "") !== String(userId)) {
@@ -72,6 +72,15 @@ export async function fulfilDomainAddonPayment(
   }
   if (Number(gatewayOrder.amount) !== DOMAIN_ADDON_PRICE * 100) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "The paid amount doesn't match the add-on price. Contact support with your payment ID." });
+  }
+  // Date the sale for the admin dashboard's revenue: once per Razorpay order,
+  // however many times the verify and the webhook arrive. A problem here is
+  // only logged — it must never stop the customer getting what they paid for.
+  try {
+    await db.insert(razorpayFulfilments).ignore()
+      .values({ razorpayOrderId, kind: "domain_addon", userId, razorpayPaymentId: paymentId, amount: DOMAIN_ADDON_PRICE.toFixed(2) });
+  } catch (e) {
+    console.error("[domain-addon] sale not recorded:", razorpayOrderId, (e as Error).message);
   }
   const granted = await grantAddon(db, userId);
   if (granted) {

@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { analyticsEvents, cards, users, subscriptions, invoices, leads, funnelEvents, products } from "@db/schema";
+import { analyticsEvents, cards, users, subscriptions, subscriptionPackages, paymentOrders, leads, funnelEvents, products } from "@db/schema";
 import { eq, and, sql, gte, desc, inArray, isNotNull } from "drizzle-orm";
 import { mergedCustomerCount } from "./admin-router";
+import { buildAdminDashboard, revenueSection, viewerAccess, PASSIVE_TYPES } from "./lib/admin-dashboard";
 
 /* ── Deep card insights ────────────────────────────────────────────────────
    Everything the customer Analytics page needs, in ONE round trip, computed
@@ -12,11 +13,10 @@ import { mergedCustomerCount } from "./admin-router";
    Why not reuse publish.myStats: that loads EVERY event row for a slug into
    node and reduces in JavaScript. Fine at a few hundred rows, ruinous at a few
    hundred thousand — and it can only ever answer "how many", never "of what".
-   These queries group in MySQL and lean on the (slug, type, created_at) index. */
+   These queries group in MySQL and lean on the (slug, type, created_at) index.
 
-// Types that represent a deliberate visitor ACTION (everything except the
-// passive page-level signals) — used for the "actions" and engagement figures.
-const PASSIVE_TYPES = ["view", "section_view", "scroll", "time_on_card", "card_exit"];
+   "Actions" are every event type except the passive page-level signals
+   (PASSIVE_TYPES, shared with the admin dashboard). */
 
 export const analyticsRouter = createRouter({
   /* The signed-in owner's deep report for ONE of their cards.
@@ -358,10 +358,10 @@ export const analyticsRouter = createRouter({
         dateTo: z.date().optional(),
       }).optional()
     )
-    .query(async () => {
+    .query(async ({ ctx }) => {
       const db = getDb();
 
-      const [cardCount, totalViewsResult, dailyViews, deviceBreakdown, clickRes, userCount, leadTotal, planRows, topCardRows] = await Promise.all([
+      const [cardCount, totalViewsResult, dailyViews, deviceBreakdown, clickRes, userCount, leadTotal, planRows, topCardRows, packageRows] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(cards),
         db.select({ count: sql<number>`sum(view_count)` }).from(cards),
         db.select({ date: sql<string>`DATE(created_at)`, count: sql<number>`count(*)` })
@@ -376,6 +376,7 @@ export const analyticsRouter = createRouter({
           .from(subscriptions).where(eq(subscriptions.status, "active")).groupBy(subscriptions.packageId),
         db.select({ id: cards.id, title: cards.title, slug: cards.slug, views: cards.viewCount, leads: cards.leadCount, userId: cards.userId })
           .from(cards).orderBy(desc(cards.viewCount)).limit(8),
+        db.select({ id: subscriptionPackages.id, name: subscriptionPackages.name }).from(subscriptionPackages),
       ]);
 
       const ownerIds = [...new Set(topCardRows.map((c) => c.userId))];
@@ -383,12 +384,18 @@ export const analyticsRouter = createRouter({
         ? await db.query.users.findMany({ where: inArray(users.id, ownerIds), columns: { id: true, fullName: true } })
         : [];
       const ownerMap = new Map(owners.map((u) => [u.id, u.fullName]));
-      const PLAN_NAMES: Record<number, string> = { 1: "Starter", 2: "Professional", 3: "Business", 4: "Agency", 5: "Starter", 6: "Standard", 7: "Trial" };
+      const planNames = new Map(packageRows.map((p) => [Number(p.id), p.name]));
       const planAgg: Record<string, number> = {};
       for (const p of planRows) {
-        const nm = PLAN_NAMES[Number(p.packageId)] || `Plan ${p.packageId}`;
+        const nm = planNames.get(Number(p.packageId)) || `Plan ${p.packageId}`;
         planAgg[nm] = (planAgg[nm] || 0) + Number(p.count);
       }
+      // Revenue only for someone who may see payments (staff without it get 0, as before).
+      const { can } = await viewerAccess(ctx.user);
+      const totalRevenue = can("payments") ? await revenueSection(db).then((r) => r.allTime, (e) => {
+        console.error("[analytics] adminOverview revenue failed:", (e as Error).message);
+        return 0;
+      }) : 0;
 
       return {
         totalCards: Number(cardCount[0]?.count || 0),
@@ -396,7 +403,7 @@ export const analyticsRouter = createRouter({
         totalClicks: Number(clickRes[0]?.count || 0),
         totalUsers: Number(userCount[0]?.count || 0),
         totalLeads: Number(leadTotal[0]?.count || 0),
-        totalRevenue: 0,
+        totalRevenue,
         dailyViews: dailyViews.map((d) => ({ date: d.date, views: Number(d.count) })),
         deviceBreakdown: deviceBreakdown.map((d) => ({ device: d.device || "unknown", count: Number(d.count) })),
         planDistribution: Object.entries(planAgg).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
@@ -437,16 +444,23 @@ export const analyticsRouter = createRouter({
       };
     }),
 
-  // Live platform stats for the admin dashboard (super-admin only).
-  adminStats: adminQuery.query(async () => {
+  // Admin: the whole dashboard in one payload (api/lib/admin-dashboard.ts).
+  // Staff get only the sections their modules allow.
+  adminDashboard: adminQuery.query(({ ctx }) => buildAdminDashboard(getDb(), ctx.user)),
+
+  // Live platform stats for the previous admin dashboard. Revenue is the real
+  // money in (the same figures as adminDashboard), shown only to someone who
+  // may see payments; the month series is the latest 12 India months.
+  adminStats: adminQuery.query(async ({ ctx }) => {
     const db = getDb();
+    const { can } = await viewerAccess(ctx.user);
+    const seesMoney = can("payments");
 
     const [
       roleCounts,
       cardCount,
       subCounts,
-      revenueRow,
-      monthly,
+      money,
       recentUsers,
       recentLeads,
       recentPaid,
@@ -454,14 +468,16 @@ export const analyticsRouter = createRouter({
       db.select({ role: users.role, count: sql<number>`count(*)` }).from(users).groupBy(users.role),
       db.select({ count: sql<number>`count(*)` }).from(cards),
       db.select({ status: subscriptions.status, count: sql<number>`count(*)` }).from(subscriptions).groupBy(subscriptions.status),
-      db.select({ total: sql<string>`coalesce(sum(total_amount), 0)` }).from(invoices).where(eq(invoices.status, "paid")),
-      db.select({
-        ym: sql<string>`DATE_FORMAT(paid_at, '%Y-%m')`,
-        total: sql<string>`coalesce(sum(total_amount), 0)`,
-      }).from(invoices).where(eq(invoices.status, "paid")).groupBy(sql`DATE_FORMAT(paid_at, '%Y-%m')`).orderBy(sql`DATE_FORMAT(paid_at, '%Y-%m')`).limit(12),
+      seesMoney ? revenueSection(db).catch((e) => {
+        console.error("[analytics] adminStats revenue failed:", (e as Error).message);
+        return null;
+      }) : null,
       db.select({ fullName: users.fullName, email: users.email, role: users.role, createdAt: users.createdAt }).from(users).orderBy(desc(users.createdAt)).limit(6),
       db.select({ fullName: leads.fullName, createdAt: leads.createdAt }).from(leads).orderBy(desc(leads.createdAt)).limit(3),
-      db.select({ amount: invoices.totalAmount, paidAt: invoices.paidAt }).from(invoices).where(eq(invoices.status, "paid")).orderBy(desc(invoices.paidAt)).limit(3),
+      seesMoney
+        ? db.select({ amount: paymentOrders.amount, paidAt: paymentOrders.verifiedAt }).from(paymentOrders)
+          .where(eq(paymentOrders.status, "verified")).orderBy(desc(paymentOrders.verifiedAt)).limit(3)
+        : [],
     ]);
 
     const roleMap: Record<string, number> = {};
@@ -488,8 +504,8 @@ export const analyticsRouter = createRouter({
       activeCards: Number(cardCount[0]?.count || 0),
       paidPlans: subMap["active"] || 0,
       trialPlans: subMap["trial"] || 0,
-      revenue: Number(revenueRow[0]?.total || 0),
-      monthlyRevenue: monthly.map((m) => ({ month: m.ym, amount: Number(m.total) })),
+      revenue: money?.allTime ?? 0,
+      monthlyRevenue: (money?.months ?? []).map((m) => ({ month: m.ym, amount: m.total })),
       recentUsers: recentUsers.map((u) => ({ fullName: u.fullName, email: u.email, role: u.role, createdAt: u.createdAt })),
       recentActivity: activity,
     };

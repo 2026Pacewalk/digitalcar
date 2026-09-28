@@ -112,11 +112,12 @@ const TABLES = {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX addon_user_idx (user_id), UNIQUE INDEX uq_addon_user_type (user_id, type))`,
-  /* Razorpay orders already fulfilled (card add-ons) — dedups the in-browser
-     verify against the payment webhook. */
+  /* Razorpay orders already fulfilled (card and domain add-ons) — dedups the
+     in-browser verify against the payment webhook, and dates each sale. */
   razorpay_fulfilments: `CREATE TABLE IF NOT EXISTS razorpay_fulfilments (
     razorpay_order_id VARCHAR(64) NOT NULL PRIMARY KEY, kind VARCHAR(32) NOT NULL,
     user_id BIGINT UNSIGNED NOT NULL, razorpay_payment_id VARCHAR(64) NOT NULL,
+    amount DECIMAL(12,2) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX rzp_fulfil_user_idx (user_id))`,
   /* Staff accounts: the admin modules each one may use. */
@@ -259,6 +260,17 @@ log("✓ users.role accepts 'staff'");
     await conn.query("ALTER TABLE team_notifications ADD COLUMN subject_user_id BIGINT UNSIGNED NULL AFTER entity_id, ADD INDEX tn_subject_idx (subject_user_id)");
     log("✓ team_notifications.subject_user_id added");
   } else { log("• team_notifications.subject_user_id present (skipped)"); }
+}
+
+// What each add-on sale was paid (the admin dashboard's revenue). Nullable:
+// rows from before stay as they are. Guarded — MySQL has no ADD COLUMN IF NOT EXISTS.
+{
+  const [cc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='razorpay_fulfilments' AND column_name='amount'");
+  if (cc[0].n === 0) {
+    await conn.query("ALTER TABLE razorpay_fulfilments ADD COLUMN amount DECIMAL(12,2) NULL AFTER razorpay_payment_id");
+    log("✓ razorpay_fulfilments.amount added");
+  } else { log("• razorpay_fulfilments.amount present (skipped)"); }
 }
 
 // Relax leads.card_id to NULL (snapshot cards have no DB card row). Guarded.
@@ -429,10 +441,12 @@ try {
   log(added ? `✓ card_events: ${added} analytics column(s) added` : "• card_events analytics columns already present (skipped)");
 
   // Range + breakdown queries always filter slug (+type) over a date window.
+  // The admin dashboard reads every card over a date window: created_at first.
   const evIdx = [
     ["cardev_slug_created_idx", "(slug, created_at)"],
     ["cardev_slug_type_created_idx", "(slug, type, created_at)"],
     ["cardev_visitor_idx", "(visitor_id)"],
+    ["cardev_created_type_idx", "(created_at, type)"],
   ];
   let idx = 0;
   for (const [name, cols] of evIdx) {

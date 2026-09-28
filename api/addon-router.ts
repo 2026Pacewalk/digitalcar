@@ -71,10 +71,11 @@ export async function fulfilAddonPayment(
   // Idempotent per Razorpay order: claim it in the ledger and grant in one
   // transaction. A second verify or webhook for the same order finds the row
   // (or waits on the first one's insert) and grants nothing; if the grant
-  // fails, the claim rolls back with it so a retry can still grant.
+  // fails, the claim rolls back with it so a retry can still grant. The row
+  // also records what was paid, for the admin dashboard's revenue.
   return db.transaction(async (tx) => {
     const claim = await tx.insert(razorpayFulfilments).ignore()
-      .values({ razorpayOrderId, kind: "card_addon", userId, razorpayPaymentId: paymentId });
+      .values({ razorpayOrderId, kind: "card_addon", userId, razorpayPaymentId: paymentId, amount: (Number(gatewayOrder.amount) / 100).toFixed(2) });
     const affected = (claim as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
       ?? (claim as unknown as { affectedRows?: number })?.affectedRows ?? 0;
     if (affected === 0) return { granted: false };

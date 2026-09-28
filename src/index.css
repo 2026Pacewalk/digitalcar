@@ -764,3 +764,16 @@ details[open] > summary .dc-faq-q--light,
 }
 .dc-faq-a--light { color: #94A3B8; border-left-color: rgba(247, 179, 28, 0.35); }
 @media (prefers-reduced-motion: reduce) { .dc-faq-q { transition: none; } }
+
+/* ── Print: account statements ───────────────────────────────────────────
+   Admin → Resellers → a reseller, and the reseller's own /reseller/statement,
+   print (or save as PDF) as a plain statement. The app chrome — sidebar, top
+   bars, tab bar, buttons — carries Tailwind's print:hidden; this keeps the
+   status pills and balance colours on paper and stops a row splitting across
+   pages. Scoped to .dc-print-statement so no other page prints differently. */
+@media print {
+  .dc-print-statement { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .dc-print-statement tr,
+  .dc-print-statement li { break-inside: avoid; }
+  .dc-print-statement thead { display: table-header-group; }
+}

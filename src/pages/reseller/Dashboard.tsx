@@ -3,7 +3,8 @@ import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router";
-import { Users, BadgeCheck, TrendingUp, Wallet, UserPlus, ReceiptText, UserCircle, ArrowRight } from "lucide-react";
+import { Users, BadgeCheck, TrendingUp, Wallet, UserPlus, ReceiptText, UserCircle, ArrowRight, FileText, RefreshCw } from "lucide-react";
+import { balanceText } from "@contracts/reseller-ledger";
 
 const inr = (n: unknown) => {
   // Whole rupees stay clean (₹999); anything with paise shows both digits (₹199.80, not ₹199.8).
@@ -20,6 +21,12 @@ export default function ResellerDashboard() {
   const navigate = useNavigate();
   const { data: rstats } = trpc.user.resellerStats.useQuery();
   const { data: custData } = trpc.user.resellerCustomers.useQuery({ page: 1, limit: 5 });
+  // Their account with DigitalCarda (cards ordered offline, payments made). Shown
+  // only once there's something on it; the rest of the page never waits for it.
+  const statement = trpc.reseller.statement.useQuery();
+  const account = statement.data?.linked ? statement.data : null;
+  const showAccount = !!account && (account.orders.length > 0 || account.payments.length > 0 || account.account.openingBalance !== 0);
+  const lastPayment = account?.payments[0] ?? null; // newest first
 
   const rate = Number(rstats?.commissionRate ?? 0);
   const stats = [
@@ -43,6 +50,33 @@ export default function ResellerDashboard() {
             </div>
           ))}
         </div>
+
+        {showAccount && account && (
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-premium border border-[#F1F5F9] flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="w-10 h-10 rounded-xl bg-[#D1FAE5] text-[#047857] flex items-center justify-center shrink-0"><FileText size={18} /></span>
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-[#0F172A]">Account with DigitalCarda</h2>
+                <p className="text-xs text-[#64748B]">{lastPayment ? `Last payment ${inr(lastPayment.amount)} on ${fmtDate(lastPayment.paidOn)}` : "No payments recorded yet"}</p>
+              </div>
+            </div>
+            <div className="flex flex-1 sm:flex-none items-center justify-between sm:justify-end gap-6">
+              <div className="sm:text-right">
+                <p className="text-[11px] text-[#64748B]">Balance due</p>
+                <p className={`text-xl font-bold leading-tight tabular-nums ${account.totals.balance > 0 ? "text-[#B45309]" : "text-[#047857]"}`}>{balanceText(account.totals.balance)}</p>
+              </div>
+              <button onClick={() => navigate("/reseller/statement")} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#047857] hover:text-[#065F46] whitespace-nowrap">
+                View statement <ArrowRight size={15} />
+              </button>
+            </div>
+          </div>
+        )}
+        {statement.isError && (
+          <div className="bg-white rounded-2xl px-4 py-3 shadow-premium border border-[#F1F5F9] flex items-center justify-between gap-3 text-xs text-[#64748B]">
+            <span>Your account balance with DigitalCarda didn't load.</span>
+            <button onClick={() => statement.refetch()} className="inline-flex items-center gap-1 font-semibold text-[#047857] hover:text-[#065F46]"><RefreshCw size={13} /> Try again</button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* How they earn — one rate, the real one */}
@@ -73,6 +107,7 @@ export default function ResellerDashboard() {
               {[
                 { label: "Add a customer", icon: UserPlus, action: () => navigate("/reseller/customers?add=1") },
                 { label: "Earnings & payouts", icon: ReceiptText, action: () => navigate("/reseller/earnings") },
+                { label: "Account statement", icon: FileText, action: () => navigate("/reseller/statement") },
                 { label: "My profile", icon: UserCircle, action: () => navigate("/reseller/profile") },
               ].map((a) => (
                 <button key={a.label} onClick={a.action} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#F8FAFC] transition-colors text-left">

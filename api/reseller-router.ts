@@ -17,6 +17,7 @@ import { sendEmail, ownerAddress } from "./lib/mail";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { affectedRows } from "./lib/wallet";
 import { notifyUser, notifyTeam, resolveTeam } from "./lib/notify";
+import { resellerStatementFor } from "./lib/reseller-ledger";
 import {
   resellerApplicationAdminEmail, resellerApplicationReceivedEmail,
   resellerApprovedEmail, resellerApprovedExistingEmail, resellerRejectedEmail, resellerLoginDetailsEmail,
@@ -678,6 +679,17 @@ export const resellerRouter = createRouter({
       commissions: commissions.map((c) => ({ ...c, orderAmount: num(c.orderAmount), rate: num(c.rate), amount: num(c.amount), customerName: c.customerName ?? "A customer" })),
       payouts: payouts.map((p) => ({ ...p, amount: num(p.amount) })),
     };
+  }),
+
+  // ── Reseller: their account with DigitalCarda — the card orders the team
+  // records for them and the payments they've made, as a statement. Read-only,
+  // and only the ledger account linked to this login (never the admin's notes).
+  // The super admin opens partner pages too, but has no ledger of their own:
+  // they get the "not set up yet" state rather than an error.
+  statement: resellerQuery.query(async ({ ctx }) => {
+    if (ctx.user.role === "super_admin") return { linked: false as const };
+    if (ctx.user.role !== "reseller") throw new TRPCError({ code: "FORBIDDEN" });
+    return resellerStatementFor(getDb(), ctx.user.id);
   }),
 
   // ─── Reseller creates a customer under their account ───

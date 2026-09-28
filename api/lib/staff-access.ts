@@ -42,6 +42,8 @@ const BY_ROUTER: Record<string, Grant> = {
 const BY_PROCEDURE: Record<string, Grant> = {
   "analytics.adminOverview": "overview",
   "analytics.adminStats": "overview",
+  // Each section inside is further limited to the staff member's modules.
+  "analytics.adminDashboard": "overview",
   "analytics.funnel": "overview",
   "analytics.productFunnel": "overview",
   "user.overview": "overview",

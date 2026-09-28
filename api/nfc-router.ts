@@ -73,6 +73,8 @@ const orderInput = z.preprocess(
 );
 
 const STATUSES = ["pending_payment", "paid", "in_production", "shipped", "delivered", "cancelled"] as const;
+// The statuses of an order that has been paid for.
+const PAID_STATUSES: readonly (typeof STATUSES)[number][] = ["paid", "in_production", "shipped", "delivered"];
 
 /** The link the NFC chip and printed QR open: the account's primary published card. */
 async function cardUrlFor(db: ReturnType<typeof getDb>, userId: number): Promise<string | null> {
@@ -539,12 +541,19 @@ export const nfcRouter = createRouter({
         ...(input.tracking !== undefined ? { tracking: input.tracking || null } : {}),
         ...(input.adminNote !== undefined ? { adminNote: input.adminNote || null } : {}),
       };
+      // An order paid by hand (UPI or cash to the team) gets its payment date
+      // when it moves from unpaid to paid, so it lands in that day's revenue.
+      // Nothing else stamps it: an edit, or a move between paid statuses, of an
+      // order marked paid before this date existed leaves it NULL, and the
+      // dashboard keeps dating that order by when it was placed.
+      const nowPaid = input.status !== prev.status && !prev.paidAt
+        && PAID_STATUSES.includes(input.status) && !PAID_STATUSES.includes(prev.status);
       // A status change is written only while the row still has the status we
       // read, so of two overlapping saves (a double click) exactly one "moves"
       // it and emails. Anything else is saved as before, unconditionally.
       let moved = false;
       if (input.status !== prev.status) {
-        const res = await db.update(nfcOrders).set(changes)
+        const res = await db.update(nfcOrders).set({ ...changes, ...(nowPaid ? { paidAt: new Date() } : {}) })
           .where(and(eq(nfcOrders.id, input.id), eq(nfcOrders.status, prev.status)));
         moved = ((res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
           ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? 0) > 0;

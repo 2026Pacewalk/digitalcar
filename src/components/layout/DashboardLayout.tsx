@@ -24,7 +24,7 @@ export default function DashboardLayout({ children, title, subtitle }: Dashboard
           mobileOpen={mobileOpen}
           onMobileToggle={toggleMenu}
         />
-        <main className={`transition-all duration-300 min-h-screen ${collapsed ? "lg:ml-[72px]" : "lg:ml-[260px]"}`}>
+        <main className={`transition-all duration-300 min-h-screen print:ml-0 ${collapsed ? "lg:ml-[72px]" : "lg:ml-[260px]"}`}>
           {title && <TopBar title={title} subtitle={subtitle} />}
           {children}
         </main>

@@ -7,6 +7,9 @@ import {
   resellerAccounts, resellerOrders, resellerPayments, resellerProfiles, users,
   resellerCommissions, resellerApplications,
 } from "@db/schema";
+import { ORDER_STATUSES, PAYMENT_METHODS, methodLabel, paise, rupees } from "@contracts/reseller-ledger";
+import { accountTotals } from "./lib/reseller-ledger";
+import { notifyUser } from "./lib/notify";
 
 /* Reseller accounts — the super-admin's book of card orders that resellers
    place offline (phone, WhatsApp, in person) and pay for by cash, UPI, bank
@@ -25,26 +28,27 @@ type Db = ReturnType<typeof getDb>;
 const money = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 const num = (v: unknown) => Number(v ?? 0) || 0;
 
-async function accountTotals(db: Db, accountIds: number[]) {
-  const orders = accountIds.length
-    ? await db.select().from(resellerOrders).where(inArray(resellerOrders.accountId, accountIds))
-    : [];
-  const payments = accountIds.length
-    ? await db.select().from(resellerPayments).where(inArray(resellerPayments.accountId, accountIds))
-    : [];
-  const out = new Map<number, { orders: number; cards: number; gross: number; commission: number; due: number; received: number; lastPayment: Date | null }>();
-  for (const id of accountIds) out.set(id, { orders: 0, cards: 0, gross: 0, commission: 0, due: 0, received: 0, lastPayment: null });
-  for (const o of orders) {
-    if (o.status === "cancelled") continue;
-    const t = out.get(o.accountId)!;
-    t.orders++; t.cards += o.quantity; t.gross += num(o.grossAmount); t.commission += num(o.commissionAmount); t.due += num(o.netAmount);
+/* A reseller with a login sees this book as their account statement
+   (/reseller/statement), so they're told when the team adds to it. */
+const STATEMENT_LINK = "/reseller/statement";
+
+/** "Payment received", with where their account stands now. It runs after the
+    payment is saved and never throws: a notice must not make the admin think
+    the payment failed and record it twice. */
+async function notifyPayment(db: Db, account: { id: number; resellerUserId: number; openingBalance: string }, amount: number, method: string) {
+  try {
+    const t = (await accountTotals(db, [account.id])).get(account.id)!;
+    const balance = paise(num(account.openingBalance) + t.due - t.received);
+    const standing = balance > 0 ? `Balance now ${rupees(balance)}.`
+      : balance < 0 ? `You're ${rupees(-balance)} in credit.`
+      : "Your account is fully settled.";
+    await notifyUser({
+      userId: account.resellerUserId, type: "reseller_statement_payment", title: "Payment received — thank you",
+      message: `${rupees(amount)} by ${methodLabel(method)}. ${standing}`, link: STATEMENT_LINK, push: "always",
+    }, db);
+  } catch (e) {
+    console.error(`[reseller-ledger] payment notice for account ${account.id} not sent:`, (e as Error).message);
   }
-  for (const p of payments) {
-    const t = out.get(p.accountId)!;
-    t.received += num(p.amount);
-    if (!t.lastPayment || p.paidOn > t.lastPayment) t.lastPayment = p.paidOn;
-  }
-  return out;
 }
 
 const accountInput = z.object({
@@ -71,7 +75,7 @@ const orderInput = z.object({
   // Per-order override; empty uses the account's current rate.
   commissionRate: z.number().min(0).max(100).nullable().optional(),
   customerNames: z.string().trim().max(1000).optional(),
-  status: z.enum(["pending", "in_progress", "delivered", "cancelled"]).default("pending"),
+  status: z.enum(ORDER_STATUSES).default("pending"),
   notes: z.string().trim().max(500).optional(),
 });
 
@@ -79,7 +83,7 @@ const paymentInput = z.object({
   accountId: z.number().int().positive(),
   orderId: z.number().int().positive().nullable().optional(),
   amount: z.number().positive().max(10_000_000),
-  method: z.enum(["cash", "upi", "bank", "cheque", "other"]),
+  method: z.enum(PAYMENT_METHODS),
   reference: z.string().trim().max(120).optional(),
   paidOn: z.coerce.date(),
   note: z.string().trim().max(500).optional(),
@@ -132,7 +136,7 @@ export const resellerLedgerRouter = createRouter({
           ...a,
           commissionRate: num(a.commissionRate),
           openingBalance: num(a.openingBalance),
-          totals: { ...t, outstanding: num(a.openingBalance) + t.due - t.received },
+          totals: { ...t, outstanding: paise(num(a.openingBalance) + t.due - t.received) },
           login: a.resellerUserId ? online(a.resellerUserId) : null,
         };
       }),
@@ -156,7 +160,8 @@ export const resellerLedgerRouter = createRouter({
       account: { ...account, commissionRate: num(account.commissionRate), openingBalance: num(account.openingBalance) },
       orders: orders.map((o) => ({ ...o, unitPrice: num(o.unitPrice), grossAmount: num(o.grossAmount), commissionRate: num(o.commissionRate), commissionAmount: num(o.commissionAmount), netAmount: num(o.netAmount) })),
       payments: payments.map((p) => ({ ...p, amount: num(p.amount) })),
-      totals: { ...totals, outstanding: num(account.openingBalance) + totals.due - totals.received },
+      // Rounded to paise: a settled account must be exactly 0, not 4.5e-13.
+      totals: { ...totals, outstanding: paise(num(account.openingBalance) + totals.due - totals.received) },
     };
   }),
 
@@ -221,11 +226,19 @@ export const resellerLedgerRouter = createRouter({
       return { ok: true, id: input.id };
     }
     const [res] = await db.insert(resellerOrders).values(values);
+    // Only a new order is news; a cancelled one adds nothing to what they owe.
+    if (account.resellerUserId && input.status !== "cancelled") {
+      void notifyUser({
+        userId: account.resellerUserId, type: "reseller_statement_order", title: "New card order on your account",
+        message: `${input.title} · ${input.quantity} ${input.quantity === 1 ? "card" : "cards"} · ${rupees(num(values.netAmount))} payable`,
+        link: STATEMENT_LINK, push: "always",
+      }, db);
+    }
     return { ok: true, id: Number(res.insertId) };
   }),
 
   setOrderStatus: adminQuery
-    .input(z.object({ id: z.number().int().positive(), status: z.enum(["pending", "in_progress", "delivered", "cancelled"]) }))
+    .input(z.object({ id: z.number().int().positive(), status: z.enum(ORDER_STATUSES) }))
     .mutation(async ({ input }) => {
       await getDb().update(resellerOrders).set({ status: input.status }).where(eq(resellerOrders.id, input.id));
       return { ok: true };
@@ -241,7 +254,8 @@ export const resellerLedgerRouter = createRouter({
 
   addPayment: adminQuery.input(paymentInput).mutation(async ({ input }) => {
     const db = getDb();
-    const [account] = await db.select({ id: resellerAccounts.id }).from(resellerAccounts).where(eq(resellerAccounts.id, input.accountId));
+    const [account] = await db.select({ id: resellerAccounts.id, resellerUserId: resellerAccounts.resellerUserId, openingBalance: resellerAccounts.openingBalance })
+      .from(resellerAccounts).where(eq(resellerAccounts.id, input.accountId));
     if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "Reseller account not found." });
     if (input.orderId) {
       const [order] = await db.select({ id: resellerOrders.id }).from(resellerOrders)
@@ -257,6 +271,9 @@ export const resellerLedgerRouter = createRouter({
       paidOn: input.paidOn,
       note: input.note || null,
     });
+    if (account.resellerUserId) {
+      void notifyPayment(db, { id: account.id, resellerUserId: account.resellerUserId, openingBalance: account.openingBalance }, input.amount, input.method);
+    }
     return { ok: true, id: Number(res.insertId) };
   }),
 

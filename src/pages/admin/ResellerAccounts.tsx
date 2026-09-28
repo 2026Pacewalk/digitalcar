@@ -13,7 +13,10 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import { trpc } from "@/providers/trpc";
 import { useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router";
+import { buildStatement, paise } from "@contracts/reseller-ledger";
+import { downloadCsv } from "@/lib/csv";
 import ResellerApplicationsPanel from "@/components/admin/ResellerApplicationsPanel";
 import { ActionMenu, AdminModal, type ActionItem } from "@/components/admin/RowActions";
 import { readableError } from "@/lib/errors";
@@ -28,7 +31,7 @@ import {
 } from "lucide-react";
 
 const inr = (n: number) => (n < 0 ? "−₹" : "₹") + Math.abs(Math.round(n)).toLocaleString("en-IN");
-const inr2 = (n: number) => "₹" + (Math.round(n * 100) / 100).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const inr2 = (n: number) => { const v = Math.round(n * 100) / 100; return "₹" + v.toLocaleString("en-IN", { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 }); };
 const dayStr = (d: unknown) => (d ? new Date(String(d)).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
 const todayInput = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const toDateInput = (d: unknown) => {
@@ -44,14 +47,6 @@ const ago = (d: unknown) => {
 };
 
 const SIGN_IN_URL = "https://digitalcarda.in/resellers-login";
-/* One CSV cell. Names and businesses come from partners themselves, so a value
-   starting with = + - @ (or a tab/CR) is prefixed with ' — otherwise Excel would
-   run it as a formula (e.g. a HYPERLINK that leaks other partners' details). */
-const csvCell = (v: unknown) => {
-  const t = String(v ?? "");
-  const safe = /^[=+\-@\t\r]/.test(t) && !/^-?\d+(\.\d+)?$/.test(t) ? `'${t}` : t;
-  return `"${safe.replace(/"/g, '""')}"`;
-};
 const WHITE_LABEL_PRICE = "Rs. 50,000 (US$499)"; // keep in step with /resellers and /become-reseller
 const SUPPORT_WHATSAPP = "+91 95177 22444";
 
@@ -186,7 +181,7 @@ export default function AdminResellerAccounts() {
       received += a.totals.received;
       cards += a.totals.cards;
     }
-    return { by, customers, earned, outstanding, received, cards };
+    return { by, customers, earned, outstanding: paise(outstanding), received, cards };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts]);
 
@@ -210,23 +205,18 @@ export default function AdminResellerAccounts() {
 
   const d = detail.data;
   const account = d?.account;
+  // To the paisa, so a paid-up account prints "All settled", never "Balance due ₹0".
+  const balance = d ? paise(d.totals.outstanding) : 0;
   const openRow = accounts.find((a) => a.id === openId) ?? null;
 
-  // Statement: opening balance, then orders (+) and payments (−) oldest first.
+  // Statement: opening balance, then orders (+) and payments (−) oldest first —
+  // the same rows the reseller sees on their own statement, plus your private
+  // payment notes (shown here and in the CSV, never printed).
   const statement = useMemo(() => {
     if (!d) return [];
-    const out: { date: Date; kind: "opening" | "order" | "payment"; label: string; sub: string; debit: number; credit: number; balance: number }[] = [];
-    const events = [
-      ...d.orders.filter((o) => o.status !== "cancelled").map((o) => ({ date: new Date(o.orderDate), kind: "order" as const, label: o.title, sub: `${o.quantity} × ${inr2(o.unitPrice)} = ${inr2(o.grossAmount)} − ${o.commissionRate}% commission ${inr2(o.commissionAmount)}`, debit: o.netAmount, credit: 0 })),
-      ...d.payments.map((p) => ({ date: new Date(p.paidOn), kind: "payment" as const, label: `Payment · ${METHODS.find((m) => m.id === p.method)?.label ?? p.method}`, sub: [p.reference, p.note].filter(Boolean).join(" · "), debit: 0, credit: p.amount })),
-    ].sort((a, b) => a.date.getTime() - b.date.getTime());
-    let balance = d.account.openingBalance;
-    if (balance) out.push({ date: new Date(d.account.createdAt), kind: "opening", label: "Opening balance", sub: "Owed before this record started", debit: balance > 0 ? balance : 0, credit: balance < 0 ? -balance : 0, balance });
-    for (const e of events) {
-      balance += e.debit - e.credit;
-      out.push({ ...e, balance });
-    }
-    return out;
+    const notes = new Map(d.payments.map((p) => [p.id, p.note]));
+    return buildStatement({ openingBalance: d.account.openingBalance, openedAt: d.account.createdAt }, d.orders, d.payments)
+      .map((r) => ({ ...r, note: r.kind === "payment" && r.id !== null ? notes.get(r.id) || "" : "" }));
   }, [d]);
 
   const openAccountForm = (a?: { id: number; name: string; company: string | null; phone: string | null; email: string | null; resellerUserId: number | null; commissionRate: number; openingBalance: number; notes: string | null; active: boolean }) => setAccountForm(a ? {
@@ -399,23 +389,12 @@ export default function AdminResellerAccounts() {
   };
 
   const exportListCsv = () => {
-    const esc = csvCell;
     const head = ["Name", "Business", "Email", "Phone", "Status", "Commission %", "Customers", "Commission earned online (₹)", "In wallet (₹)", "Cards ordered", "Received (₹)", "Outstanding (₹)", "Added", "Last sign-in"];
-    const lines = [head.map(esc).join(",")];
-    for (const a of rows) {
-      lines.push([
-        a.name, a.company, a.login?.email || a.email, a.phone, STATUS[statusOf(a)].label, a.commissionRate,
-        a.login?.customers ?? "", a.login ? a.login.commissionEarned.toFixed(2) : "", a.login ? a.login.walletBalance.toFixed(2) : "",
-        a.totals.cards, a.totals.received.toFixed(2), a.totals.outstanding.toFixed(2), dayStr(a.createdAt), a.login?.lastLoginAt ? dayStr(a.login.lastLoginAt) : "",
-      ].map(esc).join(","));
-    }
-    const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `resellers-${todayInput()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`resellers-${todayInput()}.csv`, [head, ...rows.map((a) => [
+      a.name, a.company, a.login?.email || a.email, a.phone, STATUS[statusOf(a)].label, a.commissionRate,
+      a.login?.customers ?? "", a.login ? a.login.commissionEarned.toFixed(2) : "", a.login ? a.login.walletBalance.toFixed(2) : "",
+      a.totals.cards, a.totals.received.toFixed(2), a.totals.outstanding.toFixed(2), dayStr(a.createdAt), a.login?.lastLoginAt ? dayStr(a.login.lastLoginAt) : "",
+    ])]);
   };
 
   const orderPreview = orderForm && account ? (() => {
@@ -460,16 +439,20 @@ export default function AdminResellerAccounts() {
 
   const exportCsv = () => {
     if (!account) return;
-    const esc = csvCell;
-    const lines = [["Date", "Entry", "Details", "Due (₹)", "Received (₹)", "Balance (₹)"].map(esc).join(",")];
-    for (const r of statement) lines.push([dayStr(r.date), r.label, r.sub, r.debit ? r.debit.toFixed(2) : "", r.credit ? r.credit.toFixed(2) : "", r.balance.toFixed(2)].map(esc).join(","));
-    const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${account.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-statement.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`${account.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-statement.csv`, [
+      ["Date", "Entry", "Details", "Due (₹)", "Received (₹)", "Balance (₹)"],
+      ...statement.map((r) => [
+        dayStr(r.date), r.label, [r.sub, r.note].filter(Boolean).join(" · "),
+        r.debit ? r.debit.toFixed(2) : "", r.credit ? r.credit.toFixed(2) : "", r.balance.toFixed(2),
+      ]),
+    ]);
+  };
+
+  // Print (or Save as PDF) is always the statement, whichever tab is open —
+  // switch to it before the browser takes its snapshot of the page.
+  const printStatement = () => {
+    flushSync(() => setTab("statement"));
+    window.print();
   };
 
   const statCards = [
@@ -480,7 +463,7 @@ export default function AdminResellerAccounts() {
   ];
 
   const accountFormSection = accountForm && (
-    <section className="rounded-2xl border border-[#FDE68A] bg-white p-5 shadow-premium">
+    <section className="rounded-2xl border border-[#FDE68A] bg-white p-5 shadow-premium print:hidden">
       <div className="flex items-center justify-between">
         <h2 className="text-[15px] font-bold text-[#0F172A]">{accountForm.id ? `Edit ${accountForm.name}` : "Add reseller"}</h2>
         <button type="button" onClick={() => setAccountForm(null)} aria-label="Close" className="rounded-lg p-1.5 text-[#64748B] hover:bg-[#F1F5F9]"><X size={18} /></button>
@@ -520,8 +503,8 @@ export default function AdminResellerAccounts() {
 
   return (
     <ResponsiveDashboardLayout>
-      <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 print:max-w-none print:p-0">
+        <div className={`flex flex-wrap items-center justify-between gap-3 ${openId ? "print:hidden" : ""}`}>
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0F172A] text-[#F7B31C]"><BookOpenCheck size={20} /></span>
             <div>
@@ -537,7 +520,7 @@ export default function AdminResellerAccounts() {
           )}
         </div>
 
-        <div role="tablist" aria-label="Resellers" className="flex gap-5 border-b border-[#E2E8F0]">
+        <div role="tablist" aria-label="Resellers" className={`flex gap-5 border-b border-[#E2E8F0] ${openId ? "print:hidden" : ""}`}>
           {([["resellers", `Resellers (${accounts.length})`], ["applications", "Applications"]] as const).map(([k, label]) => (
             <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)}
               className={`-mb-px inline-flex items-center gap-1.5 border-b-2 pb-2.5 text-[13.5px] font-semibold transition-colors ${view === k ? "border-[#F7B31C] text-[#0F172A]" : "border-transparent text-[#64748B] hover:text-[#0F172A]"}`}>
@@ -719,8 +702,8 @@ export default function AdminResellerAccounts() {
           </>
         ) : (
           /* ── One reseller: statement, orders, payments ── */
-          <section className="min-w-0 space-y-4">
-            <button type="button" onClick={closeAccount} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#64748B] hover:text-[#0F172A]">
+          <section className="dc-print-statement min-w-0 space-y-4">
+            <button type="button" onClick={closeAccount} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#64748B] hover:text-[#0F172A] print:hidden">
               <ArrowLeft size={15} /> All resellers
             </button>
 
@@ -732,8 +715,27 @@ export default function AdminResellerAccounts() {
               <div className="flex items-center justify-center gap-2 rounded-2xl border border-[#F1F5F9] bg-white py-16 text-sm text-[#64748B] shadow-premium"><Loader2 size={16} className="animate-spin" /> Loading account…</div>
             ) : (
               <>
-                <div className="rounded-2xl border border-[#F1F5F9] bg-white p-5 shadow-premium">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                {/* On paper (Print / Save as PDF) the statement gets its own
+                    letterhead instead of the admin screen around it. */}
+                {d && (
+                  <div className="hidden print:block">
+                    <div className="flex items-start justify-between gap-4 border-b-2 border-[#0F172A] pb-3">
+                      <div>
+                        <p className="text-[20px] font-extrabold text-[#0F172A]">DigitalCarda</p>
+                        <p className="text-[12px] text-[#475569]">Reseller account statement</p>
+                      </div>
+                      <div className="text-right text-[12px] text-[#475569]">
+                        <p>Statement date <b className="text-[#0F172A]">{dayStr(new Date())}</b></p>
+                        <p>{balance > 0 ? "Balance due" : balance < 0 ? "In credit" : "Balance"} <b className="text-[#0F172A]">{balance ? inr2(Math.abs(balance)) : "All settled"}</b></p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-[15px] font-bold text-[#0F172A]">{account.name}</p>
+                    <p className="text-[12px] text-[#475569]">{[account.company, `Commission ${account.commissionRate}%`].filter(Boolean).join(" · ")}</p>
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-[#F1F5F9] bg-white p-5 shadow-premium print:border-0 print:p-0 print:shadow-none">
+                  <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
                     <div className="flex items-start gap-3">
                       <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${avatarGrad(account.name)}`}><span className="text-[13px] font-bold text-white">{initials(account.name)}</span></span>
                       <div>
@@ -745,7 +747,7 @@ export default function AdminResellerAccounts() {
                     <div className="flex flex-wrap items-center gap-2">
                       <button type="button" onClick={() => openAccountForm(account)} className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[12.5px] font-semibold text-[#475569] ring-1 ring-[#E2E8F0] hover:bg-[#F8FAFC]"><Pencil size={14} /> Edit</button>
                       <button type="button" onClick={exportCsv} className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[12.5px] font-semibold text-[#475569] ring-1 ring-[#E2E8F0] hover:bg-[#F8FAFC]"><Download size={14} /> CSV</button>
-                      <button type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[12.5px] font-semibold text-[#475569] ring-1 ring-[#E2E8F0] hover:bg-[#F8FAFC]"><Printer size={14} /> Print</button>
+                      <button type="button" onClick={printStatement} className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[12.5px] font-semibold text-[#475569] ring-1 ring-[#E2E8F0] hover:bg-[#F8FAFC]"><Printer size={14} /> Print</button>
                       <button type="button" onClick={() => { setPaymentForm(null); setOrderForm({ orderDate: todayInput(), title: "", plan: "", quantity: "1", unitPrice: "", commissionRate: "", customerNames: "", status: "pending", notes: "" }); }}
                         className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#0F172A] px-3 text-[12.5px] font-bold text-white"><Plus size={14} /> Order</button>
                       <button type="button" onClick={() => { setOrderForm(null); setPaymentForm({ amount: d && d.totals.outstanding > 0 ? String(Math.round(d.totals.outstanding)) : "", method: "upi", reference: "", paidOn: todayInput(), orderId: null, note: "" }); }}
@@ -755,7 +757,7 @@ export default function AdminResellerAccounts() {
                   </div>
 
                   {d && (
-                    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5 print:grid-cols-5">
                       {[
                         { l: "Order value", v: inr(d.totals.gross) },
                         { l: "Their commission", v: inr(d.totals.commission) },
@@ -763,7 +765,7 @@ export default function AdminResellerAccounts() {
                         { l: "Received", v: inr(d.totals.received), cls: "text-[#15803D]" },
                         { l: "Outstanding", v: inr(d.totals.outstanding), cls: d.totals.outstanding > 0 ? "text-[#B45309]" : "text-[#15803D]" },
                       ].map((x) => (
-                        <div key={x.l} className="rounded-xl bg-[#F8FAFC] px-3 py-2.5">
+                        <div key={x.l} className="rounded-xl bg-[#F8FAFC] px-3 py-2.5 print:border print:border-[#E2E8F0]">
                           <dt className="text-[11.5px] text-[#64748B]">{x.l}</dt>
                           <dd className={`text-[16px] font-extrabold tabular-nums ${x.cls ?? "text-[#0F172A]"}`}>{x.v}</dd>
                         </div>
@@ -776,7 +778,7 @@ export default function AdminResellerAccounts() {
                     const login = openRow?.login;
                     if (!login) {
                       return (
-                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-4 py-3">
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-4 py-3 print:hidden">
                           <p className="text-[12.5px] text-[#475569]">
                             <b className="text-[#0F172A]">No login yet.</b> {account.name} can't sign in, add customers or see their commission until they have one.
                           </p>
@@ -791,7 +793,7 @@ export default function AdminResellerAccounts() {
                     }
                     const off = login.status !== "active";
                     return (
-                      <div className={`mt-4 rounded-xl px-4 py-3 ${off ? "bg-[#FEF2F2]" : "bg-[#F0FDF4]"}`}>
+                      <div className={`mt-4 rounded-xl px-4 py-3 print:hidden ${off ? "bg-[#FEF2F2]" : "bg-[#F0FDF4]"}`}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] ${off ? "text-[#991B1B]" : "text-[#166534]"}`}>
                             {off ? <Ban size={14} /> : <UserCheck size={14} />} <b>{off ? `Deactivated — ${login.email} can't sign in` : `Signs in as ${login.email}`}</b>
@@ -824,7 +826,7 @@ export default function AdminResellerAccounts() {
                 </div>
 
                 {orderForm && orderPreview && (
-                  <div className="rounded-2xl border border-[#FDE68A] bg-white p-5 shadow-premium">
+                  <div className="rounded-2xl border border-[#FDE68A] bg-white p-5 shadow-premium print:hidden">
                     <div className="flex items-center justify-between">
                       <h3 className="text-[15px] font-bold text-[#0F172A]">{orderForm.id ? "Edit order" : "New order"}</h3>
                       <button type="button" onClick={() => setOrderForm(null)} aria-label="Close" className="rounded-lg p-1.5 text-[#64748B] hover:bg-[#F1F5F9]"><X size={18} /></button>
@@ -861,7 +863,7 @@ export default function AdminResellerAccounts() {
                 )}
 
                 {paymentForm && d && (
-                  <div className="rounded-2xl border border-[#BBF7D0] bg-white p-5 shadow-premium">
+                  <div className="rounded-2xl border border-[#BBF7D0] bg-white p-5 shadow-premium print:hidden">
                     <div className="flex items-center justify-between">
                       <h3 className="text-[15px] font-bold text-[#0F172A]">Record a payment</h3>
                       <button type="button" onClick={() => setPaymentForm(null)} aria-label="Close" className="rounded-lg p-1.5 text-[#64748B] hover:bg-[#F1F5F9]"><X size={18} /></button>
@@ -897,8 +899,8 @@ export default function AdminResellerAccounts() {
                 )}
 
                 {d && (
-                  <div className="rounded-2xl border border-[#F1F5F9] bg-white shadow-premium">
-                    <div className="flex gap-1 border-b border-[#F1F5F9] p-2">
+                  <div className="rounded-2xl border border-[#F1F5F9] bg-white shadow-premium print:border-0 print:shadow-none">
+                    <div className="flex gap-1 border-b border-[#F1F5F9] p-2 print:hidden">
                       {([["statement", "Statement"], ["orders", `Orders (${d.orders.length})`], ["payments", `Payments (${d.payments.length})`]] as const).map(([id, label]) => (
                         <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id}
                           className={`h-9 rounded-xl px-3.5 text-[13px] font-semibold ${tab === id ? "bg-[#0F172A] text-white" : "text-[#475569] hover:bg-[#F8FAFC]"}`}>{label}</button>
@@ -906,8 +908,8 @@ export default function AdminResellerAccounts() {
                     </div>
 
                     {tab === "statement" && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[680px] text-[13px]">
+                      <div className="overflow-x-auto print:overflow-visible">
+                        <table className="w-full min-w-[680px] text-[13px] print:min-w-0">
                           <thead>
                             <tr className="bg-[#F8FAFC] text-left text-[11px] uppercase tracking-wider text-[#64748B]">
                               <th className="px-4 py-2.5">Date</th><th className="px-4 py-2.5">Entry</th>
@@ -920,7 +922,14 @@ export default function AdminResellerAccounts() {
                             ) : statement.map((r, i) => (
                               <tr key={i}>
                                 <td className="whitespace-nowrap px-4 py-2.5 text-[#64748B]">{dayStr(r.date)}</td>
-                                <td className="px-4 py-2.5"><p className="font-semibold text-[#0F172A]">{r.label}</p>{r.sub && <p className="text-[12px] text-[#64748B]">{r.sub}</p>}</td>
+                                <td className="px-4 py-2.5">
+                                  <p className="font-semibold text-[#0F172A]">{r.label}</p>
+                                  {(r.sub || r.note) && (
+                                    <p className={`text-[12px] text-[#64748B] ${r.sub ? "" : "print:hidden"}`}>
+                                      {r.sub}{r.note && <span className="print:hidden">{r.sub ? " · " : ""}{r.note}</span>}
+                                    </p>
+                                  )}
+                                </td>
                                 <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-[#0F172A]">{r.debit ? inr2(r.debit) : ""}</td>
                                 <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-[#15803D]">{r.credit ? inr2(r.credit) : ""}</td>
                                 <td className={`whitespace-nowrap px-4 py-2.5 text-right font-bold tabular-nums ${r.balance > 0 ? "text-[#B45309]" : "text-[#15803D]"}`}>{inr2(r.balance)}</td>

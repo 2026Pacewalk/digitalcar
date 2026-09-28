@@ -8,6 +8,7 @@ import { createContext } from "./context";
 import { env } from "./lib/env";
 import { verifyToken } from "./lib/jwt";
 import { clientIp } from "./lib/rate-limit";
+import { FUNNEL_STAGES } from "./lib/admin-dashboard";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -685,22 +686,35 @@ if (process.env.NODE_ENV === "production") {
 })();
 
 // One-time, idempotent schema ensure for razorpay_fulfilments (which Razorpay
-// orders for card add-ons have been granted — dedups verify vs webhook). Additive only.
+// orders for card and domain add-ons have been granted — dedups verify vs
+// webhook — and what each one was paid). Additive only.
 (async () => {
   try {
     const { getDb } = await import("./queries/connection");
     const { sql } = await import("drizzle-orm");
-    await getDb().execute(sql.raw(`
+    const db = getDb();
+    await db.execute(sql.raw(`
       CREATE TABLE IF NOT EXISTS razorpay_fulfilments (
         razorpay_order_id varchar(64) NOT NULL,
         kind varchar(32) NOT NULL,
         user_id bigint unsigned NOT NULL,
         razorpay_payment_id varchar(64) NOT NULL,
+        amount decimal(12,2) NULL,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (razorpay_order_id),
         KEY rzp_fulfil_user_idx (user_id)
       )
     `));
+    // Tables made before the amount column existed get it here (db/migrate-live.mjs does the same).
+    const rows = await db.execute(sql.raw(
+      `SELECT COUNT(*) AS n FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'razorpay_fulfilments' AND column_name = 'amount'`,
+    ));
+    const n = Number((rows as unknown as [{ n?: number }[]])[0]?.[0]?.n ?? (rows as unknown as { n?: number }[])[0]?.n ?? 0);
+    if (!n) {
+      await db.execute(sql.raw("ALTER TABLE razorpay_fulfilments ADD COLUMN amount decimal(12,2) NULL AFTER razorpay_payment_id"));
+      console.log("[schema] razorpay_fulfilments.amount column added");
+    }
     console.log("[schema] razorpay_fulfilments table ensured");
   } catch (e) {
     console.error("[schema] ensure razorpay_fulfilments failed:", (e as Error).message);
@@ -1024,6 +1038,26 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// card_events by date across every card, for the admin dashboard
+// (db/migrate-live.mjs is the production authority). Guarded: MySQL has no ADD INDEX IF NOT EXISTS.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    const rows = await db.execute(sql.raw(
+      "SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE table_schema=DATABASE() AND table_name='card_events' AND index_name='cardev_created_type_idx'",
+    ));
+    const n = Number((rows as unknown as [{ n?: number }[]])[0]?.[0]?.n ?? (rows as unknown as { n?: number }[])[0]?.n ?? 0);
+    if (!n) {
+      await db.execute(sql.raw("ALTER TABLE card_events ADD INDEX cardev_created_type_idx (created_at, type)"));
+      console.log("[schema] card_events.cardev_created_type_idx added");
+    }
+  } catch (e) {
+    console.error("[schema] ensure card_events index failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be
@@ -1292,14 +1326,15 @@ app.get("/api/views/:slug", async (c) => {
 
 // Conversion funnel: one row per step a visitor reaches (product_view → demo →
 // try_free → registration → published → payment) so drop-off is visible (§62).
-const FUNNEL_STAGES = ["product_view", "demo_view", "try_free", "registration", "customization", "published", "first_share", "payment", "upgrade"];
+// The steps and their labels live with the admin dashboard that shows them.
+const FUNNEL_STAGE_KEYS = FUNNEL_STAGES.map((s) => s.stage);
 app.post("/api/funnel", async (c) => {
   if (!rateLimit(c, "funnel", 60, 60_000)) return c.json({ ok: false, error: "rate_limited" }, 429);
   try {
     let body: { stage?: string; productSlug?: string; userId?: number } | null = null;
     try { body = await c.req.json(); } catch { try { body = JSON.parse(await c.req.text()); } catch { body = null; } }
     const stage = String(body?.stage || "").slice(0, 40);
-    if (FUNNEL_STAGES.includes(stage)) {
+    if (FUNNEL_STAGE_KEYS.includes(stage)) {
       // Attribute to the signed-in user (from the token) — never a client-supplied
       // userId, which would let anyone pollute another user's funnel (Phase 31).
       const tk = c.req.header("x-auth-token") || c.req.header("authorization")?.replace("Bearer ", "");

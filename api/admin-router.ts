@@ -75,7 +75,7 @@ async function addHiddenAppUser(db: ReturnType<typeof getDb>, userId: number): P
 /* Legacy customers.json rows (cached). */
 let legacyRowsCache: { id?: unknown; email?: string }[] | null = null;
 let legacyRowsAt = 0;
-function legacyCustomers(): { id?: unknown; email?: string }[] {
+export function legacyCustomers(): { id?: unknown; email?: string }[] {
   const now = Date.now();
   if (legacyRowsCache && now - legacyRowsAt < 60_000) return legacyRowsCache;
   for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
@@ -93,8 +93,9 @@ async function hiddenIdSet(db: ReturnType<typeof getDb>, key: string): Promise<S
 
 /* The SAME unique-customer total the /admin/customers page shows: legacy
    customers.json (minus hidden) + new-flow DB accounts not already in the legacy
-   list (minus hidden/super-admin). Shared so the Dashboard cards match. */
-export async function mergedCustomerCount(db: ReturnType<typeof getDb>): Promise<{ total: number; superAdmins: number; resellers: number }> {
+   list (minus hidden/super-admin). Shared so the Dashboard cards match.
+   oldSiteOnly: the legacy customers with no account here (yet). */
+export async function mergedCustomerCount(db: ReturnType<typeof getDb>): Promise<{ total: number; superAdmins: number; resellers: number; oldSiteOnly: number }> {
   const rows = legacyCustomers();
   const [hiddenCust, hiddenApp, dbUsers] = await Promise.all([
     hiddenIdSet(db, "customers"),
@@ -106,7 +107,9 @@ export async function mergedCustomerCount(db: ReturnType<typeof getDb>): Promise
   const newFlow = dbUsers.filter((u) => u.role !== "super_admin" && u.role !== "staff" && !hiddenApp.has(Number(u.id)) && !legacyEmails.has(String(u.email).toLowerCase().trim())).length;
   const superAdmins = dbUsers.filter((u) => u.role === "super_admin").length;
   const resellers = dbUsers.filter((u) => u.role === "reseller").length;
-  return { total: legacyCount + newFlow, superAdmins, resellers };
+  const dbEmails = new Set(dbUsers.map((u) => String(u.email).toLowerCase().trim()));
+  const oldSiteOnly = rows.filter((r) => !hiddenCust.has(String((r as { id?: unknown }).id)) && !dbEmails.has(String(r.email || "").toLowerCase().trim())).length;
+  return { total: legacyCount + newFlow, superAdmins, resellers, oldSiteOnly };
 }
 
 /* Super-admin tools. Today: resolve cross-system card-URL conflicts, where a

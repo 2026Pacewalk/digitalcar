@@ -78,10 +78,26 @@ export function legacyPaidPlan(email: string | null | undefined, now = Date.now(
   if (!key) return false;
   const plan = loadPlans().get(key);
   if (!plan || !PAID_PACKAGE_IDS.has(plan.packageId)) return false;
+  return stillValid(plan, now);
+}
+
+function stillValid(plan: LegacyPlan, now: number): boolean {
   if (!plan.expiredOn) return true;
   const ms = Date.parse(plan.expiredOn);
   if (!Number.isFinite(ms)) return true;
   return ms + DAY > now; // valid through the end of the recorded day
+}
+
+/** Read-only, for the admin dashboard: how many old-site customers are on each
+    package and still valid (same rule as above), leaving out `skip` emails
+    (lowercased) — people already counted from subscriptions. */
+export function legacyPlanCounts(skip: Set<string>, now = Date.now()): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const [email, plan] of loadPlans()) {
+    if (skip.has(email) || !stillValid(plan, now)) continue;
+    out.set(plan.packageId, (out.get(plan.packageId) ?? 0) + 1);
+  }
+  return out;
 }
 
 /** The admin-recorded plan for an email, for display/debugging. Never a gate. */

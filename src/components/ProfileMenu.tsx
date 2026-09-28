@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { User, Settings, KeyRound, HelpCircle, LogOut, ArrowLeft, Wallet } from "lucide-react";
+import { User, Settings, KeyRound, HelpCircle, LogOut, ArrowLeft, Wallet, FileText } from "lucide-react";
 import { useAuth, useSessionRole } from "@/hooks/useAuth";
 import { getToken, clearSession, adminReturnPath } from "@/lib/session";
 
@@ -26,6 +26,7 @@ export default function ProfileMenu() {
     { icon: User, label: "My Profile", path: "/reseller/profile" },
     { icon: KeyRound, label: "Change Password", path: "/reseller/profile#password" },
     { icon: Wallet, label: "Earnings & Payouts", path: "/reseller/earnings" },
+    { icon: FileText, label: "Account statement", path: "/reseller/statement" },
     { icon: HelpCircle, label: "Help & Support", path: "/contact" },
   ] : [
     { icon: User, label: "My Profile", path: profile },

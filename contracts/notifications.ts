@@ -106,6 +106,9 @@ export const USER_TYPES: Record<string, UserDef> = {
   reseller_customer_removed: u("customers", "userMinus", "slate", "Customer moved out of your account"),
   reseller_customer_created: u("customers", "userPlus", "teal", "Customer created"),
   reseller_welcome: u("updates", "sparkles", "gold", "Welcome, partner"),
+  // Their account with us (the statement): money, so under a reseller's Earnings chip.
+  reseller_statement_order: u("rewards", "package", "blue", "Card order on your account"),
+  reseller_statement_payment: u("rewards", "banknote", "green", "Payment received"),
 };
 
 /** Types the daily jobs key by date or subscription (ls_renew7_12_20260928 …). */
