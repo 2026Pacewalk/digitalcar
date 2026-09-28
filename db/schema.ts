@@ -13,6 +13,7 @@ import {
   json,
   index,
   uniqueIndex,
+  primaryKey,
 } from "drizzle-orm/mysql-core";
 
 // ─── Users ──────────────────────────────────────────────────────
@@ -786,13 +787,57 @@ export const notifications = mysqlTable("notifications", {
   message: text("message").notNull(),
   isRead: boolean("is_read").notNull().default(false),
   link: varchar("link", { length: 500 }),
+  // Cleared from the bell by its owner. Never deleted: the daily jobs use these
+  // rows (by type) as their send-once record, so a cleared row must still exist.
+  clearedAt: timestamp("cleared_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("notif_user_id_idx").on(table.userId),
   index("notif_read_idx").on(table.isRead),
+  index("notif_user_feed_idx").on(table.userId, table.createdAt),
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
+
+/* What the DigitalCarda team is told (Admin → bell and /admin/notifications).
+   One row per event, not per admin: who may see it is decided when it is read,
+   from the event's staff module (contracts/notifications.ts), so a change to a
+   staff member's access applies to past events too. "action" events wait in
+   Needs action until someone handles them (resolved_at). */
+export const teamNotifications = mysqlTable("team_notifications", {
+  id: serial("id").primaryKey(),
+  type: varchar("type", { length: 50 }).notNull(),
+  category: varchar("category", { length: 20 }).notNull(),
+  module: varchar("module", { length: 20 }),                 // null = super admin only
+  severity: mysqlEnum("severity", ["info", "action", "critical"]).notNull().default("info"),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  link: varchar("link", { length: 500 }),
+  entityType: varchar("entity_type", { length: 30 }),
+  entityId: bigint("entity_id", { mode: "number", unsigned: true }),
+  dedupeKey: varchar("dedupe_key", { length: 120 }),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: bigint("resolved_by", { mode: "number", unsigned: true }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("uq_tn_dedupe").on(table.dedupeKey),
+  index("tn_created_idx").on(table.createdAt),
+  index("tn_entity_idx").on(table.entityType, table.entityId),
+]);
+
+export type TeamNotification = typeof teamNotifications.$inferSelect;
+
+/* One admin's read / cleared state for one team notification. */
+export const teamNotificationMarks = mysqlTable("team_notification_marks", {
+  notificationId: bigint("notification_id", { mode: "number", unsigned: true }).notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  readAt: timestamp("read_at"),
+  clearedAt: timestamp("cleared_at"),
+}, (table) => [
+  primaryKey({ columns: [table.notificationId, table.userId] }),
+  index("tnm_user_idx").on(table.userId),
+]);
+
 
 // ─── Referrals (Refer & Earn) ───────────────────────────────────
 // status flow:

@@ -14,6 +14,7 @@ import { analyticsRouter } from "./analytics-router";
 import { settingsRouter } from "./settings-router";
 import { referralRouter } from "./referral-router";
 import { notificationRouter } from "./notification-router";
+import { teamNotificationRouter } from "./team-notification-router";
 import { paymentRouter } from "./payment-router";
 import { resellerRouter } from "./reseller-router";
 import { aiRouter } from "./ai-router";
@@ -49,6 +50,7 @@ export const appRouter = createRouter({
   settings: settingsRouter,
   referral: referralRouter,
   notification: notificationRouter,
+  teamNotification: teamNotificationRouter,
   payment: paymentRouter,
   reseller: resellerRouter,
   ai: aiRouter,

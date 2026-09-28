@@ -56,6 +56,7 @@ const RefundPolicy = lazy(() => import("./pages/public/RefundPolicy"));
 const ShippingPolicy = lazy(() => import("./pages/public/ShippingPolicy"));
 const TermsOfService = lazy(() => import("./pages/public/TermsOfService"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const NotificationsPage = lazy(() => import("./pages/Notifications"));
 const AdminCustomers = lazy(() => import("./pages/admin/Customers"));
 const AdminPackages = lazy(() => import("./pages/admin/Packages"));
 const AdminTemplates = lazy(() => import("./pages/admin/Templates"));
@@ -395,6 +396,8 @@ export default function App() {
         <Route path="/admin/deletion-requests" element={<RoleRoute allowedRoles={["super_admin"]}><AdminDeletionRequests /></RoleRoute>} />
         <Route path="/admin/domains" element={<RoleRoute allowedRoles={["super_admin"]}><AdminDomains /></RoleRoute>} />
         <Route path="/admin/email-log" element={<RoleRoute allowedRoles={["super_admin"]}><AdminEmailLog /></RoleRoute>} />
+        {/* Every admin: staff see the events of the modules they may open. */}
+        <Route path="/admin/notifications" element={<RoleRoute allowedRoles={["super_admin"]}><NotificationsPage /></RoleRoute>} />
         <Route path="/admin/email-previews" element={<RoleRoute allowedRoles={["super_admin"]}><AdminEmailPreviews /></RoleRoute>} />
         {/* Analytics is now merged into the Dashboard — keep the path as a redirect for old links */}
         <Route path="/admin/analytics" element={<Navigate to="/admin" replace />} />
@@ -420,6 +423,7 @@ export default function App() {
         <Route path="/reseller/payments" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerPaymentOrders /></RoleRoute>} />
         <Route path="/reseller/profile" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerProfile /></RoleRoute>} />
         <Route path="/reseller/earnings" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><ResellerEarnings /></RoleRoute>} />
+        <Route path="/reseller/notifications" element={<RoleRoute allowedRoles={["super_admin","reseller"]}><NotificationsPage key="reseller" /></RoleRoute>} />
 
         {/* Customer */}
         <Route path="/dashboard" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerDashboard /></RoleRoute>} />
@@ -430,6 +434,7 @@ export default function App() {
         <Route path="/dashboard/cards" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerCards /></RoleRoute>} />
         <Route path="/dashboard/bulk" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerBulkCreate /></RoleRoute>} />
         <Route path="/dashboard/refer" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerReferEarn /></RoleRoute>} />
+        <Route path="/dashboard/notifications" element={<RoleRoute allowedRoles={["super_admin","customer"]}><NotificationsPage key="customer" /></RoleRoute>} />
         <Route path="/dashboard/analytics" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerAnalytics /></RoleRoute>} />
         <Route path="/dashboard/leads" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerLeads /></RoleRoute>} />
         <Route path="/dashboard/subscription" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerSubscription /></RoleRoute>} />

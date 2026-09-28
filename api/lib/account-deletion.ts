@@ -9,6 +9,8 @@ import {
 } from "@db/schema";
 import type { getDb } from "../queries/connection";
 import { forgetSession } from "../context";
+import { notifyTeam, resolveTeam } from "./notify";
+import { teamNotifications } from "@db/schema";
 
 /* Finishing an account-deletion request (asked for in the app; see
    mobile.requestAccountDeletion). What an owner put on their card and what
@@ -48,9 +50,17 @@ export async function requestAccountDeletion(
     .where(and(eq(accountDeletionRequests.userId, user.id), eq(accountDeletionRequests.status, "pending"))).limit(1);
   if (pending[0]) return { scheduledFor: new Date(pending[0].scheduledFor), already: true };
 
-  await db.insert(accountDeletionRequests).values({
+  const [req] = await db.insert(accountDeletionRequests).values({
     userId: user.id, email: user.email, reason: opts.reason || null, source: opts.source, scheduledFor,
   });
+  const requestId = Number(req.insertId);
+  void notifyTeam({
+    type: "deletion_requested", title: `Account deletion requested · ${user.fullName}`,
+    message: `${user.email} · from the ${opts.source === "app" ? "app" : "website"} · erase after ${scheduledFor.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" })}${opts.reason ? ` · “${opts.reason}”` : ""}`,
+    link: "/admin/deletion-requests",
+    entity: requestId ? { type: "deletion_request", id: requestId } : null,
+    dedupeKey: requestId ? `deletion:${requestId}` : null,
+  }, db);
   await db.update(users).set({ status: "inactive" }).where(eq(users.id, user.id));
 
   // Signed out of every phone at once.
@@ -180,6 +190,14 @@ export async function completeAccountDeletion(
 
   sessions.forEach((s) => forgetSession(Number(s.id)));
   await hideFromAdminLists(db, userId, legacyIds);
+  try {
+    const likeEmail = `%${originalEmail.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+    await db.delete(teamNotifications).where(or(
+      and(eq(teamNotifications.entityType, "user"), eq(teamNotifications.entityId, userId)),
+      and(eq(teamNotifications.entityType, "deletion_request"), eq(teamNotifications.entityId, requestId)),
+      like(teamNotifications.message, likeEmail), like(teamNotifications.title, likeEmail),
+    ));
+  } catch (e) { console.error("[account-deletion] team notifications not purged:", (e as Error).message); }
   return { ok: true as const, userId, ...counts };
 }
 
@@ -199,6 +217,13 @@ export async function cancelAccountDeletion(db: Db, requestId: number) {
   const affected = (res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
     ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? 0;
   if (affected > 0) {
+    void resolveTeam("deletion_request", requestId, null, db);
+    void notifyTeam({
+      type: "deletion_cancelled", title: "Account deletion cancelled",
+      message: `${request.email} keeps their account. It's active again.`,
+      link: "/admin/deletion-requests",
+      entity: { type: "user", id: request.userId },
+    }, db);
     void sendRestoredEmail(db, request.userId, request.email)
       .catch((e) => console.error("[account-deletion] restored email failed:", (e as Error).message));
   }

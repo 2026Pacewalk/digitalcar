@@ -134,11 +134,22 @@ export const leadRouter = createRouter({
         .where(eq(cards.id, input.cardId));
 
       // Email the platform inbox and the card's owner (non-blocking, never throws).
+      // Then the owner's bell and the team's — unless the triage called it spam.
       void sendLeadNotification({
         name: input.fullName, email: input.email, contact: input.phone,
         message: input.message, slug: card.slug, cardName: card.title,
         company: input.company, ownerUserId: card.userId,
-      });
+      }).then(async (verdict) => {
+        if (verdict === "spam") return;
+        const { notifyUser, notifyTeam } = await import("./lib/notify");
+        const hot = verdict === "important" ? "🔥 " : "";
+        const snippet = String(input.message || input.phone || input.email || "").replace(/\s+/g, " ").trim();
+        await notifyUser({ userId: card.userId, type: "enquiry_new", title: `${hot}New enquiry from ${input.fullName}`, message: snippet || "Open Leads to reply.", link: "/dashboard/leads" });
+        await notifyTeam({
+          type: "lead_new", title: `${hot}Enquiry for digitalcarda.in/${card.slug}`,
+          message: `${input.fullName}${input.phone ? ` · ${input.phone}` : ""}${snippet ? ` — ${snippet}` : ""}`, link: "/admin/leads",
+        });
+      }).catch((e) => console.error("[lead] notifications skipped:", (e as Error).message));
 
       return db.query.leads.findFirst({ where: eq(leads.id, result[0].id) });
     }),

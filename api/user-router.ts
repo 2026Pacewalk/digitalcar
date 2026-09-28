@@ -7,6 +7,7 @@ import { users, resellerProfiles, resellerCommissions, cards, subscriptions, sub
 import { eq, and, sql, desc, inArray, gt, gte } from "drizzle-orm";
 import { PAID_PACKAGE_IDS } from "./lib/entitlement";
 import { sendEmail } from "./lib/mail";
+import { notifyUser } from "./lib/notify";
 import { accountDetailsEmail, featureUpdateEmail, planUpgradedEmail, planExtendedEmail, passwordChangedEmail } from "./lib/email-templates";
 import { getDefaultDesign } from "./template-router";
 
@@ -37,6 +38,11 @@ async function sendPlanExtended(
 ): Promise<void> {
   if (user.status !== "active") return;
   const [planName, slug] = await Promise.all([packageName(db, o.packageId), firstCardSlug(db, user.id)]);
+  await notifyUser({
+    userId: user.id, type: "plan_extended", title: `${o.days} days added to your ${planName || "plan"}`,
+    message: `Your card is now valid till ${o.validTill.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" })}.`,
+    link: "/dashboard/subscription", push: "plan",
+  }, db);
   await sendEmail(user.email, planExtendedEmail({
     name: user.fullName, planName, days: o.days, validTill: o.validTill, previousEnd: o.previousEnd, slug,
   }));
@@ -257,6 +263,11 @@ export const userRouter = createRouter({
         if (u?.email && !isTrial) {
           const [planName, slug] = await Promise.all([packageName(db, input.packageId), firstCardSlug(db, user.id)]);
           await sendEmail(u.email, planUpgradedEmail({ name: u.fullName, planName, validTill: expiredOn, slug, billingCycle: input.cycle }));
+          await notifyUser({
+            userId: user.id, type: "plan_upgraded", title: `You're now on ${planName || "a new plan"} 🎉`,
+            message: `The DigitalCarda team set your plan. It's valid till ${new Date(expiredOn).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}.`,
+            link: "/dashboard/subscription", push: "plan",
+          }, db);
         }
       } catch { /* the plan change already succeeded — never fail it on email */ }
 
@@ -327,6 +338,10 @@ export const userRouter = createRouter({
       // Security notice to the account's own address (non-blocking), so a
       // password set by our team never happens without the customer knowing.
       void sendEmail(user.email, passwordChangedEmail({ name: user.fullName, byTeam: true, at: new Date() }));
+      void notifyUser({
+        userId: user.id, type: "security_password", title: "Your password was changed by the DigitalCarda team",
+        message: "If you didn't ask for this, reply to our email or WhatsApp us straight away.", link: "/dashboard/settings?tab=password",
+      }, db);
       return { ok: true as const, password: input.password };
     }),
 
@@ -405,6 +420,10 @@ export const userRouter = createRouter({
         },
       });
 
+      void notifyUser({
+        userId, type: "welcome", title: "Welcome to DigitalCarda 👋",
+        message: "The DigitalCarda team set up your account and card. Complete your profile to start getting enquiries.", link: "/dashboard/home",
+      }, db);
       return { ok: true as const, userId, slug, password: pwd, expiredOn };
     }),
 

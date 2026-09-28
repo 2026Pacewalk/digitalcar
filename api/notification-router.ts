@@ -2,53 +2,183 @@ import { z } from "zod";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { notifications } from "@db/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, isNull, isNotNull, inArray, or, lt, type SQL } from "drizzle-orm";
+import {
+  USER_CATEGORIES, USER_CATEGORY_KEYS, userCategory, userCategoryMatcher, type UserCategory,
+} from "@contracts/notifications";
 
-/* Central notification feed — referral rewards, payouts, plan events,
-   and system messages all land in the `notifications` table and are
-   surfaced in the top bell. */
+/* A customer's or reseller's own notifications — enquiries, plan and billing,
+   NFC orders, rewards and payouts, account changes — shown in the bell and on
+   the notifications page.
+
+   "Clear" hides a row (cleared_at) rather than deleting it: the daily jobs
+   (cron/lifecycle, billing, trial-emails, lead-followups) use these rows, keyed
+   by type, as their send-once record, and a deleted row would re-send.
+
+   The first procedures keep their original shapes, because the mobile app
+   (which can't be updated in step with the site) calls them. */
+
+type Audience = "customer" | "reseller";
+const audienceOf = (role: string): Audience => (role === "reseller" ? "reseller" : "customer");
+
+const esc = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/** SQL for "this row's type belongs to `category`" (contracts/notifications.ts). */
+function categoryWhere(category: UserCategory, audience: Audience): SQL {
+  const m = userCategoryMatcher(category, audience);
+  const parts: SQL[] = [];
+  if (m.exact.length) parts.push(inArray(notifications.type, m.exact));
+  for (const p of m.prefixes) parts.push(sql`${notifications.type} LIKE ${`${esc(p)}%`}`);
+  const any = parts.length ? or(...parts)! : sql`FALSE`;
+  return m.mode === "in" ? any : sql`NOT (${any})`;
+}
+
+const mine = (userId: number) => and(eq(notifications.userId, userId), isNull(notifications.clearedAt))!;
+const idList = z.array(z.number().int().positive()).min(1).max(500);
+
+const shape = (n: typeof notifications.$inferSelect, audience: Audience) => ({
+  id: n.id, type: n.type, category: userCategory(n.type, audience),
+  title: n.title, message: n.message, link: n.link, isRead: n.isRead, createdAt: n.createdAt,
+});
+
 export const notificationRouter = createRouter({
-  // Latest notifications for the signed-in user
+  // Latest notifications (the mobile app's list).
   list: authedQuery
-    .input(z.object({ limit: z.number().min(1).max(100).default(30) }).optional())
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(30) }).optional())
     .query(async ({ ctx, input }) => {
       const db = getDb();
       return db.query.notifications.findMany({
-        where: eq(notifications.userId, ctx.user.id),
-        orderBy: [desc(notifications.createdAt)],
+        where: mine(ctx.user.id),
+        orderBy: [desc(notifications.createdAt), desc(notifications.id)],
         limit: input?.limit ?? 30,
       });
     }),
 
-  // Unread badge count
+  // Unread badge count.
   unreadCount: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
     const rows = await db
       .select({ count: sql<number>`count(*)` })
       .from(notifications)
-      .where(and(eq(notifications.userId, ctx.user.id), eq(notifications.isRead, false)));
+      .where(and(mine(ctx.user.id), eq(notifications.isRead, false)));
     return { count: Number(rows[0]?.count ?? 0) };
   }),
 
-  markRead: authedQuery
-    .input(z.object({ id: z.number() }))
-    .mutation(async ({ ctx, input }) => {
+  /* The bell and the notifications page: filter by chip, unread only or a
+     search, newest first, a page at a time. */
+  feed: authedQuery
+    .input(z.object({
+      limit: z.number().int().min(1).max(50).default(20),
+      cursor: z.object({ at: z.coerce.date(), id: z.number().int().positive() }).nullish(),
+      category: z.enum(USER_CATEGORY_KEYS).nullish(),
+      unreadOnly: z.boolean().optional(),
+      q: z.string().trim().max(80).optional(),
+    }))
+    .query(async ({ ctx, input }) => {
       const db = getDb();
-      await db
-        .update(notifications)
-        .set({ isRead: true })
-        .where(and(eq(notifications.id, input.id), eq(notifications.userId, ctx.user.id)));
+      const audience = audienceOf(ctx.user.role);
+      const where: SQL[] = [mine(ctx.user.id)];
+      if (input.category) where.push(categoryWhere(input.category, audience));
+      if (input.unreadOnly) where.push(eq(notifications.isRead, false));
+      if (input.q) {
+        const like = `%${esc(input.q)}%`;
+        where.push(or(sql`${notifications.title} LIKE ${like}`, sql`${notifications.message} LIKE ${like}`)!);
+      }
+      if (input.cursor) {
+        const { at, id } = input.cursor;
+        where.push(or(lt(notifications.createdAt, at), and(eq(notifications.createdAt, at), lt(notifications.id, id)))!);
+      }
+      const rows = await db.select().from(notifications).where(and(...where))
+        .orderBy(desc(notifications.createdAt), desc(notifications.id)).limit(input.limit + 1);
+      const more = rows.length > input.limit;
+      const items = rows.slice(0, input.limit).map((n) => shape(n, audience));
+      const last = items[items.length - 1];
+      return { items, nextCursor: more && last ? { at: last.createdAt, id: last.id } : null };
+    }),
+
+  /* Counts for the badge and the chips: unread and total, per chip. */
+  summary: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const audience = audienceOf(ctx.user.role);
+    const rows = await db.select({
+      type: notifications.type,
+      total: sql<number>`count(*)`,
+      unread: sql<number>`sum(case when ${notifications.isRead} = 0 then 1 else 0 end)`,
+    }).from(notifications).where(mine(ctx.user.id)).groupBy(notifications.type);
+    const byCategory = Object.fromEntries(USER_CATEGORIES[audience].map((c) => [c.key, { unread: 0, total: 0 }])) as Record<UserCategory, { unread: number; total: number }>;
+    let unread = 0, total = 0;
+    for (const r of rows) {
+      const c = userCategory(r.type, audience);
+      const u = Number(r.unread || 0), n = Number(r.total || 0);
+      unread += u; total += n;
+      if (byCategory[c]) { byCategory[c].unread += u; byCategory[c].total += n; }
+    }
+    return { unread, total, byCategory, categories: USER_CATEGORIES[audience] };
+  }),
+
+  // Mark one (the app sends { id }) or several read.
+  markRead: authedQuery
+    .input(z.object({ id: z.number().int().positive().optional(), ids: idList.optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const ids = input.ids ?? (input.id ? [input.id] : []);
+      if (!ids.length) return { ok: true };
+      await getDb().update(notifications).set({ isRead: true })
+        .where(and(eq(notifications.userId, ctx.user.id), inArray(notifications.id, ids)));
       return { ok: true };
     }),
 
-  markAllRead: authedQuery.mutation(async ({ ctx }) => {
-    const db = getDb();
-    await db
-      .update(notifications)
-      .set({ isRead: true })
-      .where(and(eq(notifications.userId, ctx.user.id), eq(notifications.isRead, false)));
-    return { ok: true };
-  }),
+  markUnread: authedQuery
+    .input(z.object({ ids: idList }))
+    .mutation(async ({ ctx, input }) => {
+      await getDb().update(notifications).set({ isRead: false })
+        .where(and(eq(notifications.userId, ctx.user.id), inArray(notifications.id, input.ids)));
+      return { ok: true };
+    }),
+
+  // Everything read — or everything under one chip.
+  markAllRead: authedQuery
+    .input(z.object({ category: z.enum(USER_CATEGORY_KEYS).nullish() }).optional())
+    .mutation(async ({ ctx, input }) => {
+      const where: SQL[] = [mine(ctx.user.id), eq(notifications.isRead, false)];
+      if (input?.category) where.push(categoryWhere(input.category, audienceOf(ctx.user.role)));
+      await getDb().update(notifications).set({ isRead: true }).where(and(...where));
+      return { ok: true };
+    }),
+
+  // Hide some from the bell (they can be brought back with `restore`).
+  dismiss: authedQuery
+    .input(z.object({ ids: idList }))
+    .mutation(async ({ ctx, input }) => {
+      await getDb().update(notifications).set({ clearedAt: new Date(), isRead: true })
+        .where(and(mine(ctx.user.id), inArray(notifications.id, input.ids)));
+      return { ok: true, ids: input.ids };
+    }),
+
+  restore: authedQuery
+    .input(z.object({ ids: idList }))
+    .mutation(async ({ ctx, input }) => {
+      await getDb().update(notifications).set({ clearedAt: null })
+        .where(and(eq(notifications.userId, ctx.user.id), isNotNull(notifications.clearedAt), inArray(notifications.id, input.ids)));
+      return { ok: true };
+    }),
+
+  /* Clear everything (or one chip). Returns what was cleared, so "Undo" can
+     restore exactly that. */
+  clearAll: authedQuery
+    .input(z.object({ category: z.enum(USER_CATEGORY_KEYS).nullish() }).optional())
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const where: SQL[] = [mine(ctx.user.id)];
+      if (input?.category) where.push(categoryWhere(input.category, audienceOf(ctx.user.role)));
+      const rows = await db.select({ id: notifications.id }).from(notifications).where(and(...where))
+        .orderBy(desc(notifications.createdAt)).limit(500);
+      const ids = rows.map((r) => r.id);
+      if (ids.length) {
+        await db.update(notifications).set({ clearedAt: new Date(), isRead: true })
+          .where(and(eq(notifications.userId, ctx.user.id), inArray(notifications.id, ids)));
+      }
+      return { ok: true, ids };
+    }),
 
   /* What the owner wants to hear about. One switch per kind of message, for
      push and email alike (api/lib/notify-prefs.ts); the bell keeps everything
@@ -70,21 +200,4 @@ export const notificationRouter = createRouter({
       const { setPrefs } = await import("./lib/notify-prefs");
       return setPrefs(ctx.user.id, input);
     }),
-
-  clearAll: authedQuery.mutation(async ({ ctx }) => {
-    const db = getDb();
-    // The cron jobs (cron/lifecycle.ts, cron/trial-emails.ts) use rows in THIS
-    // table as their send-once ledger: claim() only sends when no row exists for
-    // (userId, type). Hard-deleting everything therefore made the next cron run
-    // re-send trial emails the customer had already received. Those markers
-    // (ls_* / trial_email_*) are kept and just marked read; everything else is
-    // cleared as before.
-    //   NOTE: a kept marker stays listed (as read) — clearing it from the bell
-    //   too would need a `cleared_at` column, which is a schema migration.
-    const isLedger = sql`(${notifications.type} LIKE 'ls\\_%' OR ${notifications.type} LIKE 'trial\\_email\\_%')`;
-    await db.delete(notifications).where(and(eq(notifications.userId, ctx.user.id), sql`NOT ${isLedger}`));
-    await db.update(notifications).set({ isRead: true })
-      .where(and(eq(notifications.userId, ctx.user.id), isLedger));
-    return { ok: true };
-  }),
 });

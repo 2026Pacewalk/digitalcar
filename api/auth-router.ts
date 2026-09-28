@@ -10,6 +10,7 @@ import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { slugTakenByOther } from "./publish-router";
 import { resolveReferrer } from "./referral-router";
 import { createToken, createResetToken, verifyResetToken, createVerifyToken, verifyVerifyToken } from "./lib/jwt";
+import { notifyUser, notifyTeam } from "./lib/notify";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import {
   welcomeEmail, passwordChangedEmail, passwordResetEmail, newSignupAdminEmail, referralSignupAdminEmail, verifyEmailAddressEmail,
@@ -312,6 +313,11 @@ async function notifyEmailChange(
   } catch { verificationSent = false; }
   // The old address no longer maps to this account, so tag the log row with it.
   await sendEmail(oldEmail, { ...emailChangedEmail({ name: user.fullName, oldEmail, newEmail, at, verificationSent }), userId: user.id });
+  await notifyUser({
+    userId: user.id, type: "security_email", title: "Your sign-in email was changed",
+    message: `From ${oldEmail} to ${newEmail}. If this wasn't you, reset your password and contact us straight away.`,
+    link: "/dashboard/settings",
+  });
 }
 
 /* Everything a brand-new account gets, whichever way it signed up (email or
@@ -394,6 +400,13 @@ async function welcomeNewAccount(
   void alertOwnerOfSignup(db, insertedUser, {
     method: opts.method, req: opts.req, companyName: opts.companyName, card: opts.card, starter, referral,
   }).catch((e) => console.error("[signup] owner alert failed:", (e as Error).message));
+  void notifyTeam({
+    type: "signup_new", title: `New sign-up · ${insertedUser.fullName}`,
+    message: [insertedUser.email, opts.method === "google" ? "Google" : "email", opts.companyName?.trim(), referral ? `referred by ${referral.name}` : "", starter?.slug ? `digitalcarda.in/${starter.slug}` : ""].filter(Boolean).join(" · "),
+    link: `/admin/customers?q=${encodeURIComponent(insertedUser.email)}`,
+    entity: { type: "user", id: insertedUser.id },
+    dedupeKey: `signup:${insertedUser.id}`,
+  }, db);
   return starter?.slug ?? null;
 }
 
@@ -923,6 +936,11 @@ export const authRouter = createRouter({
 
       // Security notice (non-blocking).
       void sendEmail(user.email, passwordChangedEmail({ name: user.fullName }));
+      void notifyUser({
+        userId: user.id, type: "security_password", title: "Your password was changed",
+        message: "If this wasn't you, reset it now and contact us straight away.",
+        link: user.role === "reseller" ? "/reseller/profile#password" : "/dashboard/settings?tab=password",
+      }, db);
 
       return { success: true };
     }),
@@ -1051,6 +1069,11 @@ export const authRouter = createRouter({
       const hashedPassword = await bcrypt.hash(input.newPassword, 12);
       await db.update(users).set({ password: hashedPassword }).where(eq(users.id, user.id));
       void sendEmail(user.email, passwordChangedEmail({ name: user.fullName }));
+      void notifyUser({
+        userId: user.id, type: "security_password", title: "Your password was reset",
+        message: "You set a new password from a reset link. If this wasn't you, contact us straight away.",
+        link: user.role === "reseller" ? "/reseller/profile#password" : "/dashboard/settings?tab=password",
+      }, db);
       return { ok: true };
     }),
 

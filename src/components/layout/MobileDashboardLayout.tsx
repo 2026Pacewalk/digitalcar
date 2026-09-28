@@ -106,6 +106,9 @@ const NAV: Record<string, NavConfig> = {
 const ROUTE_TITLES: Record<string, string> = {
   // Customer
   "/dashboard": "Dashboard",
+  "/dashboard/notifications": "Notifications",
+  "/reseller/notifications": "Notifications",
+  "/admin/notifications": "Notifications",
   "/dashboard/build": "Edit Card",
   "/dashboard/home": "Basics",
   "/dashboard/about": "About Us",

@@ -99,5 +99,8 @@ export const authedQuery = t.procedure.use(requireAuth);
 export const adminQuery = authedQuery.use(requireAdminAccess);
 /** Super admin only — never grantable to staff (staff management, activity log). */
 export const superAdminQuery = authedQuery.use(requireRole(["super_admin"]));
+// The team's own notification feed: any admin. What each one sees is filtered
+// by their staff access inside the procedures (api/team-notification-router.ts).
+export const teamQuery = authedQuery.use(requireRole(["super_admin", "staff"]));
 export const resellerQuery = authedQuery.use(requireRole(["reseller", "super_admin"]));
 export const customerQuery = authedQuery.use(requireRole(["customer", "super_admin", "reseller"]));

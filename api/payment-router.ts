@@ -18,6 +18,7 @@ import { getUpgradeOfferPercent } from "./lib/pricing";
 import { evaluateCoupon, recordRedemption, recordPaidCoupon, completeRedemptionForOrder, cancelRedemptionForOrder } from "./lib/coupons";
 import { envRazorpayCreds, credsComplete, inferMode, createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder } from "./lib/razorpay";
 import { clientIp } from "./lib/rate-limit";
+import { notifyUser, notifyTeam, resolveTeam } from "./lib/notify";
 import { linkedSince, visibleSinceLink } from "./lib/reseller-links";
 
 type Order = typeof paymentOrders.$inferSelect;
@@ -120,6 +121,14 @@ async function emailOnlineSale(db: ReturnType<typeof getDb>, p: RazorpayPayment,
     validTill: credited.periodEnd,
     testMode: cr.mode === "test",
   }));
+  await notifyTeam({
+    type: "online_sale",
+    title: `${cr.mode === "test" ? "[Test] " : ""}Online payment · ₹${p.amountRupees} for ${p.planName}`,
+    message: `${buyer?.fullName || `Account #${p.userId}`}${buyer?.email ? ` (${buyer.email})` : ""} · ${p.billingCycle}${p.couponCode ? ` · coupon ${p.couponCode}` : ""} · ${p.paymentId}`,
+    link: "/admin/payment-orders",
+    entity: { type: "payment_order", id: order.id },
+    dedupeKey: `sale:${p.paymentId}`,
+  }, db);
 }
 
 const n = (v: unknown) => Number(v ?? 0);
@@ -153,6 +162,12 @@ function alertPaymentSettings(ctx: { user: { fullName: string; email: string }; 
     void sendEmail(ownerAddress(), paymentSettingsChangedAdminEmail({
       changedKeys, who: `${ctx.user.fullName} (${ctx.user.email})`, ip: ip === "unknown" ? null : ip,
     }));
+    void notifyTeam({
+      type: "payment_settings_changed",
+      title: "Payment details were changed",
+      message: `${ctx.user.fullName} (${ctx.user.email}) changed ${changedKeys.join(", ")}${ip !== "unknown" ? ` · IP ${ip}` : ""}. If this wasn't you or your team, check Settings → Payments now.`,
+      link: "/admin/settings?tab=payments",
+    });
   } catch { /* non-critical */ }
 }
 
@@ -307,13 +322,14 @@ async function activateVerifiedOrder(db: ReturnType<typeof getDb>, order: Order,
   }
 
   // Notify the buyer
-  await db.insert(notifications).values({
+  await notifyUser({
     userId: order.userId,
     type: "payment_verified",
     title: "Payment verified — plan active 🎉",
     message: `Your ${order.planName || "plan"} is now active. Your card is live and all features are unlocked.`,
-    link: "/dashboard",
-  });
+    link: "/dashboard/subscription",
+    push: "always",
+  }, db);
 
   // Email the buyer a confirmation + invoice (non-blocking).
   try {
@@ -447,6 +463,14 @@ export const paymentRouter = createRouter({
       const pay = { planName: pkg.name, amount: charged, reference: input.reference.trim(), method: input.method };
       void sendEmail(ctx.user.email, paymentSubmittedEmail({ name: ctx.user.fullName, ...pay }));
       void sendEmail(ownerAddress(), paymentToVerifyAdminEmail({ name: ctx.user.fullName, email: ctx.user.email, ...pay }));
+      void notifyTeam({
+        type: "payment_to_verify",
+        title: `Payment to verify · ₹${charged} for ${pkg.name}`,
+        message: `${ctx.user.fullName} (${ctx.user.email}) · ${input.method.toUpperCase()} reference ${input.reference.trim()}`,
+        link: "/admin/payment-orders",
+        entity: { type: "payment_order", id: Number(ins.insertId) },
+        dedupeKey: `payment:${ins.insertId}`,
+      }, db);
 
       return { ok: true, id: ins.insertId, amount: charged };
     }),
@@ -704,7 +728,7 @@ export const paymentRouter = createRouter({
   // Verify a payment → activate the subscription (card goes live)
   verifyOrder: adminQuery
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const order = await db.query.paymentOrders.findFirst({ where: eq(paymentOrders.id, input.id) });
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
@@ -716,26 +740,29 @@ export const paymentRouter = createRouter({
       if (!claimed) throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
       await activateVerifiedOrder(db, order, "manual");
       await completeRedemptionForOrder(db, order.id);
+      void resolveTeam("payment_order", order.id, ctx.user.id, db);
       return { ok: true };
     }),
 
   // Reject a payment order
   rejectOrder: adminQuery
     .input(z.object({ id: z.number(), note: z.string().optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const order = await db.query.paymentOrders.findFirst({ where: eq(paymentOrders.id, input.id) });
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
       if (order.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
       await db.update(paymentOrders).set({ status: "rejected", adminNote: input.note?.trim() || null, verifiedAt: new Date() }).where(eq(paymentOrders.id, order.id));
       await cancelRedemptionForOrder(db, order.id);
-      await db.insert(notifications).values({
+      void resolveTeam("payment_order", order.id, ctx.user.id, db);
+      await notifyUser({
         userId: order.userId,
         type: "payment_rejected",
         title: "Payment could not be verified",
         message: `We couldn't verify your ${order.planName || "plan"} payment${input.note ? `: ${input.note}` : ""}. Please check the reference and try again.`,
         link: "/dashboard/subscription",
-      });
+        push: "always",
+      }, db);
 
       // Email the buyer (non-blocking).
       try {

@@ -9,6 +9,7 @@ import { promises as dns } from "node:dns";
 import { cfEnabled, cfFallbackTarget, cfCreateHostname, cfGetByHostname, cfDeleteByHostname, cfIsActive, cfHealthCheck, type CfHostname } from "./lib/cloudflare";
 import { resolveRazorpay } from "./payment-router";
 import { createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder, type RazorpayOrderFull } from "./lib/razorpay";
+import { notifyUser, notifyTeam } from "./lib/notify";
 
 const ROOT_HOST = "digitalcarda.in";
 // Manual-mode CNAME target (used only when Cloudflare for SaaS isn't configured).
@@ -60,7 +61,7 @@ async function grantAddon(db: ReturnType<typeof getDb>, userId: number): Promise
     for some cheaper purchase doesn't unlock it. Throws a TRPCError otherwise. */
 export async function fulfilDomainAddonPayment(
   db: ReturnType<typeof getDb>,
-  { userId, gatewayOrder }: { userId: number; razorpayOrderId: string; paymentId: string; gatewayOrder: RazorpayOrderFull },
+  { userId, gatewayOrder, paymentId }: { userId: number; razorpayOrderId: string; paymentId: string; gatewayOrder: RazorpayOrderFull },
 ): Promise<{ granted: boolean }> {
   const notes = gatewayOrder.notes || {};
   if (String(notes.userId || "") !== String(userId)) {
@@ -72,7 +73,12 @@ export async function fulfilDomainAddonPayment(
   if (Number(gatewayOrder.amount) !== DOMAIN_ADDON_PRICE * 100) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "The paid amount doesn't match the add-on price. Contact support with your payment ID." });
   }
-  return { granted: await grantAddon(db, userId) };
+  const granted = await grantAddon(db, userId);
+  if (granted) {
+    void notifyUser({ userId, type: "addon_active", title: "Custom domain add-on is active", message: `Paid ₹${DOMAIN_ADDON_PRICE}. Connect your domain from Custom Domain in your dashboard.`, link: "/dashboard/domain" }, db);
+    void notifyTeam({ type: "online_sale", title: `Online payment · ₹${DOMAIN_ADDON_PRICE} for the custom domain add-on`, message: `Account #${userId} · ${paymentId}`, link: "/admin/domains", dedupeKey: `sale:${paymentId}` }, db);
+  }
+  return { granted };
 }
 // Free custom domain = an active Platinum subscription bought on the 3-year term.
 async function freeDomainEligible(db: ReturnType<typeof getDb>, userId: number): Promise<boolean> {
@@ -312,6 +318,11 @@ export const domainRouter = createRouter({
       if (cfEnabled()) { try { cfHost = await cfCreateHostname(domain); } catch (e) { throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Cloudflare: ${(e as Error).message}` }); } }
       const role = ctx.user.role === "reseller" ? "reseller" : "customer";
       await db.insert(customDomains).values({ domain, userId: ctx.user.id, cardId: input.cardId, verifyToken, addedByRole: role, status: "pending" });
+      void notifyTeam({
+        type: "domain_added", title: `Custom domain added · ${domain}`,
+        message: `${ctx.user.fullName} (${ctx.user.email})${role === "reseller" ? " · reseller" : ""} · waiting for their DNS`,
+        link: "/admin/domains",
+      }, db);
       return { ok: true, domain, dns: await ownerInfo(domain, verifyToken, cfHost) };
     }),
 

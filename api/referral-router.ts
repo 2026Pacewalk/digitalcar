@@ -15,6 +15,7 @@ import {
 } from "./lib/email-templates";
 import { enforceRateLimit } from "./lib/rate-limit";
 import { applyWallet, affectedRows } from "./lib/wallet";
+import { notifyUser, notifyTeam, resolveTeam } from "./lib/notify";
 
 const COMMISSION_KEY = "referral_commission_percent";
 const DISCOUNT_KEY = "referral_discount_percent";
@@ -233,6 +234,18 @@ export const referralRouter = createRouter({
         destinationMasked: input.destination.trim(), accountName: input.accountName?.trim() || null, ifsc: input.ifsc?.trim() || null,
         balance: balanceAfter, requestId: insertId, requestedAt: new Date(),
       }));
+      void notifyUser({
+        userId: ctx.user.id, type: "payout_requested", title: `Payout requested · ₹${money(input.amount)}`,
+        message: `We'll send it by ${input.method.toUpperCase()} once the team checks it. The amount is held from your wallet until then.`,
+        link: ctx.user.role === "reseller" ? "/reseller/earnings" : "/dashboard/refer",
+      }, db);
+      void notifyTeam({
+        type: "payout_request", title: `Payout request · ₹${money(input.amount)} by ${input.method.toUpperCase()}`,
+        message: `${ctx.user.fullName} (${ctx.user.email})${ctx.user.role === "reseller" ? " · reseller" : ""}`,
+        link: "/admin/referrals",
+        entity: { type: "withdrawal", id: Number(insertId) },
+        dedupeKey: `payout:${insertId}`,
+      }, db);
 
       return { ok: true, id: insertId };
     }),
@@ -421,7 +434,7 @@ export const referralRouter = createRouter({
   // Admin marks a payout as paid (funds were already held on request)
   payWithdrawal: adminQuery
     .input(z.object({ id: z.number(), reference: z.string().optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const wr = await db.query.withdrawalRequests.findFirst({ where: eq(withdrawalRequests.id, input.id) });
       if (!wr) throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
@@ -438,13 +451,15 @@ export const referralRouter = createRouter({
         .update(walletTransactions)
         .set({ status: "completed", note: `Payout paid${input.reference ? ` · ref ${input.reference}` : ""}` })
         .where(and(eq(walletTransactions.withdrawalId, input.id), eq(walletTransactions.type, "withdrawal")));
-      await db.insert(notifications).values({
+      void resolveTeam("withdrawal", wr.id, ctx.user.id, db);
+      await notifyUser({
         userId: wr.userId,
         type: "payout_paid",
         title: "Payout sent ✅",
         message: `Your payout of ₹${money(n(wr.amount))} has been paid via ${wr.method.toUpperCase()}.`,
         link: "/dashboard/refer",
-      });
+        push: "rewards",
+      }, db);
       // Email the recipient that their payout was processed (non-blocking).
       try {
         const payee = await db.query.users.findFirst({ where: eq(users.id, wr.userId), columns: { email: true, fullName: true } });
@@ -456,7 +471,7 @@ export const referralRouter = createRouter({
   // Admin rejects a payout — funds are returned to the wallet
   rejectWithdrawal: adminQuery
     .input(z.object({ id: z.number(), note: z.string().optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const wr = await db.query.withdrawalRequests.findFirst({ where: eq(withdrawalRequests.id, input.id) });
       if (!wr) throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
@@ -477,13 +492,15 @@ export const referralRouter = createRouter({
         withdrawalId: wr.id,
         note: `Payout rejected — amount refunded${input.note ? `: ${input.note}` : ""}`,
       });
-      await db.insert(notifications).values({
+      void resolveTeam("withdrawal", wr.id, ctx.user.id, db);
+      await notifyUser({
         userId: wr.userId,
         type: "payout_rejected",
         title: "Payout request declined",
         message: `Your payout of ₹${money(n(wr.amount))} was declined and refunded to your wallet.`,
         link: "/dashboard/refer",
-      });
+        push: "rewards",
+      }, db);
       // The note is already on the customer's wallet statement (above), so it can be quoted.
       void emailPayoutRejected(db, wr, input.note?.trim() || null, balance).catch(() => {});
       return { ok: true };

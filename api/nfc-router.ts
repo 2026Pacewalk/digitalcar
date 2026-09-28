@@ -12,6 +12,7 @@ import {
   nfcOrderDeliveredEmail, nfcOrderCancelledEmail, type Email, type NfcPaymentDetails,
 } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
+import { notifyUser, notifyTeam as postToTeam, resolveTeam } from "./lib/notify";
 import { NFC_PRODUCTS, NFC_DELIVERY, NFC_MAX_QTY, nfcProduct } from "../src/lib/nfcProducts";
 
 /* Physical NFC products — the PVC card and the standee — ordered from the
@@ -116,6 +117,16 @@ function notifyTeam(rows: NfcOrder[], opts: { paid: boolean; paymentId?: string 
   const sorted = [...rows].sort((a, b) => a.id - b.id);
   const first = sorted[0];
   if (!first) return;
+  const itemText = sorted.map((r) => `${r.quantity} × ${nfcProduct(r.product)?.name ?? r.product}`).join(", ");
+  const total = sorted.reduce((sum, r) => sum + Number(r.amount), 0);
+  void postToTeam({
+    type: opts.paid ? "nfc_order_paid" : "nfc_order_awaiting",
+    title: `${opts.paid ? "NFC order to print" : "NFC order awaiting payment"} · #${sorted.map((r) => r.id).join(", #")}`,
+    message: `${itemText} · ₹${total} · ${opts.customer?.fullName ?? first.shipName}${opts.paid ? "" : " — collect the payment"}`,
+    link: "/admin/nfc-orders",
+    entity: { type: "nfc_order", id: first.id },
+    dedupeKey: `nfc:${first.id}:${opts.paid ? "paid" : "awaiting"}`,
+  });
   return sendEmail(ownerAddress(), nfcOrderAdminEmail({
     ids: sorted.map((r) => r.id),
     paid: opts.paid,
@@ -203,6 +214,11 @@ export async function fulfilNfcPayment(
       }), ownerAddress());
     }
     void notifyTeam(paid, { paid: true, paymentId, customer: customer ?? null });
+    void notifyUser({
+      userId, type: "nfc_confirmed", title: `NFC order confirmed · #${first.id}`,
+      message: `We've got your payment for ${paid.map((p) => `${p.quantity} × ${nfcProduct(p.product)?.name ?? p.product}`).join(", ")}. It's printed and shipped in ${NFC_DELIVERY.label}.`,
+      link: "/dashboard/nfc", push: "always",
+    });
   }
   return { orderIds: ids, confirmed: true };
 }
@@ -245,6 +261,11 @@ async function notifyManualCheckout(db: ReturnType<typeof getDb>, rows: NfcOrder
     emailedHowToPay = !!(payment?.upiId || payment?.bank);
   } catch { /* the team alert below must still go out */ }
   void notifyTeam(sorted, { paid: false, customer, customerEmailed: emailedHowToPay });
+  void notifyUser({
+    userId: customer.id, type: "nfc_received", title: `NFC order received · #${first.id}`,
+    message: `${sorted.map((r) => `${r.quantity} × ${nfcProduct(r.product)?.name ?? r.product}`).join(", ")} — we've emailed you how to pay. We print it once the payment reaches us.`,
+    link: "/dashboard/nfc",
+  });
 }
 
 /* The customer email for an admin status change, or null when there isn't one.
@@ -305,6 +326,14 @@ function statusEmail(prev: NfcOrder, status: NfcOrder["status"], tracking: strin
 async function emailStatusChange(db: ReturnType<typeof getDb>, prev: NfcOrder, status: NfcOrder["status"], tracking: string | null | undefined) {
   const email = statusEmail(prev, status, tracking);
   if (!email) return;
+  const what = `${prev.quantity} × ${nfcProduct(prev.product)?.name ?? prev.product}`;
+  const bell: Record<string, { type: string; title: string; message: string }> = {
+    shipped: { type: "nfc_shipped", title: `NFC order shipped · #${prev.id}`, message: tracking ? `${what} is on its way. Tracking: ${tracking}` : `${what} is on its way.` },
+    paid: { type: "nfc_confirmed", title: `NFC order confirmed · #${prev.id}`, message: `Payment received for ${what}. It's printed and shipped in ${NFC_DELIVERY.label}.` },
+    delivered: { type: "nfc_delivered", title: `NFC order delivered · #${prev.id}`, message: `${what} has been delivered. Tap it on your phone once to check it opens your card.` },
+    cancelled: { type: "nfc_cancelled", title: `NFC order cancelled · #${prev.id}`, message: `${what} won't be printed or shipped.` },
+  };
+  if (bell[status]) void notifyUser({ userId: prev.userId, ...bell[status], link: "/dashboard/nfc", push: "always" });
   const [owner] = await db.select({ email: users.email }).from(users).where(eq(users.id, prev.userId));
   if (owner?.email) await sendEmail(owner.email, email, ownerAddress());
 }
@@ -312,6 +341,11 @@ async function emailStatusChange(db: ReturnType<typeof getDb>, prev: NfcOrder, s
 /* The tracking number reached a parcel that had already shipped. */
 async function emailTracking(db: ReturnType<typeof getDb>, prev: NfcOrder, tracking: string, update: "added" | "changed") {
   const product = nfcProduct(prev.product);
+  void notifyUser({
+    userId: prev.userId, type: "nfc_tracking",
+    title: `${update === "changed" ? "Updated tracking" : "Tracking number"} · NFC order #${prev.id}`,
+    message: `${prev.quantity} × ${product?.name ?? prev.product}: ${tracking}`, link: "/dashboard/nfc", push: "always",
+  });
   const [owner] = await db.select({ email: users.email }).from(users).where(eq(users.id, prev.userId));
   if (!owner?.email) return;
   await sendEmail(owner.email, nfcOrderShippedEmail({
@@ -476,7 +510,7 @@ export const nfcRouter = createRouter({
       tracking: z.string().trim().max(255).optional(),
       adminNote: z.string().trim().max(500).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const [prev] = await db.select().from(nfcOrders).where(eq(nfcOrders.id, input.id));
       if (!prev) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
@@ -511,6 +545,7 @@ export const nfcRouter = createRouter({
       // Tell the customer on the first move into shipped, paid (manual payment),
       // delivered or cancelled. Non-blocking: the save never waits on email.
       if (moved) void emailStatusChange(db, prev, input.status, input.tracking ?? prev.tracking).catch(() => {});
+      if (moved) void resolveTeam("nfc_order", prev.id, ctx.user.id);
       if (trackingSent) void emailTracking(db, prev, newTracking!, prev.tracking ? "changed" : "added").catch(() => {});
       return { ok: true, emailed: (moved && !!statusEmail(prev, input.status, input.tracking ?? prev.tracking)) || trackingSent };
     }),

@@ -10,6 +10,7 @@ import { eq, and, desc, like, or, sql, gte, inArray } from "drizzle-orm";
 import { legacySlugSet, legacySlugOwners, slugTakenByOther } from "./publish-router";
 import { cancelAccountDeletion, completeAccountDeletion } from "./lib/account-deletion";
 import { sendEmail } from "./lib/mail";
+import { notifyUser } from "./lib/notify";
 import { cardLinkChangedEmail } from "./lib/email-templates";
 
 /* Tell a card's owner our team moved it to a new link: the old one stops
@@ -22,6 +23,11 @@ async function tellOwnerOfNewLink(
 ): Promise<void> {
   const owner = await db.query.users.findFirst({ where: eq(users.id, userId), columns: { email: true, fullName: true, status: true } });
   if (!owner || owner.status !== "active") return;
+  void notifyUser({
+    userId, type: "card_link_changed", title: "Your card has a new link",
+    message: `It's now digitalcarda.in/${card.newSlug} (was /${card.oldSlug}). Your QR codes keep working.`,
+    link: "/dashboard/qr",
+  }, db);
   const [row] = await db.select({ data: publishedCards.data }).from(publishedCards).where(eq(publishedCards.id, card.id)).limit(1);
   const company = (row?.data as { customer?: { company_name?: unknown } } | null)?.customer?.company_name;
   await sendEmail(owner.email, cardLinkChangedEmail({

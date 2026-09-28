@@ -6,6 +6,7 @@ import { cardAddons, razorpayFulfilments } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import { resolveRazorpay } from "./payment-router";
 import { createRazorpayOrder, verifyRazorpaySignature, fetchRazorpayOrder, type RazorpayOrderFull } from "./lib/razorpay";
+import { notifyUser, notifyTeam } from "./lib/notify";
 
 /* Card add-ons — ID Card & Membership Card. Paid extras ON TOP of the plan.
    ₹299/year each; on a monthly plan the price is that ÷12. Self-contained so
@@ -79,6 +80,14 @@ export async function fulfilAddonPayment(
     if (affected === 0) return { granted: false };
     await grantAddon(tx, userId, paidType, paidCycle);
     return { granted: true };
+  }).then((r) => {
+    if (r.granted) {
+      const name = ADDONS.find((a) => a.type === paidType)?.name ?? "Add-on";
+      const amount = Number(gatewayOrder.amount) / 100;
+      void notifyUser({ userId, type: "addon_active", title: `${name} is active`, message: `Paid ₹${amount} (${paidCycle}). It's ready in your dashboard.`, link: "/dashboard" });
+      void notifyTeam({ type: "online_sale", title: `Online payment · ₹${amount} for ${name}`, message: `Account #${userId} · ${paidCycle} · ${paymentId}`, link: "/admin/customers", dedupeKey: `sale:${paymentId}` });
+    }
+    return r;
   });
 }
 

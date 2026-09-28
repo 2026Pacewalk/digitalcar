@@ -5,6 +5,7 @@ import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { leads, users } from "@db/schema";
 import { sendEmail, ownerAddress } from "./lib/mail";
+import { notifyTeam } from "./lib/notify";
 import { contactReceivedEmail, contactEnquiryAdminEmail } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
@@ -98,6 +99,12 @@ export const contactRouter = createRouter({
           message: "We could not deliver your enquiry just now. Please reach us on WhatsApp or email instead.",
         });
       }
+
+      void notifyTeam({
+        type: "contact_new", title: `Website enquiry · ${input.name}${requirement ? ` · ${requirement}` : ""}`,
+        message: [input.businessName, input.email, input.phone, input.message].filter(Boolean).join(" · "),
+        link: "/admin/leads",
+      });
 
       // The visitor's confirmation. Best effort: the enquiry is already safe,
       // so a mail hiccup here must not turn into an error on their screen.

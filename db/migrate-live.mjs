@@ -175,6 +175,27 @@ const TABLES = {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX rasg_customer_idx (customer_user_id, created_at),
     INDEX rasg_to_idx (to_reseller_id))`,
+  // What the team is told (Admin → bell / notifications): one row per event;
+  // who may see it comes from its staff module (contracts/notifications.ts).
+  team_notifications: `CREATE TABLE IF NOT EXISTS team_notifications (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    type VARCHAR(50) NOT NULL, category VARCHAR(20) NOT NULL, module VARCHAR(20) NULL,
+    severity ENUM('info','action','critical') NOT NULL DEFAULT 'info',
+    title VARCHAR(255) NOT NULL, message TEXT NOT NULL, link VARCHAR(500) NULL,
+    entity_type VARCHAR(30) NULL, entity_id BIGINT UNSIGNED NULL,
+    dedupe_key VARCHAR(120) NULL,
+    resolved_at TIMESTAMP NULL, resolved_by BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX uq_tn_dedupe (dedupe_key),
+    INDEX tn_created_idx (created_at),
+    INDEX tn_entity_idx (entity_type, entity_id))`,
+  // Each admin's read / cleared state per team notification.
+  team_notification_marks: `CREATE TABLE IF NOT EXISTS team_notification_marks (
+    notification_id BIGINT UNSIGNED NOT NULL, user_id BIGINT UNSIGNED NOT NULL,
+    read_at TIMESTAMP NULL, cleared_at TIMESTAMP NULL,
+    PRIMARY KEY (notification_id, user_id),
+    INDEX tnm_user_idx (user_id),
+    CONSTRAINT fk_tnm_notification FOREIGN KEY (notification_id) REFERENCES team_notifications(id) ON DELETE CASCADE)`,
 };
 
 for (const [name, sql] of Object.entries(TABLES)) {
@@ -212,6 +233,24 @@ for (const [col, def] of [
   } else { log(`• reseller_profiles.${col} present (skipped)`); }
 }
 log("✓ users.role accepts 'staff'");
+
+// Notifications: "Clear" hides a row instead of deleting it (the daily jobs
+// use the rows as their send-once record), and the feed is read per user,
+// newest first. Both guarded — MySQL has no ADD COLUMN / INDEX IF NOT EXISTS.
+{
+  const [cc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='notifications' AND column_name='cleared_at'");
+  if (cc[0].n === 0) {
+    await conn.query("ALTER TABLE notifications ADD COLUMN cleared_at TIMESTAMP NULL AFTER link");
+    log("✓ notifications.cleared_at added");
+  } else { log("• notifications.cleared_at present (skipped)"); }
+  const [ix] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE table_schema=DATABASE() AND table_name='notifications' AND index_name='notif_user_feed_idx'");
+  if (ix[0].n === 0) {
+    await conn.query("ALTER TABLE notifications ADD INDEX notif_user_feed_idx (user_id, created_at)");
+    log("✓ notifications (user_id, created_at) index added");
+  } else { log("• notifications feed index present (skipped)"); }
+}
 
 // Relax leads.card_id to NULL (snapshot cards have no DB card row). Guarded.
 const [col] = await conn.query(

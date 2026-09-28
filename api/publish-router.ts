@@ -8,6 +8,7 @@ import { getDb } from "./queries/connection";
 import { publishedCards, cards, cardTrials, subscriptions, appSettings, cardEvents, users, accountDeletionRequests, type User } from "@db/schema";
 import { legacyPaidPlan } from "./lib/entitlement";
 import { sendEmail } from "./lib/mail";
+import { notifyUser } from "./lib/notify";
 import { cardPublishedEmail } from "./lib/email-templates";
 import { getDefaultDesign } from "./template-router";
 
@@ -125,10 +126,15 @@ export async function slugTakenByOther(
 
 /* "Your card is live" to the owner, for a card's FIRST snapshot. Best-effort:
    never awaited by the publish, so a mail problem can't slow or fail it. */
-async function notifyCardPublished(owner: Pick<User, "email" | "fullName">, slug: string, publicId: string, data: unknown): Promise<void> {
+async function notifyCardPublished(owner: Pick<User, "id" | "email" | "fullName">, slug: string, publicId: string, data: unknown): Promise<void> {
   // A legacy owner reclaiming their customers.json address has been live for
   // years; the go-live email would be news to nobody.
   if (legacySlugSet().has(slug.toLowerCase())) return;
+  void notifyUser({
+    userId: owner.id, type: "card_published", title: "Your card is live 🎉",
+    message: `digitalcarda.in/${slug} is online. Share the link or your QR code to start getting enquiries.`,
+    link: "/dashboard/qr",
+  });
   const company = (data as { customer?: { company_name?: unknown } } | null)?.customer?.company_name;
   await sendEmail(owner.email, cardPublishedEmail({
     name: owner.fullName, slug, publicId,

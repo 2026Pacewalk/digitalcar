@@ -22,7 +22,8 @@ export function useStaffAccess() {
     if (isSuper) return true;
     if (!isStaff) return false;
     const clean = path.split("?")[0];
-    if (clean === "/admin/profile") return true;
+    // Their profile, and the team notifications (filtered to their modules server-side).
+    if (clean === "/admin/profile" || clean === "/admin/notifications") return true;
     const m = moduleForAdminPath(clean);
     return !!m && hasAccess(perms, m, "view");
   };

@@ -377,6 +377,21 @@ app.post("/api/enquiry", async (c) => {
       })().catch((e) => console.error("[enquiry] push skipped:", (e as Error).message));
     }
 
+    /* The card owner's bell, and the team's. Spam goes in neither. (The owner's
+       phone push is sent above, so none here.) */
+    if (verdict !== "spam") {
+      const { notifyUser, notifyTeam } = await import("./lib/notify");
+      const hot = verdict === "important" ? "🔥 " : "";
+      const snippet = String(body.description || body.contact || body.email || "").replace(/\s+/g, " ").trim();
+      if (pushOwnerId) {
+        void notifyUser({ userId: pushOwnerId, type: "enquiry_new", title: `${hot}New enquiry from ${name}`, message: snippet || "Open Leads to reply.", link: "/dashboard/leads" });
+      }
+      void notifyTeam({
+        type: "lead_new", title: `${hot}Enquiry for digitalcarda.in/${slug || "unknown card"}`,
+        message: `${name}${body.contact ? ` · ${body.contact}` : ""}${snippet ? ` — ${snippet}` : ""}`, link: "/admin/leads",
+      });
+    }
+
     /* Reply to the VISITOR on the card owner's behalf. Until now only the owner
        was emailed, so whoever filled the form heard nothing back and our
        customer looked unresponsive. Best-effort: a failure here must never fail
@@ -956,6 +971,50 @@ if (process.env.NODE_ENV === "production") {
     console.log("[schema] email_log_bodies ensured");
   } catch (e) {
     console.error("[schema] ensure email_log_bodies failed:", (e as Error).message);
+  }
+})();
+
+// Notifications: the team feed, and "Clear" as a hidden flag on the user feed
+// (db/migrate-live.mjs is the production authority).
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS team_notifications (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        type VARCHAR(50) NOT NULL, category VARCHAR(20) NOT NULL, module VARCHAR(20) NULL,
+        severity ENUM('info','action','critical') NOT NULL DEFAULT 'info',
+        title VARCHAR(255) NOT NULL, message TEXT NOT NULL, link VARCHAR(500) NULL,
+        entity_type VARCHAR(30) NULL, entity_id BIGINT UNSIGNED NULL,
+        dedupe_key VARCHAR(120) NULL,
+        resolved_at TIMESTAMP NULL, resolved_by BIGINT UNSIGNED NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE INDEX uq_tn_dedupe (dedupe_key), INDEX tn_created_idx (created_at), INDEX tn_entity_idx (entity_type, entity_id)
+      )
+    `));
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS team_notification_marks (
+        notification_id BIGINT UNSIGNED NOT NULL, user_id BIGINT UNSIGNED NOT NULL,
+        read_at TIMESTAMP NULL, cleared_at TIMESTAMP NULL,
+        PRIMARY KEY (notification_id, user_id), INDEX tnm_user_idx (user_id),
+        CONSTRAINT fk_tnm_notification FOREIGN KEY (notification_id) REFERENCES team_notifications(id) ON DELETE CASCADE
+      )
+    `));
+    const count = async (q: string) => {
+      const rows = await db.execute(sql.raw(q));
+      return Number((rows as unknown as [{ n?: number }[]])[0]?.[0]?.n ?? (rows as unknown as { n?: number }[])[0]?.n ?? 0);
+    };
+    if (!(await count("SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='notifications' AND column_name='cleared_at'"))) {
+      await db.execute(sql.raw("ALTER TABLE notifications ADD COLUMN cleared_at TIMESTAMP NULL AFTER link"));
+    }
+    if (!(await count("SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE table_schema=DATABASE() AND table_name='notifications' AND index_name='notif_user_feed_idx'"))) {
+      await db.execute(sql.raw("ALTER TABLE notifications ADD INDEX notif_user_feed_idx (user_id, created_at)"));
+    }
+    console.log("[schema] team_notifications, notifications.cleared_at ensured");
+  } catch (e) {
+    console.error("[schema] ensure notifications failed:", (e as Error).message);
   }
 })();
 

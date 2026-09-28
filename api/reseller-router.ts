@@ -16,6 +16,7 @@ import { recordActivity } from "./lib/staff-access";
 import { sendEmail, ownerAddress } from "./lib/mail";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 import { affectedRows } from "./lib/wallet";
+import { notifyUser, notifyTeam, resolveTeam } from "./lib/notify";
 import {
   resellerApplicationAdminEmail, resellerApplicationReceivedEmail,
   resellerApprovedEmail, resellerApprovedExistingEmail, resellerRejectedEmail, resellerLoginDetailsEmail,
@@ -182,6 +183,11 @@ async function grantResellerLogin(db: Db, o: {
     const link = `${PUBLIC_BASE_URL}/reset-password?token=${encodeURIComponent(token)}&for=partner`;
     void sendEmail(email, resellerApprovedEmail({ name: fullName, link, email, companyName: company, commissionRate: rate, invited: o.invited }));
   }
+  void notifyUser({
+    userId: result.userId, type: "reseller_welcome", title: "Welcome to the DigitalCarda partner programme 🤝",
+    message: `You earn ${Number(rate)}% on every plan your customers pay for. Add your first customer from My Customers.`,
+    link: "/reseller/customers",
+  }, db);
   return { ...result, isNew: !existing };
 }
 
@@ -219,13 +225,24 @@ export const resellerRouter = createRouter({
       const existing = await db.query.resellerApplications.findFirst({
         where: and(eq(resellerApplications.email, email), eq(resellerApplications.status, "pending")),
       });
+      let appId = existing?.id ?? 0;
       if (!existing) {
-        await db.insert(resellerApplications).values({
+        const [ins] = await db.insert(resellerApplications).values({
           fullName: input.fullName.trim(), email,
           phone: input.phone?.trim() || null,
           companyName: input.companyName?.trim() || null,
           message: input.message?.trim() || null,
         });
+        appId = Number(ins.insertId);
+      }
+      if (appId) {
+        void notifyTeam({
+          type: "reseller_application", title: `Reseller application · ${input.fullName.trim()}`,
+          message: `${input.companyName?.trim() ? `${input.companyName.trim()} · ` : ""}${email}${input.phone ? ` · ${input.phone}` : ""}`,
+          link: "/admin/resellers",
+          entity: { type: "reseller_application", id: appId },
+          dedupeKey: `resapp:${appId}`,
+        }, db);
       }
       void sendEmail(ownerAddress(), resellerApplicationAdminEmail({ name: input.fullName, email, phone: input.phone, companyName: input.companyName, message: input.message }));
       void sendEmail(email, resellerApplicationReceivedEmail({ name: input.fullName }));
@@ -244,7 +261,7 @@ export const resellerRouter = createRouter({
       note: z.string().optional(),
       commissionRate: z.number().min(0).max(100).default(20),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const app = await db.query.resellerApplications.findFirst({ where: eq(resellerApplications.id, input.id) });
       if (!app) throw new TRPCError({ code: "NOT_FOUND", message: "Application not found" });
@@ -259,6 +276,7 @@ export const resellerRouter = createRouter({
           commissionRate: input.commissionRate, accountId: null, invited: false,
         });
         await db.update(resellerApplications).set({ userId: r.userId }).where(eq(resellerApplications.id, app.id));
+        void resolveTeam("reseller_application", app.id, ctx.user.id, db);
         return { ok: true, isNew: r.isNew };
       } catch (e) {
         // Put it back so the admin can fix the problem and approve again.
@@ -269,7 +287,7 @@ export const resellerRouter = createRouter({
 
   reject: adminQuery
     .input(z.object({ id: z.number(), note: z.string().optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const app = await db.query.resellerApplications.findFirst({ where: eq(resellerApplications.id, input.id) });
       if (!app) throw new TRPCError({ code: "NOT_FOUND", message: "Application not found" });
@@ -278,6 +296,7 @@ export const resellerRouter = createRouter({
         .where(and(eq(resellerApplications.id, app.id), eq(resellerApplications.status, "pending")));
       if (affectedRows(claimed) === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Already processed" });
       void sendEmail(app.email, resellerRejectedEmail({ name: app.fullName, note: input.note?.trim() }));
+      void resolveTeam("reseller_application", app.id, ctx.user.id, db);
       return { ok: true };
     }),
 
@@ -396,6 +415,10 @@ export const resellerRouter = createRouter({
       await db.update(users).set({ password: await bcrypt.hash(input.password, 12) }).where(eq(users.id, user.id));
       recordActivity({ actor: ctx.user, module: "resellers", action: "Set a reseller's password", target: user.email, req: ctx.req });
       void sendEmail(user.email, passwordChangedEmail({ name: user.fullName, byTeam: true, at: new Date() }));
+      void notifyUser({
+        userId: user.id, type: "security_password", title: "Your password was changed by the DigitalCarda team",
+        message: "If you didn't ask for this, reply to our email or WhatsApp us straight away.", link: "/reseller/profile#password",
+      }, db);
       return { ok: true };
     }),
 
@@ -528,6 +551,15 @@ export const resellerRouter = createRouter({
         actor: ctx.user, module: "customers", action, target: cust.email, req: ctx.req,
         summary: `${fromName ?? "No reseller"} → ${target?.acc.name ?? "No reseller"}${note ? ` · ${note}` : ""}`,
       });
+
+      // The reseller who had them hears it's over — past commission stays theirs.
+      if (from && from !== to) {
+        void notifyUser({
+          userId: from, type: "reseller_customer_removed", title: `${cust.fullName} was moved out of your account`,
+          message: "Commission you've already earned on them stays yours; their new plan payments no longer earn you commission.",
+          link: "/reseller/customers",
+        }, db);
+      }
 
       // Tell the reseller who now has them: in the portal and by email.
       let emailed = false;
@@ -676,6 +708,17 @@ export const resellerRouter = createRouter({
       // default template. It used to create the account only, so the customer
       // had no card and no link ("/" in Admin → Customers).
       const starter = await provisionStarterCard(db, { id: ins.id, email, fullName, phone });
+      void notifyUser({
+        userId: ins.id, type: "welcome", title: "Welcome to DigitalCarda 👋",
+        message: `${ctx.user.fullName} set up your account. Complete your card profile to start getting enquiries.`, link: "/dashboard/home",
+      }, db);
+      void notifyTeam({
+        type: "customer_created", title: `New customer from ${ctx.user.fullName} (reseller)`,
+        message: `${fullName} · ${email}${starter?.slug ? ` · digitalcarda.in/${starter.slug}` : ""}`,
+        link: `/admin/customers?q=${encodeURIComponent(email)}`,
+        entity: { type: "user", id: ins.id },
+        dedupeKey: `signup:${ins.id}`,
+      }, db);
       return { ok: true, id: ins.id, slug: starter?.slug ?? null };
     }),
 });

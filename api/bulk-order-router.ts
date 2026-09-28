@@ -4,6 +4,7 @@ import { getDb } from "./queries/connection";
 import { bulkOrderRequests } from "@db/schema";
 import { desc, eq } from "drizzle-orm";
 import { sendEmail, ownerAddress } from "./lib/mail";
+import { notifyTeam, resolveTeam } from "./lib/notify";
 import { bulkOrderAdminEmail, bulkOrderReceivedEmail } from "./lib/email-templates";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
 
@@ -42,6 +43,13 @@ function firstConfirmation(key: string): boolean {
    awaited by the mutation: the request is already saved. */
 async function notifyBulkOrder(input: z.infer<typeof createInput>, userId: number | null, requestId: number | null): Promise<void> {
   const email = validEmail(input.email);
+  void notifyTeam({
+    type: "bulk_order", title: `Bulk order request · ${input.quantity} cards${input.packageName ? ` (${input.packageName})` : ""}`,
+    message: [input.company, input.contactName, input.phone, input.email, input.totalEstimate ? `≈ ₹${input.totalEstimate}` : ""].filter(Boolean).join(" · "),
+    link: "/admin/bulk-orders",
+    entity: requestId ? { type: "bulk_order", id: requestId } : null,
+    dedupeKey: requestId ? `bulk:${requestId}` : null,
+  });
   await sendEmail(ownerAddress(), bulkOrderAdminEmail({
     company: input.company, contactName: input.contactName, phone: input.phone, email: input.email,
     quantity: input.quantity, pricePerCard: input.pricePerCard, totalEstimate: input.totalEstimate,
@@ -108,9 +116,11 @@ export const bulkOrderRouter = createRouter({
   // Admin: move a request along the pipeline.
   setStatus: adminQuery
     .input(z.object({ id: z.number(), status: z.enum(["new", "contacted", "won", "lost"]) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       await db.update(bulkOrderRequests).set({ status: input.status }).where(eq(bulkOrderRequests.id, input.id));
+      // Someone picked it up: it leaves the team's Needs action.
+      if (input.status !== "new") void resolveTeam("bulk_order", input.id, ctx.user.id, db);
       return { ok: true };
     }),
 });
