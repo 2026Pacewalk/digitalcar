@@ -58,9 +58,16 @@ export default function AdminNfcOrders() {
 
   const save = async (id: number, status: Status, trackingValue?: string) => {
     setSaving(id);
+    const was = rows.find((r) => r.id === id)?.status;
     try {
-      await update.mutateAsync({ id, status, ...(trackingValue !== undefined ? { tracking: trackingValue } : {}) });
-      toast.success(status === "shipped" ? "Marked shipped — the customer has been emailed" : `Order #${id} updated`);
+      const res = await update.mutateAsync({ id, status, ...(trackingValue !== undefined ? { tracking: trackingValue } : {}) });
+      toast.success(
+        status === "shipped" && was !== "shipped"
+          ? `Marked shipped — the customer has been emailed${trackingValue?.trim() ? " with the tracking number" : " (no tracking number yet)"}`
+          : status === "shipped" && res.emailed ? "Tracking saved — the customer has been emailed it"
+          : res.emailed ? `Order #${id} updated — the customer has been emailed`
+          : `Order #${id} updated`,
+      );
       await refetch();
     } catch {
       toast.error("Could not update the order");
@@ -133,7 +140,8 @@ export default function AdminNfcOrders() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${st.cls}`}>{st.label}</span>
-                      <select value={o.status} disabled={saving === o.id} onChange={(e) => save(o.id, e.target.value as Status)}
+                      {/* A tracking number typed below goes with the status, so "Shipped" emails it. */}
+                      <select value={o.status} disabled={saving === o.id} onChange={(e) => save(o.id, e.target.value as Status, tracking[o.id])}
                         aria-label={`Status of order ${o.id}`} className="h-9 rounded-xl border border-[#E2E8F0] bg-white px-2.5 text-[13px] font-semibold text-[#0F172A]">
                         {STATUS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                       </select>
@@ -174,6 +182,9 @@ export default function AdminNfcOrders() {
                         className="h-10 rounded-xl bg-[#0F172A] px-4 text-[13px] font-bold text-white hover:bg-[#1E293B]">Mark shipped & email customer</button>
                     )}
                   </div>
+                  {o.status === "shipped" && (
+                    <p className="mt-1.5 text-[11.5px] text-[#94A3B8]">Saving a new or corrected tracking number emails it to the customer.</p>
+                  )}
                 </li>
               );
             })}

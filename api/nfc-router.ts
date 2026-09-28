@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { nfcOrders, publishedCards, users, type NfcOrder } from "@db/schema";
@@ -309,6 +309,22 @@ async function emailStatusChange(db: ReturnType<typeof getDb>, prev: NfcOrder, s
   if (owner?.email) await sendEmail(owner.email, email, ownerAddress());
 }
 
+/* The tracking number reached a parcel that had already shipped. */
+async function emailTracking(db: ReturnType<typeof getDb>, prev: NfcOrder, tracking: string, update: "added" | "changed") {
+  const product = nfcProduct(prev.product);
+  const [owner] = await db.select({ email: users.email }).from(users).where(eq(users.id, prev.userId));
+  if (!owner?.email) return;
+  await sendEmail(owner.email, nfcOrderShippedEmail({
+    name: prev.shipName,
+    orderId: prev.id,
+    productName: product?.name ?? prev.product,
+    quantity: prev.quantity,
+    tracking,
+    ids: [prev.id], items: [itemOf(prev)], ship: shipOf(prev), cardUrl: prev.cardUrl,
+    trackingUpdate: update,
+  }), ownerAddress());
+}
+
 export const nfcRouter = createRouter({
   // Products, whether online payment is on, the link that will be printed, and
   // the signed-in user's orders.
@@ -479,11 +495,23 @@ export const nfcRouter = createRouter({
         moved = ((res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
           ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? 0) > 0;
       }
+      // Already shipped, and the team saves a new or corrected tracking number:
+      // the shipped email may have gone out without one, so send it. Written
+      // only while the stored number differs, so a double click emails once.
+      const newTracking = input.tracking !== undefined ? input.tracking || null : null;
+      let trackingSent = false;
+      if (!moved && newTracking && prev.status === "shipped" && input.status === "shipped") {
+        const res = await db.update(nfcOrders).set({ tracking: newTracking })
+          .where(and(eq(nfcOrders.id, input.id), or(isNull(nfcOrders.tracking), ne(nfcOrders.tracking, newTracking))));
+        trackingSent = ((res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+          ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? 0) > 0;
+      }
       if (!moved) await db.update(nfcOrders).set(changes).where(eq(nfcOrders.id, input.id));
 
       // Tell the customer on the first move into shipped, paid (manual payment),
       // delivered or cancelled. Non-blocking: the save never waits on email.
       if (moved) void emailStatusChange(db, prev, input.status, input.tracking ?? prev.tracking).catch(() => {});
-      return { ok: true };
+      if (trackingSent) void emailTracking(db, prev, newTracking!, prev.tracking ? "changed" : "added").catch(() => {});
+      return { ok: true, emailed: (moved && !!statusEmail(prev, input.status, input.tracking ?? prev.tracking)) || trackingSent };
     }),
 });

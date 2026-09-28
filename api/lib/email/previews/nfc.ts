@@ -122,6 +122,19 @@ export const previews: Preview[] = [
     render: () => nfcOrderShippedEmail({ name: null, orderId: 140, productName: "NFC Standee", quantity: 1, tracking: null }),
   },
 
+  /* ── Tracking saved after it had shipped ── */
+  {
+    name: "nfcTrackingEmail", module: MODULE, audience: "customer", variant: "added",
+    render: () => nfcOrderShippedEmail({
+      name: "Aarav Mehta", orderId: 101, productName: "NFC PVC Card", quantity: 1, tracking: "DTDC D12345678",
+      ship: SHIP, cardUrl: CARD_URL, trackingUpdate: "added",
+    }),
+  },
+  {
+    name: "nfcTrackingEmail", module: MODULE, audience: "customer", variant: "corrected",
+    render: () => nfcOrderShippedEmail({ name: "Aarav Mehta", orderId: 101, productName: "NFC PVC Card", quantity: 1, tracking: "DTDC D87654321", trackingUpdate: "changed" }),
+  },
+
   /* ── Delivered ── */
   {
     name: "nfcOrderDeliveredEmail", module: MODULE, audience: "customer", variant: "card-and-standee",

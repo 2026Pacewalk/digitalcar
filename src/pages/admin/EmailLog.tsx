@@ -58,6 +58,7 @@ const KIND_LABEL: Record<string, string> = {
   nfcOrderReceivedEmail: "NFC order received",
   nfcOrderConfirmedEmail: "NFC order confirmed",
   nfcOrderShippedEmail: "NFC order shipped",
+  nfcTrackingEmail: "NFC tracking number",
   nfcOrderDeliveredEmail: "NFC order delivered",
   nfcOrderCancelledEmail: "NFC order cancelled",
   nfcOrderAdmin: "NFC order (admin)",

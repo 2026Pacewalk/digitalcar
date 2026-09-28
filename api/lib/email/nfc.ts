@@ -638,6 +638,9 @@ export function nfcOrderConfirmedEmail(o: {
  * - trackingUrl: a tracking page (http/https only). A `tracking` value that is itself a URL is linked too.
  * - ship: where it's going, shown as a label.
  * - cardUrl: the link the chip opens, for the "when it arrives" check.
+ * - trackingUpdate: "added" / "changed" — the order had already shipped and the team
+ *   has now saved (or corrected) its tracking number: kind "nfcTrackingEmail",
+ *   led by the tracking details instead of "it has shipped".
  */
 export function nfcOrderShippedEmail(o: {
   name?: string | null; orderId: number; productName: string; quantity: number; tracking?: string | null;
@@ -647,6 +650,7 @@ export function nfcOrderShippedEmail(o: {
   trackingUrl?: string | null;
   ship?: NfcShip | null;
   cardUrl?: string | null;
+  trackingUpdate?: "added" | "changed" | null;
 }): Email {
   const ids = sortedIds(o.ids, o.orderId);
   const ref = refOf(ids);
@@ -660,17 +664,22 @@ export function nfcOrderShippedEmail(o: {
   const courier = (o.courier || "").trim();
   const cardUrl = safeUrl(o.cardUrl);
 
+  const update = o.trackingUpdate && (trackingCode || trackingHref) ? o.trackingUpdate : null;
   const hero = heroBand({
-    eyebrow: "Shipped",
+    eyebrow: update === "changed" ? "Tracking updated" : update ? "Tracking added" : "Shipped",
     tone: "blue",
-    title: `Your ${noun} ${plural ? "are" : "is"} on the way`,
-    sub: trackingCode || trackingHref ? "It's with the courier — your tracking details are below." : "It's with the courier and heading to you.",
+    title: update ? "Here's your tracking number" : `Your ${noun} ${plural ? "are" : "is"} on the way`,
+    sub: update ? `Your ${noun} ${plural ? "are" : "is"} with the courier — use this to follow ${plural ? "them" : "it"}.` : trackingCode || trackingHref ? "It's with the courier — your tracking details are below." : "It's with the courier and heading to you.",
     chips: [darkChip(`Order ${esc(ref)}`), darkChip(esc(itemText)), ...(courier ? [darkChip(esc(courier))] : [])],
   });
 
   const bodyHtml =
     hi(o.name) +
-    p(`Good news — order ${esc(ref)} has left us and is on its way to you.`) +
+    p(update === "changed"
+      ? `We've corrected the tracking number for order ${esc(ref)}, which is on its way to you. Please use this one.`
+      : update
+        ? `Here's the tracking number for order ${esc(ref)}, which is on its way to you.`
+        : `Good news — order ${esc(ref)} has left us and is on its way to you.`) +
     (trackingCode || trackingHref
       ? trackingPanel({ code: trackingCode, href: trackingHref, courier })
       : callout("blue", "No tracking number on this one",
@@ -692,7 +701,9 @@ export function nfcOrderShippedEmail(o: {
 
   const text = [
     `Hi ${firstName(o.name) || "there"},`, "",
-    `Your ${itemText} (order ${ref}) is on its way.`,
+    update === "changed" ? `We've corrected the tracking number for your ${itemText} (order ${ref}) — please use this one.`
+      : update ? `Here's the tracking number for your ${itemText} (order ${ref}), which is on its way.`
+      : `Your ${itemText} (order ${ref}) is on its way.`,
     ...(courier ? [`Courier: ${courier}`] : []),
     ...(trackingCode ? [`Tracking: ${trackingCode}`] : []),
     ...(trackingHref ? [`Track your parcel: ${trackingHref}`] : []),
@@ -705,8 +716,10 @@ export function nfcOrderShippedEmail(o: {
   ].join("\n");
 
   return {
-    kind: "nfcOrderShippedEmail",
-    subject: multi ? `Shipped — your ${noun} (${ref})` : `Shipped — your ${o.productName} (#${o.orderId})`,
+    kind: update ? "nfcTrackingEmail" : "nfcOrderShippedEmail",
+    subject: update
+      ? `${update === "changed" ? "Updated tracking" : "Tracking number"} for your ${multi ? noun : o.productName} (${multi ? ref : `#${o.orderId}`})`
+      : multi ? `Shipped — your ${noun} (${ref})` : `Shipped — your ${o.productName} (#${o.orderId})`,
     html: layout({
       preheader: trackingCode
         ? `Tracking ${trackingCode}. When it arrives, tap it on your phone once to check it opens your card.`
