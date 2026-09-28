@@ -127,6 +127,7 @@ async function emailOnlineSale(db: ReturnType<typeof getDb>, p: RazorpayPayment,
     message: `${buyer?.fullName || `Account #${p.userId}`}${buyer?.email ? ` (${buyer.email})` : ""} · ${p.billingCycle}${p.couponCode ? ` · coupon ${p.couponCode}` : ""} · ${p.paymentId}`,
     link: "/admin/payment-orders",
     entity: { type: "payment_order", id: order.id },
+    subjectUserId: p.userId,
     dedupeKey: `sale:${p.paymentId}`,
   }, db);
 }
@@ -166,7 +167,7 @@ function alertPaymentSettings(ctx: { user: { fullName: string; email: string }; 
       type: "payment_settings_changed",
       title: "Payment details were changed",
       message: `${ctx.user.fullName} (${ctx.user.email}) changed ${changedKeys.join(", ")}${ip !== "unknown" ? ` · IP ${ip}` : ""}. If this wasn't you or your team, check Settings → Payments now.`,
-      link: "/admin/settings?tab=payments",
+      link: "/admin/settings?tab=payment",
     });
   } catch { /* non-critical */ }
 }
@@ -469,6 +470,7 @@ export const paymentRouter = createRouter({
         message: `${ctx.user.fullName} (${ctx.user.email}) · ${input.method.toUpperCase()} reference ${input.reference.trim()}`,
         link: "/admin/payment-orders",
         entity: { type: "payment_order", id: Number(ins.insertId) },
+        subjectUserId: ctx.user.id,
         dedupeKey: `payment:${ins.insertId}`,
       }, db);
 

@@ -104,6 +104,7 @@ export const contactRouter = createRouter({
         type: "contact_new", title: `Website enquiry · ${input.name}${requirement ? ` · ${requirement}` : ""}`,
         message: [input.businessName, input.email, input.phone, input.message].filter(Boolean).join(" · "),
         link: "/admin/leads",
+        subjectUserId: userId,
       });
 
       // The visitor's confirmation. Best effort: the enquiry is already safe,

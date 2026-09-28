@@ -48,6 +48,7 @@ async function notifyBulkOrder(input: z.infer<typeof createInput>, userId: numbe
     message: [input.company, input.contactName, input.phone, input.email, input.totalEstimate ? `≈ ₹${input.totalEstimate}` : ""].filter(Boolean).join(" · "),
     link: "/admin/bulk-orders",
     entity: requestId ? { type: "bulk_order", id: requestId } : null,
+    subjectUserId: userId,
     dedupeKey: requestId ? `bulk:${requestId}` : null,
   });
   await sendEmail(ownerAddress(), bulkOrderAdminEmail({

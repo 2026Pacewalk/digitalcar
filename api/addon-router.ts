@@ -85,7 +85,7 @@ export async function fulfilAddonPayment(
       const name = ADDONS.find((a) => a.type === paidType)?.name ?? "Add-on";
       const amount = Number(gatewayOrder.amount) / 100;
       void notifyUser({ userId, type: "addon_active", title: `${name} is active`, message: `Paid ₹${amount} (${paidCycle}). It's ready in your dashboard.`, link: "/dashboard" });
-      void notifyTeam({ type: "online_sale", title: `Online payment · ₹${amount} for ${name}`, message: `Account #${userId} · ${paidCycle} · ${paymentId}`, link: "/admin/customers", dedupeKey: `sale:${paymentId}` });
+      void notifyTeam({ type: "addon_sale", title: `Online payment · ₹${amount} for ${name}`, message: `Account #${userId} · ${paidCycle} · ${paymentId}`, link: "/admin/customers", subjectUserId: userId, dedupeKey: `sale:${paymentId}` });
     }
     return r;
   });

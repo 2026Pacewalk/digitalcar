@@ -148,6 +148,7 @@ export const leadRouter = createRouter({
         await notifyTeam({
           type: "lead_new", title: `${hot}Enquiry for digitalcarda.in/${card.slug}`,
           message: `${input.fullName}${input.phone ? ` · ${input.phone}` : ""}${snippet ? ` — ${snippet}` : ""}`, link: "/admin/leads",
+          subjectUserId: card.userId,
         });
       }).catch((e) => console.error("[lead] notifications skipped:", (e as Error).message));
 

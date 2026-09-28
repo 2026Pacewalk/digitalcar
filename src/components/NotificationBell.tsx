@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { Bell, CheckCheck, Inbox, ArrowRight, X, Circle, CircleDot, AlertCircle, RotateCw } from "lucide-react";
+import { Bell, CheckCheck, Inbox, ArrowRight, X, Circle, CircleDot, AlertCircle, RotateCw, CalendarClock } from "lucide-react";
+import { toast } from "sonner";
 import { useSessionRole } from "@/hooks/useAuth";
 import { timeAgo, exactTime } from "@contracts/notifications";
 import {
-  lookFor, linkFor, pageFor, scopeForRole, useNotifActions, useNotifFeed, useNotifSummary,
+  lookFor, linkFor, pageFor, scopeForRole, useNotifActions, useNotifFeed, useNotifSummary, useCanOpen, useExpiryNotice, expiryText,
   type FeedItem, type Filter,
 } from "@/lib/notificationsUi";
 
@@ -26,8 +27,10 @@ export default function NotificationBell() {
   const filter: Filter = chip === "unread" ? { unreadOnly: true } : chip === "action" ? { needsAction: true } : chip === "all" ? {} : { category: chip };
   const feed = useNotifFeed(scope, filter, { limit: 8, enabled: open });
   const act = useNotifActions(scope);
+  const canOpen = useCanOpen(role);
+  const { notice, dismiss: dismissNotice } = useExpiryNotice(summary.data?.expiry);
 
-  const unread = summary.data?.unread ?? 0;
+  const unread = (summary.data?.unread ?? 0) + (notice ? 1 : 0);
   const needsAction = summary.data?.needsAction ?? 0;
   const chips = (summary.data?.categories ?? []).filter((c) => c.total > 0);
 
@@ -40,8 +43,10 @@ export default function NotificationBell() {
 
   const openItem = (i: FeedItem) => {
     if (!i.isRead) void act.markRead([i.id]).catch(() => {});
+    const to = linkFor(role, i.link);
+    if (!canOpen(to)) { toast("That page isn't part of your access — marked as read."); return; }
     setOpen(false);
-    navigate(linkFor(role, i.link));
+    navigate(to);
   };
 
   const empty = chip === "unread" ? "No unread notifications." : chip === "action" ? "Nothing needs your attention." : "You're all caught up.";
@@ -63,7 +68,7 @@ export default function NotificationBell() {
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
           <div role="dialog" aria-label="Notifications"
-            className="absolute right-0 top-11 z-20 w-[24rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-[#F1F5F9] bg-white shadow-premium-lg">
+            className="fixed inset-x-3 top-16 z-20 overflow-hidden rounded-2xl border border-[#F1F5F9] bg-white shadow-premium-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 sm:w-[24rem]">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-[#F1F5F9] px-4 py-3">
               <p className="text-sm font-bold text-[#0F172A]">
@@ -96,6 +101,16 @@ export default function NotificationBell() {
 
             {/* Feed */}
             <div className="max-h-[22rem] overflow-y-auto">
+              {notice && (chip === "all" || chip === "unread" || chip === "billing") && (
+                <div className="relative flex items-start gap-3 border-b border-[#F8FAFC] bg-[#FFFDF5] px-4 py-3 pr-10">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#FEE2E2]"><CalendarClock size={14} className="text-[#DC2626]" /></span>
+                  <button type="button" onClick={() => { setOpen(false); navigate("/dashboard/subscription"); }} className="min-w-0 flex-1 text-left">
+                    <span className="block text-xs font-bold text-[#0F172A]">{expiryText(notice).title}</span>
+                    <span className="mt-0.5 block text-[11px] text-[#64748B]">{expiryText(notice).message}</span>
+                  </button>
+                  <button type="button" onClick={dismissNotice} aria-label="Dismiss" className="absolute right-2 top-2.5 flex h-6 w-6 items-center justify-center rounded-md text-[#94A3B8] hover:bg-white hover:text-[#DC2626]"><X size={12} /></button>
+                </div>
+              )}
               {feed.isError ? (
                 <div className="px-4 py-8 text-center">
                   <AlertCircle size={22} className="mx-auto mb-2 text-[#F87171]" />

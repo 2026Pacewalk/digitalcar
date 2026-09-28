@@ -2,14 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import {
-  Bell, CheckCheck, Trash2, Search, Inbox, AlertCircle, RotateCw, ExternalLink, Circle, CircleDot, X, Loader2, Settings2,
+  Bell, CheckCheck, Trash2, Search, Inbox, AlertCircle, RotateCw, ExternalLink, Circle, CircleDot, X, Loader2, Settings2, CalendarClock,
 } from "lucide-react";
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import { useSessionRole } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 import { DAY_GROUP_LABEL, dayGroup, exactTime, timeAgo } from "@contracts/notifications";
 import {
-  linkFor, lookFor, scopeForRole, useNotifActions, useNotifFeed, useNotifSummary, type FeedItem, type Filter,
+  linkFor, lookFor, scopeForRole, useNotifActions, useNotifFeed, useNotifSummary, useCanOpen, useExpiryNotice, expiryText,
+  type FeedItem, type Filter,
 } from "@/lib/notificationsUi";
 
 /* Everything a person has been told, with the filters the bell can't fit:
@@ -54,6 +55,8 @@ export default function Notifications() {
   const filter: Filter = { q, ...(f === "unread" ? { unreadOnly: true } : f === "action" ? { needsAction: true } : f === "all" ? {} : { category: f }) };
   const feed = useNotifFeed(scope, filter, { limit: 20 });
   const act = useNotifActions(scope);
+  const canOpen = useCanOpen(role);
+  const { notice, dismiss: dismissNotice } = useExpiryNotice(summary.data?.expiry);
 
   const categories = summary.data?.categories ?? [];
   const chipCategory = categories.some((c) => c.key === f) ? f : null;
@@ -78,9 +81,11 @@ export default function Notifications() {
   const clearAll = async () => {
     setConfirmClear(false);
     try {
-      const ids = await act.clearAll(chipCategory);
-      if (!ids.length) { toast("Nothing to clear"); return; }
-      toast(`Cleared ${ids.length} notification${ids.length === 1 ? "" : "s"}`, { action: { label: "Undo", onClick: () => void act.restore(ids) } });
+      const { ids, count } = await act.clearAll(chipCategory);
+      if (!count) { toast("Nothing to clear"); return; }
+      const text = `Cleared ${count} notification${count === 1 ? "" : "s"}`;
+      // Undo is offered while it can put back exactly what was cleared.
+      if (ids.length) toast(text, { action: { label: "Undo", onClick: () => void act.restore(ids) } }); else toast(text);
     } catch { toast.error("Couldn't clear them. Try again."); }
   };
   const markAll = async () => {
@@ -89,7 +94,9 @@ export default function Notifications() {
   };
   const open = (i: FeedItem) => {
     if (!i.isRead) void act.markRead([i.id]).catch(() => {});
-    navigate(linkFor(role, i.link));
+    const to = linkFor(role, i.link);
+    if (!canOpen(to)) { toast("That page isn't part of your access — marked as read."); return; }
+    navigate(to);
   };
 
   const chips = [
@@ -150,6 +157,18 @@ export default function Notifications() {
             {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[#94A3B8] hover:text-[#0F172A]"><X size={13} /></button>}
           </div>
         </div>
+
+        {notice && (
+          <div className="flex items-start gap-3 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-4">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white"><CalendarClock size={16} className="text-[#DC2626]" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13.5px] font-bold text-[#7F1D1D]">{expiryText(notice).title}</p>
+              <p className="text-[12.5px] text-[#991B1B]">{expiryText(notice).message}</p>
+            </div>
+            <Link to="/dashboard/subscription" className="inline-flex h-9 shrink-0 items-center rounded-xl bg-[#DC2626] px-3 text-[12.5px] font-bold text-white hover:bg-[#B91C1C]">Renew</Link>
+            <button type="button" onClick={dismissNotice} aria-label="Dismiss" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#B91C1C] hover:bg-white"><X size={14} /></button>
+          </div>
+        )}
 
         {/* The list */}
         <div className="overflow-hidden rounded-2xl border border-[#F1F5F9] bg-white shadow-premium">

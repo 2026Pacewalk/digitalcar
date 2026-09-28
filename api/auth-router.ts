@@ -402,9 +402,10 @@ async function welcomeNewAccount(
   }).catch((e) => console.error("[signup] owner alert failed:", (e as Error).message));
   void notifyTeam({
     type: "signup_new", title: `New sign-up · ${insertedUser.fullName}`,
-    message: [insertedUser.email, opts.method === "google" ? "Google" : "email", opts.companyName?.trim(), referral ? `referred by ${referral.name}` : "", starter?.slug ? `digitalcarda.in/${starter.slug}` : ""].filter(Boolean).join(" · "),
+    message: [insertedUser.email, opts.method === "google" ? "Google" : "email", opts.companyName?.trim(), referral ? "via a referral link" : "", starter?.slug ? `digitalcarda.in/${starter.slug}` : ""].filter(Boolean).join(" · "),
     link: `/admin/customers?q=${encodeURIComponent(insertedUser.email)}`,
     entity: { type: "user", id: insertedUser.id },
+    subjectUserId: insertedUser.id,
     dedupeKey: `signup:${insertedUser.id}`,
   }, db);
   return starter?.slug ?? null;

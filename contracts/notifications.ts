@@ -159,6 +159,9 @@ export const TEAM_TYPES: Record<string, TeamDef> = {
   customer_created: t("signups", "customers", "info", "userPlus", "teal", "Customer added by a reseller or the team"),
   payment_to_verify: t("payments", "payments", "action", "clock", "amber", "Payment to verify"),
   online_sale: t("payments", "payments", "info", "banknote", "green", "Online payment received"),
+  // Add-on sales open pages of other modules, so only staff who can open them see these.
+  addon_sale: t("payments", "customers", "info", "banknote", "green", "Card add-on bought online"),
+  domain_sale: t("payments", "domains", "info", "banknote", "green", "Custom domain add-on bought online"),
   payout_request: t("payouts", "referrals", "action", "banknote", "amber", "Payout requested"),
   reseller_application: t("resellers", "resellers", "action", "store", "violet", "Reseller application"),
   nfc_order_paid: t("orders", "orders", "action", "package", "green", "NFC order to print"),

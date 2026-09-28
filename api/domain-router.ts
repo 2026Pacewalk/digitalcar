@@ -76,7 +76,7 @@ export async function fulfilDomainAddonPayment(
   const granted = await grantAddon(db, userId);
   if (granted) {
     void notifyUser({ userId, type: "addon_active", title: "Custom domain add-on is active", message: `Paid ₹${DOMAIN_ADDON_PRICE}. Connect your domain from Custom Domain in your dashboard.`, link: "/dashboard/domain" }, db);
-    void notifyTeam({ type: "online_sale", title: `Online payment · ₹${DOMAIN_ADDON_PRICE} for the custom domain add-on`, message: `Account #${userId} · ${paymentId}`, link: "/admin/domains", dedupeKey: `sale:${paymentId}` }, db);
+    void notifyTeam({ type: "domain_sale", title: `Online payment · ₹${DOMAIN_ADDON_PRICE} for the custom domain add-on`, message: `Account #${userId} · ${paymentId}`, link: "/admin/domains", subjectUserId: userId, dedupeKey: `sale:${paymentId}` }, db);
   }
   return { granted };
 }
@@ -322,6 +322,7 @@ export const domainRouter = createRouter({
         type: "domain_added", title: `Custom domain added · ${domain}`,
         message: `${ctx.user.fullName} (${ctx.user.email})${role === "reseller" ? " · reseller" : ""} · waiting for their DNS`,
         link: "/admin/domains",
+        subjectUserId: ctx.user.id,
       }, db);
       return { ok: true, domain, dns: await ownerInfo(domain, verifyToken, cfHost) };
     }),

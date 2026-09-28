@@ -51,6 +51,8 @@ export async function notifyTeam(o: {
   message: string;
   link?: string | null;
   entity?: { type: string; id: number } | null;
+  /** The customer the event is about (named in it) — erasing their account deletes it. */
+  subjectUserId?: number | null;
   dedupeKey?: string | null;
   severity?: NotifSeverity;
 }, db: Db = getDb()): Promise<void> {
@@ -66,6 +68,7 @@ export async function notifyTeam(o: {
       link: o.link ?? null,
       entityType: o.entity?.type ?? null,
       entityId: o.entity?.id ?? null,
+      subjectUserId: o.subjectUserId || null,
       dedupeKey: o.dedupeKey ? o.dedupeKey.slice(0, 120) : null,
     });
   } catch (e) {
@@ -74,14 +77,18 @@ export async function notifyTeam(o: {
 }
 
 /** Someone handled it (verified the payment, paid the payout …): the event
-    leaves Needs action for the whole team. */
-export async function resolveTeam(entityType: string, ids: number | number[], byUserId: number | null | undefined, db: Db = getDb()): Promise<void> {
+    leaves Needs action for the whole team. `types` limits it to some events
+    about that entity (an NFC checkout has "awaiting payment" and "to print"). */
+export async function resolveTeam(entityType: string, ids: number | number[], byUserId: number | null | undefined, db: Db = getDb(), types?: string[]): Promise<void> {
   const list = (Array.isArray(ids) ? ids : [ids]).filter((n) => Number.isFinite(n) && n > 0);
   if (!list.length) return;
   try {
     await db.update(teamNotifications)
       .set({ resolvedAt: new Date(), resolvedBy: byUserId ?? null })
-      .where(and(eq(teamNotifications.entityType, entityType), inArray(teamNotifications.entityId, list), isNull(teamNotifications.resolvedAt)));
+      .where(and(
+        eq(teamNotifications.entityType, entityType), inArray(teamNotifications.entityId, list), isNull(teamNotifications.resolvedAt),
+        types?.length ? inArray(teamNotifications.type, types) : undefined,
+      ));
   } catch (e) {
     console.error(`[notify] resolve ${entityType} ${list.join(",")} failed:`, (e as Error).message);
   }

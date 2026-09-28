@@ -717,6 +717,7 @@ export const resellerRouter = createRouter({
         message: `${fullName} · ${email}${starter?.slug ? ` · digitalcarda.in/${starter.slug}` : ""}`,
         link: `/admin/customers?q=${encodeURIComponent(email)}`,
         entity: { type: "user", id: ins.id },
+        subjectUserId: ins.id,
         dedupeKey: `signup:${ins.id}`,
       }, db);
       return { ok: true, id: ins.id, slug: starter?.slug ?? null };

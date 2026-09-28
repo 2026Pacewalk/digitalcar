@@ -815,6 +815,8 @@ export const teamNotifications = mysqlTable("team_notifications", {
   link: varchar("link", { length: 500 }),
   entityType: varchar("entity_type", { length: 30 }),
   entityId: bigint("entity_id", { mode: "number", unsigned: true }),
+  // The customer the event is about (named in it): erasing their account deletes it.
+  subjectUserId: bigint("subject_user_id", { mode: "number", unsigned: true }),
   dedupeKey: varchar("dedupe_key", { length: 120 }),
   resolvedAt: timestamp("resolved_at"),
   resolvedBy: bigint("resolved_by", { mode: "number", unsigned: true }),
@@ -823,6 +825,7 @@ export const teamNotifications = mysqlTable("team_notifications", {
   uniqueIndex("uq_tn_dedupe").on(table.dedupeKey),
   index("tn_created_idx").on(table.createdAt),
   index("tn_entity_idx").on(table.entityType, table.entityId),
+  index("tn_subject_idx").on(table.subjectUserId),
 ]);
 
 export type TeamNotification = typeof teamNotifications.$inferSelect;

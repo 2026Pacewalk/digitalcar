@@ -59,6 +59,7 @@ export async function requestAccountDeletion(
     message: `${user.email} · from the ${opts.source === "app" ? "app" : "website"} · erase after ${scheduledFor.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" })}${opts.reason ? ` · “${opts.reason}”` : ""}`,
     link: "/admin/deletion-requests",
     entity: requestId ? { type: "deletion_request", id: requestId } : null,
+    subjectUserId: user.id,
     dedupeKey: requestId ? `deletion:${requestId}` : null,
   }, db);
   await db.update(users).set({ status: "inactive" }).where(eq(users.id, user.id));
@@ -190,12 +191,13 @@ export async function completeAccountDeletion(
 
   sessions.forEach((s) => forgetSession(Number(s.id)));
   await hideFromAdminLists(db, userId, legacyIds);
+  // The team's notifications about them (their sign-up, payments, payouts,
+  // orders, and their card's enquiries) go too.
   try {
-    const likeEmail = `%${originalEmail.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
     await db.delete(teamNotifications).where(or(
+      eq(teamNotifications.subjectUserId, userId),
       and(eq(teamNotifications.entityType, "user"), eq(teamNotifications.entityId, userId)),
       and(eq(teamNotifications.entityType, "deletion_request"), eq(teamNotifications.entityId, requestId)),
-      like(teamNotifications.message, likeEmail), like(teamNotifications.title, likeEmail),
     ));
   } catch (e) { console.error("[account-deletion] team notifications not purged:", (e as Error).message); }
   return { ok: true as const, userId, ...counts };
@@ -223,6 +225,7 @@ export async function cancelAccountDeletion(db: Db, requestId: number) {
       message: `${request.email} keeps their account. It's active again.`,
       link: "/admin/deletion-requests",
       entity: { type: "user", id: request.userId },
+      subjectUserId: request.userId,
     }, db);
     void sendRestoredEmail(db, request.userId, request.email)
       .catch((e) => console.error("[account-deletion] restored email failed:", (e as Error).message));

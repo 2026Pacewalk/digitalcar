@@ -1,4 +1,4 @@
-import type { ComponentType, CSSProperties } from "react";
+import { useState, type ComponentType, type CSSProperties } from "react";
 import {
   Mail, Clock, Calendar, CalendarPlus, CheckCircle2, XCircle, Banknote, Users, UserPlus, UserMinus,
   Sparkles, Package, Truck, Percent, Wand2, Link2, ShieldAlert, Handshake, TrendingUp, Globe, Trash2,
@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { teamDef, userDef, type NotifIcon, type NotifTone } from "@contracts/notifications";
+import { useStaffAccess } from "@/hooks/useStaffAccess";
+import { scopedKey } from "@/hooks/useCustomer";
 
 /* The web side of notifications: how each type looks, where it opens for this
    person, and one hook that reads either feed — a customer's or reseller's own
@@ -50,12 +52,39 @@ export function linkFor(role: string, link: string | null | undefined): string {
   return l;
 }
 
+/* Opening a notification: staff are only sent to pages they may open; for
+   anything else the item is just marked read. */
+export function useCanOpen(role: string) {
+  const access = useStaffAccess();
+  // Until their access has loaded, let the page's own gate decide.
+  return (path: string) => (role === "staff" && !access.loading ? access.canOpenPath(path) : true);
+}
+
+/* The old-site plan expiry notice: shown until dismissed for this plan date. */
+export function useExpiryNotice(expiry: Expiry | null | undefined) {
+  const key = expiry ? scopedKey(`dc_expiry_notice_${expiry.endsOn}`) : "";
+  const [goneKey, setGoneKey] = useState("");
+  let stored = false;
+  try { stored = !!key && localStorage.getItem(key) === "1"; } catch { /* private mode */ }
+  const hidden = !key || goneKey === key || stored;
+  return {
+    notice: expiry && !hidden ? expiry : null,
+    dismiss: () => { try { if (key) localStorage.setItem(key, "1"); } catch { /* private mode */ } setGoneKey(key); },
+  };
+}
+
+export const expiryText = (e: Expiry) => ({
+  title: e.daysLeft < 0 ? `Your ${e.planName} plan has ended` : e.daysLeft === 0 ? `Your ${e.planName} plan ends today` : `Your ${e.planName} plan ends in ${e.daysLeft} day${e.daysLeft === 1 ? "" : "s"}`,
+  message: e.daysLeft < 0 ? "Renew to keep your card live." : "Renew early so your card never goes offline.",
+});
+
 export type FeedItem = {
   id: number; type: string; category: string; title: string; message: string; link: string | null;
   isRead: boolean; createdAt: Date | string; needsAction?: boolean; resolvedAt?: Date | string | null; severity?: string;
 };
 export type Chip = { key: string; label: string; unread: number; total: number; action: number };
-export type Summary = { unread: number; total: number; needsAction: number; categories: Chip[] };
+export type Expiry = { planName: string; endsOn: string; daysLeft: number };
+export type Summary = { unread: number; total: number; needsAction: number; categories: Chip[]; expiry: Expiry | null };
 
 export type Filter = { category?: string | null; unreadOnly?: boolean; needsAction?: boolean; q?: string };
 
@@ -68,11 +97,11 @@ export function useNotifSummary(scope: Scope, opts: { poll?: boolean } = {}) {
   let data: Summary | undefined;
   if (scope === "team" && team.data) {
     const t = team.data;
-    data = { unread: t.unread, total: t.total, needsAction: t.needsAction,
+    data = { unread: t.unread, total: t.total, needsAction: t.needsAction, expiry: null,
       categories: t.categories.map((c) => ({ key: c.key, label: c.label, ...t.byCategory[c.key] })) };
   } else if (scope === "user" && user.data) {
     const u = user.data;
-    data = { unread: u.unread, total: u.total, needsAction: 0,
+    data = { unread: u.unread, total: u.total, needsAction: 0, expiry: u.expiry ?? null,
       categories: u.categories.map((c) => ({ key: c.key, label: c.label, action: 0, ...u.byCategory[c.key] })) };
   }
   return { data, isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
@@ -126,7 +155,10 @@ export function useNotifActions(scope: Scope) {
     markAllRead: (category?: string | null) => m.markAllRead.mutateAsync({ category: (category || null) as never }),
     dismiss: (ids: number[]) => m.dismiss.mutateAsync({ ids }),
     restore: (ids: number[]) => m.restore.mutateAsync({ ids }),
-    clearAll: async (category?: string | null) => (await m.clearAll.mutateAsync({ category: (category || null) as never })).ids,
+    clearAll: async (category?: string | null) => {
+      const r = await m.clearAll.mutateAsync({ category: (category || null) as never });
+      return { ids: r.ids, count: r.count };
+    },
     busy: Object.values(m).some((x) => x.isPending),
   };
 }

@@ -389,6 +389,7 @@ app.post("/api/enquiry", async (c) => {
       void notifyTeam({
         type: "lead_new", title: `${hot}Enquiry for digitalcarda.in/${slug || "unknown card"}`,
         message: `${name}${body.contact ? ` · ${body.contact}` : ""}${snippet ? ` — ${snippet}` : ""}`, link: "/admin/leads",
+        subjectUserId: pushOwnerId, // the card owner: erasing them removes their visitors' details too
       });
     }
 
@@ -988,10 +989,12 @@ if (process.env.NODE_ENV === "production") {
         severity ENUM('info','action','critical') NOT NULL DEFAULT 'info',
         title VARCHAR(255) NOT NULL, message TEXT NOT NULL, link VARCHAR(500) NULL,
         entity_type VARCHAR(30) NULL, entity_id BIGINT UNSIGNED NULL,
+        subject_user_id BIGINT UNSIGNED NULL,
         dedupe_key VARCHAR(120) NULL,
         resolved_at TIMESTAMP NULL, resolved_by BIGINT UNSIGNED NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE INDEX uq_tn_dedupe (dedupe_key), INDEX tn_created_idx (created_at), INDEX tn_entity_idx (entity_type, entity_id)
+        UNIQUE INDEX uq_tn_dedupe (dedupe_key), INDEX tn_created_idx (created_at), INDEX tn_entity_idx (entity_type, entity_id),
+        INDEX tn_subject_idx (subject_user_id)
       )
     `));
     await db.execute(sql.raw(`
@@ -1011,6 +1014,9 @@ if (process.env.NODE_ENV === "production") {
     }
     if (!(await count("SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE table_schema=DATABASE() AND table_name='notifications' AND index_name='notif_user_feed_idx'"))) {
       await db.execute(sql.raw("ALTER TABLE notifications ADD INDEX notif_user_feed_idx (user_id, created_at)"));
+    }
+    if (!(await count("SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='team_notifications' AND column_name='subject_user_id'"))) {
+      await db.execute(sql.raw("ALTER TABLE team_notifications ADD COLUMN subject_user_id BIGINT UNSIGNED NULL AFTER entity_id, ADD INDEX tn_subject_idx (subject_user_id)"));
     }
     console.log("[schema] team_notifications, notifications.cleared_at ensured");
   } catch (e) {

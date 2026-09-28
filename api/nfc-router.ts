@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, asc, between, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { nfcOrders, publishedCards, users, type NfcOrder } from "@db/schema";
@@ -125,6 +125,7 @@ function notifyTeam(rows: NfcOrder[], opts: { paid: boolean; paymentId?: string 
     message: `${itemText} · ₹${total} · ${opts.customer?.fullName ?? first.shipName}${opts.paid ? "" : " — collect the payment"}`,
     link: "/admin/nfc-orders",
     entity: { type: "nfc_order", id: first.id },
+    subjectUserId: first.userId,
     dedupeKey: `nfc:${first.id}:${opts.paid ? "paid" : "awaiting"}`,
   });
   return sendEmail(ownerAddress(), nfcOrderAdminEmail({
@@ -338,6 +339,25 @@ async function emailStatusChange(db: ReturnType<typeof getDb>, prev: NfcOrder, s
   if (owner?.email) await sendEmail(owner.email, email, ownerAddress());
 }
 
+/* A checkout's team items (entity = its first order) leave Needs action once
+   every order in it has moved on: "awaiting payment" when none is still unpaid,
+   "to print" when none is still waiting to be printed. The orders of one
+   checkout share its Razorpay order, or — paid by hand — were created together. */
+async function resolveCheckout(db: ReturnType<typeof getDb>, prev: NfcOrder, byUserId: number) {
+  try {
+    const at = new Date(prev.createdAt).getTime();
+    const rows = await db.select({ id: nfcOrders.id, status: nfcOrders.status }).from(nfcOrders).where(prev.razorpayOrderId
+      ? eq(nfcOrders.razorpayOrderId, prev.razorpayOrderId)
+      : and(eq(nfcOrders.userId, prev.userId), isNull(nfcOrders.razorpayOrderId), between(nfcOrders.createdAt, new Date(at - 10_000), new Date(at + 10_000))));
+    if (!rows.length) return;
+    const first = Math.min(...rows.map((r) => r.id));
+    if (!rows.some((r) => r.status === "pending_payment")) await resolveTeam("nfc_order", first, byUserId, db, ["nfc_order_awaiting"]);
+    if (!rows.some((r) => r.status === "pending_payment" || r.status === "paid")) await resolveTeam("nfc_order", first, byUserId, db, ["nfc_order_paid"]);
+  } catch (e) {
+    console.error("[nfc] resolve checkout failed:", (e as Error).message);
+  }
+}
+
 /* The tracking number reached a parcel that had already shipped. */
 async function emailTracking(db: ReturnType<typeof getDb>, prev: NfcOrder, tracking: string, update: "added" | "changed") {
   const product = nfcProduct(prev.product);
@@ -545,7 +565,7 @@ export const nfcRouter = createRouter({
       // Tell the customer on the first move into shipped, paid (manual payment),
       // delivered or cancelled. Non-blocking: the save never waits on email.
       if (moved) void emailStatusChange(db, prev, input.status, input.tracking ?? prev.tracking).catch(() => {});
-      if (moved) void resolveTeam("nfc_order", prev.id, ctx.user.id);
+      if (moved) void resolveCheckout(db, prev, ctx.user.id);
       if (trackingSent) void emailTracking(db, prev, newTracking!, prev.tracking ? "changed" : "added").catch(() => {});
       return { ok: true, emailed: (moved && !!statusEmail(prev, input.status, input.tracking ?? prev.tracking)) || trackingSent };
     }),

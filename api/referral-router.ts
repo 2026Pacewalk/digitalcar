@@ -244,6 +244,7 @@ export const referralRouter = createRouter({
         message: `${ctx.user.fullName} (${ctx.user.email})${ctx.user.role === "reseller" ? " · reseller" : ""}`,
         link: "/admin/referrals",
         entity: { type: "withdrawal", id: Number(insertId) },
+        subjectUserId: ctx.user.id,
         dedupeKey: `payout:${insertId}`,
       }, db);
 

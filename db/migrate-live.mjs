@@ -183,12 +183,14 @@ const TABLES = {
     severity ENUM('info','action','critical') NOT NULL DEFAULT 'info',
     title VARCHAR(255) NOT NULL, message TEXT NOT NULL, link VARCHAR(500) NULL,
     entity_type VARCHAR(30) NULL, entity_id BIGINT UNSIGNED NULL,
+    subject_user_id BIGINT UNSIGNED NULL,
     dedupe_key VARCHAR(120) NULL,
     resolved_at TIMESTAMP NULL, resolved_by BIGINT UNSIGNED NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX uq_tn_dedupe (dedupe_key),
     INDEX tn_created_idx (created_at),
-    INDEX tn_entity_idx (entity_type, entity_id))`,
+    INDEX tn_entity_idx (entity_type, entity_id),
+    INDEX tn_subject_idx (subject_user_id))`,
   // Each admin's read / cleared state per team notification.
   team_notification_marks: `CREATE TABLE IF NOT EXISTS team_notification_marks (
     notification_id BIGINT UNSIGNED NOT NULL, user_id BIGINT UNSIGNED NOT NULL,
@@ -250,6 +252,13 @@ log("✓ users.role accepts 'staff'");
     await conn.query("ALTER TABLE notifications ADD INDEX notif_user_feed_idx (user_id, created_at)");
     log("✓ notifications (user_id, created_at) index added");
   } else { log("• notifications feed index present (skipped)"); }
+  // Who a team event is about, so erasing their account removes it.
+  const [sc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='team_notifications' AND column_name='subject_user_id'");
+  if (sc[0].n === 0) {
+    await conn.query("ALTER TABLE team_notifications ADD COLUMN subject_user_id BIGINT UNSIGNED NULL AFTER entity_id, ADD INDEX tn_subject_idx (subject_user_id)");
+    log("✓ team_notifications.subject_user_id added");
+  } else { log("• team_notifications.subject_user_id present (skipped)"); }
 }
 
 // Relax leads.card_id to NULL (snapshot cards have no DB card row). Guarded.

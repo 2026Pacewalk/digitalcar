@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { notifications } from "@db/schema";
-import { eq, desc, and, sql, isNull, isNotNull, inArray, or, lt, type SQL } from "drizzle-orm";
+import { notifications, subscriptions } from "@db/schema";
+import { eq, desc, and, sql, isNull, isNotNull, inArray, or, lt, gt, type SQL } from "drizzle-orm";
+import { legacyPlanOf, PAID_PACKAGE_IDS } from "./lib/entitlement";
 import {
   USER_CATEGORIES, USER_CATEGORY_KEYS, userCategory, userCategoryMatcher, type UserCategory,
 } from "@contracts/notifications";
@@ -35,6 +36,27 @@ function categoryWhere(category: UserCategory, audience: Audience): SQL {
 
 const mine = (userId: number) => and(eq(notifications.userId, userId), isNull(notifications.clearedAt))!;
 const idList = z.array(z.number().int().positive()).min(1).max(500);
+
+/* A plan recorded on the old site (customers.json) ending soon or just ended.
+   Plans bought here get the daily reminders (cron/billing.ts) in the bell;
+   these don't, so the bell shows this notice until the customer dismisses it. */
+async function legacyExpiry(user: { id: number; email: string; role: string }) {
+  if (user.role !== "customer") return null;
+  try {
+    const plan = legacyPlanOf(user.email);
+    if (!plan?.expiredOn || !PAID_PACKAGE_IDS.has(plan.packageId)) return null;
+    const ends = Date.parse(plan.expiredOn);
+    if (!Number.isFinite(ends)) return null;
+    const days = Math.ceil((ends - Date.now()) / 86_400_000);
+    if (days > 7 || days < -3) return null;
+    const [sub] = await getDb().select({ id: subscriptions.id }).from(subscriptions)
+      .where(and(eq(subscriptions.userId, user.id), eq(subscriptions.status, "active"), gt(subscriptions.currentPeriodEnd, new Date()))).limit(1);
+    if (sub) return null; // renewed here: the billing reminders cover it
+    return { planName: plan.packageId === 6 ? "Platinum" : "Gold", endsOn: plan.expiredOn, daysLeft: days };
+  } catch {
+    return null;
+  }
+}
 
 const shape = (n: typeof notifications.$inferSelect, audience: Audience) => ({
   id: n.id, type: n.type, category: userCategory(n.type, audience),
@@ -113,7 +135,7 @@ export const notificationRouter = createRouter({
       unread += u; total += n;
       if (byCategory[c]) { byCategory[c].unread += u; byCategory[c].total += n; }
     }
-    return { unread, total, byCategory, categories: USER_CATEGORIES[audience] };
+    return { unread, total, byCategory, categories: USER_CATEGORIES[audience], expiry: await legacyExpiry(ctx.user) };
   }),
 
   // Mark one (the app sends { id }) or several read.
@@ -145,11 +167,11 @@ export const notificationRouter = createRouter({
       return { ok: true };
     }),
 
-  // Hide some from the bell (they can be brought back with `restore`).
+  // Hide some from the bell (they can be brought back, as they were, with `restore`).
   dismiss: authedQuery
     .input(z.object({ ids: idList }))
     .mutation(async ({ ctx, input }) => {
-      await getDb().update(notifications).set({ clearedAt: new Date(), isRead: true })
+      await getDb().update(notifications).set({ clearedAt: new Date() })
         .where(and(mine(ctx.user.id), inArray(notifications.id, input.ids)));
       return { ok: true, ids: input.ids };
     }),
@@ -162,22 +184,19 @@ export const notificationRouter = createRouter({
       return { ok: true };
     }),
 
-  /* Clear everything (or one chip). Returns what was cleared, so "Undo" can
-     restore exactly that. */
+  /* Clear everything (or one chip). Returns what was cleared so "Undo" can
+     restore exactly that — up to 500; a bigger clear can't be undone. */
   clearAll: authedQuery
     .input(z.object({ category: z.enum(USER_CATEGORY_KEYS).nullish() }).optional())
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const where: SQL[] = [mine(ctx.user.id)];
       if (input?.category) where.push(categoryWhere(input.category, audienceOf(ctx.user.role)));
-      const rows = await db.select({ id: notifications.id }).from(notifications).where(and(...where))
-        .orderBy(desc(notifications.createdAt)).limit(500);
-      const ids = rows.map((r) => r.id);
-      if (ids.length) {
-        await db.update(notifications).set({ clearedAt: new Date(), isRead: true })
-          .where(and(eq(notifications.userId, ctx.user.id), inArray(notifications.id, ids)));
-      }
-      return { ok: true, ids };
+      const rows = await db.select({ id: notifications.id }).from(notifications).where(and(...where)).limit(501);
+      const res = await db.update(notifications).set({ clearedAt: new Date() }).where(and(...where));
+      const count = Number((res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
+        ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? rows.length);
+      return { ok: true, count, ids: rows.length <= 500 ? rows.map((r) => r.id) : [] };
     }),
 
   /* What the owner wants to hear about. One switch per kind of message, for
