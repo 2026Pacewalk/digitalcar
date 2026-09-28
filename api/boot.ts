@@ -1456,12 +1456,18 @@ for (const from of ["/templates", "/templates/", "/card-designs", "/card-designs
   app.get(from, (c) => c.redirect(`/digital-business-cards-templates${new URL(c.req.url).search}`, 301));
 }
 
-// Dynamic sitemap: marketing pages, template pages and every public card worth
-// indexing, so Google can discover the card profiles. Built from every published
-// snapshot, so the result is kept for a few minutes rather than rebuilt per hit.
-let sitemapXml: { body: string; at: number } | null = null;
+// Dynamic sitemap, split in two behind a sitemap index:
+//   /sitemap-pages.xml — our own pages (marketing, blog, industries, cities,
+//                        comparisons, templates): the ones that must rank.
+//   /sitemap-cards.xml — customer cards with enough on them to index.
+// Splitting lets Search Console report indexing for each set separately, and
+// keeps hundreds of customer cards from diluting the file our key pages sit in.
+// Built from every published snapshot, so the result is kept for a few minutes
+// rather than rebuilt per hit.
+let sitemapXml: { pages: string; cards: string; at: number } | null = null;
 const SITEMAP_TTL = 10 * 60_000;
-app.get("/sitemap.xml", async (c) => {
+const XML = { "content-type": "application/xml; charset=utf-8" };
+async function buildSitemaps(): Promise<{ pages: string; cards: string }> {
   const base = "https://digitalcarda.in";
   const pages = ["", "/digital-business-cards-templates", "/features", "/pricing", "/industries", "/bulk-cards",
     "/ai-card-generator", "/resellers", "/refer-earn", "/custom-domain", "/contact",
@@ -1480,9 +1486,7 @@ app.get("/sitemap.xml", async (c) => {
     ].map((s) => `/digital-visiting-card/${s}`),
     ...["linktree","hihello","beaconstac"].map((s) => `/vs/${s}`),
   ];
-  if (sitemapXml && Date.now() - sitemapXml.at < SITEMAP_TTL) {
-    return c.body(sitemapXml.body, 200, { "content-type": "application/xml; charset=utf-8" });
-  }
+  if (sitemapXml && Date.now() - sitemapXml.at < SITEMAP_TTL) return sitemapXml;
   const customers = (await readPublicJson("customers")) as Record<string, unknown>[];
   const legacyProducts = (await readPublicJson("product")) as Record<string, unknown>[];
   const { cardSeo } = await import("../src/lib/cardSeo");
@@ -1573,7 +1577,7 @@ app.get("/sitemap.xml", async (c) => {
     const snap = published.get(k);
     const customer = snap?.customer ?? legacyBySlug.get(k);
     if (!customer) continue;
-    if (!cardSeo({ slug: k, customer, products: snap ? snap.products : productsBySlug.get(k) }).indexable) continue;
+    if (!cardSeo({ slug: k, customer, products: snap ? snap.products : productsBySlug.get(k) }).inSitemap) continue;
     cardUrls.push(url(`${base}/${encodeURIComponent(s)}`, "0.5", cardEdited.get(k) || ""));
   }
   // Blog articles, with the date each was last really updated.
@@ -1586,17 +1590,28 @@ app.get("/sitemap.xml", async (c) => {
   const blogLastmod = BLOG_POSTS.map((p) => p.updatedAt).sort().at(-1) || deployDay;
   // A template page shows its design images (product.images, site paths or URLs).
   const productImages = (images: unknown) => (Array.isArray(images) ? images : []).map((i) => String(i ?? "").trim()).filter((i) => /^(https?:\/\/|\/)/i.test(i));
-  const body =
-    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n` +
+  const head = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
+  const pagesXml =
+    head +
     pages.map((p) => url(base + p, p === "" ? "1.0" : "0.7", p === "/blog" ? blogLastmod : p === "/industries" ? industryLastmod : deployDay, pageImages[p] ?? [])).join("\n") + "\n" +
     blogUrls.join("\n") + "\n" +
     industryUrls.join("\n") + "\n" +
-    productRows.map((r) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(r.slug)}`, "0.8", day(r.updatedAt), productImages(r.images))).join("\n") + "\n" +
-    cardUrls.join("\n") +
+    productRows.map((r) => url(`${base}/digital-business-cards-templates/${encodeURIComponent(r.slug)}`, "0.8", day(r.updatedAt), productImages(r.images))).join("\n") +
     `\n</urlset>`;
-  sitemapXml = { body, at: Date.now() };
-  return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
+  const cardsXml = head + cardUrls.join("\n") + `\n</urlset>`;
+  sitemapXml = { pages: pagesXml, cards: cardsXml, at: Date.now() };
+  return sitemapXml;
+}
+app.get("/sitemap.xml", (c) => {
+  const base = "https://digitalcarda.in";
+  const body =
+    `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    ["/sitemap-pages.xml", "/sitemap-cards.xml"].map((p) => `  <sitemap><loc>${base}${p}</loc></sitemap>`).join("\n") +
+    `\n</sitemapindex>`;
+  return c.body(body, 200, XML);
 });
+app.get("/sitemap-pages.xml", async (c) => c.body((await buildSitemaps()).pages, 200, XML));
+app.get("/sitemap-cards.xml", async (c) => c.body((await buildSitemaps()).cards, 200, XML));
 
 // Block the raw public files outright (defence-in-depth alongside the CDN rule).
 // Google Merchant product feed (RSS 2.0 + g: namespace), generated from the
