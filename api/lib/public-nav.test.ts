@@ -1,13 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { FOOTER_GROUPS, FOOTER_GUIDES, HEADER_MENUS, INDUSTRY_SEARCH, LEGAL_LINKS, SEARCH_PAGES, SITEMAP_GROUPS } from "../../src/lib/publicNav";
+import { CITY_LINKS, COMPARE_LINKS, FOOTER_GROUPS, FOOTER_GUIDES, HEADER_MENUS, INDUSTRY_SEARCH, LEGAL_LINKS, SEARCH_PAGES, SITEMAP_GROUPS } from "../../src/lib/publicNav";
 import { BLOG_POSTS, blogPostPath } from "../../src/data/blog";
 import { INDUSTRIES, getIndustry, industryPath } from "../../src/data/industries";
 import { seoForPath } from "../../src/lib/publicSeo";
+import { CITIES } from "../../src/data/cities";
+import { COMPARISONS } from "../../src/data/comparisons";
 
 const INDUSTRY_DETAIL = "/industries/";
 const industrySlug = (href: string) => href.split("?")[0].slice(INDUSTRY_DETAIL.length);
 
 describe("public navigation links", () => {
+  it("city links cover exactly the city pages", () => {
+    expect(CITY_LINKS.map((l) => l.href).sort()).toEqual(CITIES.map((c) => `/digital-visiting-card/${c.slug}`).sort());
+  });
+
+  it("compare links cover exactly the comparison pages", () => {
+    expect(COMPARE_LINKS.map((l) => l.href).sort()).toEqual(COMPARISONS.map((c) => `/vs/${c.slug}`).sort());
+  });
+
   it("footer guides point at real blog articles", () => {
     const paths = new Set(BLOG_POSTS.map((p) => blogPostPath(p.slug)));
     for (const g of FOOTER_GUIDES) expect(paths.has(g.href), g.href).toBe(true);

@@ -105,3 +105,19 @@ describe("cityFromAddress", () => {
     expect(cityFromAddress(address)).toBe(city);
   });
 });
+
+describe("cardSeo sitemap bar", () => {
+  const about = "We are a family-run tax and accounting practice in Ludhiana helping small businesses with GST, ITR and bookkeeping since 2009.";
+  it("lists cards with a real About or several services", () => {
+    expect(cardSeo({ slug: "a", customer: { name: "A", designation: "CA", about_us: about } }).inSitemap).toBe(true);
+    expect(cardSeo({ slug: "b", customer: { name: "B" }, products: [{ name: "GST Filing" }, { name: "ITR" }, { name: "Audit" }] }).inSitemap).toBe(true);
+  });
+  it("keeps name-and-title cards open to Google but out of the sitemap", () => {
+    const seo = cardSeo({ slug: "c", customer: { name: "C", designation: "CEO" } });
+    expect(seo.indexable).toBe(true);
+    expect(seo.inSitemap).toBe(false);
+  });
+  it("never lists a paused card", () => {
+    expect(cardSeo({ slug: "d", customer: { name: "D", about_us: about }, paused: true }).inSitemap).toBe(false);
+  });
+});

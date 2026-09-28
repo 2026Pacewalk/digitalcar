@@ -95,6 +95,37 @@ export const LEGAL_LINKS: NavLink[] = [
   { label: "Shipping policy", href: "/shipping-policy" },
 ];
 
+/** One link per city page (/digital-visiting-card/:slug). Written by hand —
+ *  this file stays import-free — and kept in step with src/data/cities.ts by
+ *  api/lib/public-nav.test.ts. Without these the city pages had no internal
+ *  link anywhere, so Google found them only in the sitemap and left them
+ *  "Discovered – not indexed". */
+export const CITY_LINKS: NavLink[] = [
+  { label: "Delhi", href: "/digital-visiting-card/delhi" },
+  { label: "Mumbai", href: "/digital-visiting-card/mumbai" },
+  { label: "Bangalore", href: "/digital-visiting-card/bangalore" },
+  { label: "Hyderabad", href: "/digital-visiting-card/hyderabad" },
+  { label: "Chennai", href: "/digital-visiting-card/chennai" },
+  { label: "Kolkata", href: "/digital-visiting-card/kolkata" },
+  { label: "Pune", href: "/digital-visiting-card/pune" },
+  { label: "Ahmedabad", href: "/digital-visiting-card/ahmedabad" },
+  { label: "Jaipur", href: "/digital-visiting-card/jaipur" },
+  { label: "Chandigarh", href: "/digital-visiting-card/chandigarh" },
+  { label: "Lucknow", href: "/digital-visiting-card/lucknow" },
+  { label: "Surat", href: "/digital-visiting-card/surat" },
+  { label: "Ludhiana", href: "/digital-visiting-card/ludhiana" },
+  { label: "Indore", href: "/digital-visiting-card/indore" },
+  { label: "Nagpur", href: "/digital-visiting-card/nagpur" },
+  { label: "Gurgaon", href: "/digital-visiting-card/gurgaon" },
+];
+
+/** Comparison pages (/vs/:slug), kept in step with src/data/comparisons.ts. */
+export const COMPARE_LINKS: NavLink[] = [
+  { label: "DigitalCarda vs Linktree", href: "/vs/linktree" },
+  { label: "DigitalCarda vs HiHello", href: "/vs/hihello" },
+  { label: "DigitalCarda vs Beaconstac", href: "/vs/beaconstac" },
+];
+
 export const FOOTER_GROUPS: NavGroup[] = [PRODUCT, FREE_TOOLS, BUSINESS, COMPANY];
 
 /** Blog guides featured in the footer. Hand-picked (this file stays import-free,
@@ -112,6 +143,8 @@ export const SITEMAP_GROUPS: NavGroup[] = [
   PRODUCT,
   FREE_TOOLS,
   BUSINESS,
+  { title: "Digital visiting card by city", links: CITY_LINKS },
+  { title: "Compare", links: COMPARE_LINKS },
   { title: "Legal", links: LEGAL_LINKS },
 ];
 

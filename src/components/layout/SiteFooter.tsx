@@ -17,7 +17,7 @@ import {
   ArrowRight, BarChart3, BookOpen, Check, Globe, IndianRupee, Inbox, LayoutGrid, MessageCircle, Nfc,
   PenLine, Play, QrCode, Rocket, ShieldCheck, Sparkles, Star, Truck, UserPlus, Wand2, Youtube, Zap, type LucideIcon,
 } from "lucide-react";
-import { CONTACT, FOOTER_GROUPS, FOOTER_GUIDES, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicNav";
+import { CITY_LINKS, COMPARE_LINKS, CONTACT, FOOTER_GROUPS, FOOTER_GUIDES, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicNav";
 import { TUTORIAL } from "@/data/tutorial";
 import { InstallAppRow } from "@/components/mobile/InstallApp";
 
@@ -363,6 +363,25 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
             </Link>
             </li>
           </ul>
+
+          {/* City and comparison pages — linked from every page so Google
+              crawls them (they had no internal links before). */}
+          <nav aria-label="Digital visiting card by city" className="mt-8">
+            <p className="text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80">Digital visiting card in your city</p>
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+              {CITY_LINKS.map((l) => (
+                <li key={l.href}><Link to={l.href} className="text-[13px] text-[#94A3B8] transition-colors hover:text-white">{l.label}</Link></li>
+              ))}
+            </ul>
+          </nav>
+          <nav aria-label="Compare" className="mt-5">
+            <p className="text-[11.5px] font-bold uppercase tracking-[0.16em] text-[#F7B31C]/80">Compare</p>
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+              {COMPARE_LINKS.map((l) => (
+                <li key={l.href}><Link to={l.href} className="text-[13px] text-[#94A3B8] transition-colors hover:text-white">{l.label}</Link></li>
+              ))}
+            </ul>
+          </nav>
         </div>
 
         {/* ── 5. Legal bar ─────────────────────────────────────────
