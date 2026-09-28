@@ -11,6 +11,7 @@ import { demoForProduct } from "@/lib/demoData";
 import { logFunnel } from "@/lib/funnel";
 import MockupGallery from "@/components/MockupGallery";
 import { webpFor } from "@/lib/imageSources";
+import { OFFER_POLICY } from "@/lib/offerPolicy";
 
 const inr = (v?: string | number | null) => "₹" + Number(v || 0).toLocaleString("en-IN");
 const THUMB_W = 375, THUMB_H = 560;
@@ -121,19 +122,7 @@ export default function ProductDetail() {
         price: Number(product.salePrice || product.price).toFixed(2),
         availability: "https://schema.org/InStock",
         url: `https://digitalcarda.in/digital-business-cards-templates/${product.slug}`,
-      },
-      // AggregateRating reflects the platform-wide rating shown on the home page
-      // ("4.9/5 from 1,456+ businesses"), collected from Indian customers using
-      // DigitalCarda. Each template inherits the platform rating because the
-      // customer experience — publishing, sharing, editing — is identical across
-      // templates. Resolves the Search Console "Missing field aggregateRating"
-      // non-critical warning on /digital-business-cards-templates/<slug>.
-      aggregateRating: {
-        "@type": "AggregateRating",
-        ratingValue: "4.9",
-        reviewCount: "1456",
-        bestRating: "5",
-        worstRating: "1",
+        ...OFFER_POLICY,
       },
     };
     let s = document.getElementById("pdp-ld");
