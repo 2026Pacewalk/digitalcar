@@ -9,6 +9,7 @@ import { planFeatures, type PlanPkg } from "@/lib/planFeatures";
 import { NFC_PRODUCTS, NFC_DELIVERY } from "@/lib/nfcProducts";
 import { Reveal } from "@/components/public/Reveal";
 import JsonLd from "@/components/seo/JsonLd";
+import { OFFER_POLICY } from "@/lib/offerPolicy";
 
 /* ── Billing periods ──────────────────────────────────────────── */
 type Period = "monthly" | "yearly" | "3year";
@@ -349,17 +350,8 @@ export default function Pricing() {
           priceCurrency: "INR",
           availability: "https://schema.org/InStock",
           url: "https://digitalcarda.in/pricing",
+          ...OFFER_POLICY,
         })),
-        // Matches the rating shown on the home page — "4.9/5 from 1,456+
-        // businesses" — collected from Indian customers using DigitalCarda.
-        // Resolves the Search Console "Missing field aggregateRating" warning.
-        aggregateRating: {
-          "@type": "AggregateRating",
-          ratingValue: "4.9",
-          reviewCount: "1456",
-          bestRating: "5",
-          worstRating: "1",
-        },
       }] : []),
     ],
   };
