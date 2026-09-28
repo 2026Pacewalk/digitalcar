@@ -18,8 +18,11 @@ import { scopedKey } from "@/hooks/useCustomer";
 import { setSession, okToReplaceMainSession } from "@/lib/session";
 import { ActionMenu, AdminModal as Modal, type ActionItem } from "@/components/admin/RowActions";
 import AssignResellerModal from "@/components/admin/AssignResellerModal";
+import SendEmailModal from "@/components/admin/SendEmailModal";
 import { useSessionRole } from "@/hooks/useAuth";
+import { useStaffAccess } from "@/hooks/useStaffAccess";
 import { readableError } from "@/lib/errors";
+import type { RecipientRef } from "@contracts/customer-email";
 
 /* Retailer (admin_id) → name, from the old PHP superadmin table. Display only:
    these old attributions earn nothing. A customer's real reseller today is
@@ -44,7 +47,7 @@ type Customer = {
   slug: string; package_id: number; admin_id: number;
   activated_on: string | null; expired_on: string | null; status: number;
   password: string; company_name?: string; designation?: string; views?: number;
-  isNew?: boolean; dbId?: number; // isNew = new-flow DB account (not in legacy customers.json)
+  isNew?: boolean; dbId?: number; // isNew = new-flow DB account (not in legacy customers.json); dbId = users.id, also on legacy rows that have an account
   billing_cycle?: "monthly" | "yearly" | "triennial" | null; // term of the active DB plan, when known
   // The reseller the account belongs to (users.reseller_id), when it has one.
   resellerUserId?: number | null; resellerAccountId?: number | null; resellerName?: string | null;
@@ -56,6 +59,12 @@ const retailerOf = (c: Customer): { key: string; label: string; partner: boolean
   c.resellerUserId
     ? { key: `r:${c.resellerUserId}`, label: c.resellerName || `Reseller #${c.resellerUserId}`, partner: true }
     : { key: `l:${c.admin_id}`, label: retailerName(c.admin_id), partner: false };
+
+/* Who "Send email" is for, by id; the server looks the address up itself. An
+   account wins; an old-site customer without one goes by their customers.json
+   id. New-flow rows always carry dbId, so their offset id is never sent. */
+const recipientOf = (c: Customer): RecipientRef | null =>
+  c.dbId ? { userId: c.dbId } : !c.isNew && c.id > 0 && c.id < 900_000_000 ? { legacyId: c.id } : null;
 
 
 const fmtDate = (s: string | null) => {
@@ -122,6 +131,8 @@ export default function AdminCustomers() {
     return Number.isInteger(r) && r > 0 ? `r:${r}` : "all";
   });
   const isSuper = useSessionRole() === "super_admin";
+  // Emailing a customer is a change, so staff need Customers → manage (the server checks too).
+  const canEmail = useStaffAccess().can("customers", "manage");
   const [pkg, setPkg] = useState("all");
   const [status, setStatus] = useState<"all" | "active" | "expired" | "inactive">("all");
   const [sortBy, setSortBy] = useState<"recent" | "oldest" | "name" | "name_desc" | "expiry">("recent");
@@ -145,6 +156,8 @@ export default function AdminCustomers() {
   const [limitValue, setLimitValue] = useState<number>(3);
   const [delModal, setDelModal] = useState<Customer | null>(null);
   const [assignModal, setAssignModal] = useState<Customer | null>(null);
+  // trigger: the row's ⋮ button, where focus goes back when the modal closes.
+  const [mailModal, setMailModal] = useState<{ recipient: RecipientRef; name: string; email: string; trigger: HTMLElement | null } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [pwdValue, setPwdValue] = useState("");
   const [pkgValue, setPkgValue] = useState("Trial");
@@ -173,8 +186,9 @@ export default function AdminCustomers() {
       const dbByEmail = new Map(db.map((u) => [(u.email || "").toLowerCase().trim(), u]));
       const legacyCurrent = legacy.map((c) => {
         const live = dbByEmail.get((c.email || "").toLowerCase().trim());
-        // The live account's reseller always applies, plan or no plan.
-        const partner = live ? { resellerUserId: live.resellerUserId ?? null, resellerAccountId: live.resellerAccountId ?? null, resellerName: live.resellerName ?? null } : {};
+        // The live account's reseller always applies, plan or no plan, and so
+        // does its users.id, so actions on the row can name the account by id.
+        const partner = live ? { dbId: live.dbId, resellerUserId: live.resellerUserId ?? null, resellerAccountId: live.resellerAccountId ?? null, resellerName: live.resellerName ?? null } : {};
         return live?.subActive
           ? { ...c, ...partner, package_id: live.package_id, expired_on: live.expired_on ?? c.expired_on, billing_cycle: live.billing_cycle ?? null }
           : { ...c, ...partner };
@@ -450,7 +464,11 @@ export default function AdminCustomers() {
     // through the DB delete (they aren't in customers.json); legacy rows use the
     // JSON hide-overlay. Both also deactivate the account + take the card offline.
     try {
-      if (c.dbId) {
+      // By where the row came from, not by dbId: a customers.json row with an
+      // account carries a dbId too, and it keeps the hide + deactivate path
+      // (deleteAppUser would also delete its published card). Rows from
+      // admin.appUsers, and "Add New" ones, are keyed 900_000_000 + users.id.
+      if (c.dbId && c.id >= 900_000_000) {
         await deleteAppUserMut.mutateAsync({ userId: c.dbId });
         toast.success(`${c.name} deleted — account deactivated & card offline`);
       } else {
@@ -497,8 +515,10 @@ export default function AdminCustomers() {
         }
       }
       const now = new Date();
+      // Shaped like the row admin.appUsers returns after a refresh: a new-flow
+      // account, keyed by its users.id.
       setRows((r) => [{
-        id: Math.max(0, ...r.map((x) => x.id)) + 1,
+        id: 900_000_000 + res.userId, dbId: res.userId, isNew: true,
         name: addForm.name, username: addForm.username || slug, email: addForm.email,
         mobile1: addForm.mobile1, slug: res.slug, package_id: pid, admin_id: 0, ...partner,
         activated_on: now.toISOString().slice(0, 10), expired_on: res.expiredOn,
@@ -544,6 +564,8 @@ export default function AdminCustomers() {
     { icon: <CalendarPlus size={15} className="text-[#15803D]" />, label: "Extend Validity", onClick: () => { setExpModal(c); setExpDays(30); } },
     { icon: <Lock size={15} className="text-[#7C3AED]" />, label: "Change Password", onClick: () => { setPwdModal(c); setPwdValue(c.password || ""); } },
     { icon: <Send size={15} className="text-[#0EA5E9]" />, label: "Share with Customer", onClick: () => { setShareModal(c); setShareKind("welcome"); setSharePwd(c.password || ""); setShareIncludePwd(false); } },
+    // The menu is still open while its item's click runs, so its ⋮ button is the expanded one.
+    { icon: <Mail size={15} className="text-[#B45309]" />, label: "Send email", onClick: () => { const to = recipientOf(c); if (to) setMailModal({ recipient: to, name: c.name, email: c.email, trigger: document.querySelector<HTMLElement>('button[aria-haspopup="menu"][aria-expanded="true"]') }); }, hidden: !canEmail || !c.email || !recipientOf(c) },
     { icon: <Database size={15} className="text-[#2563EB]" />, label: "Change Package", onClick: () => { setPkgModal(c); setPkgValue(packageName(c.package_id)); setPkgCycle(c.package_id !== 7 && c.billing_cycle ? c.billing_cycle : "yearly"); } },
     { icon: <Layers size={15} className="text-[#7C3AED]" />, label: "Card Limit", onClick: () => { setLimitModal(c); setLimitValue(3); } },
     // Super admin only: it decides which reseller earns commission on them.
@@ -607,6 +629,7 @@ export default function AdminCustomers() {
   );
 
   return (
+    <>
     <ResponsiveDashboardLayout title="Customer List" subtitle="Manage all customer cards & subscriptions">
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Stats */}
@@ -1035,6 +1058,15 @@ export default function AdminCustomers() {
         </div>
       </Modal>}
     </ResponsiveDashboardLayout>
+
+    {/* Send email: pick a template or write a message, preview it, send. Kept
+        outside the layout, which swaps its phone and desktop versions when
+        the width crosses 768 px — inside, that would wipe a half-written
+        message. It draws itself over the page anyway. */}
+    {mailModal && (
+      <SendEmailModal recipient={mailModal.recipient} name={mailModal.name} email={mailModal.email} returnFocus={mailModal.trigger} onClose={() => setMailModal(null)} />
+    )}
+    </>
   );
 }
 

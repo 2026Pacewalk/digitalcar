@@ -33,6 +33,14 @@ import { eq, desc, and } from "drizzle-orm";
 
 const DAY = 86_400_000;
 
+/** publicState's rule: the account's newest subscriptions row keeps its card
+    live while it is active and hasn't run out — whatever the package, a Trial
+    one included. Admin → Customers → Send email reads it the same way
+    (api/lib/customer-email.ts). */
+export function subscriptionKeepsCardLive(sub: { status: string; currentPeriodEnd: Date | string | null } | null | undefined, now: number): boolean {
+  return !!sub && sub.status === "active" && (!sub.currentPeriodEnd || new Date(sub.currentPeriodEnd).getTime() > now);
+}
+
 // A published snapshot is served to the PUBLIC by slug, so it must never carry
 // account secrets. The card JSON (dc_customer) has historically picked up a few
 // non-card fields (a stray `password` from the old change-password flow, the
@@ -296,10 +304,9 @@ export const publishRouter = createRouter({
       .where(and(eq(accountDeletionRequests.userId, uid), eq(accountDeletionRequests.status, "pending"))).limit(1);
     if (deletion[0]) return { paused: true, mode };
 
-    // An active paid subscription always keeps the card live.
-    const subs = await db.select().from(subscriptions).where(eq(subscriptions.userId, uid)).orderBy(desc(subscriptions.createdAt)).limit(1);
-    const sub = subs[0];
-    if (sub && sub.status === "active" && (!sub.currentPeriodEnd || new Date(sub.currentPeriodEnd).getTime() > now)) return { paused: false, mode };
+    // An active subscription (any package) always keeps the card live.
+    const subs =await db.select().from(subscriptions).where(eq(subscriptions.userId, uid)).orderBy(desc(subscriptions.createdAt)).limit(1);
+    if (subscriptionKeepsCardLive(subs[0], now)) return { paused: false, mode };
 
     // Manual / legacy paid plans: admin-set packages (Gold=5 / Platinum=6 +
     // expired_on) with NO subscriptions row. A valid paid package must keep the

@@ -1029,7 +1029,7 @@ export type CustomDomain = typeof customDomains.$inferSelect;
 // ─── Email log ──────────────────────────────────────────────────
 // One row per outbound email, written by sendEmail(). Support's answer to
 // "did they get their login?" without digging through the SMTP provider.
-// No body is stored — welcome mails contain a plaintext password.
+// The body lives in email_log_bodies (below), redacted.
 export const emailLogs = mysqlTable("email_logs", {
   id: serial("id").primaryKey(),
   toEmail: varchar("to_email", { length: 255 }).notNull(),
@@ -1039,12 +1039,16 @@ export const emailLogs = mysqlTable("email_logs", {
   status: mysqlEnum("status", ["sent", "failed", "skipped"]).notNull().default("sent"),
   error: varchar("error", { length: 500 }),
   userId: bigint("user_id", { mode: "number", unsigned: true }),
+  // The admin who sent it by hand (Admin → Customers → Send email); null for
+  // everything the platform sends by itself.
+  sentBy: bigint("sent_by", { mode: "number", unsigned: true }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("emlog_created_idx").on(table.createdAt),
   index("emlog_to_idx").on(table.toEmail),
   index("emlog_status_idx").on(table.status),
   index("emlog_kind_idx").on(table.kind),
+  index("emlog_user_created").on(table.userId, table.createdAt),
 ]);
 
 export type EmailLog = typeof emailLogs.$inferSelect;

@@ -43,6 +43,11 @@ function transport(): Transporter | null {
     secure: port === 465,
     // Gmail displays App Passwords with spaces — strip them so either form works.
     auth: { user: SMTP_USER, pass: SMTP_PASS.replace(/\s+/g, "") },
+    // Give up on an unreachable or stalled server in seconds, not nodemailer's
+    // minutes — an admin clicking Send is waiting on this.
+    connectionTimeout: 15_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 30_000,
   });
   mode = "live";
   const a = fromAlignment();
@@ -128,10 +133,17 @@ export function fromAlignment(): { aligned: boolean; from: string; via: string |
     Existing callers that ignore the return value are unaffected. */
 /** `secrets`: values the email carries that must never be stored — e.g. a
     password the admin chose to include. The copy kept for Admin → Email Log has
-    them blanked (see redactForLog); the recipient gets the real email. */
-export type SendOptions = { secrets?: (string | null | undefined)[] };
+    them blanked (see redactForLog); the recipient gets the real email.
+    `sentBy`: the admin who sent it by hand (Admin → Customers → Send email),
+    kept in email_logs.sent_by. Such a send also waits for its log row, so the
+    limits that count those rows see it at once. */
+export type SendOptions = { secrets?: (string | null | undefined)[]; sentBy?: number | null };
 
-export async function sendEmail(to: string | undefined | null, email: Email, replyTo?: string | null, opts: SendOptions = {}): Promise<{ ok: boolean; error?: string }> {
+/** The log note on an email the dev preview mailbox captured instead of delivering. */
+export const CAPTURED_NOTE = "Captured in the dev preview mailbox — not delivered";
+
+/** `captured`: true when the dev preview mailbox took it — `ok`, but nobody got it. */
+export async function sendEmail(to: string | undefined | null, email: Email, replyTo?: string | null, opts: SendOptions = {}): Promise<{ ok: boolean; error?: string; captured?: boolean }> {
   try {
     if (!to) return { ok: false, error: "No recipient" };
     // Accounts created for a client whose email we didn't have get a stand-in
@@ -164,13 +176,16 @@ export async function sendEmail(to: string | undefined | null, email: Email, rep
     console.log(`[mail] "${email.subject}" ${captured ? "captured for" : "sent to"} ${to}${preview ? ` — open it: ${preview}` : ""}`);
     // Logged as "skipped", because the log answers one question — did the
     // customer get it? In dev capture mode the honest answer is no.
-    void logEmail(to, email, replyTo, captured ? "skipped" : "sent",
-      captured ? "Captured in the dev preview mailbox — not delivered" : null, opts);
-    return { ok: true };
+    const logged = logEmail(to, email, replyTo, captured ? "skipped" : "sent", captured ? CAPTURED_NOTE : null, opts);
+    if (opts.sentBy) await logged;
+    return captured ? { ok: true, captured: true } : { ok: true };
   } catch (e) {
     const why = (e as Error).message;
     console.error(`[mail] failed to send "${email.subject}":`, why);
-    if (to) void logEmail(to, email, replyTo, "failed", why, opts);
+    if (to) {
+      const logged = logEmail(to, email, replyTo, "failed", why, opts);
+      if (opts.sentBy) await logged;
+    }
     return { ok: false, error: why };
   }
 }
@@ -218,6 +233,7 @@ async function logEmail(
       status,
       error: error ? error.slice(0, 500) : null,
       userId: owner?.id ?? null,
+      sentBy: opts.sentBy || null,
     }).$returningId();
     if (row?.id && (email.html || email.text)) {
       try {

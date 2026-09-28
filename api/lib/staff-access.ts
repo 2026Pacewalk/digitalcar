@@ -66,6 +66,10 @@ const BY_PROCEDURE: Record<string, Grant> = {
   "admin.lookupAccount": "customers",
   "subscription.list": "customers",
   "card.listAll": "customers",
+  // Send email: the options and the preview are reads (view); sending is a change (manage).
+  "customerEmail.options": "customers",
+  "customerEmail.preview": "customers",
+  "customerEmail.send": "customers",
 
   "lead.listAll": "leads",
 
@@ -140,7 +144,7 @@ export function staffMayUse(access: Access, grant: Grant, level: "view" | "manag
 const ACCOUNT_ACTIONS = new Set([
   "user.create", "user.update", "user.delete", "user.setPackage", "user.sendAccountDetails",
   "user.sendFeatureUpdate", "user.setPassword", "user.extendValidity", "user.setCardLimit",
-  "user.deactivateCustomer", "admin.deleteAppUser",
+  "user.deactivateCustomer", "admin.deleteAppUser", "customerEmail.send",
 ]);
 
 export async function staffAccountViolation(path: string, input: unknown): Promise<string | null> {
@@ -178,6 +182,7 @@ const ACTION_LABELS: Record<string, string> = {
   "user.deactivateCustomer": "Deactivated a customer",
   "user.sendAccountDetails": "Emailed account details",
   "user.sendFeatureUpdate": "Emailed a feature update",
+  "customerEmail.send": "Emailed a customer",
   "admin.deleteAppUser": "Removed an account",
   "admin.reslugCard": "Changed a card address",
   "admin.completeDeletion": "Erased a deleted account",
@@ -223,23 +228,37 @@ export function actionLabel(path: string): string {
 }
 
 const SECRET_KEY = /pass|secret|token|otp|key|credential|signature|cvv|card_?number|account_?number|ifsc/i;
+// What someone wrote to a customer (Send email's custom message) belongs in
+// their inbox, not in this log: only its length is kept. The subject stays.
+const PRIVATE_TEXT = /^(message|body)$/i;
+// Objects spelled out one level down ("custom.subject: …") instead of {…}.
+const SPELL_OUT = new Set(["custom"]);
 
-/** A short, redacted description of what was sent — never passwords, tokens or images. */
+/** A short, redacted description of what was sent — never passwords, tokens,
+    images or the text of a message. */
 export function summarizeInput(input: unknown): { summary: string | null; target: string | null } {
   if (input == null || typeof input !== "object") return { summary: input == null ? null : String(input).slice(0, 120), target: null };
   const rec = input as Record<string, unknown>;
-  const target = ["email", "slug", "domain", "code", "name", "userId", "id", "orderId"]
+  const target = ["email", "slug", "domain", "code", "name", "userId", "id", "orderId", "legacyId"]
     .map((k) => rec[k])
     .find((v) => (typeof v === "string" && v.trim()) || typeof v === "number");
   const parts: string[] = [];
-  for (const [k, v] of Object.entries(rec)) {
-    if (parts.join(", ").length > 240) break;
-    if (SECRET_KEY.test(k)) { parts.push(`${k}: [hidden]`); continue; }
-    if (v == null || v === "") continue;
-    if (typeof v === "string") parts.push(`${k}: ${/^data:/.test(v) ? "[image]" : v.length > 60 ? v.slice(0, 57) + "…" : v}`);
-    else if (typeof v === "number" || typeof v === "boolean") parts.push(`${k}: ${v}`);
+  const add = (k: string, v: unknown) => {
+    if (SECRET_KEY.test(k)) { parts.push(`${k}: [hidden]`); return; }
+    if (v == null || v === "") return;
+    if (typeof v === "string") {
+      const text = PRIVATE_TEXT.test(k.split(".").pop() || "") ? `[${v.length} chars]`
+        : /^data:/.test(v) ? "[image]" : v.length > 60 ? v.slice(0, 57) + "…" : v;
+      parts.push(`${k}: ${text}`);
+    } else if (typeof v === "number" || typeof v === "boolean") parts.push(`${k}: ${v}`);
     else if (Array.isArray(v)) parts.push(`${k}: ${v.length} item${v.length === 1 ? "" : "s"}`);
     else parts.push(`${k}: {…}`);
+  };
+  for (const [k, v] of Object.entries(rec)) {
+    if (parts.join(", ").length > 240) break;
+    if (SPELL_OUT.has(k) && v && typeof v === "object" && !Array.isArray(v)) {
+      for (const [k2, v2] of Object.entries(v as Record<string, unknown>)) add(`${k}.${k2}`, v2);
+    } else add(k, v);
   }
   return { summary: parts.join(", ").slice(0, 300) || null, target: target != null ? String(target).slice(0, 191) : null };
 }

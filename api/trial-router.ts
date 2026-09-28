@@ -26,11 +26,11 @@ async function getSetting(db: ReturnType<typeof getDb>, key: string): Promise<st
 async function setSetting(db: ReturnType<typeof getDb>, key: string, value: string) {
   await db.insert(appSettings).values({ key, value }).onDuplicateKeyUpdate({ set: { value } });
 }
-async function trialDays(db: ReturnType<typeof getDb>): Promise<number> {
+export async function trialDays(db: ReturnType<typeof getDb>): Promise<number> {
   const n = Number(await getSetting(db, K_TRIAL_DAYS));
   return n >= 1 && n <= 365 ? n : DEFAULT_DAYS;
 }
-async function graceConfig(db: ReturnType<typeof getDb>): Promise<{ enabled: boolean; days: number }> {
+export async function graceConfig(db: ReturnType<typeof getDb>): Promise<{ enabled: boolean; days: number }> {
   const enabled = (await getSetting(db, K_GRACE_ENABLED)) === "1";
   const d = Number(await getSetting(db, K_GRACE_DAYS));
   return { enabled, days: d >= 1 && d <= 90 ? d : DEFAULT_GRACE };
@@ -38,7 +38,7 @@ async function graceConfig(db: ReturnType<typeof getDb>): Promise<{ enabled: boo
 
 type Row = typeof cardTrials.$inferSelect;
 type Grace = { enabled: boolean; days: number };
-function computeState(row: Row, grace: Grace) {
+export function computeState(row: Row, grace: Grace) {
   const now = Date.now();
   const started = row.startedAt ? new Date(row.startedAt).getTime() : 0;
   const ends = row.endsAt ? new Date(row.endsAt).getTime() : 0;

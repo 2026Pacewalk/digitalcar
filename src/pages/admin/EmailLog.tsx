@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Mail, Search, RefreshCw, Loader2, CheckCircle2, XCircle, MinusCircle,
-  ChevronLeft, ChevronRight, Download, Trash2, Inbox, Eye,
+  ChevronLeft, ChevronRight, Download, Trash2, Inbox, Eye, Hand,
 } from "lucide-react";
 import EmailBodyViewer from "@/components/admin/EmailBodyViewer";
 
@@ -101,12 +101,19 @@ const KIND_LABEL: Record<string, string> = {
   reviewRequestEmail: "Review request",
   bulkOrderReceivedEmail: "Bulk order received",
   smtpTestEmail: "SMTP test",
+  // Written by hand in Admin → Customers → Send email
+  teamMessageEmail: "Message from the team",
 };
 
-// Shared with Admin → Email previews so both pages call a template the same thing.
+/* Shared with Admin → Email previews and Customers → Send email so every page
+   calls a template the same thing. An email an admin sent by hand is logged as
+   "manual:<kind>" and reads "Welcome · by hand"; a custom message marked as a
+   promotion is "manual:promo:teamMessageEmail". */
 // eslint-disable-next-line react-refresh/only-export-components
-export const kindLabel = (k: string | null) =>
+export const kindLabel = (k: string | null): string =>
   !k ? "—"
+    : k.startsWith("manual:") ? `${kindLabel(k.slice("manual:".length))} · by hand`
+    : k.startsWith("promo:") ? `${kindLabel(k.slice("promo:".length))} · promotion`
     : KIND_LABEL[k]
     || k.replace(/Email$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
 
@@ -128,13 +135,14 @@ export default function AdminEmailLog() {
   const [term, setTerm] = useState("");           // committed search (Enter / button)
   const [status, setStatus] = useState<Status>("all");
   const [kind, setKind] = useState<string>("");
+  const [byHand, setByHand] = useState(false);    // only emails an admin sent from Customers → Send email
   const [days, setDays] = useState(30);
   const [page, setPage] = useState(1);
   const [viewing, setViewing] = useState<number | null>(null);
   const perPage = 50;
 
   const { data, isLoading, isFetching, refetch } = trpc.admin.emailLogs.useQuery(
-    { q: term || undefined, status, kind: kind || undefined, days, page, perPage },
+    { q: term || undefined, status, kind: kind || undefined, byHand: byHand || undefined, days, page, perPage },
     { placeholderData: (prev) => prev },
   );
   const prune = trpc.admin.pruneEmailLogs.useMutation();
@@ -226,6 +234,11 @@ export default function AdminEmailLog() {
                 {s}
               </button>
             ))}
+            <button onClick={() => setFilter(() => setByHand((v) => !v))} aria-pressed={byHand}
+              className={`h-9 px-3.5 rounded-xl text-[12.5px] font-semibold border-2 transition-all flex items-center gap-1.5 ${
+                byHand ? "border-[#F7B31C] bg-[#FEF3C7]/50 text-[#92400E]" : "border-[#E2E8F0] text-[#334155] hover:border-[#F7B31C]/50"}`}>
+              <Hand size={14} /> Sent by hand
+            </button>
 
             <span className="w-px h-6 bg-[#E2E8F0] mx-1 hidden sm:block" />
 
@@ -265,7 +278,7 @@ export default function AdminEmailLog() {
               <Inbox size={30} className="mx-auto text-[#CBD5E1]" />
               <p className="text-sm font-semibold text-[#334155] mt-3">Nothing here yet</p>
               <p className="text-[12.5px] text-[#94A3B8] mt-1">
-                {term || status !== "all" || kind
+                {term || status !== "all" || kind || byHand
                   ? "No emails match these filters. Try widening the date range."
                   : "Emails sent from now on will be recorded here."}
               </p>
@@ -297,7 +310,10 @@ export default function AdminEmailLog() {
                             {r.subject}
                             {r.error && <div className="text-[11.5px] text-[#B91C1C] mt-1 break-words">{r.error}</div>}
                           </td>
-                          <td className="px-4 py-3 text-[12.5px] text-[#64748B] whitespace-nowrap">{kindLabel(r.kind)}</td>
+                          <td className="px-4 py-3 text-[12.5px] text-[#64748B] whitespace-nowrap">
+                            {kindLabel(r.kind)}
+                            {r.sentByName && <div className="text-[11.5px] text-[#94A3B8] mt-0.5">by {r.sentByName}</div>}
+                          </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11.5px] font-bold ${st.chip}`}>
                               <Icon size={12} /> {st.label}
@@ -336,7 +352,7 @@ export default function AdminEmailLog() {
                       <p className="text-[13px] text-[#334155] mt-1.5">{r.subject}</p>
                       {r.error && <p className="text-[11.5px] text-[#B91C1C] mt-1 break-words">{r.error}</p>}
                       <div className="flex items-center gap-2 mt-2 text-[11.5px] text-[#94A3B8]">
-                        <span>{kindLabel(r.kind)}</span><span>·</span><span className="tabular-nums">{when(r.createdAt)}</span>
+                        <span>{kindLabel(r.kind)}{r.sentByName && ` · by ${r.sentByName}`}</span><span>·</span><span className="tabular-nums">{when(r.createdAt)}</span>
                         {withBody.has(r.id) && (
                           <button type="button" onClick={() => setViewing(r.id)} className="ml-auto inline-flex items-center gap-1 font-semibold text-[#B45309]">
                             <Eye size={12} /> View email

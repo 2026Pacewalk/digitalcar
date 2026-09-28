@@ -30,6 +30,7 @@ import { resellerLedgerRouter } from "./reseller-ledger-router";
 import { emailPreviewRouter } from "./email-preview-router";
 import { mobileRouter } from "./mobile-router";
 import { staffRouter } from "./staff-router";
+import { customerEmailRouter } from "./customer-email-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -66,6 +67,7 @@ export const appRouter = createRouter({
   emailPreview: emailPreviewRouter,
   mobile: mobileRouter,
   staff: staffRouter,
+  customerEmail: customerEmailRouter,
 });
 
 export type AppRouter = typeof appRouter;

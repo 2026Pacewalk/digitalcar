@@ -6,6 +6,7 @@ import {
   featureUpdateEmail, marketingIntroEmail, contactReceivedEmail, reviewRequestEmail,
   smtpTestEmail, bulkOrderReceivedEmail,
 } from "../marketing";
+import { teamMessageEmail } from "../manual";
 
 const MODULE = "marketing";
 const HOSTILE = `<b>Aarav</b> & "Mehta" 'Sons' <script>alert(1)</script>`;
@@ -71,5 +72,27 @@ export const previews: {
     render: () => bulkOrderReceivedEmail({
       name: HOSTILE, company: HOSTILE, quantity: 12, packageName: `<i>Team</i>"`,
       pricePerCard: 799, estimate: 9588, phone: "<b>not a number</b>", requestId: 7,
+    }) },
+
+  /* A message the team writes by hand (Admin → Customers → Send email) */
+  { name: "teamMessageEmail", module: MODULE, audience: "customer", variant: "service-with-links",
+    render: () => teamMessageEmail({
+      name: "Aarav Mehta", subject: "Your card's new QR standee is on its way", promotional: false,
+      message: "Thanks for your order today.\n\nYour QR standee ships tomorrow. You can see the design here: https://digitalcarda.in/pacewalk.\nQuestions? Message us on https://wa.me/919517722444\n\nWe'll send the tracking number as soon as it's out.",
+    }) },
+  { name: "teamMessageEmail", module: MODULE, audience: "customer", variant: "promotional",
+    render: () => teamMessageEmail({
+      name: "Priya Nair", subject: "Diwali offer: 20% off Platinum this week", promotional: true,
+      message: "Diwali is the busiest week of the year for many of our customers.\n\nUpgrade to Platinum before Sunday and get 20% off: https://digitalcarda.in/dashboard/subscription",
+    }) },
+  { name: "teamMessageEmail", module: MODULE, audience: "customer", variant: "more-links-than-allowed",
+    render: () => teamMessageEmail({
+      name: null, subject: "Links you asked for", promotional: false,
+      message: Array.from({ length: 12 }, (_, i) => `Link ${i + 1}: https://digitalcarda.in/help/${i + 1}`).join("\n"),
+    }) },
+  { name: "teamMessageEmail", module: MODULE, audience: "customer", variant: "hostile-input",
+    render: () => teamMessageEmail({
+      name: HOSTILE, subject: `${HOSTILE}\r\nBcc: someone@example.com`, promotional: false,
+      message: `${HOSTILE}\n\njavascript:alert(1) and https://example.com/"><script>alert(1)</script> and https://digitalcarda.in@example.com/login`,
     }) },
 ];

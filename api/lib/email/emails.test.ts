@@ -11,6 +11,7 @@ import { planExtendedEmail, paymentRejectedEmail } from "./billing";
 import { nfcOrderConfirmedEmail } from "./nfc";
 import { referralJoinedEmail } from "./referral";
 import { resellerCommissionEmail } from "./reseller";
+import { teamMessageEmail } from "./manual";
 
 /* Every preview in api/lib/email/previews/ is rendered and checked, so a
    template that breaks on real-looking data fails here instead of in someone's
@@ -89,6 +90,13 @@ describe("hostile input is escaped", () => {
   })));
   it("referralJoinedEmail", () => clean(referralJoinedEmail({ name: X, friendName: X, rewardText: X, code: X })));
   it("resellerCommissionEmail", () => clean(resellerCommissionEmail({ name: X, customerName: X, amount: 99.9, planName: X, billingCycle: X })));
+  it("teamMessageEmail", () => {
+    const e = teamMessageEmail({ name: X, subject: `${X}\r\nBcc: someone@example.com`, message: `${X}\n\njavascript:alert(1) https://example.com/${X}`, promotional: true });
+    clean(e);
+    expect(e.subject, "subject is one line").not.toMatch(/[\r\n]/);
+    expect(e.html.includes('href="javascript:'), "javascript: link").toBe(false);
+    expect(/<[^>]+\bonerror\s*=/i.test(e.html), "onerror attribute on a tag").toBe(false);
+  });
 });
 
 describe("Admin → Email log", () => {

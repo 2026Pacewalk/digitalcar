@@ -58,7 +58,7 @@ function legacyEmailSet(): Set<string> {
 /* Soft-deleted DB accounts: an admin "delete" records the user id here so the
    account never reappears in the Customers list after a refresh. Reversible —
    the row is kept; this just hides + deactivates it. */
-async function hiddenAppUserIds(db: ReturnType<typeof getDb>): Promise<Set<number>> {
+export async function hiddenAppUserIds(db: ReturnType<typeof getDb>): Promise<Set<number>> {
   try {
     const rows = await db.select().from(appSettings).where(eq(appSettings.key, "hidden_app_users"));
     const arr = rows[0]?.value ? JSON.parse(rows[0].value) : [];
@@ -83,7 +83,7 @@ export function legacyCustomers(): { id?: unknown; email?: string }[] {
   }
   return legacyRowsCache ?? [];
 }
-async function hiddenIdSet(db: ReturnType<typeof getDb>, key: string): Promise<Set<string>> {
+export async function hiddenIdSet(db: ReturnType<typeof getDb>, key: string): Promise<Set<string>> {
   try {
     const rows = await db.select().from(appSettings).where(eq(appSettings.key, `hidden_${key}`));
     const arr = rows[0]?.value ? JSON.parse(rows[0].value) : [];
@@ -318,12 +318,16 @@ export const adminRouter = createRouter({
      actually asks — "did their login/invoice/reset actually go out?" — without
      logging into the SMTP provider. The envelope only: recipient, subject,
      which template, and whether it left the building. Since 26 Sept 2026 the
-     body is kept too (redacted — see api/lib/mail.ts); emailLogBody reads it. */
+     body is kept too (redacted — see api/lib/mail.ts); emailLogBody reads it.
+     Emails the team sent by hand (Customers → Send email) are logged as
+     "manual:<template>"; `byHand` lists only those, and each row carries the
+     sender's name (`sentByName`). */
   emailLogs: adminQuery
     .input(z.object({
       q: z.string().max(200).optional(),
       status: z.enum(["all", "sent", "failed", "skipped"]).default("all"),
       kind: z.string().max(64).optional(),
+      byHand: z.boolean().optional(),
       days: z.number().int().min(1).max(365).default(30),
       page: z.number().int().min(1).default(1),
       perPage: z.number().int().min(10).max(200).default(50),
@@ -334,6 +338,7 @@ export const adminRouter = createRouter({
       const where = [gte(emailLogs.createdAt, since)];
       if (input.status !== "all") where.push(eq(emailLogs.status, input.status));
       if (input.kind) where.push(eq(emailLogs.kind, input.kind));
+      if (input.byHand) where.push(like(emailLogs.kind, "manual:%"));
       const term = (input.q || "").trim();
       if (term) {
         const pat = `%${term.replace(/[%_]/g, "")}%`;
@@ -341,8 +346,10 @@ export const adminRouter = createRouter({
       }
       const filter = and(...where);
 
-      const [rows, counted, kinds, totals] = await Promise.all([
-        db.select().from(emailLogs).where(filter)
+      const [found, counted, kinds, totals] = await Promise.all([
+        db.select({ log: emailLogs, sentByName: users.fullName }).from(emailLogs)
+          .leftJoin(users, eq(users.id, emailLogs.sentBy))
+          .where(filter)
           .orderBy(desc(emailLogs.createdAt))
           .limit(input.perPage).offset((input.page - 1) * input.perPage),
         db.select({ n: sql<number>`count(*)` }).from(emailLogs).where(filter),
@@ -351,6 +358,7 @@ export const adminRouter = createRouter({
         db.select({ status: emailLogs.status, n: sql<number>`count(*)` })
           .from(emailLogs).where(gte(emailLogs.createdAt, since)).groupBy(emailLogs.status),
       ]);
+      const rows = found.map((r) => ({ ...r.log, sentByName: r.log.sentBy ? r.sentByName ?? null : null }));
 
       // Which of these rows have a saved body (emails before 26 Sept 2026 don't).
       let withBody: number[] = [];

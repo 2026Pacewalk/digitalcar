@@ -85,15 +85,29 @@ const requireAdminAccess = t.middleware(async (opts) => {
   const result = await next({ ctx: { ...ctx, user } });
   if (logIt) {
     const d = await describe();
+    const failed = result.ok ? returnedFailure(result.data) : result.error.message;
     recordActivity({
       actor: user, module: grant, action: actionLabel(path), ...d,
-      status: result.ok ? "ok" : "error",
-      error: result.ok ? null : result.error.message,
+      status: failed == null ? "ok" : "error",
+      error: failed,
       req: ctx.req,
     });
   }
   return result;
 });
+
+/** The error text of a change that reports its failure in what it returns
+    instead of throwing — { status: "failed" | "skipped", error }
+    (customerEmail.send) or { ok: false, error } (a send that passes sendEmail's
+    answer on) — so the activity log doesn't call it done; null otherwise. A
+    { ok: false, reason } refusal (no such account, and the like) is logged as before. */
+function returnedFailure(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const { status, ok, error } = data as { status?: unknown; ok?: unknown; error?: unknown };
+  const text = typeof error === "string" && error.trim() ? error : null;
+  if (status === "failed" || status === "skipped") return text ?? `Not sent (${status})`;
+  return ok === false && text ? text : null;
+}
 
 export const authedQuery = t.procedure.use(requireAuth);
 export const adminQuery = authedQuery.use(requireAdminAccess);

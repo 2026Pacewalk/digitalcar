@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Loader2, Monitor, Smartphone, FileText, Mail, ShieldCheck, Inbox } from "lucide-react";
 import { trpc } from "@/providers/trpc";
+import EmailFrame from "@/components/admin/EmailFrame";
 
 /* Admin → Email Log → View: one logged email as the recipient saw it.
 
@@ -25,15 +26,6 @@ export default function EmailBodyViewer({ id, onClose, kindLabel }: { id: number
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  // Links in the email open in a new tab, not inside the preview frame.
-  const srcDoc = useMemo(() => {
-    const html = data?.html;
-    if (!html) return "";
-    return /<head[^>]*>/i.test(html)
-      ? html.replace(/<head([^>]*)>/i, (_m, a) => `<head${a}><base target="_blank">`)
-      : `<base target="_blank">${html}`;
-  }, [data?.html]);
 
   const log = data?.log;
   const hasBody = !!(data?.html || data?.text);
@@ -101,13 +93,7 @@ export default function EmailBodyViewer({ id, onClose, kindLabel }: { id: number
             <pre className="m-4 whitespace-pre-wrap break-words rounded-xl bg-white p-5 font-mono text-[12.5px] leading-relaxed text-[#1E293B] ring-1 ring-[#E2E8F0]">{data?.text}</pre>
           ) : (
             <div className="flex justify-center p-3 sm:p-5">
-              <iframe
-                title="Email as the recipient sees it"
-                srcDoc={srcDoc}
-                sandbox="allow-popups allow-popups-to-escape-sandbox"
-                referrerPolicy="no-referrer"
-                className={`h-[70vh] rounded-xl bg-white shadow-sm ring-1 ring-[#E2E8F0] transition-[width] duration-300 ${device === "phone" ? "w-[380px] max-w-full" : "w-full max-w-[760px]"}`}
-              />
+              <EmailFrame html={data?.html ?? ""} device={device} title="Email as the recipient sees it" className="h-[70vh]" />
             </div>
           )}
         </div>

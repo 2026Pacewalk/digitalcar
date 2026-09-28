@@ -76,6 +76,8 @@ export const USER_TYPES: Record<string, UserDef> = {
   welcome: u("updates", "sparkles", "gold", "Welcome"),
   card_published: u("updates", "sparkles", "green", "Card published"),
   card_link_changed: u("updates", "link", "blue", "Card link changed"),
+  // A custom message the team emailed them by hand (Admin → Customers → Send email).
+  team_message: u("updates", "mail", "gold", "Message from the DigitalCarda team"),
   ls_abandoned: u("updates", "wand", "gold", "Card not published yet"),
   referral_joined: u("rewards", "users", "blue", "Someone joined with your link"),
   referral_reward: u("rewards", "banknote", "green", "Referral reward"),

@@ -20,3 +20,4 @@ export * from "./email/referral";
 export * from "./email/reseller";
 export * from "./email/admin";
 export * from "./email/marketing";
+export { teamMessageEmail } from "./email/manual";

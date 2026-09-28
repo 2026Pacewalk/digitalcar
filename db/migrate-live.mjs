@@ -35,10 +35,11 @@ const TABLES = {
     to_email VARCHAR(255) NOT NULL, subject VARCHAR(300) NOT NULL,
     kind VARCHAR(64) NULL, reply_to VARCHAR(255) NULL,
     status ENUM('sent','failed','skipped') NOT NULL DEFAULT 'sent', error VARCHAR(500) NULL,
-    user_id BIGINT UNSIGNED NULL,
+    user_id BIGINT UNSIGNED NULL, sent_by BIGINT UNSIGNED NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX emlog_created_idx (created_at), INDEX emlog_to_idx (to_email),
-    INDEX emlog_status_idx (status), INDEX emlog_kind_idx (kind))`,
+    INDEX emlog_status_idx (status), INDEX emlog_kind_idx (kind),
+    INDEX emlog_user_created (user_id, created_at))`,
   // Coupons offered to one customer until a deadline (EARLY20, day-2 trial email).
   coupon_grants: `CREATE TABLE IF NOT EXISTS coupon_grants (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -271,6 +272,25 @@ log("✓ users.role accepts 'staff'");
     await conn.query("ALTER TABLE razorpay_fulfilments ADD COLUMN amount DECIMAL(12,2) NULL AFTER razorpay_payment_id");
     log("✓ razorpay_fulfilments.amount added");
   } else { log("• razorpay_fulfilments.amount present (skipped)"); }
+}
+
+// Email log: who sent an email by hand (Admin → Customers → Send email), and
+// each customer's emails newest first. Nullable/additive; guarded — MySQL has
+// no ADD COLUMN / INDEX IF NOT EXISTS. The app writes sent_by on every email,
+// so this must run before (or with) the release that ships it.
+{
+  const [cc] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='email_logs' AND column_name='sent_by'");
+  if (cc[0].n === 0) {
+    await conn.query("ALTER TABLE email_logs ADD COLUMN sent_by BIGINT UNSIGNED NULL AFTER user_id");
+    log("✓ email_logs.sent_by added");
+  } else { log("• email_logs.sent_by present (skipped)"); }
+  const [ix] = await conn.query(
+    "SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE table_schema=DATABASE() AND table_name='email_logs' AND index_name='emlog_user_created'");
+  if (ix[0].n === 0) {
+    await conn.query("ALTER TABLE email_logs ADD INDEX emlog_user_created (user_id, created_at)");
+    log("✓ email_logs (user_id, created_at) index added");
+  } else { log("• email_logs (user_id, created_at) index present (skipped)"); }
 }
 
 // Relax leads.card_id to NULL (snapshot cards have no DB card row). Guarded.

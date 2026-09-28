@@ -98,7 +98,7 @@ const priceFor = (p: Pkg, cycle: string) =>
   Number(cycle === "triennial" ? p.threeYearPrice : cycle === "yearly" ? p.yearlyPrice : p.monthlyPrice) || 0;
 /** The next plan up on the same term (cheapest one that costs more), for the
     "upgrade before it ends and what you paid comes off" tip. */
-function nextTier(pkgs: Pkg[], current: Pkg | undefined, cycle: string): Pkg | null {
+export function nextTier(pkgs: Pkg[], current: Pkg | undefined, cycle: string): Pkg | null {
   if (!current) return null;
   const mine = priceFor(current, cycle);
   return pkgs

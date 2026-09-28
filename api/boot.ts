@@ -52,6 +52,12 @@ app.use("/api/trpc/*", async (c) => {
     req: c.req.raw,
     router: appRouter,
     createContext,
+    // A read whose input is too big for a URL (the preview of a long custom
+    // email: 5,000 characters of Hindi is ~45 KB encoded, past the ~16 KB a
+    // request line may be) can be sent as a POST instead. Safe because sign-in
+    // travels in a header (x-auth-token), never a cookie, so another site
+    // can't make a signed-in request. GET keeps working as before.
+    allowMethodOverride: true,
   });
 });
 
@@ -986,6 +992,30 @@ if (process.env.NODE_ENV === "production") {
     console.log("[schema] email_log_bodies ensured");
   } catch (e) {
     console.error("[schema] ensure email_log_bodies failed:", (e as Error).message);
+  }
+})();
+
+// Who sent an email by hand (Admin → Customers → Send email), and each
+// customer's emails newest first (db/migrate-live.mjs is the production
+// authority). Guarded: MySQL has no ADD COLUMN / INDEX IF NOT EXISTS.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    const count = async (q: string) => {
+      const rows = await db.execute(sql.raw(q));
+      return Number((rows as unknown as [{ n?: number }[]])[0]?.[0]?.n ?? (rows as unknown as { n?: number }[])[0]?.n ?? 0);
+    };
+    if (!(await count("SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='email_logs' AND column_name='sent_by'"))) {
+      await db.execute(sql.raw("ALTER TABLE email_logs ADD COLUMN sent_by BIGINT UNSIGNED NULL AFTER user_id"));
+    }
+    if (!(await count("SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE table_schema=DATABASE() AND table_name='email_logs' AND index_name='emlog_user_created'"))) {
+      await db.execute(sql.raw("ALTER TABLE email_logs ADD INDEX emlog_user_created (user_id, created_at)"));
+    }
+    console.log("[schema] email_logs.sent_by ensured");
+  } catch (e) {
+    console.error("[schema] ensure email_logs.sent_by failed:", (e as Error).message);
   }
 })();
 
