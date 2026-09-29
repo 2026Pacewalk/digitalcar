@@ -1276,9 +1276,12 @@ app.get("/api/my/leads", async (c) => {
   if (!user) return c.json({ error: "Unauthorized" }, 401);
   const email = String(user.email || "").toLowerCase();
   if (!email) return c.json([]);
-  const customers = (await readPublicJson("customers")) as { email?: string; slug?: string }[];
+  const customers = (await readPublicJson("customers")) as { id?: string | number; email?: string; slug?: string }[];
+  // An erased (hidden) old-site customer's enquiries never go to whoever holds
+  // that email now — the same rule the leads import follows.
+  const hidden = await getHiddenIds("customers");
   const slugs = new Set(
-    customers.filter((x) => String(x.email || "").toLowerCase() === email)
+    customers.filter((x) => String(x.email || "").toLowerCase() === email && !hidden.has(String(x.id)))
       .map((x) => String(x.slug || "").toLowerCase()).filter(Boolean),
   );
   if (!slugs.size) return c.json([]);

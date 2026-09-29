@@ -10,11 +10,14 @@
  * rows. Re-running inserts nothing (dedup by user_id + name + created_at).
  * Imported rows carry source='legacy' so they're easy to identify/rollback.
  *
- * Owner resolution for each enquiry's `uname`, first match wins:
- *   1. cards.slug              → user_id (+ card_id)
- *   2. published_cards.slug    → user_id
- *   3. customers.json username → email → users.id   (the primary legacy key)
- *   4. customers.json slug     → email → users.id
+ * Owner resolution for each enquiry's `uname` (legacyEnquiryOwners below):
+ *   1. customers.json username → email → users.id   (the key the old site used)
+ *   2. customers.json slug     → email → users.id
+ *   3. cards.slug              → user_id (+ card_id)  — only for a uname the
+ *   4. published_cards.slug    → user_id                old site never had
+ * A legacy username/slug whose customer has no account here, or was erased /
+ * removed by an admin (app_settings.hidden_customers), belongs to NOBODY: it
+ * never falls through to a new card that happens to use the same address.
  * Enquiries whose uname maps to no account are skipped (counted, never guessed).
  * The legacy demo/test bucket (uname 'admin' → hundreds of spam submissions on
  * the demo card) is intentionally excluded so it never floods a real CRM.
@@ -51,32 +54,72 @@ function normalizeDt(s) {
   return `${m[1]} ${m[2] || "00:00:00"}`;
 }
 
+const lc = (v) => String(v || "").toLowerCase().trim();
+
+/** uname → { userId, cardId|null } | null (null = a legacy name with no owner
+    here). Pure, so the order is unit-tested (api/lib/legacy-enquiry-owners.test.ts).
+    Most legacy usernames differ from the customer's slug, and card URLs were
+    only kept clear of legacy SLUGS — so a new card could sit on someone's old
+    username. The legacy file therefore decides first, for every name it has;
+    usernames before slugs, as the old site filed enquiries under the username.
+    A hidden (erased or admin-removed) customer still claims its names, so its
+    enquiries go nowhere rather than to whoever else matches.
+    cards / published_cards rows: { slug, userId, cardId } with slug lowercased. */
+export function legacyEnquiryOwners({ customers, hiddenIds, userIdByEmail, cards, publishedCards }) {
+  const hidden = new Set([...hiddenIds].map(String));
+  const cardBySlug = new Map();
+  for (const r of cards) if (r.slug && !cardBySlug.has(r.slug)) cardBySlug.set(r.slug, r);
+  const owners = new Map();
+  for (const field of ["username", "slug"]) {
+    for (const c of customers) {
+      const key = lc(c[field]);
+      if (!key || owners.has(key)) continue;
+      const email = lc(c.email);
+      const userId = email && !hidden.has(String(c.id)) ? userIdByEmail.get(email) : undefined;
+      const card = cardBySlug.get(key);
+      owners.set(key, userId ? { userId, cardId: card && card.userId === userId ? card.cardId : null } : null);
+    }
+  }
+  for (const r of cards) if (r.slug && !owners.has(r.slug)) owners.set(r.slug, { userId: r.userId, cardId: r.cardId });
+  for (const r of publishedCards) if (r.slug && !owners.has(r.slug)) owners.set(r.slug, { userId: r.userId, cardId: null });
+  return owners;
+}
+
+/* The customers.json ids an erasure or an admin removed (the same list the
+   admin screens hide). An unreadable list stops the import rather than
+   handing a removed customer's enquiries back to an account. */
+async function hiddenCustomerIds(conn) {
+  let rows;
+  try { [rows] = await conn.query("SELECT value FROM app_settings WHERE `key` = 'hidden_customers'"); }
+  catch (e) { if (e.code === "ER_NO_SUCH_TABLE") return new Set(); throw e; }
+  if (!rows[0]?.value) return new Set();
+  const arr = JSON.parse(rows[0].value);
+  if (!Array.isArray(arr)) throw new Error("app_settings.hidden_customers is not a list");
+  return new Set(arr.map(String));
+}
+
 export async function importLegacyEnquiries(conn, log = (s) => console.log(s)) {
   const enquiries = await readJson("enquiries");
   if (!enquiries.length) { log("• legacy enquiries: file not found / empty (skipped)"); return { imported: 0, dup: 0, noOwner: 0 }; }
   const customers = await readJson("customers");
+  // Without the old customer list every old username would fall through to
+  // whichever new card uses that address — so import nothing instead.
+  if (!customers.length) { log("• legacy enquiries: customers.json not found / empty (skipped)"); return { imported: 0, dup: 0, noOwner: 0 }; }
 
-  // Build slug → { userId, cardId|null }
-  const slugToOwner = new Map();
+  // uname → { userId, cardId|null } | null — the legacy file first (see above).
   const [cardRows] = await conn.query("SELECT id, user_id, LOWER(slug) AS slug FROM cards WHERE slug IS NOT NULL AND slug <> ''");
-  for (const r of cardRows) if (!slugToOwner.has(r.slug)) slugToOwner.set(r.slug, { userId: r.user_id, cardId: r.id });
+  let pcRows = [];
   try {
-    const [pcRows] = await conn.query("SELECT user_id, LOWER(slug) AS slug FROM published_cards WHERE slug IS NOT NULL AND slug <> ''");
-    for (const r of pcRows) if (!slugToOwner.has(r.slug)) slugToOwner.set(r.slug, { userId: r.user_id, cardId: null });
+    [pcRows] = await conn.query("SELECT user_id, LOWER(slug) AS slug FROM published_cards WHERE slug IS NOT NULL AND slug <> ''");
   } catch { /* table may not exist yet */ }
-  const emailToUserId = new Map();
-  const [userRows] = await conn.query("SELECT id, LOWER(email) AS email FROM users WHERE email IS NOT NULL");
-  for (const u of userRows) emailToUserId.set(u.email, u.id);
-  // Legacy enquiries key on the customer's `username` (primary) — also index
-  // `slug` — so uname resolves via customers.json → email → users.id.
-  for (const c of customers) {
-    const email = String(c.email || "").toLowerCase();
-    const uid = emailToUserId.get(email);
-    if (!uid) continue;
-    for (const key of [String(c.username || "").toLowerCase(), String(c.slug || "").toLowerCase()]) {
-      if (key && !slugToOwner.has(key)) slugToOwner.set(key, { userId: uid, cardId: null });
-    }
-  }
+  const userIdByEmail = new Map();
+  const [userRows] = await conn.query("SELECT id, LOWER(TRIM(email)) AS email FROM users WHERE email IS NOT NULL");
+  for (const u of userRows) userIdByEmail.set(u.email, u.id);
+  const ownerOf = legacyEnquiryOwners({
+    customers, hiddenIds: await hiddenCustomerIds(conn), userIdByEmail,
+    cards: cardRows.map((r) => ({ slug: r.slug, userId: r.user_id, cardId: r.id })),
+    publishedCards: pcRows.map((r) => ({ slug: r.slug, userId: r.user_id })),
+  });
 
   // Existing legacy dedup keys (user_id | full_name | created_at string).
   const [existing] = await conn.query(
@@ -92,9 +135,9 @@ export async function importLegacyEnquiries(conn, log = (s) => console.log(s)) {
   let imported = 0, dup = 0, noOwner = 0, skipped = 0, deleted = 0;
   const batch = [];
   for (const e of enquiries) {
-    const uname = String(e.uname || "").toLowerCase();
+    const uname = lc(e.uname);
     if (SKIP_UNAMES.has(uname)) { skipped++; continue; }
-    const owner = slugToOwner.get(uname);
+    const owner = ownerOf.get(uname);
     if (!owner) { noOwner++; continue; }
     const name = (String(e.name || "").trim()) || "Anonymous";
     const dt = normalizeDt(e.created_on);

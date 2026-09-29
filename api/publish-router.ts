@@ -69,20 +69,27 @@ async function setting(db: ReturnType<typeof getDb>, key: string): Promise<strin
    (snapshot wins over legacy JSON in PublicCard.tsx). Cached 60s like card-og. */
 let legacyCache: Set<string> | null = null;
 let legacyOwnerCache: Map<string, string> | null = null;
+let legacyUsernameCache: Map<string, string> | null = null;
 let legacyAt = 0;
 function loadLegacy(): void {
   const now = Date.now();
-  if (legacyCache && legacyOwnerCache && now - legacyAt < 60_000) return;
+  if (legacyCache && legacyOwnerCache && legacyUsernameCache && now - legacyAt < 60_000) return;
   for (const p of ["./dist/public/customers.json", "./public/customers.json"]) {
     try {
-      const rows = JSON.parse(fs.readFileSync(path.resolve(p), "utf-8")) as { slug?: string; email?: string }[];
+      const rows = JSON.parse(fs.readFileSync(path.resolve(p), "utf-8")) as { slug?: string; username?: string; email?: string }[];
       const owners = new Map<string, string>();
+      const usernames = new Map<string, string>();
       for (const r of rows) {
+        const email = String(r.email || "").toLowerCase().trim();
         const slug = String(r.slug || "").toLowerCase().trim();
-        if (slug) owners.set(slug, String(r.email || "").toLowerCase().trim());
+        if (slug) owners.set(slug, email);
+        // First row wins, as in the enquiry import (db/import-legacy-enquiries.mjs).
+        const username = String(r.username || "").toLowerCase().trim();
+        if (username && !usernames.has(username)) usernames.set(username, email);
       }
       legacyOwnerCache = owners;
       legacyCache = new Set(owners.keys());
+      legacyUsernameCache = usernames;
       legacyAt = now;
       return;
     } catch { /* try next path */ }
@@ -97,6 +104,13 @@ export function legacySlugSet(): Set<string> {
 export function legacySlugOwners(): Map<string, string> {
   loadLegacy();
   return legacyOwnerCache ?? new Map();
+}
+/* username → owner email. Most legacy usernames differ from the slug; the old
+   site filed its enquiries (and the rest of a card's content) under them, and
+   they still sign their customer in. */
+function legacyUsernameOwners(): Map<string, string> {
+  loadLegacy();
+  return legacyUsernameCache ?? new Map();
 }
 
 /* True when `slug` is already owned by anyone OTHER than (ownerUserId, ownerCardId).
@@ -123,6 +137,21 @@ export async function slugTakenByOther(
     // different internal user id, which would otherwise wrongly flag their own
     // slug as "taken" and silently block every edit from reaching the live card.
     return false;
+  }
+  // 1b) A legacy customer's USERNAME — reserved the same way, so a new card can
+  //     never sit on it and look like that customer's (their enquiries come in
+  //     under it). Unlike their slug it isn't a live URL of theirs, so the
+  //     owner still goes through the checks below. A card that was already
+  //     published there before usernames were reserved keeps its address.
+  const usernameOwner = legacyUsernameOwners().get(key);
+  if (usernameOwner !== undefined) {
+    const email = String(ownerEmail || "").toLowerCase().trim();
+    if (!email || usernameOwner !== email) {
+      const [held] = await db.select({ id: publishedCards.id }).from(publishedCards)
+        .where(and(eq(publishedCards.userId, ownerUserId), eq(publishedCards.cardId, ownerCardId), eq(publishedCards.slug, slug)))
+        .limit(1);
+      if (!held) return true;
+    }
   }
   // 2) Relational cards — cards.slug is globally unique; taken if another user holds it.
   const rel = await db.select({ userId: cards.userId }).from(cards).where(eq(cards.slug, slug));

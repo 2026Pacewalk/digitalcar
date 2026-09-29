@@ -13,7 +13,6 @@ import { loadNewEnquiries, type Enq } from "@/hooks/useEnquiryNotifications";
 import { readCustomer, scopedKey, getAuthUser, getActiveCardId } from "@/hooks/useCustomer";
 import { useValidityDays } from "@/hooks/useValidityDays";
 import { useCurrentPlan, type Term } from "@/hooks/useCurrentPlan";
-import { fetchMyLeads } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import TrialBanner from "@/components/customer/TrialBanner";
 import EmailVerifyBanner from "@/components/customer/EmailVerifyBanner";
@@ -85,7 +84,6 @@ export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [customer, setCustomer] = useState<Customer>(EMPTY);
   const [counts, setCounts] = useState({ products: 0, offers: 0, gallery: 0, videos: 0, uploads: 0, qrcodes: 0, upi: 0, banks: 0 });
-  const [enquiries, setEnquiries] = useState<number | null>(null);
   const [recentEnqs, setRecentEnqs] = useState<Enq[]>([]);
   const [copied, setCopied] = useState(false);
   // Real, live view count — same source as the public card's eye-counter, so the
@@ -107,6 +105,11 @@ export default function CustomerDashboard() {
   // so copy/share can never surface another account's (or a stale local) slug.
   const { data: mine } = trpc.publish.mine.useQuery({ cardId: getActiveCardId() }, { retry: false });
   const { data: followUps } = trpc.lead.followUps.useQuery(undefined, { retry: false });
+  // Enquiries = the Leads page's total (old-site + card leads, minus the ones
+  // the owner deleted); null while it loads.
+  const utils = trpc.useUtils();
+  const { data: leadStats, isError: leadStatsFailed } = trpc.lead.stats.useQuery(undefined, { retry: false });
+  const enquiries = leadStats ? leadStats.total : null;
   const dueFollowUps = (followUps ?? []).filter((l) => {
     if (!l.followUpDate) return false;
     const end = new Date(); end.setHours(23, 59, 59, 999);
@@ -151,27 +154,20 @@ export default function CustomerDashboard() {
   // expiry) — keeps the Dashboard, Card Builder, Profile & Settings all in sync.
   const { days: daysPending, active, onTrial } = useValidityDays(customer.expired_on, pkg.days, [5, 6].includes(Number(customer.package_id)));
 
-  // live enquiries count = historical + card submissions − deleted
+  // Recent card submissions seen in this browser; a new one also refreshes the count.
   useEffect(() => {
-    if (!slug) { setEnquiries(0); return; }
-    let baseIds: string[] = [];
+    if (!slug) return;
     const deletedSet = () => { try { return new Set(JSON.parse(localStorage.getItem("dc_deleted_enquiries") || "[]")); } catch { return new Set<string>(); } };
     const recount = () => {
       const del = deletedSet();
-      const fresh = loadNewEnquiries(slug);
-      const freshIds = fresh.map((e) => e.id);
-      const all = new Set([...baseIds, ...freshIds]);
-      setEnquiries([...all].filter((id) => !del.has(id)).length);
-      setRecentEnqs(fresh.filter((e) => !del.has(e.id)).slice(-3).reverse());
+      setRecentEnqs(loadNewEnquiries(slug).filter((e) => !del.has(e.id)).slice(-3).reverse());
     };
-    fetchMyLeads<{ id: string; uname: string }[]>()
-      .then((d) => { const sl = slug.toLowerCase(); baseIds = d.filter((e) => String(e.uname ?? "").toLowerCase() === sl).map((e) => String(e.id)); recount(); })
-      .catch(() => recount());
-    const onStorage = () => recount();
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("dc:new-enquiry", onStorage as EventListener);
-    return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("dc:new-enquiry", onStorage as EventListener); };
-  }, [slug]);
+    recount();
+    const onNew = () => { recount(); void utils.lead.stats.invalidate(); };
+    window.addEventListener("storage", recount);
+    window.addEventListener("dc:new-enquiry", onNew as EventListener);
+    return () => { window.removeEventListener("storage", recount); window.removeEventListener("dc:new-enquiry", onNew as EventListener); };
+  }, [slug, utils]);
 
   /* ─── Smart completion score ─── */
   const hasSocial = !!(customer.facebook || customer.twitter || customer.instagram || customer.youtube || customer.pinterest || customer.linkedin);
@@ -207,7 +203,7 @@ export default function CustomerDashboard() {
 
   const stats = [
     { icon: CalendarClock, value: daysPending.toLocaleString("en-IN"), label: !active ? "Plan expired" : onTrial ? "Trial days left" : "Days left", bg: active ? "#DCFCE7" : "#FEE2E2", fg: active ? "#16A34A" : "#DC2626", onClick: () => navigate("/dashboard/settings?tab=package") },
-    { icon: MessageSquare, value: enquiries === null ? "…" : String(enquiries), label: "Enquiries", bg: "#FEF3C7", fg: "#D97706", onClick: () => navigate("/dashboard/enquiry") },
+    { icon: MessageSquare, value: enquiries === null ? (leadStatsFailed ? "—" : "…") : enquiries.toLocaleString("en-IN"), label: "Enquiries", bg: "#FEF3C7", fg: "#D97706", onClick: () => navigate("/dashboard/enquiry") },
     { icon: Eye, value: totalViews.toLocaleString("en-IN"), label: "Total Views", bg: "#CFFAFE", fg: "#0891B2", onClick: () => navigate("/dashboard/analytics") },
     { icon: Wallet, value: inr(program?.wallet?.balance ?? 0), label: "Wallet", bg: "#EDE9FE", fg: "#7C3AED", onClick: () => navigate("/dashboard/refer") },
   ];
