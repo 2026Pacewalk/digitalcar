@@ -1207,3 +1207,21 @@ export const adminActivity = mysqlTable("admin_activity", {
 ]);
 
 export type AdminActivity = typeof adminActivity.$inferSelect;
+
+// ─── Card view boosts: extra views the super admin gives a card ──
+// GET /api/views/:slug shows a card's tracked visits (card_events) plus
+// extra_views from here: on the public card, the owner's dashboard and Card
+// Studio. Never written into card_events, so every analytics page keeps
+// counting real visits (contracts/card-views.ts). One row per card slug,
+// lowercase. "Remove" sets 0 and keeps the row, so the one-time seed of
+// pacewalk's old-site views (db/migrate-live.mjs) never comes back.
+export const cardViewBoosts = mysqlTable("card_view_boosts", {
+  slug: varchar("slug", { length: 191 }).primaryKey(),
+  extraViews: int("extra_views", { unsigned: true }).notNull().default(0),
+  note: varchar("note", { length: 200 }),   // the super admin's private note
+  updatedBy: bigint("updated_by", { mode: "number", unsigned: true }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type CardViewBoost = typeof cardViewBoosts.$inferSelect;

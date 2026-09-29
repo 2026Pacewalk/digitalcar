@@ -10,6 +10,7 @@ import { legacyPaidPlan } from "./lib/entitlement";
 import { sendEmail } from "./lib/mail";
 import { notifyUser } from "./lib/notify";
 import { cardPublishedEmail } from "./lib/email-templates";
+import { clearExtraViews, forgetExtraViews, moveExtraViews } from "./lib/card-views";
 import { getDefaultDesign } from "./template-router";
 
 /* A save that carries no design must not wipe the card's template. A card
@@ -201,13 +202,20 @@ export const publishRouter = createRouter({
         }
         await db.update(publishedCards).set({ slug, data }).where(owner);
         // The card moved to a new address. Visit stats are kept by address, so
-        // its history moves with it — except an address a legacy card also
-        // uses, whose events may belong to that card's owner.
+        // its history moves with it, and its extra views too — except an
+        // address a legacy card also uses, whose events may belong to that
+        // card's owner.
         const oldSlug = String(existing[0].slug || "").toLowerCase();
         const newSlug = slug.toLowerCase();
         if (oldSlug && oldSlug !== newSlug && !legacySlugSet().has(oldSlug)) {
           try { await db.update(cardEvents).set({ slug: newSlug }).where(eq(cardEvents.slug, oldSlug)); }
           catch (e) { console.error("[publish] moving visit history to the new address failed:", (e as Error).message); }
+          // Separately, so a failure moving the extra views never holds back
+          // the visit history above.
+          try { await db.transaction((tx) => moveExtraViews(tx, oldSlug, newSlug)); }
+          catch (e) { console.error("[publish] moving extra views to the new address failed:", (e as Error).message); }
+          forgetExtraViews(oldSlug);
+          forgetExtraViews(newSlug);
         }
         const fresh = await db.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner);
         return { ok: true, publicId: existing[0].publicId, updatedAt: fresh[0]?.updatedAt ? new Date(fresh[0].updatedAt).toISOString() : null };
@@ -276,7 +284,17 @@ export const publishRouter = createRouter({
     .input(z.object({ cardId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      await db.delete(publishedCards).where(and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, input.cardId)));
+      const owner = and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, input.cardId));
+      const [card] = await db.select({ slug: publishedCards.slug }).from(publishedCards).where(owner).limit(1);
+      await db.delete(publishedCards).where(owner);
+      // Its address is free now, so its extra views go (clearExtraViews) —
+      // except on a legacy card's address, which stays as it is.
+      const freed = String(card?.slug || "").toLowerCase();
+      if (freed && !legacySlugSet().has(freed)) {
+        try { await clearExtraViews(db, [freed]); }
+        catch (e) { console.error("[publish] clearing the removed card's extra views failed:", (e as Error).message); }
+        forgetExtraViews(freed);
+      }
       return { ok: true };
     }),
 

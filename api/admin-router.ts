@@ -9,6 +9,7 @@ import { publishedCards, users, cardTrials, subscriptions, appSettings, emailLog
 import { eq, and, desc, like, or, sql, gte, inArray } from "drizzle-orm";
 import { legacySlugSet, legacySlugOwners, slugTakenByOther } from "./publish-router";
 import { cancelAccountDeletion, completeAccountDeletion } from "./lib/account-deletion";
+import { clearExtraViews, forgetExtraViews, moveExtraViews } from "./lib/card-views";
 import { sendEmail } from "./lib/mail";
 import { notifyUser } from "./lib/notify";
 import { cardLinkChangedEmail } from "./lib/email-templates";
@@ -206,7 +207,17 @@ export const adminRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       await addHiddenAppUser(db, input.userId);
+      const published = await db.select({ slug: publishedCards.slug }).from(publishedCards).where(eq(publishedCards.userId, input.userId));
       await db.delete(publishedCards).where(eq(publishedCards.userId, input.userId));
+      // The freed addresses lose their extra views, so the next owner doesn't
+      // inherit them. A legacy card's address stays as it is.
+      const legacy = legacySlugSet();
+      const freed = published.map((p) => String(p.slug || "").toLowerCase()).filter((s) => s && !legacy.has(s));
+      if (freed.length) {
+        try { await clearExtraViews(db, freed); }
+        catch (e) { console.error("[deleteAppUser] clearing extra views failed:", (e as Error).message); }
+        freed.forEach((s) => forgetExtraViews(s));
+      }
       await db.update(users).set({ status: "inactive" }).where(eq(users.id, input.userId));
       try { await db.update(cardTrials).set({ status: "cancelled" }).where(eq(cardTrials.userId, input.userId)); } catch { /* no trial row */ }
       return { ok: true };
@@ -305,6 +316,15 @@ export const adminRouter = createRouter({
       const affected = (res as unknown as { affectedRows?: number }[])?.[0]?.affectedRows
         ?? (res as unknown as { affectedRows?: number })?.affectedRows ?? 0;
       if (!affected) await db.update(publishedCards).set({ slug }).where(owner);
+      // The card's extra views go with it, unless the old address is a legacy
+      // card's (the usual case here), which keeps its own.
+      const from = String(oldSlug).toLowerCase();
+      if (affected && from !== slug && !legacySlugSet().has(from)) {
+        try { await db.transaction((tx) => moveExtraViews(tx, from, slug)); }
+        catch (e) { console.error("[reslugCard] moving extra views failed:", (e as Error).message); }
+        forgetExtraViews(from);
+        forgetExtraViews(slug);
+      }
       // Only a real change of address is news to the owner (not a case-only fix).
       if (affected && String(oldSlug).toLowerCase() !== slug) {
         void tellOwnerOfNewLink(db, input.userId, { id: Number(existing[0].id), oldSlug, newSlug: slug, publicId: existing[0].publicId ?? null })

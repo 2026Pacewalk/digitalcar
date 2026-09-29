@@ -657,6 +657,38 @@ async function signupSection(db: Db): Promise<SignupRow[]> {
 
 type LegacyCard = { slug?: string; name?: string; company_name?: string };
 
+/** Which of these (lowercase) slugs are real cards, published here, in the
+    `cards` table or on the old site (the systems the public card page serves),
+    and their names: the owner of a card published here, else the old site's
+    list. The old list is read only when a slug is still missing either.
+    Also Admin → Customers → Card views' check that a card exists. */
+export async function realCards(db: Db, slugs: string[]): Promise<{ real: Set<string>; nameBy: Map<string, string> }> {
+  const real = new Set<string>();
+  const nameBy = new Map<string, string>();
+  if (!slugs.length) return { real, nameBy };
+  const owners = await rows<{ slug: string; name: string | null }>(db, sql`
+    SELECT pc.slug, u.full_name AS name FROM published_cards pc LEFT JOIN users u ON u.id = pc.user_id
+     WHERE pc.slug IN (${list(slugs)})
+    UNION ALL
+    SELECT c.slug, NULL FROM cards c WHERE c.slug IN (${list(slugs)})`);
+  for (const o of owners) {
+    const slug = String(o.slug).toLowerCase();
+    real.add(slug);
+    if (o.name && !nameBy.has(slug)) nameBy.set(slug, o.name);
+  }
+  if (slugs.some((s) => !real.has(s) || !nameBy.has(s))) {
+    const { legacyCustomers } = await import("../admin-router");
+    for (const c of legacyCustomers() as LegacyCard[]) {
+      const slug = String(c.slug || "").toLowerCase().trim();
+      if (!slug) continue;
+      real.add(slug);
+      const name = String(c.name || c.company_name || "").trim();
+      if (name && !nameBy.has(slug)) nameBy.set(slug, name);
+    }
+  }
+  return { real, nameBy };
+}
+
 /* card_events is the busiest table and shares the site's one connection pool
    (10) with every card visit, so its queries run three at a time, and each
    filters created_at itself (FROM_UNIXTIME, not UNIX_TIMESTAMP(created_at)) so
@@ -696,37 +728,14 @@ async function engagementSection(db: Db, w: Windows): Promise<EngagementSection>
        WHERE type = 'view' AND created_at >= ${from30} GROUP BY k ORDER BY n DESC`),
   ]);
 
-  // The cards behind those slugs, published here or on the old site (the
-  // systems the public card page serves), and their names: the owner of a card
-  // published here, else the old site's list.
+  // The cards behind those slugs, and their names (realCards).
   const slugs = top.map((r) => String(r.slug).toLowerCase()).filter(isCardSlug);
-  const [types, owners] = await Promise.all([
+  const [types, { real, nameBy }] = await Promise.all([
     rows<{ k: string; n: unknown }>(db, sql`
       SELECT type AS k, COUNT(*) AS n FROM card_events
        WHERE type NOT IN (${PASSIVE_SQL}) AND created_at >= ${from30} GROUP BY type ORDER BY n DESC`),
-    slugs.length ? rows<{ slug: string; name: string | null }>(db, sql`
-      SELECT pc.slug, u.full_name AS name FROM published_cards pc LEFT JOIN users u ON u.id = pc.user_id
-       WHERE pc.slug IN (${list(slugs)})
-      UNION ALL
-      SELECT c.slug, NULL FROM cards c WHERE c.slug IN (${list(slugs)})`) : [],
+    realCards(db, slugs),
   ]);
-  const real = new Set<string>();
-  const nameBy = new Map<string, string>();
-  for (const o of owners) {
-    const slug = String(o.slug).toLowerCase();
-    real.add(slug);
-    if (o.name && !nameBy.has(slug)) nameBy.set(slug, o.name);
-  }
-  if (slugs.some((s) => !real.has(s) || !nameBy.has(s))) {
-    const { legacyCustomers } = await import("../admin-router");
-    for (const c of legacyCustomers() as LegacyCard[]) {
-      const slug = String(c.slug || "").toLowerCase().trim();
-      if (!slug) continue;
-      real.add(slug);
-      const name = String(c.name || c.company_name || "").trim();
-      if (name && !nameBy.has(slug)) nameBy.set(slug, name);
-    }
-  }
   const topCards = top
     .map((r) => ({ ...r, slug: String(r.slug).toLowerCase() }))
     .filter((r) => isCardSlug(r.slug) && real.has(r.slug))

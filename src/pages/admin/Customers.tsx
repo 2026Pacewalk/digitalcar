@@ -19,6 +19,7 @@ import { setSession, okToReplaceMainSession } from "@/lib/session";
 import { ActionMenu, AdminModal as Modal, type ActionItem } from "@/components/admin/RowActions";
 import AssignResellerModal from "@/components/admin/AssignResellerModal";
 import SendEmailModal from "@/components/admin/SendEmailModal";
+import CardViewsModal from "@/components/admin/CardViewsModal";
 import { useSessionRole } from "@/hooks/useAuth";
 import { useStaffAccess } from "@/hooks/useStaffAccess";
 import { readableError } from "@/lib/errors";
@@ -158,6 +159,7 @@ export default function AdminCustomers() {
   const [assignModal, setAssignModal] = useState<Customer | null>(null);
   // trigger: the row's ⋮ button, where focus goes back when the modal closes.
   const [mailModal, setMailModal] = useState<{ recipient: RecipientRef; name: string; email: string; trigger: HTMLElement | null } | null>(null);
+  const [viewsModal, setViewsModal] = useState<{ slug: string; name: string; trigger: HTMLElement | null } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [pwdValue, setPwdValue] = useState("");
   const [pkgValue, setPkgValue] = useState("Trial");
@@ -568,6 +570,8 @@ export default function AdminCustomers() {
     { icon: <Mail size={15} className="text-[#B45309]" />, label: "Send email", onClick: () => { const to = recipientOf(c); if (to) setMailModal({ recipient: to, name: c.name, email: c.email, trigger: document.querySelector<HTMLElement>('button[aria-haspopup="menu"][aria-expanded="true"]') }); }, hidden: !canEmail || !c.email || !recipientOf(c) },
     { icon: <Database size={15} className="text-[#2563EB]" />, label: "Change Package", onClick: () => { setPkgModal(c); setPkgValue(packageName(c.package_id)); setPkgCycle(c.package_id !== 7 && c.billing_cycle ? c.billing_cycle : "yearly"); } },
     { icon: <Layers size={15} className="text-[#7C3AED]" />, label: "Card Limit", onClick: () => { setLimitModal(c); setLimitValue(3); } },
+    // Super admin only: extra views on their card's counter (the server checks too).
+    { icon: <Eye size={15} className="text-[#0369A1]" />, label: "Card views", onClick: () => setViewsModal({ slug: c.slug, name: c.name, trigger: document.querySelector<HTMLElement>('button[aria-haspopup="menu"][aria-expanded="true"]') }), hidden: !isSuper || !c.slug },
     // Super admin only: it decides which reseller earns commission on them.
     { icon: <Handshake size={15} className="text-[#0F766E]" />, label: c.resellerUserId ? "Change reseller" : "Assign to reseller", onClick: () => setAssignModal(c), hidden: !isSuper || !c.email },
     { icon: <Trash2 size={15} className="text-[#DC2626]" />, label: "Delete Customer", onClick: () => setDelModal(c), danger: true },
@@ -1065,6 +1069,10 @@ export default function AdminCustomers() {
         message. It draws itself over the page anyway. */}
     {mailModal && (
       <SendEmailModal recipient={mailModal.recipient} name={mailModal.name} email={mailModal.email} returnFocus={mailModal.trigger} onClose={() => setMailModal(null)} />
+    )}
+    {/* Card views (super admin): outside the layout for the same reason. */}
+    {viewsModal && (
+      <CardViewsModal slug={viewsModal.slug} name={viewsModal.name} returnFocus={viewsModal.trigger} onClose={() => setViewsModal(null)} />
     )}
     </>
   );

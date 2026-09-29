@@ -10,6 +10,7 @@ import {
 import type { getDb } from "../queries/connection";
 import { forgetSession } from "../context";
 import { notifyTeam, resolveTeam } from "./notify";
+import { clearExtraViews, forgetExtraViews } from "./card-views";
 import { teamNotifications } from "@db/schema";
 
 /* Finishing an account-deletion request (asked for in the app; see
@@ -21,7 +22,7 @@ import { teamNotifications } from "@db/schema";
    Erased: published cards (with their photos, which live inside the card),
    legacy block cards, enquiries, notifications, media records, custom domains,
    team membership, app sessions and push tokens, email-log rows, card visit
-   stats. Subscriptions stop auto-renewing. The user row is kept for the
+   stats and extra views. Subscriptions stop auto-renewing. The user row is kept for the
    ledgers, but its email, name, phone, avatar, password and referral code are
    replaced, and it stays inactive. */
 
@@ -155,6 +156,9 @@ export async function completeAccountDeletion(
       await tx.delete(cards).where(eq(cards.userId, userId));
     }
     if (slugs.length) await tx.delete(cardEvents).where(inArray(cardEvents.slug, slugs));
+    // Their extra views and the private note about them go too, so the next
+    // owner of an address doesn't inherit them.
+    if (slugs.length) await clearExtraViews(tx, slugs);
     await tx.delete(leads).where(eq(leads.userId, userId));
     await tx.delete(notifications).where(eq(notifications.userId, userId));
     await tx.delete(mediaLibrary).where(eq(mediaLibrary.userId, userId));
@@ -190,6 +194,7 @@ export async function completeAccountDeletion(
   });
 
   sessions.forEach((s) => forgetSession(Number(s.id)));
+  slugs.forEach((s) => forgetExtraViews(s));
   await hideFromAdminLists(db, userId, legacyIds);
   // The team's notifications about them (their sign-up, payments, payouts,
   // orders, and their card's enquiries) go too.

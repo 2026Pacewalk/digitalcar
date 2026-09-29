@@ -1088,6 +1088,33 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// Extra card views (Admin → Customers → Card views), with pacewalk's old-site
+// views carried over from the number this file used to hold
+// (db/migrate-live.mjs is the production authority). INSERT IGNORE never
+// changes a row that exists, so an edit stands across restarts.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    const db = getDb();
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS card_view_boosts (
+        slug VARCHAR(191) NOT NULL PRIMARY KEY,
+        extra_views INT UNSIGNED NOT NULL DEFAULT 0, note VARCHAR(200) NULL,
+        updated_by BIGINT UNSIGNED NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `));
+    await db.execute(sql.raw("INSERT IGNORE INTO card_view_boosts (slug, extra_views, note) VALUES ('pacewalk', 11542, 'Views from the old site')"));
+    // A visit that came in before the row existed may have cached 0.
+    (await import("./lib/card-views")).forgetExtraViews("pacewalk");
+    console.log("[schema] card_view_boosts ensured");
+  } catch (e) {
+    console.error("[schema] ensure card_view_boosts failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be
@@ -1333,12 +1360,13 @@ app.post("/api/track", async (c) => {
   return c.body(null, 204);
 });
 
-// Public: the REAL view count for a card slug — the same "view" events the card
-// beacons to /api/track above, so the eye-counter shows live reality instead of
-// a frozen snapshot number. A few cards carry a starting base (their historic
-// count from the old platform) that new real views add on top of. ACAO:* so the
-// parent page (or the card) can read it; short cache to spare the DB.
-const VIEW_BASE: Record<string, number> = { pacewalk: 11542 };
+// Public: the view count a card shows — its REAL tracked visits (the same
+// "view" events the card beacons to /api/track above, so the eye-counter shows
+// live reality instead of a frozen snapshot number) plus any extra views the
+// super admin gave the card (card_view_boosts: e.g. its count from the old
+// platform; Admin → Customers → Card views). The extras never go into
+// card_events, so every analytics page stays real. ACAO:* so the parent page
+// (or the card) can read it; short cache to spare the DB.
 app.get("/api/views/:slug", async (c) => {
   const slug = String(c.req.param("slug") || "").slice(0, 191).toLowerCase();
   c.header("Access-Control-Allow-Origin", "*");
@@ -1346,12 +1374,13 @@ app.get("/api/views/:slug", async (c) => {
   if (!slug) return c.json({ views: 0 });
   try {
     const { getDb } = await import("./queries/connection");
-    const { cardEvents } = await import("@db/schema");
-    const { and, eq, sql } = await import("drizzle-orm");
-    const rows = await getDb().select({ n: sql<number>`count(*)` }).from(cardEvents)
-      .where(and(eq(cardEvents.slug, slug), eq(cardEvents.type, "view")));
-    return c.json({ views: (VIEW_BASE[slug] || 0) + Number(rows[0]?.n || 0) });
-  } catch { return c.json({ views: VIEW_BASE[slug] || 0 }); }
+    const { extraViewsFor, realViewsFor } = await import("./lib/card-views");
+    const db = getDb();
+    const extra = extraViewsFor(db, slug); // never rejects; cached a minute
+    // If the count can't be read, the card still shows what's known.
+    const real = await realViewsFor(db, slug).catch(() => 0);
+    return c.json({ views: (await extra) + real });
+  } catch { return c.json({ views: 0 }); }
 });
 
 // Conversion funnel: one row per step a visitor reaches (product_view → demo →

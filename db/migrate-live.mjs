@@ -200,11 +200,28 @@ const TABLES = {
     PRIMARY KEY (notification_id, user_id),
     INDEX tnm_user_idx (user_id),
     CONSTRAINT fk_tnm_notification FOREIGN KEY (notification_id) REFERENCES team_notifications(id) ON DELETE CASCADE)`,
+  // Extra views the super admin gives a card (Admin → Customers → Card views),
+  // added to the card's view counter. Never written into card_events.
+  card_view_boosts: `CREATE TABLE IF NOT EXISTS card_view_boosts (
+    slug VARCHAR(191) NOT NULL PRIMARY KEY,
+    extra_views INT UNSIGNED NOT NULL DEFAULT 0, note VARCHAR(200) NULL,
+    updated_by BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`,
 };
 
 for (const [name, sql] of Object.entries(TABLES)) {
   await conn.query(sql);
   log(`✓ table ${name}`);
+}
+
+// pacewalk's views from the old platform, which used to be a number written
+// into api/boot.ts, so the count on its card doesn't change. INSERT IGNORE:
+// once the row exists (even at 0) this never touches it again, so the super
+// admin's later changes stand.
+{
+  const [r] = await conn.query("INSERT IGNORE INTO card_view_boosts (slug, extra_views, note) VALUES ('pacewalk', 11542, 'Views from the old site')");
+  log(r.affectedRows ? "✓ card_view_boosts: pacewalk's old-site views carried over" : "• card_view_boosts: pacewalk already set (skipped)");
 }
 
 // Staff accounts: widen users.role to include 'staff'. Idempotent (the same
