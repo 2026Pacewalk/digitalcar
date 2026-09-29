@@ -215,10 +215,17 @@ export default function AdminCustomers() {
       type Snap = { customer?: unknown; products?: unknown[]; gallery?: unknown[]; videos?: unknown[]; offers?: unknown[]; qrcodes?: unknown[] } | null;
       let snap: Snap = null;
       try { snap = c.slug ? ((await utils.publish.bySlug.fetch({ slug: String(c.slug).toLowerCase().trim() })) as Snap) : null; } catch { snap = null; }
-      // The card shows real + extra views (cardViews.get.shownViews), so the
-      // preview matches the live card. Super-admin only; falls back otherwise.
+      // The number the live card shows (real + extra views), from the same
+      // public counter it reads — so the preview matches for staff as well as
+      // the super admin. Falls back to the stored number if it can't be read.
       let shownViews: number | null = null;
-      try { if (c.slug) { const cv = await utils.cardViews.get.fetch({ slug: String(c.slug).toLowerCase().trim() }); shownViews = cv?.shownViews ?? null; } } catch { shownViews = null; }
+      try {
+        if (c.slug) {
+          const r = await fetch(`/api/views/${encodeURIComponent(String(c.slug).toLowerCase().trim())}`);
+          const d = r.ok ? ((await r.json()) as { views?: unknown }) : null;
+          shownViews = typeof d?.views === "number" ? d.views : null;
+        }
+      } catch { shownViews = null; }
       if (cancelled) return;
       if (snap?.customer) {
         type B = Parameters<typeof buildCardHtml>;
