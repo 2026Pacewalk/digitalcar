@@ -20,6 +20,14 @@
  * the demo card) is intentionally excluded so it never floods a real CRM.
  */
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+
+/** The hash an owner's deletion leaves behind (lead_tombstones), so this import
+    never brings a deleted enquiry back. Keep in step with legacyLeadKeyHash in
+    api/lib/lead-tombstones.ts. */
+export function legacyLeadKeyHash(userId, fullName, createdAt) {
+  return createHash("sha256").update(`${userId}|${fullName}|${createdAt}`, "utf8").digest("hex");
+}
 
 async function readJson(file) {
   for (const p of [`./dist/public/${file}.json`, `./public/${file}.json`]) {
@@ -74,8 +82,14 @@ export async function importLegacyEnquiries(conn, log = (s) => console.log(s)) {
   const [existing] = await conn.query(
     "SELECT user_id, full_name, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS cstr FROM leads WHERE source = 'legacy'");
   const seen = new Set(existing.map((r) => `${r.user_id}|${r.full_name}|${r.cstr}`));
+  // Enquiries their owner deleted — never import those again.
+  let deletedKeys = new Set();
+  try {
+    const [rows] = await conn.query("SELECT user_id, key_hash FROM lead_tombstones");
+    deletedKeys = new Set(rows.map((r) => `${r.user_id}|${r.key_hash}`));
+  } catch { /* table not created yet: nothing has been deleted */ }
 
-  let imported = 0, dup = 0, noOwner = 0, skipped = 0;
+  let imported = 0, dup = 0, noOwner = 0, skipped = 0, deleted = 0;
   const batch = [];
   for (const e of enquiries) {
     const uname = String(e.uname || "").toLowerCase();
@@ -86,6 +100,8 @@ export async function importLegacyEnquiries(conn, log = (s) => console.log(s)) {
     const dt = normalizeDt(e.created_on);
     const key = `${owner.userId}|${name}|${dt}`;
     if (seen.has(key)) { dup++; continue; }
+    // The same identity the delete hashed: the name as stored (≤255 chars).
+    if (deletedKeys.has(`${owner.userId}|${legacyLeadKeyHash(owner.userId, name.slice(0, 255), dt)}`)) { deleted++; continue; }
     seen.add(key);
     const status = STATUS_MAP[String(e.status || "new").toLowerCase()] || "new";
     batch.push([
@@ -104,6 +120,6 @@ export async function importLegacyEnquiries(conn, log = (s) => console.log(s)) {
       "INSERT INTO leads (card_id, user_id, full_name, email, phone, message, source, status, created_at) VALUES ?",
       [batch]);
   }
-  log(`✓ legacy enquiries import — ${imported} imported, ${dup} already present, ${noOwner} no matching account, ${skipped} test-bucket skipped`);
-  return { imported, dup, noOwner, skipped };
+  log(`✓ legacy enquiries import — ${imported} imported, ${dup} already present, ${deleted} deleted by their owner, ${noOwner} no matching account, ${skipped} test-bucket skipped`);
+  return { imported, dup, noOwner, skipped, deleted };
 }

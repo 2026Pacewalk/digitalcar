@@ -665,6 +665,18 @@ export const leads = mysqlTable("leads", {
 
 export type Lead = typeof leads.$inferSelect;
 
+// Old-site enquiries an owner deleted. Every deploy re-runs the back-fill of
+// enquiries.json into `leads` (db/import-legacy-enquiries.mjs); without this it
+// would bring a deleted one straight back. Only a hash of the lead's identity
+// (owner | name | date) is kept — never the name or contact details.
+export const leadTombstones = mysqlTable("lead_tombstones", {
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  keyHash: varchar("key_hash", { length: 64 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.keyHash] }),
+]);
+
 // ─── Bulk-order requests (buy bulk cards → team invoices) ───────
 // A logged-in user (or guest) asks to buy a bulk-card bundle; the team follows
 // up with an invoice (no upfront payment). Captured here + emailed to the owner.

@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { leads, cards } from "@db/schema";
+import { leads, cards, leadTombstones } from "@db/schema";
 import { eq, and, or, desc, asc, sql, like, isNotNull, notInArray, lte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendLeadNotification } from "./lib/mail";
 import { enforceRateLimit, clientIp } from "./lib/rate-limit";
+import { legacyLeadKeyHash } from "./lib/lead-tombstones";
 
 // The lead pipeline stages (must match the DB enum on the leads table).
 const STAGES = ["new", "contacted", "interested", "follow_up", "converted", "not_interested", "closed"] as const;
@@ -186,9 +187,20 @@ export const leadRouter = createRouter({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      await db.delete(leads).where(
-        and(eq(leads.id, input.id), eq(leads.userId, ctx.user.id))
-      );
+      const mine = and(eq(leads.id, input.id), eq(leads.userId, ctx.user.id));
+      await db.transaction(async (tx) => {
+        // An enquiry imported from the old site would be imported again on the
+        // next deploy; remember it's deleted (lib/lead-tombstones).
+        const [lead] = await tx.select({
+          userId: leads.userId, fullName: leads.fullName, source: leads.source,
+          createdAt: sql<string>`DATE_FORMAT(${leads.createdAt}, '%Y-%m-%d %H:%i:%s')`,
+        }).from(leads).where(mine).limit(1);
+        if (lead?.source === "legacy") {
+          await tx.insert(leadTombstones).ignore()
+            .values({ userId: lead.userId, keyHash: legacyLeadKeyHash(lead.userId, lead.fullName, String(lead.createdAt)) });
+        }
+        await tx.delete(leads).where(mine);
+      });
       return { success: true };
     }),
 

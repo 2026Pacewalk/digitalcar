@@ -11,7 +11,7 @@ import type { getDb } from "../queries/connection";
 import { forgetSession } from "../context";
 import { notifyTeam, resolveTeam } from "./notify";
 import { clearExtraViews, forgetExtraViews } from "./card-views";
-import { teamNotifications } from "@db/schema";
+import { leadTombstones, teamNotifications } from "@db/schema";
 
 /* Finishing an account-deletion request (asked for in the app; see
    mobile.requestAccountDeletion). What an owner put on their card and what
@@ -160,6 +160,7 @@ export async function completeAccountDeletion(
     // owner of an address doesn't inherit them.
     if (slugs.length) await clearExtraViews(tx, slugs);
     await tx.delete(leads).where(eq(leads.userId, userId));
+    await tx.delete(leadTombstones).where(eq(leadTombstones.userId, userId));
     await tx.delete(notifications).where(eq(notifications.userId, userId));
     await tx.delete(mediaLibrary).where(eq(mediaLibrary.userId, userId));
     await tx.delete(customDomains).where(eq(customDomains.userId, userId));

@@ -208,6 +208,12 @@ const TABLES = {
     updated_by BIGINT UNSIGNED NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`,
+  /* Old-site enquiries an owner deleted, so the enquiries.json back-fill
+     (Phase 33 below) doesn't bring them back. A hash only — no names. */
+  lead_tombstones: `CREATE TABLE IF NOT EXISTS lead_tombstones (
+    user_id BIGINT UNSIGNED NOT NULL, key_hash VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, key_hash))`,
 };
 
 for (const [name, sql] of Object.entries(TABLES)) {

@@ -1115,6 +1115,25 @@ if (process.env.NODE_ENV === "production") {
   }
 })();
 
+// Old-site enquiries an owner deleted (see db/import-legacy-enquiries.mjs).
+// Dev safety net — production gets it from migrate-live. Additive only.
+(async () => {
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    await getDb().execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS lead_tombstones (
+        user_id BIGINT UNSIGNED NOT NULL, key_hash VARCHAR(64) NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, key_hash)
+      )
+    `));
+    console.log("[schema] lead_tombstones ensured");
+  } catch (e) {
+    console.error("[schema] ensure lead_tombstones failed:", (e as Error).message);
+  }
+})();
+
 // ─── Sensitive data files: block public access, serve only to super-admins ───
 // customers.json has passwords + bank/UPI details; enquiries.json is lead PII;
 // members_data / members_migration are full user PII dumps. None may be
