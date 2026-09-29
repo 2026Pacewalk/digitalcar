@@ -215,14 +215,19 @@ export default function AdminCustomers() {
       type Snap = { customer?: unknown; products?: unknown[]; gallery?: unknown[]; videos?: unknown[]; offers?: unknown[]; qrcodes?: unknown[] } | null;
       let snap: Snap = null;
       try { snap = c.slug ? ((await utils.publish.bySlug.fetch({ slug: String(c.slug).toLowerCase().trim() })) as Snap) : null; } catch { snap = null; }
+      // The card shows real + extra views (cardViews.get.shownViews), so the
+      // preview matches the live card. Super-admin only; falls back otherwise.
+      let shownViews: number | null = null;
+      try { if (c.slug) { const cv = await utils.cardViews.get.fetch({ slug: String(c.slug).toLowerCase().trim() }); shownViews = cv?.shownViews ?? null; } } catch { shownViews = null; }
       if (cancelled) return;
       if (snap?.customer) {
         type B = Parameters<typeof buildCardHtml>;
-        setCardHtml(buildCardHtml(snap.customer as B[0], (snap.products ?? []) as B[1], (snap.gallery ?? []) as B[2],
+        const cust = (shownViews != null ? { ...(snap.customer as Record<string, unknown>), views: shownViews } : snap.customer) as B[0];
+        setCardHtml(buildCardHtml(cust, (snap.products ?? []) as B[1], (snap.gallery ?? []) as B[2],
           (snap.videos ?? []) as B[3], (snap.offers ?? []) as B[4], (snap.qrcodes ?? []) as B[5]));
         return;
       }
-      const rec = { ...c, specialities: decodeSpecialities((c as Record<string, unknown>).specialities), logo: imgUrl("home", (c as Record<string, unknown>).logo) } as unknown as Parameters<typeof buildCardHtml>[0];
+      const rec = { ...c, ...(shownViews != null ? { views: shownViews } : {}), specialities: decodeSpecialities((c as Record<string, unknown>).specialities), logo: imgUrl("home", (c as Record<string, unknown>).logo) } as unknown as Parameters<typeof buildCardHtml>[0];
       let content;
       try { content = await loadCustomerContent(String(c.slug)); } catch { content = null; }
       if (cancelled) return;
