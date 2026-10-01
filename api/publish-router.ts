@@ -307,6 +307,50 @@ export const publishRouter = createRouter({
       return rows[0]?.data ? sanitizeSnapshot(rows[0].data) : null;
     }),
 
+  /* Public: the identity of a card, for the "Our Team" picker — the same few
+     things a visitor already sees on that card (name, business, designation,
+     photo/logo), and nothing else. Used to resolve an @handle to a real
+     DigitalCarda profile so a team member always points at a live card. */
+  profileBySlug: publicQuery
+    .input(z.object({ slug: z.string().min(2).max(100) }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const slug = input.slug.trim().toLowerCase().replace(/^@+/, "").replace(/^.*\//, "");
+      const rows = await db.select({ slug: publishedCards.slug, data: publishedCards.data })
+        .from(publishedCards).where(eq(publishedCards.slug, slug)).limit(1);
+      if (!rows[0]) return null;
+      const c = ((rows[0].data as { customer?: Record<string, unknown> })?.customer) || {};
+      const str = (v: unknown) => String(v ?? "").trim();
+      return {
+        slug: rows[0].slug,
+        name: str(c.name) || str(c.company_name),
+        company: str(c.company_name),
+        designation: str(c.designation),
+        photo: str(c.photo),        // the person's own picture, if they use one
+        logo: str(c.logo),          // their business logo — the second choice
+      };
+    }),
+
+  /* The other profiles in this login — what Platinum's multi-card plan creates.
+     The owner adds their team from here in one tap. */
+  myProfiles: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const rows = await db.select({ slug: publishedCards.slug, cardId: publishedCards.cardId, data: publishedCards.data })
+      .from(publishedCards).where(eq(publishedCards.userId, ctx.user.id)).orderBy(publishedCards.cardId);
+    const str = (v: unknown) => String(v ?? "").trim();
+    return rows.map((r) => {
+      const c = ((r.data as { customer?: Record<string, unknown> })?.customer) || {};
+      return {
+        slug: r.slug, cardId: Number(r.cardId) || 1,
+        name: str(c.name) || str(c.company_name) || r.slug,
+        company: str(c.company_name),
+        designation: str(c.designation),
+        photo: str(c.photo),
+        logo: str(c.logo),
+      };
+    });
+  }),
+
   // Public: is this card paused (trial expired past grace, no active plan)?
   // Never deletes data or the URL — just controls what a visitor sees (§11–12).
   publicState: publicQuery.input(z.object({ slug: z.string() })).query(async ({ input }) => {

@@ -75,7 +75,7 @@ const PLANS: Plan[] = [
     headline: "Everything in Gold, plus:",
     features: [
       { icon: IdCard, text: "Up to 3 digital cards" },
-      { icon: Users, text: "Your team on your card — up to 12 members" },
+      { icon: Users, text: "Your team on your card — added by @handle" },
       { icon: Tag, text: "Unlimited products & offers" },
       { icon: Images, text: "60-photo gallery + 25 videos" },
       { icon: Globe, text: "Custom domain (yourbrand.com)" },

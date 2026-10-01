@@ -6,9 +6,12 @@
 import { describe, expect, test } from "vitest";
 import { buildCardHtml } from "../../src/card-template/buildCard";
 
+/* Members are DigitalCarda profiles, added by their @handle: the card shows the
+   name, title and photo copied from that profile and links back to it. The last
+   two entries cover cards still holding the older hand-typed shape. */
 const team = [
-  { id: 1, name: "Isha Khanna", role: "Project Lead", photo: "/demo/avatars/studio-nivas.svg", phone: "+91 90000 00012", email: "", link: "", show: true },
-  { id: 2, name: "Rohan Das", role: "Site Manager", photo: "", phone: "", email: "rohan@example.com", link: "", show: true },
+  { id: 1, slug: "isha-khanna", name: "Isha Khanna", role: "Project Lead", photo: "/demo/avatars/studio-nivas.svg", link: "isha-khanna", show: true },
+  { id: 2, name: "Rohan Das", role: "Site Manager", photo: "", phone: "+91 90000 00012", email: "rohan@example.com", link: "", show: true },
   { id: 3, name: "Hidden Person", role: "Not on this card", photo: "", phone: "", email: "", link: "", show: false },
 ];
 
@@ -27,8 +30,8 @@ for (const [label, theme] of [["classic template", 1], ["premium design", 63]] a
       expect(html).toContain("Isha Khanna");
       expect(html).toContain("Project Lead");
       expect(html).toContain("Rohan Das");
-      expect(html).toContain("tel:+919000000012");          // photo-less member still links out
-      expect(html).toContain("mailto:rohan@example.com");
+      expect(html).toContain("https://digitalcarda.in/isha-khanna");  // tapping opens their own card
+      expect(html).toContain("tel:+919000000012");                    // older hand-typed member still links out
       expect(html).not.toContain("Hidden Person");          // per-member switch is off
     });
 
@@ -41,6 +44,19 @@ for (const [label, theme] of [["classic template", 1], ["premium design", 63]] a
     test("renders nothing when no one has been added", () => {
       const html = card({ theme, team_on: 1, team: "[]" });
       expect(html).not.toContain("team-section");
+    });
+
+    test("falls back photo → logo → the business initial", () => {
+      const html = card({ theme, team_on: 1, team: JSON.stringify([
+        { id: 1, slug: "a", name: "With Photo", company: "Alpha Ltd", photo: "/demo/avatars/pixelforge.svg", logo: "/demo/logos/pixelforge.svg", show: true },
+        { id: 2, slug: "b", name: "Logo Only", company: "Beta Ltd", photo: "", logo: "/demo/logos/jain-co.svg", show: true },
+        { id: 3, slug: "c", name: "Nothing At All", company: "Carla Interiors", photo: "", logo: "", show: true },
+      ]) });
+      expect(html).toContain("/demo/avatars/pixelforge.svg");   // the person's own picture wins
+      expect(html).not.toContain("/demo/logos/pixelforge.svg"); // ...so their logo is not used
+      expect(html).toContain("/demo/logos/jain-co.svg");        // no photo → the logo
+      expect(html).toContain("is-logo");                        // and it is fitted, not cropped
+      expect(html).toMatch(/>C</);                              // neither → the business initial
     });
 
     test("accepts the list as an array as well as JSON", () => {

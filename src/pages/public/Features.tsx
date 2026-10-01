@@ -603,16 +603,17 @@ export default function Features() {
                 Put your <span className="text-gradient-gold">whole team</span> on your card
               </h2>
               <p className="mt-4 text-[15px] text-[#64748B] leading-relaxed">
-                One card, every person behind it. Add your colleagues with a photo and a role, and choose
-                who appears — the customer taps the right one and reaches them straight away, instead of
-                asking you to forward a number.
+                Platinum gives you up to 3 cards in one login — one for you, one for each colleague.
+                Add them to your card by their <span className="font-mono text-[#0F172A]">@handle</span> and
+                their photo, name and title come straight from their own card. A customer taps the right
+                person and lands on them, instead of asking you to forward a number.
               </p>
               <ul className="mt-6 grid sm:grid-cols-2 gap-2.5">
                 {[
+                  { t: "Added by @handle", d: "Only real DigitalCarda profiles — never a name you typed." },
+                  { t: "Taps straight to their card", d: "Their number, their links, always up to date." },
                   { t: "You pick who shows", d: "Keep everyone in the list, show only the ones you want." },
-                  { t: "Taps straight through", d: "To their own card, their phone or their email." },
-                  { t: "Up to 12 members", d: "Enough for a shop floor, a clinic or a sales team." },
-                  { t: "Change it any time", d: "Someone joins or leaves — the live card updates at once." },
+                  { t: "Up to 12 on a card", d: "Someone joins or leaves — the live card updates at once." },
                 ].map((b) => (
                   <li key={b.t} className="flex gap-3 rounded-2xl bg-white ring-1 ring-[#E7EBF2] p-3.5">
                     <span className="w-6 h-6 rounded-full bg-[#FEF3C7] text-[#B45309] flex items-center justify-center shrink-0 mt-0.5"><Check size={13} strokeWidth={3} /></span>

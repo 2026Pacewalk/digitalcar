@@ -10,10 +10,12 @@ import { Toaster as Sonner, type ToasterProps } from "sonner"
 
 /* App-wide notifications.
 
-   Placement: bottom-right on desktop (1024px+) — out of the way of what you're working on
-   (they used to drop in top-centre, over headings and the template list). On
-   phones and tablets they sit at the top under the header, because the bottom of
-   the screen belongs to the tab bar and the floating Call / WhatsApp buttons.
+   Placement: bottom-right on desktop (1024px+) — out of the way of what you're
+   working on (they used to drop in top-centre, over headings and the template
+   list). On phones and tablets they sit just ABOVE the bottom tab bar: dropping
+   them under the header put them straight on top of the first control of every
+   dashboard page — a toast would cover a section switch and swallow the tap
+   while it was on screen.
 
    Look: a calm white card with a small tinted icon for the type, instead of a
    solid green/red block with a close button. One at a time stays readable, so
@@ -42,9 +44,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme="light"
       className="toaster group"
-      position={phone ? "top-center" : "bottom-right"}
-      offset={phone ? 72 : 24}
-      mobileOffset={{ top: 72, left: 12, right: 12 }}
+      position={phone ? "bottom-center" : "bottom-right"}
+      // Clear of the tab bar (84px) plus the phone's own home indicator.
+      offset={phone ? "calc(env(safe-area-inset-bottom, 0px) + 96px)" : 24}
+      mobileOffset={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)", left: 12, right: 12 }}
       visibleToasts={3}
       gap={8}
       duration={3200}

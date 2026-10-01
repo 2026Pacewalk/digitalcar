@@ -347,7 +347,7 @@ export function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: stri
 
 
   /* Our team (Platinum): the colleagues the owner chose to show on this card. */
-  type PCTeam = { name?: string; role?: string; photo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
+  type PCTeam = { name?: string; company?: string; role?: string; photo?: string; logo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
   const readTeam = (raw: unknown): PCTeam[] => {
     try {
       const arr = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
@@ -365,7 +365,11 @@ export function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: stri
   };
   const teamBody = `<div class="pwx-team">${teamList.map((m) => {
     const href = memberHref(m);
-    const inner = `<span class="pwx-team-ph${s(m.photo) ? "" : " is-text"}">${s(m.photo) ? `<img src="${esc(m.photo)}" alt="${esc(s(m.name))}" ${IMG} onerror="this.parentNode.classList.add('is-text');this.remove()">` : ""}<b>${esc(s(m.name).charAt(0).toUpperCase())}</b></span><b class="pwx-team-name">${esc(s(m.name))}</b>${s(m.role) ? `<span class="pwx-team-role">${esc(s(m.role))}</span>` : ""}`;
+    // Picture order: their photo, then their logo (fitted), then the initial.
+    const pic = s(m.photo) || s(m.logo);
+    const cls = !pic ? " is-text" : s(m.photo) ? "" : " is-logo";
+    const initial = (s(m.company) || s(m.name)).charAt(0).toUpperCase();
+    const inner = `<span class="pwx-team-ph${cls}">${pic ? `<img src="${esc(pic)}" alt="${esc(s(m.name))}" ${IMG} onerror="this.parentNode.classList.add('is-text');this.remove()">` : ""}<b>${esc(initial)}</b></span><b class="pwx-team-name">${esc(s(m.name))}</b>${s(m.role) ? `<span class="pwx-team-role">${esc(s(m.role))}</span>` : ""}`;
     return href
       ? `<a class="pwx-team-m" href="${esc(href)}"${/^https?:/i.test(href) ? ' target="_blank" rel="noopener"' : ""}>${inner}</a>`
       : `<span class="pwx-team-m">${inner}</span>`;
@@ -551,6 +555,8 @@ export function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: stri
   .pwx-team-m{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;text-decoration:none;color:inherit;}
   .pwx-team-ph{width:74px;height:74px;border-radius:50%;overflow:hidden;background:var(--gold,#F7B31C);border:3px solid #fff;box-shadow:0 10px 20px -12px rgba(17,24,39,.5);display:flex;align-items:center;justify-content:center;}
   .pwx-team-ph img{width:100%;height:100%;object-fit:cover;}
+  .pwx-team-ph.is-logo{background:#fff;}
+  .pwx-team-ph.is-logo img{object-fit:contain;padding:9px;}
   .pwx-team-ph b{display:none;color:#fff;font-size:28px;font-weight:700;}
   .pwx-team-ph.is-text b{display:block;}
   .pwx-team-name{font-size:13.5px;font-weight:700;line-height:1.2;}

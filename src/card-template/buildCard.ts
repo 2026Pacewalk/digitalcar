@@ -101,6 +101,8 @@ const TEAM_CSS = `
 .dc-team-m{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;text-decoration:none;color:inherit;}
 .dc-team-ph{width:74px;height:74px;border-radius:50%;overflow:hidden;background:var(--theme-color,#F7B31C);border:3px solid rgba(255,255,255,.9);box-shadow:0 8px 18px -10px rgba(17,24,39,.55);display:flex;align-items:center;justify-content:center;}
 .dc-team-ph img{width:100%;height:100%;object-fit:cover;}
+.dc-team-ph.is-logo{background:#fff;border-color:#E2E8F0;}
+.dc-team-ph.is-logo img{object-fit:contain;padding:9px;}
 .dc-team-ph b{display:none;color:#fff;font-size:28px;font-weight:700;}
 .dc-team-ph.is-text b{display:block;}
 .dc-team-name{font-size:13.5px;font-weight:700;line-height:1.2;}
@@ -584,7 +586,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
      a photo, a name and a role; tapping a member opens their own card, calls
      or emails them, whichever they gave. Members with "show" off are kept in
      the owner's list but never rendered. */
-  type TeamMember = { id?: number; name?: string; role?: string; photo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
+  type TeamMember = { id?: number; name?: string; company?: string; role?: string; photo?: string; logo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
   const readTeam = (raw: unknown): TeamMember[] => {
     try {
       const arr = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
@@ -606,10 +608,15 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       <div class="dc-team">
         ${teamList.map((m) => {
           const href = memberHref(m);
+          // Their own picture first, their logo second (fitted, not cropped),
+          // and failing both the first letter of the business name.
+          const pic = s(m.photo) || s(m.logo);
+          const cls = !pic ? " is-text" : s(m.photo) ? "" : " is-logo";
+          const initial = (s(m.company) || s(m.name)).charAt(0).toUpperCase();
           const inner = `
-            <span class="dc-team-ph${s(m.photo) ? "" : " is-text"}">${s(m.photo)
-              ? `<img src="${esc(m.photo)}" alt="${esc(s(m.name))}" ${IMG} onerror="this.parentNode.classList.add('is-text');this.remove()">`
-              : ""}<b>${esc(s(m.name).charAt(0).toUpperCase())}</b></span>
+            <span class="dc-team-ph${cls}">${pic
+              ? `<img src="${esc(pic)}" alt="${esc(s(m.name))}" ${IMG} onerror="this.parentNode.classList.add('is-text');this.remove()">`
+              : ""}<b>${esc(initial)}</b></span>
             <b class="dc-team-name">${esc(s(m.name))}</b>
             ${s(m.role) ? `<span class="dc-team-role">${esc(s(m.role))}</span>` : ""}`;
           return href
