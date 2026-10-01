@@ -345,6 +345,32 @@ export function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: stri
   ].join("");
   const reviewsHtml = on(c.review_on) && s(c.google_review) ? sec("review-section", s(c.review) || "Google Reviews", reviewBody) : "";
 
+
+  /* Our team (Platinum): the colleagues the owner chose to show on this card. */
+  type PCTeam = { name?: string; role?: string; photo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
+  const readTeam = (raw: unknown): PCTeam[] => {
+    try {
+      const arr = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
+      return Array.isArray(arr) ? (arr as PCTeam[]) : [];
+    } catch { return []; }
+  };
+  const teamList = readTeam((c as { team?: unknown }).team)
+    .filter((m) => s(m?.name) && (m?.show === undefined || on(m.show)));
+  const memberHref = (m: PCTeam) => {
+    const link = s(m.link), phone = s(m.phone), mail = s(m.email);
+    if (link) return /^https?:/i.test(link) ? link : `https://digitalcarda.in/${link.replace(/^\/+/, "")}`;
+    if (phone) return `tel:${phone.replace(/[^\d+]/g, "")}`;
+    if (mail) return `mailto:${mail}`;
+    return "";
+  };
+  const teamBody = `<div class="pwx-team">${teamList.map((m) => {
+    const href = memberHref(m);
+    const inner = `<span class="pwx-team-ph${s(m.photo) ? "" : " is-text"}">${s(m.photo) ? `<img src="${esc(m.photo)}" alt="${esc(s(m.name))}" ${IMG} onerror="this.parentNode.classList.add('is-text');this.remove()">` : ""}<b>${esc(s(m.name).charAt(0).toUpperCase())}</b></span><b class="pwx-team-name">${esc(s(m.name))}</b>${s(m.role) ? `<span class="pwx-team-role">${esc(s(m.role))}</span>` : ""}`;
+    return href
+      ? `<a class="pwx-team-m" href="${esc(href)}"${/^https?:/i.test(href) ? ' target="_blank" rel="noopener"' : ""}>${inner}</a>`
+      : `<span class="pwx-team-m">${inner}</span>`;
+  }).join("")}</div>`;
+  const teamHtml = on(c.team_on, 0) && teamList.length ? sec("team-section", s(c.team_title) || "Our Team", teamBody) : "";
   // Enquiry form — posts to the same /api/enquiry endpoint as the classic card
   // (with the sandboxed-iframe postMessage fallback so no lead is ever lost).
   // Booking designs (o.booking) show an appointment request instead: service,
@@ -378,7 +404,7 @@ export function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: stri
       <button type="submit"><i class="fa fa-paper-plane"></i> Send Enquiry</button>
     </form>`);
 
-  const html = about + servicesHtml + offersHtml + payment + galleryHtml + videosHtml + reviewsHtml + enquiryHtml;
+  const html = about + servicesHtml + teamHtml + offersHtml + payment + galleryHtml + videosHtml + reviewsHtml + enquiryHtml;
   if (!html) return { css: "", html: "", js: "" };
 
   const css = `
@@ -521,6 +547,14 @@ export function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: stri
   .pwx-rev{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:17px 16px;position:relative;overflow:hidden;}
   .pwx-rev::before{content:"";position:absolute;right:-24px;top:-24px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--gold) 16%,#fff),transparent 70%);pointer-events:none;}
   .pwx-rev-score{font-family:'Sora',sans-serif;font-size:34px;font-weight:800;color:var(--ink);letter-spacing:-.02em;line-height:1;}
+  .pwx-team{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 10px;}
+  .pwx-team-m{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;text-decoration:none;color:inherit;}
+  .pwx-team-ph{width:74px;height:74px;border-radius:50%;overflow:hidden;background:var(--gold,#F7B31C);border:3px solid #fff;box-shadow:0 10px 20px -12px rgba(17,24,39,.5);display:flex;align-items:center;justify-content:center;}
+  .pwx-team-ph img{width:100%;height:100%;object-fit:cover;}
+  .pwx-team-ph b{display:none;color:#fff;font-size:28px;font-weight:700;}
+  .pwx-team-ph.is-text b{display:block;}
+  .pwx-team-name{font-size:13.5px;font-weight:700;line-height:1.2;}
+  .pwx-team-role{font-size:11.5px;opacity:.7;line-height:1.25;}
   .pwx-rev-stars{position:relative;display:inline-block;font-size:20px;color:#e4e7ec;letter-spacing:2px;line-height:1;}
   .pwx-rev-stars > span{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;color:#eda906;}
   .pwx-rev small{display:block;width:100%;font-size:12px;color:var(--muted);}

@@ -592,6 +592,79 @@ export default function Features() {
         </div>
       </section>
 
+      {/* ── Our team on your card (Platinum) ── */}
+      <section className="scroll-mt-20 py-16 sm:py-24 relative overflow-hidden" id="team">
+        <div aria-hidden="true" className="absolute -top-20 left-0 w-[420px] h-[420px] rounded-full bg-[#F7B31C]/10 blur-3xl" />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+            <Reveal>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#FEF3C7] text-[#92400E]"><Users size={12} /> Platinum</span>
+              <h2 className="mt-4 text-[1.9rem] sm:text-[2.4rem] font-extrabold text-[#0F172A] tracking-tight leading-[1.12]">
+                Put your <span className="text-gradient-gold">whole team</span> on your card
+              </h2>
+              <p className="mt-4 text-[15px] text-[#64748B] leading-relaxed">
+                One card, every person behind it. Add your colleagues with a photo and a role, and choose
+                who appears — the customer taps the right one and reaches them straight away, instead of
+                asking you to forward a number.
+              </p>
+              <ul className="mt-6 grid sm:grid-cols-2 gap-2.5">
+                {[
+                  { t: "You pick who shows", d: "Keep everyone in the list, show only the ones you want." },
+                  { t: "Taps straight through", d: "To their own card, their phone or their email." },
+                  { t: "Up to 12 members", d: "Enough for a shop floor, a clinic or a sales team." },
+                  { t: "Change it any time", d: "Someone joins or leaves — the live card updates at once." },
+                ].map((b) => (
+                  <li key={b.t} className="flex gap-3 rounded-2xl bg-white ring-1 ring-[#E7EBF2] p-3.5">
+                    <span className="w-6 h-6 rounded-full bg-[#FEF3C7] text-[#B45309] flex items-center justify-center shrink-0 mt-0.5"><Check size={13} strokeWidth={3} /></span>
+                    <span>
+                      <span className="block text-[14px] font-semibold text-[#0F172A]">{b.t}</span>
+                      <span className="block text-[12.5px] text-[#64748B] leading-snug">{b.d}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-7 flex flex-col sm:flex-row sm:items-center gap-3">
+                <Link to="/pricing" className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl text-sm font-bold text-[#0F172A] bg-[#F7B31C] transition-all hover:-translate-y-0.5 hover:bg-[#E6A317]">
+                  See Platinum <ArrowRight size={15} />
+                </Link>
+                <p className="text-[13px] text-[#64748B]">Included with <span className="font-bold text-[#0F172A]">Platinum</span> — along with 3 cards and your own domain.</p>
+              </div>
+            </Reveal>
+
+            <Reveal>
+              <div className="relative mx-auto w-full max-w-[420px]">
+                <div aria-hidden="true" className="absolute -inset-6 rounded-[2.4rem] bg-[#F7B31C]/20 blur-3xl" />
+                <div className="relative rounded-[1.75rem] bg-white p-5 sm:p-6 ring-1 ring-[#E7EBF2] shadow-premium-lg">
+                  <div className="text-center">
+                    <span className="mx-auto block w-20 h-20 rounded-full bg-gradient-to-br from-[#F7B31C] to-[#B45309] ring-4 ring-white shadow-lg" />
+                    <p className="mt-3 text-[18px] font-extrabold text-[#0F172A]">Nayara Interiors</p>
+                    <p className="text-[12.5px] text-[#64748B]">Design studio · Bengaluru</p>
+                    <span className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-[#0F172A] px-5 text-[13px] font-bold text-white">Save contact</span>
+                  </div>
+                  <p className="mt-6 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-[#94A3B8]">Our team</p>
+                  <div className="mt-3 grid grid-cols-3 gap-3">
+                    {[
+                      { n: "Aarav", r: "Principal Designer", c: "from-[#6366F1] to-[#1E1B4B]" },
+                      { n: "Isha", r: "Project Lead", c: "from-[#EC4899] to-[#831843]" },
+                      { n: "Rohan", r: "Site Manager", c: "from-[#0EA5E9] to-[#0C4A6E]" },
+                    ].map((m) => (
+                      <div key={m.n} className="text-center">
+                        <span className={`mx-auto block w-14 h-14 rounded-full bg-gradient-to-br ${m.c} ring-2 ring-white shadow`} />
+                        <span className="mt-1.5 block text-[12.5px] font-bold text-[#0F172A]">{m.n}</span>
+                        <span className="block text-[10.5px] leading-tight text-[#64748B]">{m.r}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-4 rounded-xl bg-[#F8FAFC] px-3 py-2 text-center text-[11.5px] text-[#64748B]">
+                    Tap a face → their card, call or email
+                  </p>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
       {/* ── Paper vs digital ── */}
       <section className="py-16 sm:py-24 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] relative overflow-hidden">
         <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-30" />

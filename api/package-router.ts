@@ -24,6 +24,7 @@ const DEFAULT_FEATURES: { customer: Feat[]; reseller: Feat[] } = {
     { name: "Save-contact, call & all social links", link: "/features" },
     { name: "AI content generator", link: "/ai-card-generator" },
     { name: "SEO settings for Google", link: "/features" },
+    { name: "Your team on your card (Platinum)", link: "/features#team" },
     { name: "Custom domain support", link: "/custom-domain" },
   ],
   reseller: [

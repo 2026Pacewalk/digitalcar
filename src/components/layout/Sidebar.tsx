@@ -37,6 +37,7 @@ export const customerGroups: NavGroup[] = [
       { label: "Social Links", icon: Share2, path: "/dashboard/social" },
       { label: "About Us", icon: Info, path: "/dashboard/about" },
       { label: "Products / Services", icon: ShoppingBag, path: "/dashboard/products?tab=products" },
+      { label: "Our Team", icon: Users, path: "/dashboard/team" },
       { label: "Payments", icon: Wallet, path: "/dashboard/payments" },
       { label: "Gallery & Videos", icon: ImageIcon, path: "/dashboard/media" },
       { label: "Google Reviews", icon: Star, path: "/dashboard/reviews" },

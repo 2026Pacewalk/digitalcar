@@ -94,6 +94,19 @@ type Offer = { id: number; title: string; description: string; valid: string; fi
 type Qr = { id: number; name: string; filename: string };
 type Review = { id: number; name: string; rating: number | string; text: string; date?: string };
 
+
+/* Our team — a row of round portraits under the card's own details. */
+const TEAM_CSS = `
+.dc-team{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 10px;padding:4px 2px 2px;}
+.dc-team-m{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;text-decoration:none;color:inherit;}
+.dc-team-ph{width:74px;height:74px;border-radius:50%;overflow:hidden;background:var(--theme-color,#F7B31C);border:3px solid rgba(255,255,255,.9);box-shadow:0 8px 18px -10px rgba(17,24,39,.55);display:flex;align-items:center;justify-content:center;}
+.dc-team-ph img{width:100%;height:100%;object-fit:cover;}
+.dc-team-ph b{display:none;color:#fff;font-size:28px;font-weight:700;}
+.dc-team-ph.is-text b{display:block;}
+.dc-team-name{font-size:13.5px;font-weight:700;line-height:1.2;}
+.dc-team-role{font-size:11.5px;opacity:.7;line-height:1.25;}
+@media (max-width:360px){.dc-team{gap:14px 8px;}.dc-team-ph{width:64px;height:64px;}}
+`;
 const s = (v: unknown) => String(v ?? "").trim();
 const on = (v: unknown) => Number(v ?? 1) === 1;
 const esc = (v: unknown) => s(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -565,6 +578,47 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
       </div>
     </div>` : "";
 
+
+  /* ── Our team (Platinum) ──────────────────────────────────────────────
+     The owner adds colleagues and picks who appears on this card. Each one is
+     a photo, a name and a role; tapping a member opens their own card, calls
+     or emails them, whichever they gave. Members with "show" off are kept in
+     the owner's list but never rendered. */
+  type TeamMember = { id?: number; name?: string; role?: string; photo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
+  const readTeam = (raw: unknown): TeamMember[] => {
+    try {
+      const arr = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
+      return Array.isArray(arr) ? (arr as TeamMember[]) : [];
+    } catch { return []; }
+  };
+  const teamList = readTeam((c as { team?: unknown }).team)
+    .filter((m) => s(m?.name) && (m?.show === undefined || on(m.show)));
+  const memberHref = (m: TeamMember) => {
+    const link = s(m.link), phone = s(m.phone), mail = s(m.email);
+    if (link) return /^https?:/i.test(link) ? link : `https://digitalcarda.in/${link.replace(/^\/+/, "")}`;
+    if (phone) return `tel:${phone.replace(/[^\d+]/g, "")}`;
+    if (mail) return `mailto:${mail}`;
+    return "";
+  };
+  const teamSection = on(c.team_on) && teamList.length ? `
+    <div id="team-section" class="section-container">
+      <div class="section-header">${esc(s(c.team_title) || "Our Team")}</div>
+      <div class="dc-team">
+        ${teamList.map((m) => {
+          const href = memberHref(m);
+          const inner = `
+            <span class="dc-team-ph${s(m.photo) ? "" : " is-text"}">${s(m.photo)
+              ? `<img src="${esc(m.photo)}" alt="${esc(s(m.name))}" ${IMG} onerror="this.parentNode.classList.add('is-text');this.remove()">`
+              : ""}<b>${esc(s(m.name).charAt(0).toUpperCase())}</b></span>
+            <b class="dc-team-name">${esc(s(m.name))}</b>
+            ${s(m.role) ? `<span class="dc-team-role">${esc(s(m.role))}</span>` : ""}`;
+          return href
+            ? `<a class="dc-team-m" href="${esc(href)}"${/^https?:/i.test(href) ? ' target="_blank" rel="noopener"' : ""}>${inner}</a>`
+            : `<span class="dc-team-m">${inner}</span>`;
+        }).join("")}
+      </div>
+    </div>` : "";
+
   // Owner-chosen gallery layout: "compact" = uniform square grid, default =
   // full-width masonry.
   const galleryCompact = s(c.gallery_layout) === "compact";
@@ -660,11 +714,12 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     payment: { html: paymentSection, foot: { id: "payment-section", icon: "fas fa-money-bill-alt", label: navLabel(c.payment, "Payment") } },
     gallery: { html: gallerySection, foot: { id: "gallery-section", icon: "fa fa-photo-video", label: navLabel(c.gallery, "Gallery") } },
     video: { html: videoSection, foot: { id: "video-section", icon: "fa fa-video", label: navLabel(c.video, "Video") } },
+    team: { html: teamSection, foot: { id: "team-section", icon: "fas fa-user-friends", label: navLabel(c.team_title, "Team") } },
     reviews: { html: googleReviewSection, foot: { id: "review-section", icon: "fab fa-google", label: "Reviews" } },
     enquiry: { html: enquirySection, foot: { id: "enquiry-section", icon: "fas fa-comment-alt", label: navLabel(c.enquiry, "Enquiry") } },
     cardqr: { html: cardQrSection, foot: { id: "cardqr-section", icon: "fas fa-qrcode", label: navLabel(c.cardqr, "QR") } },
   };
-  const DEFAULT_SECTION_ORDER = ["about", "products", "offers", "payment", "gallery", "video", "reviews", "enquiry", "cardqr"];
+  const DEFAULT_SECTION_ORDER = ["about", "products", "team", "offers", "payment", "gallery", "video", "reviews", "enquiry", "cardqr"];
   const chosen = s(c.section_order).split(",").map((x) => x.trim()).filter((k) => k in sectionByKey);
   const sectionOrder = [...chosen, ...DEFAULT_SECTION_ORDER.filter((k) => !chosen.includes(k))];
   const orderedSectionsHtml = sectionOrder.map((k) => sectionByKey[k].html).join("\n    ");
@@ -691,6 +746,7 @@ ${desigFontCss(Number(theme))}
 :root{--theme-color:${accent};--btn-bg:${buttonPalette(accent).bg};--btn-bg2:${buttonPalette(accent).bg2};--btn-fg:${buttonPalette(accent).fg};${secondary ? `--theme-secondary:${secondary};` : ""}}
 ${textIconOverrideCss(c)}
 ${offersSection ? OFFER_CSS : ""}
+${teamSection ? TEAM_CSS : ""}
 ${servicesSection ? PRODUCT_CSS : ""}
 ${galleryCompact && gallerySection ? GALLERY_GRID_CSS : ""}
 ${compact ? COMPACT_CSS : ""}

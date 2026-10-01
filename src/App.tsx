@@ -124,6 +124,7 @@ const CustomerSocial = lazy(() => import("./pages/customer/Social"));
 const CustomerUploads = lazy(() => import("./pages/customer/Uploads"));
 const CustomerViewCard = lazy(() => import("./pages/customer/ViewCard"));
 const CustomerReviews = lazy(() => import("./pages/customer/Reviews"));
+const CustomerTeam = lazy(() => import("./pages/customer/Team"));
 const CustomerReferEarn = lazy(() => import("./pages/customer/ReferEarn"));
 const PublicCard = lazy(() => import("./pages/PublicCard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -469,6 +470,7 @@ export default function App() {
         {/* Offers / Deals is now the offers tab of the Products module */}
         <Route path="/dashboard/offers" element={<Navigate to="/dashboard/products?tab=offers" replace />} />
         <Route path="/dashboard/reviews" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerReviews /></RoleRoute>} />
+        <Route path="/dashboard/team" element={<RoleRoute allowedRoles={["super_admin","customer"]}><CustomerTeam /></RoleRoute>} />
 
         {/* Backward-compat: old printed cards used digitalcarda.in/<slug> (no /c/).
             Kept last so every named route above wins first. */}

@@ -75,6 +75,7 @@ const PLANS: Plan[] = [
     headline: "Everything in Gold, plus:",
     features: [
       { icon: IdCard, text: "Up to 3 digital cards" },
+      { icon: Users, text: "Your team on your card — up to 12 members" },
       { icon: Tag, text: "Unlimited products & offers" },
       { icon: Images, text: "60-photo gallery + 25 videos" },
       { icon: Globe, text: "Custom domain (yourbrand.com)" },
@@ -163,6 +164,8 @@ function compareGroups(pkgs: DbPkg[]): { title: string; rows: CompareRow[] }[] {
         { label: "Products & services", cells: all((p) => (num(p.maxProducts) >= 9999 ? "Unlimited" : String(p.maxProducts))) },
         { label: "Gallery photos", cells: all((p) => String(p.maxGalleryImages)) },
         { label: "Videos", cells: all((p) => String(p.maxVideos)) },
+        // Team members ride with the multi-card plan — Platinum only.
+        { label: "Team members on your card", cells: all((p) => (num(p.maxCards) > 1 ? "Up to 12" : false)) },
       ],
     },
     {

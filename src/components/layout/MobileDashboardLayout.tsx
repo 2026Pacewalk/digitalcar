@@ -72,7 +72,7 @@ const NAV: Record<string, NavConfig> = {
       { icon: Home, label: "Home", path: "/dashboard", match: (p) => p === "/dashboard" },
       { icon: Wand2, label: "Edit", path: "/dashboard/build", match: under(
         "/dashboard/build", "/dashboard/home", "/dashboard/templates", "/dashboard/social", "/dashboard/about",
-        "/dashboard/products", "/dashboard/payments", "/dashboard/media", "/dashboard/reviews", "/dashboard/uploads",
+        "/dashboard/products", "/dashboard/team", "/dashboard/payments", "/dashboard/media", "/dashboard/reviews", "/dashboard/uploads",
         "/dashboard/view", "/dashboard/builder", "/dashboard/cards", "/dashboard/ai") },
       { icon: QrCode, label: "Share", path: "/dashboard/qr", match: under("/dashboard/qr", "/dashboard/signature", "/dashboard/whatsapp", "/dashboard/instagram", "/dashboard/tools") },
       { icon: Mail, label: "Leads", path: "/dashboard/leads", match: under("/dashboard/leads", "/dashboard/enquiry") },
@@ -113,6 +113,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/dashboard/home": "Basics",
   "/dashboard/about": "About Us",
   "/dashboard/products": "Products / Services",
+  "/dashboard/team": "Our Team",
   "/dashboard/payments": "Payments",
   "/dashboard/signature": "Email Signature",
   "/dashboard/whatsapp": "WhatsApp Messages",
