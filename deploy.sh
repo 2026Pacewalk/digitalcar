@@ -81,4 +81,17 @@ else
 fi
 pm2 save
 
+# A release can add built-in designs. The app only writes them into app_settings
+# the first time something asks for the preset list, so ask for it here — then
+# sync the product catalogue, which reads that list. Without this the new designs
+# exist as templates but have no card to open in the gallery until the NEXT deploy.
+echo "▶ Registering any new built-in designs, then syncing the catalogue…"
+APP_PORT="$(grep -E '^PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '\"' )"
+APP_PORT="${APP_PORT:-3000}"
+for _ in $(seq 1 20); do
+  curl -fsS -o /dev/null "http://127.0.0.1:${APP_PORT}/api/trpc/template.presets" && break
+  sleep 2
+done
+node db/sync-products-from-templates.mjs || echo "  (catalogue sync skipped)"
+
 echo "✓ Deploy complete — https://digitalcarda.in/  ($(git rev-parse --short HEAD))"
