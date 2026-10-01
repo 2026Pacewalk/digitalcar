@@ -11,8 +11,8 @@ import { safeExternalUrl } from "@/lib/url";
 import { SOCIAL_BY_KEY, readSocialLinks } from "@/lib/socialPlatforms";
 import { buttonPalette, CONTRAST_GUARD_SCRIPT } from "./contrast";
 
-type PCProduct = { name: string; tagline?: string; description?: string; button?: string; button_title?: string; filename?: string; price?: string; offer_price?: string };
-type PCRecord = Record<string, unknown>;
+export type PCProduct = { name: string; tagline?: string; description?: string; button?: string; button_title?: string; filename?: string; price?: string; offer_price?: string };
+export type PCRecord = Record<string, unknown>;
 /* Full mini-website content passed through from buildCardHtml, so the premium
    designs can render the SAME sections as the classic templates. */
 export type PremiumExtras = {
@@ -21,23 +21,23 @@ export type PremiumExtras = {
   offers?: { title?: string; description?: string; valid?: string; filename?: string }[];
 };
 
-const s = (v: unknown) => String(v ?? "").trim();
-const esc = (v: unknown) => s(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+export const s = (v: unknown) => String(v ?? "").trim();
+export const esc = (v: unknown) => s(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 // Perceived brightness of a #rrggbb colour (0 dark … 1 light) — pick readable text.
 const lum = (hex: string) => { const h = s(hex).replace("#", ""); if (h.length < 6) return 1; const r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255; return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-const IMG = 'referrerpolicy="no-referrer"';
+export const IMG = 'referrerpolicy="no-referrer"';
 /* Social icons for the premium designs — reads the SAME source as the classic
    templates (the Social Links page's saved list, with the legacy per-platform
    fields as fallback) and honours the owner's "Icon style" choice: theme colour
    (the template's own look) vs each platform's real brand colour. Shared by all
    premium templates so the setting keeps working for future designs too. */
-const safeHref = (u: string) => {
+export const safeHref = (u: string) => {
   const t = String(u ?? "").trim();
   if (/^(https?:|mailto:|tel:)/i.test(t)) return t;
   if (/^[\w-]+(\.[\w-]+)+(\/|$)/.test(t)) return "https://" + t;
   return "#"; // block javascript:/data: etc.
 };
-function premiumSocials(c: PCRecord, cls: string): string {
+export function premiumSocials(c: PCRecord, cls: string): string {
   const brand = s(c.social_icon_style) === "brand";
   return readSocialLinks(c as Record<string, unknown>).map(({ platform, url }) => {
     const p = SOCIAL_BY_KEY[platform];
@@ -50,17 +50,20 @@ function premiumSocials(c: PCRecord, cls: string): string {
 
 /* Design names — the count drives the template gallery. Add more here + a branch
    in buildPremiumCardHtml to introduce the ID / Membership cards later. */
-export const PREMIUM_NAMES = ["Corporate Business Card", "Employee ID Card", "Membership Card", "Professional Profile", "Bloom Profile"];
+import { buildDesignCardHtml, DESIGN_NAMES } from "./premiumDesigns";
+import { buildDesign2CardHtml, DESIGN2_NAMES } from "./premiumDesigns2";
+
+export const PREMIUM_NAMES = ["Corporate Business Card", "Employee ID Card", "Membership Card", "Professional Profile", "Bloom Profile", ...DESIGN_NAMES, ...DESIGN2_NAMES];
 export const PREMIUM_COUNT = PREMIUM_NAMES.length;
 
-const HEAD = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+export const HEAD = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&family=Sora:wght@600;700;800&family=Manrope:wght@500;600;700;800&display=swap">`;
 
 /* Alt text for the brand logo: the company name, else the person's name, else a
    generic label (company_name is optional, and an empty alt hides the logo from
    screen readers). Already HTML-escaped. */
-const logoAlt = (c: PCRecord) => esc(s(c.company_name) || s(c.name) || "Company logo");
+export const logoAlt = (c: PCRecord) => esc(s(c.company_name) || s(c.name) || "Company logo");
 /* Gallery alt text. Captions are usually the uploaded file's name ("IMG_2041.jpg"),
    which says nothing — keep a caption only when it isn't a bare file name, else
    describe it as the owner's gallery photo. Raw text: escape before HTML use. */
@@ -82,7 +85,11 @@ export function buildPremiumCardHtml(c: PCRecord, products: PCProduct[] = [], in
     case 2: return membershipCard(c);
     case 3: return professionalProfile(c, products, opts);
     case 4: return bloomProfile(c, products, opts);
-    default: return businessCard(c, products, opts);
+    // 5+ — the ten newer designs, each a skin over the same shared sections.
+    default:
+      if (index >= 15) return buildDesign2CardHtml(c, products, index - 15, opts);
+      if (index >= 5) return buildDesignCardHtml(c, products, index - 5, opts);
+      return businessCard(c, products, opts);
   }
 }
 
@@ -219,7 +226,7 @@ export function svcMeta(nm: string): { icon: string; desc: string } {
    Reviews / Enquiry) in the premium aesthetic, so a premium card is the same
    complete mini-website as the classic templates — not just a first screen.
    Gated by the owner's per-section flags; empty sections are skipped. ── */
-function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: { skip?: string[]; products?: PCProduct[]; accent?: string; booking?: boolean } = {}): { css: string; html: string; js: string } {
+export function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: string, o: { skip?: string[]; products?: PCProduct[]; accent?: string; booking?: boolean } = {}): { css: string; html: string; js: string } {
   // Buttons in these sections sit on the template's accent (--gold). Their text
   // colour and gradient come from buttonPalette, so a blue or navy card gets
   // white text on a deepened blue, a gold card keeps dark text on gold.
@@ -1049,19 +1056,19 @@ function professionalProfile(c: PCRecord, products: PCProduct[], opts: { thumb?:
    accent drives the whole palette; text colours are chosen for contrast (icons
    and button fills use a darkened accent so a light brand colour stays legible).
    Motion is gentle and fully disabled under prefers-reduced-motion. */
-const mix = (hex: string, other: string, pct: number) => {
+export const mix = (hex: string, other: string, pct: number) => {
   const p = (h: string) => { const x = s(h).replace("#", ""); return x.length >= 6 ? [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)) : [0, 0, 0]; };
   const a = p(hex), b = p(other);
   return "#" + a.map((v, i) => Math.round(v * (1 - pct) + b[i] * pct).toString(16).padStart(2, "0")).join("");
 };
 /* WCAG contrast ratio between two #rrggbb colours. */
-const contrast = (x: string, y: string) => {
+export const contrast = (x: string, y: string) => {
   const L = (h: string) => { const v = s(h).replace("#", ""); const ch = [0, 2, 4].map((i) => { const c = parseInt(v.slice(i, i + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }); return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]; };
   const [a, b] = [L(x), L(y)].sort((m, n) => n - m);
   return (a + 0.05) / (b + 0.05);
 };
 /* Darken a colour only as far as needed to reach `min` contrast against `bg`. */
-const legible = (hex: string, bg: string, min: number) => {
+export const legible = (hex: string, bg: string, min: number) => {
   for (let k = 0; k <= 0.9; k += 0.04) { const c = mix(hex, "#000000", k); if (contrast(c, bg) >= min) return c; }
   return "#1b1d29";
 };

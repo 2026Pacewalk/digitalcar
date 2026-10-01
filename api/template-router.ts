@@ -87,6 +87,29 @@ const SEED_PRESETS: Preset[] = [
   { id: 50, name: "Membership Card", style: 50, primary: "#D4AF37", secondary: "#0F5132", active: true },
   { id: 51, name: "Professional Profile", style: 51, primary: "#2563EB", secondary: "#0F2747", active: true },
   { id: 52, name: "Bloom Profile", style: 52, primary: "#F97316", secondary: "#7C2D12", active: true },
+  // Designs 53–62: the ten newer premium skins (src/card-template/premiumDesigns.ts).
+  { id: 53, name: "Bento Grid", style: 53, primary: "#4F46E5", secondary: "#1E1B4B", active: true, category: "premium", featured: true },
+  { id: 54, name: "Chat Thread", style: 54, primary: "#25D366", secondary: "#064E3B", active: true, category: "premium" },
+  { id: 55, name: "Boarding Pass", style: 55, primary: "#0EA5E9", secondary: "#0C4A6E", active: true, category: "premium", featured: true },
+  { id: 56, name: "Vinyl Player", style: 56, primary: "#F59E0B", secondary: "#1C1917", active: true, category: "premium" },
+  { id: 57, name: "Terminal", style: 57, primary: "#22C55E", secondary: "#052E16", active: true, category: "premium" },
+  { id: 58, name: "Story Slides", style: 58, primary: "#EC4899", secondary: "#500724", active: true, category: "premium", featured: true },
+  { id: 59, name: "Timeline", style: 59, primary: "#0F766E", secondary: "#042F2E", active: true, category: "premium" },
+  { id: 60, name: "Map First", style: 60, primary: "#EF4444", secondary: "#450A0A", active: true, category: "premium" },
+  { id: 61, name: "Flip Card", style: 61, primary: "#D4AF37", secondary: "#3F2D0B", active: true, category: "premium" },
+  { id: 62, name: "Poster Collage", style: 62, primary: "#111827", secondary: "#374151", active: true, category: "premium" },
+
+  // Designs 63–72: the classic photo-led cards (src/card-template/premiumDesigns2.ts).
+  { id: 63, name: "Pastel Portrait", style: 63, primary: "#38BDF8", secondary: "#0C4A6E", active: true, category: "premium", featured: true },
+  { id: 64, name: "Bold Circles", style: 64, primary: "#2DA6B2", secondary: "#111827", active: true, category: "premium" },
+  { id: 65, name: "Link Hub", style: 65, primary: "#2563EB", secondary: "#1E3A8A", active: true, category: "premium", featured: true },
+  { id: 66, name: "Agency Stack", style: 66, primary: "#F97316", secondary: "#1E293B", active: true, category: "premium" },
+  { id: 67, name: "Geo Yellow", style: 67, primary: "#FACC15", secondary: "#1F2937", active: true, category: "premium" },
+  { id: 68, name: "Sky Profile", style: 68, primary: "#93C5FD", secondary: "#1E3A8A", active: true, category: "premium", featured: true },
+  { id: 69, name: "Photo Frame", style: 69, primary: "#A16207", secondary: "#422006", active: true, category: "premium" },
+  { id: 70, name: "Diagonal Split", style: 70, primary: "#7C3AED", secondary: "#2E1065", active: true, category: "premium" },
+  { id: 71, name: "Ribbon Wave", style: 71, primary: "#06B6D4", secondary: "#0E7490", active: true, category: "premium" },
+  { id: 72, name: "Corporate Slate", style: 72, primary: "#334155", secondary: "#0F172A", active: true, category: "premium" },
 ];
 /* The lowest preset id/style that is a link-in-bio layout (rest are card styles). */
 const LINKBIO_MIN_ID = 32;
@@ -158,7 +181,7 @@ export async function getDefaultDesign(db: ReturnType<typeof getDb>): Promise<{ 
 const presetInput = z.object({
   id: z.number().optional(),
   name: z.string().min(1),
-  style: z.number().min(1).max(60), // 1–31 card styles, 32+ link-in-bio layouts
+  style: z.number().min(1).max(90), // 1–31 card styles, 32+ link-in-bio, 48+ premium designs
   primary: z.string(),
   secondary: z.string(),
   active: z.boolean().default(true),

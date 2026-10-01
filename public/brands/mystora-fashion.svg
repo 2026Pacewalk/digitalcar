@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="mystora-fashion logo">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#BE185D"/>
+      <stop offset="1" stop-color="#4A044E"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="44" fill="url(#g)"/>
+  <g><circle cx="100" cy="62" r="11" stroke="#fff" stroke-width="7" fill="none" opacity=".9"/><path d="M100 73v10l-42 29a8 8 0 0 0 5 14h74a8 8 0 0 0 5-14l-42-29" fill="#fff" opacity=".95"/></g>
+  <text x="100" y="178" text-anchor="middle" font-family="Poppins, Inter, system-ui, sans-serif" font-size="26" font-weight="800" letter-spacing="2" fill="#fff" opacity=".92">MY</text>
+</svg>

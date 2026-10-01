@@ -46,7 +46,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#2a2320; --lb-sub:#8a7d6d; --lb-name-font:'Playfair Display',serif; --lb-name-weight:600;
         --lb-btn-bg:rgba(255,255,255,.72); --lb-btn-text:#37302a; --lb-btn-border:1px solid rgba(120,100,80,.16);
         --lb-btn-shadow:0 2px 10px rgba(120,100,80,.08); --lb-btn-hover:#fff; --lb-radius:12px;
-        --lb-ring:rgba(255,255,255,.9); --lb-social:#6b5f52; --lb-accent:${a};`,
+        --lb-ring:rgba(255,255,255,.9); --lb-social:#6b5f52; --lb-accent:${a};
+        --lb-art:radial-gradient(circle at 18% 12%,rgba(201,162,75,.18) 0 90px,transparent 91px),radial-gradient(circle at 88% 30%,rgba(190,160,120,.16) 0 120px,transparent 121px),radial-gradient(rgba(140,115,85,.16) 1.4px,transparent 1.5px);--lb-art-size:auto,auto,22px 22px;--lb-art-repeat:no-repeat,no-repeat,repeat;`,
     },
     {
       name: "Aurora Glass", swatch: "#8b5cf6",
@@ -55,7 +56,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#ffffff; --lb-sub:rgba(255,255,255,.82); --lb-name-font:'Poppins',sans-serif; --lb-name-weight:700;
         --lb-btn-bg:rgba(255,255,255,.16); --lb-btn-text:#ffffff; --lb-btn-border:1px solid rgba(255,255,255,.28);
         --lb-btn-shadow:0 6px 20px rgba(0,0,0,.18); --lb-btn-hover:rgba(255,255,255,.28); --lb-radius:14px;
-        --lb-ring:rgba(255,255,255,.55); --lb-social:#ffffff; --lb-glass:1; --lb-accent:#ffffff;`,
+        --lb-ring:rgba(255,255,255,.55); --lb-social:#ffffff; --lb-glass:1; --lb-accent:#ffffff;
+        --lb-art:radial-gradient(circle at 12% 18%,rgba(255,255,255,.26) 0 150px,transparent 151px),radial-gradient(circle at 92% 8%,rgba(56,189,248,.35) 0 180px,transparent 181px),radial-gradient(circle at 78% 86%,rgba(251,191,36,.28) 0 200px,transparent 201px);--lb-art-repeat:no-repeat;`,
     },
     {
       name: "Midnight Neon", swatch: "#0ea5e9",
@@ -64,7 +66,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#f1f5f9; --lb-sub:#94a3b8; --lb-name-font:'Poppins',sans-serif; --lb-name-weight:700;
         --lb-btn-bg:rgba(255,255,255,.04); --lb-btn-text:#e2e8f0; --lb-btn-border:1px solid ${a}66;
         --lb-btn-shadow:0 0 0 1px ${a}22, 0 6px 22px rgba(0,0,0,.4); --lb-btn-hover:${a}1f; --lb-radius:12px;
-        --lb-ring:${a}; --lb-social:#cbd5e1; --lb-accent:${a};`,
+        --lb-ring:${a}; --lb-social:#cbd5e1; --lb-accent:${a};
+        --lb-art:linear-gradient(rgba(148,163,184,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.14) 1px,transparent 1px),radial-gradient(circle at 50% -10%,rgba(14,165,233,.30) 0 240px,transparent 241px);--lb-art-size:34px 34px,34px 34px,auto;--lb-art-repeat:repeat,repeat,no-repeat;`,
     },
     {
       name: "Sunset Warm", swatch: "#fb7185",
@@ -73,7 +76,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#ffffff; --lb-sub:rgba(255,255,255,.9); --lb-name-font:'Poppins',sans-serif; --lb-name-weight:700;
         --lb-btn-bg:#ffffff; --lb-btn-text:#b21e3a; --lb-btn-border:none;
         --lb-btn-shadow:0 8px 22px rgba(0,0,0,.16); --lb-btn-hover:#fff5f6; --lb-radius:14px;
-        --lb-ring:rgba(255,255,255,.85); --lb-social:#ffffff; --lb-accent:#ffffff;`,
+        --lb-ring:rgba(255,255,255,.85); --lb-social:#ffffff; --lb-accent:#ffffff;
+        --lb-art:repeating-conic-gradient(from 200deg at 50% -20%,rgba(255,255,255,.14) 0 6deg,transparent 6deg 14deg),radial-gradient(circle at 50% -12%,rgba(255,237,213,.5) 0 150px,transparent 151px);--lb-art-repeat:no-repeat;`,
     },
     {
       name: "Ocean Frost", swatch: "#0891b2",
@@ -82,7 +86,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#ffffff; --lb-sub:rgba(255,255,255,.85); --lb-name-font:'Poppins',sans-serif; --lb-name-weight:700;
         --lb-btn-bg:rgba(255,255,255,.18); --lb-btn-text:#ffffff; --lb-btn-border:1px solid rgba(255,255,255,.3);
         --lb-btn-shadow:0 6px 20px rgba(0,0,0,.14); --lb-btn-hover:rgba(255,255,255,.3); --lb-radius:14px;
-        --lb-ring:rgba(255,255,255,.6); --lb-social:#ffffff; --lb-glass:1; --lb-accent:#ffffff;`,
+        --lb-ring:rgba(255,255,255,.6); --lb-social:#ffffff; --lb-glass:1; --lb-accent:#ffffff;
+        --lb-art:repeating-radial-gradient(circle at 50% 118%,rgba(255,255,255,.16) 0 2px,transparent 2px 46px),radial-gradient(circle at 14% 14%,rgba(255,255,255,.22) 0 120px,transparent 121px);--lb-art-repeat:no-repeat;`,
     },
     {
       name: "Noir Bold", swatch: "#111111",
@@ -90,7 +95,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-bg:#0a0a0a; --lb-text:#ffffff; --lb-sub:#a1a1aa; --lb-name-font:'Poppins',sans-serif; --lb-name-weight:800;
         --lb-btn-bg:#ffffff; --lb-btn-text:#0a0a0a; --lb-btn-border:none;
         --lb-btn-shadow:0 6px 18px rgba(0,0,0,.5); --lb-btn-hover:#eaeaea; --lb-radius:999px;
-        --lb-ring:#ffffff; --lb-social:#ffffff; --lb-accent:#ffffff;`,
+        --lb-ring:#ffffff; --lb-social:#ffffff; --lb-accent:#ffffff;
+        --lb-art:radial-gradient(rgba(255,255,255,.16) 2.2px,transparent 2.3px);--lb-art-size:26px 26px;`,
     },
     {
       name: "Peach Soft", swatch: "#fecaca",
@@ -99,7 +105,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#7a3b3b; --lb-sub:#b08585; --lb-name-font:'Playfair Display',serif; --lb-name-weight:600;
         --lb-btn-bg:rgba(255,255,255,.8); --lb-btn-text:#8a4a4a; --lb-btn-border:1px solid rgba(190,120,120,.18);
         --lb-btn-shadow:0 4px 14px rgba(190,120,120,.14); --lb-btn-hover:#fff; --lb-radius:14px;
-        --lb-ring:#ffffff; --lb-social:#a56a6a; --lb-accent:#e26d6d;`,
+        --lb-ring:#ffffff; --lb-social:#a56a6a; --lb-accent:#e26d6d;
+        --lb-art:radial-gradient(circle at 20% 16%,rgba(255,255,255,.75) 0 110px,transparent 111px),radial-gradient(rgba(244,114,128,.30) 2px,transparent 2.1px),radial-gradient(rgba(251,191,36,.26) 1.6px,transparent 1.7px);--lb-art-size:auto,54px 54px,38px 38px;--lb-art-pos:0 0,0 0,19px 24px;--lb-art-repeat:no-repeat,repeat,repeat;`,
     },
     {
       name: "Gold Luxe", swatch: "#c9a24b",
@@ -108,7 +115,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#f5eede; --lb-sub:#b8ab8c; --lb-name-font:'Playfair Display',serif; --lb-name-weight:600;
         --lb-btn-bg:rgba(201,162,75,.08); --lb-btn-text:#f0e6cf; --lb-btn-border:1px solid rgba(201,162,75,.55);
         --lb-btn-shadow:0 6px 20px rgba(0,0,0,.35); --lb-btn-hover:rgba(201,162,75,.18); --lb-radius:10px;
-        --lb-ring:#c9a24b; --lb-social:#d8c491; --lb-accent:#c9a24b;`,
+        --lb-ring:#c9a24b; --lb-social:#d8c491; --lb-accent:#c9a24b;
+        --lb-art:repeating-linear-gradient(135deg,rgba(201,162,75,.12) 0 1px,transparent 1px 12px),radial-gradient(circle at 50% -8%,rgba(201,162,75,.26) 0 200px,transparent 201px);--lb-art-repeat:repeat,no-repeat;`,
     },
     {
       name: "Neon Cyber", swatch: "#22d3ee",
@@ -117,7 +125,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#e8fbff; --lb-sub:#7fd8e8; --lb-name-font:'Poppins',sans-serif; --lb-name-weight:800;
         --lb-btn-bg:rgba(10,20,35,.6); --lb-btn-text:#c9f7ff; --lb-btn-border:1px solid rgba(34,211,238,.55);
         --lb-btn-shadow:0 0 14px rgba(34,211,238,.33),inset 0 0 0 1px rgba(34,211,238,.2); --lb-btn-hover:rgba(34,211,238,.14); --lb-radius:10px;
-        --lb-ring:#22d3ee; --lb-social:#67e8f9; --lb-accent:#22d3ee;`,
+        --lb-ring:#22d3ee; --lb-social:#67e8f9; --lb-accent:#22d3ee;
+        --lb-art:linear-gradient(rgba(34,211,238,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,.12) 1px,transparent 1px),radial-gradient(circle at 50% 108%,rgba(34,211,238,.30) 0 220px,transparent 221px);--lb-art-size:40px 40px,40px 40px,auto;--lb-art-repeat:repeat,repeat,no-repeat;`,
     },
     {
       name: "Retro Groove", swatch: "#d99a5b",
@@ -126,7 +135,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#5a3b1e; --lb-sub:#8a6a45; --lb-name-font:'Poppins',sans-serif; --lb-name-weight:800;
         --lb-btn-bg:#fff7ea; --lb-btn-text:#7a4b22; --lb-btn-border:2px solid #7a4b22;
         --lb-btn-shadow:3px 3px 0 #7a4b22; --lb-btn-hover:#ffefd6; --lb-radius:14px;
-        --lb-ring:#fff7ea; --lb-social:#7a4b22; --lb-accent:#c2410c;`,
+        --lb-ring:#fff7ea; --lb-social:#7a4b22; --lb-accent:#c2410c;
+        --lb-art:repeating-linear-gradient(135deg,rgba(122,75,34,.14) 0 14px,transparent 14px 34px),radial-gradient(circle at 86% 10%,rgba(255,247,234,.6) 0 110px,transparent 111px);--lb-art-repeat:repeat,no-repeat;`,
     },
     {
       name: "Editorial", swatch: "#111111",
@@ -134,7 +144,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-bg:#ffffff; --lb-text:#0a0a0a; --lb-sub:#6b7280; --lb-name-font:'Playfair Display',serif; --lb-name-weight:700;
         --lb-btn-bg:#ffffff; --lb-btn-text:#111111; --lb-btn-border:1.5px solid #111111;
         --lb-btn-shadow:none; --lb-btn-hover:#f3f4f6; --lb-radius:0px;
-        --lb-ring:#111111; --lb-social:#111111; --lb-accent:#111111;`,
+        --lb-ring:#111111; --lb-social:#111111; --lb-accent:#111111;
+        --lb-art:linear-gradient(rgba(17,17,17,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(17,17,17,.07) 1px,transparent 1px);--lb-art-size:28px 28px;`,
     },
     {
       name: "Mint Fresh", swatch: "#34d399",
@@ -143,7 +154,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#064e3b; --lb-sub:#0f766e; --lb-name-font:'Poppins',sans-serif; --lb-name-weight:700;
         --lb-btn-bg:#ffffff; --lb-btn-text:#065f46; --lb-btn-border:none;
         --lb-btn-shadow:0 6px 18px rgba(6,95,70,.14); --lb-btn-hover:#ecfdf5; --lb-radius:14px;
-        --lb-ring:rgba(255,255,255,.85); --lb-social:#065f46; --lb-accent:#059669;`,
+        --lb-ring:rgba(255,255,255,.85); --lb-social:#065f46; --lb-accent:#059669;
+        --lb-art:radial-gradient(circle at 10% 10%,rgba(255,255,255,.55) 0 130px,transparent 131px),radial-gradient(circle at 94% 36%,rgba(255,255,255,.4) 0 110px,transparent 111px),radial-gradient(rgba(6,95,70,.14) 1.6px,transparent 1.7px);--lb-art-size:auto,auto,30px 30px;--lb-art-repeat:no-repeat,no-repeat,repeat;`,
     },
     {
       name: "Lavender Dream", swatch: "#a78bfa",
@@ -152,7 +164,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#4c1d95; --lb-sub:#6d28d9; --lb-name-font:'Playfair Display',serif; --lb-name-weight:600;
         --lb-btn-bg:rgba(255,255,255,.82); --lb-btn-text:#5b21b6; --lb-btn-border:1px solid rgba(124,58,237,.18);
         --lb-btn-shadow:0 4px 16px rgba(124,58,237,.15); --lb-btn-hover:#fff; --lb-radius:14px;
-        --lb-ring:#ffffff; --lb-social:#7c3aed; --lb-accent:#7c3aed;`,
+        --lb-ring:#ffffff; --lb-social:#7c3aed; --lb-accent:#7c3aed;
+        --lb-art:radial-gradient(rgba(255,255,255,.9) 1.8px,transparent 1.9px),radial-gradient(rgba(124,58,237,.22) 1.2px,transparent 1.3px),radial-gradient(circle at 84% 12%,rgba(255,255,255,.6) 0 120px,transparent 121px);--lb-art-size:46px 46px,32px 32px,auto;--lb-art-pos:0 0,16px 20px,0 0;--lb-art-repeat:repeat,repeat,no-repeat;`,
     },
     {
       // Corporate navy + gold — like a premium business card.
@@ -162,7 +175,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#eaf2fb; --lb-sub:#9db4cc; --lb-name-font:'Poppins',sans-serif; --lb-name-weight:700;
         --lb-btn-bg:rgba(255,255,255,.05); --lb-btn-text:#eaf2fb; --lb-btn-border:1px solid ${a}88;
         --lb-btn-shadow:0 6px 20px rgba(0,0,0,.42); --lb-btn-hover:${a}1f; --lb-radius:12px;
-        --lb-ring:${a}; --lb-social:#cfe0f0; --lb-accent:${a};`,
+        --lb-ring:${a}; --lb-social:#cfe0f0; --lb-accent:${a};
+        --lb-art:repeating-linear-gradient(45deg,rgba(255,255,255,.05) 0 1px,transparent 1px 10px),repeating-linear-gradient(-45deg,rgba(255,255,255,.05) 0 1px,transparent 1px 10px);`,
     },
     {
       // Deep emerald + gold — a prestige / membership look.
@@ -172,7 +186,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#f4f1e4; --lb-sub:#bcd6c6; --lb-name-font:'Playfair Display',serif; --lb-name-weight:600;
         --lb-btn-bg:rgba(212,175,55,.08); --lb-btn-text:#f6f0da; --lb-btn-border:1px solid ${a}99;
         --lb-btn-shadow:0 6px 20px rgba(0,0,0,.38); --lb-btn-hover:${a}26; --lb-radius:10px;
-        --lb-ring:${a}; --lb-social:#e6d9a8; --lb-accent:${a};`,
+        --lb-ring:${a}; --lb-social:#e6d9a8; --lb-accent:${a};
+        --lb-art:repeating-linear-gradient(45deg,rgba(212,175,55,.10) 0 1px,transparent 1px 22px),repeating-linear-gradient(-45deg,rgba(212,175,55,.10) 0 1px,transparent 1px 22px),radial-gradient(circle at 50% -6%,rgba(212,175,55,.22) 0 180px,transparent 181px);--lb-art-repeat:repeat,repeat,no-repeat;`,
     },
     {
       // Clean white + deep navy — a crisp corporate / ID-card feel.
@@ -182,7 +197,8 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
         --lb-text:#12263d; --lb-sub:#5a708a; --lb-name-font:'Poppins',sans-serif; --lb-name-weight:700;
         --lb-btn-bg:#12263d; --lb-btn-text:#ffffff; --lb-btn-border:none;
         --lb-btn-shadow:0 8px 20px rgba(18,38,61,.22); --lb-btn-hover:#1c3d61; --lb-radius:12px;
-        --lb-ring:#12263d; --lb-social:#12263d; --lb-accent:#12263d;`,
+        --lb-ring:#12263d; --lb-social:#12263d; --lb-accent:#12263d;
+        --lb-art:repeating-radial-gradient(circle at 50% -40%,rgba(18,38,61,.06) 0 1px,transparent 1px 40px);--lb-art-repeat:no-repeat;`,
     },
   ];
   return defs.map((d, i) => ({ ...d, id: LINKBIO_START + i }));
@@ -195,7 +211,14 @@ const BASE_CSS = `
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;padding:0;}
 body.lb{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--lb-bg);color:var(--lb-text);min-height:100vh;}
-.lb-wrap{max-width:480px;margin:0 auto;padding:38px 22px 30px;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100vh;}
+/* Decorative background art — the graphic layer that gives each theme its
+   personality (dots, grids, waves, stripes…). Pure CSS, so it costs nothing to
+   load and scales on any screen. A customer's own background image replaces it. */
+body.lb::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:var(--lb-art,none);background-size:var(--lb-art-size,auto);
+  background-position:var(--lb-art-pos,0 0);background-repeat:var(--lb-art-repeat,repeat);
+  opacity:var(--lb-art-opacity,1);}
+.lb-wrap{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:38px 22px 30px;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100vh;}
 .lb-avatar{width:104px;height:104px;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.2);box-shadow:0 0 0 4px var(--lb-ring),0 10px 30px rgba(0,0,0,.18);margin-bottom:16px;display:flex;align-items:center;justify-content:center;}
 .lb-avatar img{width:100%;height:100%;object-fit:cover;display:block;}
 /* Square shape — a rounded tile instead of a circle. */

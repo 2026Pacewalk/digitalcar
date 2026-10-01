@@ -7,7 +7,8 @@
  * realistic, varied cards instead of the same placeholder everywhere.
  */
 type DemoProduct = { id: number; name: string; filename: string; price: string; offer_price: string; description: string; button: string; button_title: string };
-export type DemoBundle = { customer: Record<string, unknown>; products: DemoProduct[] };
+export type DemoGallery = { id: number; name: string; filename: string };
+export type DemoBundle = { customer: Record<string, unknown>; products: DemoProduct[]; gallery?: DemoGallery[] };
 
 const base = {
   logo: "", gst: "", establishment: "2019", about_on: 1, product_on: 1, enquiry_on: 1,
@@ -43,6 +44,50 @@ const PERSONAS: Persona[] = [
   { keys: ["digital agency", "it", "software", "web"], bundle: { customer: { ...base, name: "Karan Mehta", designation: "Founder · Digital Agency", company_name: "PixelForge Studios", nature: "IT & Digital", mobile1: "+91 90000 00190", email: "team@example.com", url: "https://pixelforge.example.com", address: "HITEC City, Hyderabad 500081", google_map: "https://maps.google.com", about_us: "Websites, apps and marketing that grow your business. A small, senior team that ships fast.", specialties_title: "Services", specialities: "Web & App Development, SEO, Social Media, Branding, E-commerce" }, products: [svc(1, "Free Project Call", "Tell us your idea — get a clear plan and quote.", "WhatsApp"), svc(2, "See Our Work", "Recent websites, apps and campaigns.", "Visit Us"), svc(3, "Call the Team", "Let's talk about your project.", "Call Now")] } },
   { keys: ["insurance", "loan", "advisor"], bundle: { customer: { ...base, name: "Deepak Sharma", designation: "Insurance & Loan Advisor", company_name: "SecureLife Advisors", nature: "Insurance & Loans", mobile1: "+91 90000 00201", email: "advisor@example.com", url: "https://securelife.example.com", address: "Civil Lines, Nagpur 440001", google_map: "https://maps.google.com", about_us: "The right cover and the right loan, explained simply. Trusted by 500+ families.", specialties_title: "Services", specialities: "Life & Health Insurance, Home Loans, Car Loans, Mutual Funds, Claims Help" }, products: [svc(1, "Free Advice Call", "Get honest guidance — no pushy selling.", "WhatsApp"), svc(2, "Compare Plans", "Find the best cover for your budget.", "Get Quote"), svc(3, "Call Deepak", "Have a question? I'm happy to help.", "Call Now")] } },
 ];
+
+/*
+ * Sample artwork for every persona, so a preview shows a FINISHED card — brand
+ * mark, portrait, service photos and a gallery — instead of empty frames.
+ * The marks and portraits are generated illustrations (public/demo/logos,
+ * public/demo/avatars): no real brand, and no photograph of any real person.
+ * `folder` names a set of licensed sample photos under public/demo/<folder>/.
+ */
+const MEDIA: Record<string, { slug: string; folder?: string }> = {
+  "Skyline Estates": { slug: "skyline-estates", folder: "realestate" },
+  "SmileCare Dental Clinic": { slug: "smilecare-dental", folder: "dental" },
+  "Northstar Consulting": { slug: "northstar-consulting" },
+  "Spice Route Restaurant": { slug: "spice-route", folder: "restaurant" },
+  "Glow Beauty Studio": { slug: "glow-studio", folder: "salon" },
+  "Menon & Associates": { slug: "menon-associates" },
+  "Jain & Co.": { slug: "jain-co" },
+  "Frame Stories": { slug: "frame-stories", folder: "photography" },
+  "IronCore Fitness": { slug: "ironcore-fitness", folder: "fitness" },
+  "Studio Nivas": { slug: "studio-nivas", folder: "interior" },
+  "Celebrations by Riya": { slug: "celebrations" },
+  "Aara Boutique": { slug: "aara-boutique", folder: "boutique" },
+  "Brew & Bake": { slug: "brew-bake", folder: "cafe" },
+  "QuickFix Home Services": { slug: "quickfix" },
+  "Wanderlust Trips": { slug: "wanderlust-trips" },
+  "Apex Learning Academy": { slug: "apex-learning", folder: "coaching" },
+  "AutoHub Motors": { slug: "autohub-motors" },
+  "Suhani Jewels": { slug: "suhani-jewels", folder: "jewellery" },
+  "PixelForge Studios": { slug: "pixelforge" },
+  "SecureLife Advisors": { slug: "securelife" },
+};
+
+/* Hang the artwork on each persona once, at module load. */
+for (const persona of PERSONAS) {
+  const c = persona.bundle.customer;
+  const m = MEDIA[String(c.company_name ?? "")];
+  if (!m) continue;
+  c.logo = `/demo/logos/${m.slug}.svg`;
+  c.photo = `/demo/avatars/${m.slug}.svg`;
+  c.qrcode_on = 1;
+  if (!m.folder) continue;
+  persona.bundle.products.forEach((svcItem, i) => { svcItem.filename = `/demo/${m.folder}/svc-${i + 1}.webp`; });
+  persona.bundle.gallery = [1, 2].map((n) => ({ id: n, name: `${c.company_name} ${n}`, filename: `/demo/${m.folder}/gal-${n}.webp` }));
+  c.gallery_on = 1;
+}
 
 const DEFAULT: DemoBundle = {
   customer: { ...base, name: "Aarav Sharma", designation: "Founder & CEO", company_name: "Bright Ideas Pvt Ltd", email: "hello@example.com",

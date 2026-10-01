@@ -192,6 +192,12 @@ export const PUBLIC_SEO: Record<string, PageSeo> = {
     description: "Read our terms of service to understand the rules and guidelines for using DigitalCarda.",
     crumb: "Terms & Conditions",
   },
+  "/big-brand-cards": {
+    title: "Big Brand Digital Business Cards — Samples | DigitalCarda",
+    description: "See how a large brand looks on a digital business card: eight sample brands with product catalogues, offers, payments and enquiry forms. Samples are fictional.",
+    crumb: "Big brand cards",
+    parent: "/",
+  },
   "/digital-business-card-guide": {
     title: "Digital Business Card Guide India 2026 — Complete",
     description: "The complete guide to digital business cards in India: cost, NFC vs QR, templates, industry cards and how to make one in 2 minutes. Updated 2026.",

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="voltessa-electronics logo">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#0B1120"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="44" fill="url(#g)"/>
+  <g><path d="M112 46 L80 106 h22 l-10 48 34-62h-22z" fill="#fff" opacity=".95"/></g>
+  <text x="100" y="178" text-anchor="middle" font-family="Poppins, Inter, system-ui, sans-serif" font-size="26" font-weight="800" letter-spacing="2" fill="#fff" opacity=".92">VE</text>
+</svg>

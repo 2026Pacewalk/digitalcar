@@ -123,6 +123,7 @@ export function cardBgOverrideCss(bg: ResolvedBg): string {
        --lb-ring:rgba(255,255,255,.9);--lb-social:#0f172a;`;
   return `
 body.lb{background:${bg.bodyBg};background-size:cover;background-position:center;background-attachment:fixed;${vars}}
+body.lb::before{display:none;}
 body.lb .lb-link{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
 ${bg.layerCss}`;
 }

@@ -96,7 +96,8 @@ export default function CardDemo() {
       ? { color: product.primaryColor || "#F7B31C", color2: product.secondaryColor || "" }
       : { color: palette.primary, color2: palette.secondary };
     const sc = showcaseFor(industry);
-    const base = sc ?? { ...demoForProduct(product), offers: [], gallery: [] };
+    const persona = demoForProduct(product);
+    const base = sc ?? { ...persona, offers: [], gallery: persona.gallery ?? [] };
     const rec = { ...base.customer, slug: "demo", theme: product.styleNumber, ...colours } as unknown as Parameters<typeof buildCardHtml>[0];
     // No desktop scrollbar inside the phone: a phone scrolls with an overlay one.
     return withoutScrollbars(buildCardHtml(
@@ -143,6 +144,7 @@ export default function CardDemo() {
             ? Promise.resolve(new w.Response('{"ok":true}', { status: 200, headers: { "Content-Type": "application/json" } }))
             : realFetch(input, init)) as typeof fetch;
         if ("sendBeacon" in w.navigator) Object.defineProperty(w.navigator, "sendBeacon", { value: () => true, configurable: true });
+        w.scrollTo(0, 0);   // every sample opens at the top of the card
       }
     } catch { /* same-origin demo; guard anyway */ }
     setReady(true);
@@ -222,7 +224,7 @@ export default function CardDemo() {
         </div>
       </div>
 
-      <main className="relative max-w-7xl mx-auto px-4 pt-4 pb-28 lg:pt-8 lg:pb-14">
+      <main className="relative max-w-7xl mx-auto px-4 pt-4 pb-28 lg:pt-4 lg:pb-10">
         {/* Phones & tablets: industries as one swipeable row */}
         {DEMO_INDUSTRIES.length > 0 && (
           <div className="lg:hidden flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1" aria-label="Sample industry">{industryButtons(true)}</div>
@@ -250,13 +252,13 @@ export default function CardDemo() {
 
           {/* The stage */}
           <section className="relative flex flex-col items-center dc-enter dc-enter-1" aria-label="Live card">
-            <div className="hidden lg:inline-flex items-center gap-2 mb-5 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-[12px] text-[#CBD5E1]">
+            <div className="hidden lg:inline-flex items-center gap-2 mb-3 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-[12px] text-[#CBD5E1]">
               <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60 motion-reduce:animate-none" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" /></span>
               <span className="font-semibold text-white">{bizName || designName}</span>
               {ind && <><span className="text-[#475569]">·</span>{ind.label}</>}
             </div>
 
-            <div className="relative w-full max-w-[390px]">
+            <div className="relative w-full max-w-[390px] lg:max-w-[320px]">
               {/* Spotlight in the card's own colour */}
               <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[42%] h-[520px] w-[520px] max-w-[130vw] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-[0.32] blur-[90px] transition-[background-color] duration-700" style={{ backgroundColor: palette.primary }} />
 
@@ -265,7 +267,7 @@ export default function CardDemo() {
                 <span aria-hidden="true" className="absolute -left-[3px] top-[110px] h-9 w-[3px] rounded-l-sm bg-[#2b3447]" />
                 <span aria-hidden="true" className="absolute -left-[3px] top-[160px] h-14 w-[3px] rounded-l-sm bg-[#2b3447]" />
                 <span aria-hidden="true" className="absolute -right-[3px] top-[140px] h-20 w-[3px] rounded-r-sm bg-[#2b3447]" />
-                <div className="relative overflow-hidden rounded-[2.4rem] bg-[#0B1120] h-[min(calc(100dvh_-_300px),760px)] min-h-[470px] lg:h-[min(calc(100vh_-_250px),760px)] lg:min-h-[560px]">
+                <div className="relative overflow-hidden rounded-[2.4rem] bg-[#0B1120] h-[min(calc(100dvh_-_300px),760px)] min-h-[470px] lg:h-[min(calc(100vh_-_210px),660px)] lg:min-h-[520px]">
                   <span aria-hidden="true" className="absolute left-1/2 top-2 z-10 h-[24px] w-[92px] -translate-x-1/2 rounded-full bg-black/90" />
                   <iframe ref={frameRef} srcDoc={html} title={`${product.name} demo`} onLoad={onFrameLoad}
                     className={`block w-full h-full border-0 bg-white transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"}`} />

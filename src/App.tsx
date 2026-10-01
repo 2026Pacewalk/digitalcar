@@ -39,6 +39,7 @@ const Features = lazy(() => import("./pages/public/Features"));
 const Marketplace = lazy(() => import("./pages/public/Marketplace"));
 const ProductDetail = lazy(() => import("./pages/public/ProductDetail"));
 const CardDemo = lazy(() => import("./pages/public/CardDemo"));
+const BrandShowcase = lazy(() => import("./pages/public/BrandShowcase"));
 const Industries = lazy(() => import("./pages/public/Industries"));
 const IndustryPage = lazy(() => import("./pages/public/IndustryPage"));
 const CityPage = lazy(() => import("./pages/public/CityPage"));
@@ -332,6 +333,7 @@ export default function App() {
           <Route path="/digital-business-cards" element={<Navigate to="/digital-business-cards-templates" replace />} />
           <Route path="/digital-business-cards/:slug" element={<LegacyProductRedirect />} />
           <Route path="/demo/:slug" element={<CardDemo />} />
+          <Route path="/big-brand-cards" element={<BrandShowcase />} />
           <Route path="/industries" element={<Industries />} />
           <Route path="/industries/:slug" element={<IndustryPage />} />
           {/* Long-tail SEO pages: city landing pages, the topical pillar guide,
