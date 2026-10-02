@@ -222,6 +222,10 @@ export function linkBioVariants(accent: string): LinkBioVariant[] {
 
 export const LINKBIO_COUNT = linkBioVariants("#000").length;
 
+/* Themes whose header runs left with no avatar — the brand name leads, the way
+   an editorial link page reads. */
+const HEAD_LEFT = new Set([LINKBIO_START + 9, LINKBIO_START + 10, LINKBIO_START + 7, LINKBIO_START + 13]);
+
 /* Base CSS — consumes the variant's CSS variables. */
 const BASE_CSS = `
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -237,8 +241,16 @@ body.lb::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
   background-image:var(--lb-art,none);background-size:var(--lb-art-size,auto);
   background-position:var(--lb-art-pos,0 0);background-repeat:var(--lb-art-repeat,repeat);
   opacity:var(--lb-art-opacity,1);}
+/* A left-aligned header (no avatar) for the themes that lead with the brand
+   name rather than a face. */
+body[data-head="left"] .lb-wrap{text-align:left;align-items:stretch;}
+body[data-head="left"] .lb-avatar-wrap{display:none;}
+body[data-head="left"] .lb-name{font-size:34px;line-height:1.05;margin-top:8px;}
+body[data-head="left"] .lb-bio,body[data-head="left"] .lb-handle{max-width:none;}
+body[data-head="left"] .lb-social{justify-content:flex-start;}
+body[data-head="left"] .lb-qr{align-self:flex-start;}
 .lb-wrap{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:38px 22px 30px;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100vh;}
-.lb-avatar{width:104px;height:104px;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.2);box-shadow:0 0 0 4px var(--lb-ring),0 10px 30px rgba(0,0,0,.18);margin-bottom:16px;display:flex;align-items:center;justify-content:center;}
+.lb-avatar{width:96px;height:96px;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.2);box-shadow:0 0 0 3px var(--lb-ring),0 10px 30px rgba(0,0,0,.22);margin-bottom:16px;display:flex;align-items:center;justify-content:center;}
 .lb-avatar img{width:100%;height:100%;object-fit:cover;display:block;}
 /* Square shape — a rounded tile instead of a circle. */
 .lb-avatar.shape-square{border-radius:22px;}
@@ -257,20 +269,21 @@ body.lb::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
 .lb-share{position:fixed;top:14px;right:14px;z-index:50;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--lb-btn-bg);color:var(--lb-social);border:var(--lb-btn-border);box-shadow:var(--lb-btn-shadow);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;font-size:16px;transition:transform .15s;}
 .lb-share:active{transform:scale(.92);}
 /* Inline QR card. */
-.lb-qr{display:flex;align-items:center;gap:14px;width:100%;margin-top:13px;padding:13px 14px;border-radius:var(--lb-radius);background:var(--lb-btn-bg);color:var(--lb-btn-text);border:var(--lb-btn-border);box-shadow:var(--lb-btn-shadow);text-align:left;}
+/* The QR is a quiet line at the foot, not a card — a template should end on the
+   brand, the way a link-in-bio page does. */
+.lb-qr{display:inline-flex;align-items:center;gap:9px;margin-top:18px;padding:7px 12px 7px 7px;border-radius:999px;background:var(--lb-btn-bg);color:var(--lb-btn-text);border:var(--lb-btn-border);}
 body[data-glass="1"] .lb-qr{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
-.lb-qr img{width:76px;height:76px;border-radius:11px;background:#fff;padding:5px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.12);}
-.lb-qr-tx b{display:block;font-size:14.5px;font-weight:700;line-height:1.2;}
-.lb-qr-tx span{display:block;margin-top:3px;font-size:12px;opacity:.72;line-height:1.35;}
+.lb-qr img{width:34px;height:34px;border-radius:999px;background:#fff;padding:3px;flex-shrink:0;}
+.lb-qr span{font-size:12.5px;font-weight:600;letter-spacing:.01em;}
 .lb-name{font-family:var(--lb-name-font);font-weight:var(--lb-name-weight);font-size:26px;line-height:1.15;margin:2px 0 4px;letter-spacing:-.01em;color:var(--lb-text);}
 .lb-handle{font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--lb-sub);margin:0 0 10px;}
 .lb-bio{font-size:13.5px;line-height:1.5;color:var(--lb-sub);margin:0 0 22px;max-width:340px;}
-.lb-links{width:100%;display:flex;flex-direction:column;gap:13px;}
-.lb-link{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:56px;padding:14px 46px;border-radius:var(--lb-radius);background:var(--lb-btn-bg);color:var(--lb-btn-text);border:var(--lb-btn-border);box-shadow:var(--lb-btn-shadow);font-size:14.5px;font-weight:600;text-decoration:none;transition:transform .16s ease,background .2s,box-shadow .2s;}
+.lb-links{width:100%;display:flex;flex-direction:column;gap:14px;}
+.lb-link{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:60px;padding:15px 50px;border-radius:var(--lb-radius);background:var(--lb-btn-bg);color:var(--lb-btn-text);border:var(--lb-btn-border);box-shadow:var(--lb-btn-shadow);font-size:14.5px;font-weight:600;text-decoration:none;transition:transform .16s ease,background .2s,box-shadow .2s;}
 body[data-glass="1"] .lb-link{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
 .lb-link:hover{transform:translateY(-2px);background:var(--lb-btn-hover);}
 .lb-link:active{transform:translateY(0);}
-.lb-link .lb-ic{position:absolute;left:18px;top:50%;transform:translateY(-50%);font-size:16px;opacity:.9;width:20px;text-align:center;}
+.lb-link .lb-ic{position:absolute;left:19px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.55;width:20px;text-align:center;}
 .lb-link .lb-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .lb-social{list-style:none;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:0;margin:26px 0 6px;}
 .lb-social a{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;color:var(--lb-social);border:1px solid color-mix(in srgb,var(--lb-social) 35%,transparent);font-size:16px;text-decoration:none;transition:transform .15s,background .2s;}
@@ -382,20 +395,19 @@ body{${v.css}}
 ${customBg ? cardBgOverrideCss(customBg) : ""}
 ${showShare ? shareSheetCss("#111827") : ""}
 </style></head>
-<body class="lb" data-variant="${v.id}"${glass ? ' data-glass="1"' : ""}${customBg ? "" : " data-photo=\"1\""}>
+<body class="lb" data-variant="${v.id}"${HEAD_LEFT.has(v.id) ? ' data-head="left"' : ""}${glass ? ' data-glass="1"' : ""}${customBg ? "" : " data-photo=\"1\""}>
   ${customBg ? customBg.layerHtml : ""}
   ${showShare ? `<button class="lb-share" onclick="openShare()" aria-label="Share this card"><i class="fa fa-share-alt"></i></button>` : ""}
   <div class="lb-wrap">
     <div class="lb-avatar-wrap"><div class="lb-avatar${avatarClass ? " " + avatarClass : ""}" style="${avatarStyle}"><img src="${esc(c.logo) || avatarPh}" alt="${name}" style="${avatarImgStyle}" ${IMG} onerror="this.onerror=null;this.src='${avatarPh}'"></div>${planBadge}</div>
     <h1 class="lb-name">${name}</h1>
-    ${handle ? `<p class="lb-handle">@${esc(handle)}</p>` : ""}
-    ${bio ? `<p class="lb-bio">${bio}</p>` : ""}
+    ${bio ? `<p class="lb-bio">${bio}</p>` : handle ? `<p class="lb-handle">@${esc(handle)}</p>` : ""}
     <div class="lb-links">
       ${links}
       ${btn("fa fa-user-plus", vcardHref, "Save Contact", "_self", `${slug || "contact"}.vcf`)}
     </div>
-    ${qrSrc ? `<div class="lb-qr"><img src="${qrSrc}" alt="Scan to open this card" ${IMG}><div class="lb-qr-tx"><b>Scan my card</b><span>Point your camera to open &amp; save my card</span></div></div>` : ""}
     ${social ? `<ul class="lb-social">${social}</ul>` : ""}
+    ${qrSrc ? `<div class="lb-qr"><img src="${qrSrc}" alt="Scan to open this card" ${IMG}><span>Scan my card</span></div>` : ""}
     ${siteText ? `<a class="lb-site" href="${esc(safeExternalUrl(c.url))}" target="_blank" rel="noopener">${esc(siteText)}</a>` : ""}
     <div class="lb-powered">Powered by <a href="https://digitalcarda.in" target="_blank" rel="noopener">DigitalCarda</a></div>
     ${chrome}
