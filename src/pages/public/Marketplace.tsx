@@ -198,23 +198,17 @@ export default function Marketplace() {
               ? Array.from({ length: 8 }).map((_, i) => <div key={i} className="rounded-2xl bg-white border border-[#F1F5F9] h-[380px] animate-pulse" />)
               : shown.map((p) => {
                 return (
-                  <article key={p.id} className="group flex flex-col">
-                    {/* The design in a phone, the way it will actually be seen. */}
-                    <div className="relative rounded-[1.6rem] bg-gradient-to-b from-[#F8FAFC] to-[#EEF2F7] p-3 sm:p-4 ring-1 ring-[#E9EDF3] transition-all duration-300 group-hover:-translate-y-1.5 group-hover:ring-[#F7B31C]/40 group-hover:shadow-premium-lg">
+                  <article key={p.id} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1.5 transition-all duration-300 flex flex-col">
+                    <div className="relative">
                       <Link to={`/digital-business-cards-templates/${p.slug}`} className="relative block active:scale-[0.99] transition-transform">
-                        {isFeat(p) && <span role="img" aria-label="Featured design" title="Featured" className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-[#0F172A]/45 backdrop-blur-sm ring-1 ring-white/20 flex items-center justify-center shadow-sm"><Star size={13} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" /></span>}
-                        <span className="relative block rounded-[1.25rem] bg-[#0F172A] p-[5px] shadow-[0_18px_40px_-22px_rgba(15,23,42,0.75)]">
-                          <span aria-hidden="true" className="absolute left-1/2 top-[11px] z-20 h-[7px] w-[52px] -translate-x-1/2 rounded-full bg-black/80" />
-                          <span className="block overflow-hidden rounded-[0.95rem] bg-white">
-                            <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} name={p.name} />
-                          </span>
-                        </span>
-                        <span className="absolute inset-0 hidden md:flex items-center justify-center rounded-[1.25rem] bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
+                        {isFeat(p) && <span role="img" aria-label="Featured design" title="Featured" className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-[#0F172A]/45 backdrop-blur-sm ring-1 ring-white/20 flex items-center justify-center shadow-sm"><Star size={13} className="fill-[#F7B31C] text-[#F7B31C]" aria-hidden="true" /></span>}
+                        <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} name={p.name} />
+                        <div className="absolute inset-0 hidden md:flex items-center justify-center bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
                           <span className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0F172A] text-[13px] font-bold shadow-lg"><Eye size={14} /> Live Preview</span>
-                        </span>
+                        </div>
                       </Link>
                     </div>
-                    <div className="px-1 pt-3 flex items-start gap-2 flex-1">
+                    <div className="p-3.5 flex items-start gap-2 flex-1">
                       <div className="min-w-0 flex-1">
                         <p className="text-[10px] font-bold text-[#F7B31C] uppercase tracking-wide truncate">{industryOf(p)}</p>
                         <Link to={`/digital-business-cards-templates/${p.slug}`} className="hover:text-[#F7B31C] transition-colors"><h3 className="text-[13px] sm:text-[14px] font-bold text-[#0F172A] leading-snug line-clamp-3 md:line-clamp-2 min-h-[36px] mt-0.5">{p.name}</h3></Link>
