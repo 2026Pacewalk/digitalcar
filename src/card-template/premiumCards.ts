@@ -347,7 +347,7 @@ export function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: stri
 
 
   /* Our team (Platinum): the colleagues the owner chose to show on this card. */
-  type PCTeam = { name?: string; company?: string; role?: string; photo?: string; logo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
+  type PCTeam = { name?: string; company?: string; role?: string; pic?: string; fit?: string; photo?: string; logo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
   const readTeam = (raw: unknown): PCTeam[] => {
     try {
       const arr = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
@@ -366,8 +366,9 @@ export function pwContentSections(c: PCRecord, extras: PremiumExtras, slug: stri
   const teamBody = `<div class="pwx-team">${teamList.map((m) => {
     const href = memberHref(m);
     // Picture order: their photo, then their logo (fitted), then the initial.
-    const pic = s(m.photo) || s(m.logo);
-    const cls = !pic ? " is-text" : s(m.photo) ? "" : " is-logo";
+    const pic = s(m.pic) || s(m.photo) || s(m.logo);
+    const asLogo = s(m.pic) ? s(m.fit) === "contain" : !s(m.photo);
+    const cls = !pic ? " is-text" : asLogo ? " is-logo" : "";
     const initial = (s(m.company) || s(m.name)).charAt(0).toUpperCase();
     const inner = `<span class="pwx-team-ph${cls}">${pic ? `<img src="${esc(pic)}" alt="${esc(s(m.name))}" ${IMG} onerror="this.parentNode.classList.add('is-text');this.remove()">` : ""}<b>${esc(initial)}</b></span><b class="pwx-team-name">${esc(s(m.name))}</b>${s(m.role) ? `<span class="pwx-team-role">${esc(s(m.role))}</span>` : ""}`;
     return href

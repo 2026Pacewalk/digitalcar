@@ -586,7 +586,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
      a photo, a name and a role; tapping a member opens their own card, calls
      or emails them, whichever they gave. Members with "show" off are kept in
      the owner's list but never rendered. */
-  type TeamMember = { id?: number; name?: string; company?: string; role?: string; photo?: string; logo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
+  type TeamMember = { id?: number; name?: string; company?: string; role?: string; pic?: string; fit?: string; photo?: string; logo?: string; phone?: string; email?: string; link?: string; show?: boolean | number };
   const readTeam = (raw: unknown): TeamMember[] => {
     try {
       const arr = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
@@ -609,9 +609,11 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
         ${teamList.map((m) => {
           const href = memberHref(m);
           // Their own picture first, their logo second (fitted, not cropped),
-          // and failing both the first letter of the business name.
-          const pic = s(m.photo) || s(m.logo);
-          const cls = !pic ? " is-text" : s(m.photo) ? "" : " is-logo";
+          // and failing both the first letter of the business name. `pic` links
+          // to their profile's image; photo/logo are the older copied values.
+          const pic = s(m.pic) || s(m.photo) || s(m.logo);
+          const asLogo = s(m.pic) ? s(m.fit) === "contain" : !s(m.photo);
+          const cls = !pic ? " is-text" : asLogo ? " is-logo" : "";
           const initial = (s(m.company) || s(m.name)).charAt(0).toUpperCase();
           const inner = `
             <span class="dc-team-ph${cls}">${pic

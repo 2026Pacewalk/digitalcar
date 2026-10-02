@@ -326,8 +326,12 @@ export const publishRouter = createRouter({
         name: str(c.name) || str(c.company_name),
         company: str(c.company_name),
         designation: str(c.designation),
-        photo: str(c.photo),        // the person's own picture, if they use one
-        logo: str(c.logo),          // their business logo — the second choice
+        // Not the picture itself: an uploaded photo is a data: URI inside the
+        // snapshot (often 150 KB+), and copying that into someone else's card
+        // would bloat every record that lists them. The caller points an <img>
+        // at /api/sig-img/<slug>/photo instead, which serves the same bytes.
+        hasPhoto: !!str(c.photo),    // the person's own picture, if they use one
+        hasLogo: !!str(c.logo),      // their business logo — the second choice
       };
     }),
 
@@ -345,8 +349,8 @@ export const publishRouter = createRouter({
         name: str(c.name) || str(c.company_name) || r.slug,
         company: str(c.company_name),
         designation: str(c.designation),
-        photo: str(c.photo),
-        logo: str(c.logo),
+        hasPhoto: !!str(c.photo),
+        hasLogo: !!str(c.logo),
       };
     });
   }),

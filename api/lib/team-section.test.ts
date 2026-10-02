@@ -46,6 +46,18 @@ for (const [label, theme] of [["classic template", 1], ["premium design", 63]] a
       expect(html).not.toContain("team-section");
     });
 
+    test("links the member's picture instead of copying it", () => {
+      const html = card({ theme, team_on: 1, team: JSON.stringify([
+        { id: 1, slug: "pacewalk", name: "Shekhar Jain", company: "Pacewalk", role: "Director",
+          pic: "https://digitalcarda.in/api/sig-img/pacewalk/logo", fit: "contain", link: "pacewalk", show: true },
+      ]) });
+      expect(html).toContain("https://digitalcarda.in/api/sig-img/pacewalk/logo");
+      expect(html).toContain("is-logo");                       // a logo is fitted, not cropped
+      // The member's picture is a link, never a copy of their image bytes.
+      const section = html.slice(html.indexOf("team-section"), html.indexOf("team-section") + 1200);
+      expect(section).not.toContain("data:image");
+    });
+
     test("falls back photo → logo → the business initial", () => {
       const html = card({ theme, team_on: 1, team: JSON.stringify([
         { id: 1, slug: "a", name: "With Photo", company: "Alpha Ltd", photo: "/demo/avatars/pixelforge.svg", logo: "/demo/logos/pixelforge.svg", show: true },

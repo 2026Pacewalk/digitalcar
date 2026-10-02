@@ -8,14 +8,19 @@ import { useCardAutosave } from "@/hooks/useCardAutosave";
 import { trpc } from "@/providers/trpc";
 
 /* A team member is always a real DigitalCarda profile, added by its @handle.
-   The picture follows the same order everywhere: the person's own display
-   picture first, their business logo second, and failing both the first letter
-   of the business name. `logo` is kept apart from `photo` so the card can fit a
-   logo inside the circle instead of cropping it like a portrait. */
+   `pic` is a link to that profile's own picture, never a copy of it — an
+   uploaded photo lives in their card as a data: URI and is often 150 KB+.
+   The order is their display picture, then their business logo, then the first
+   letter of the business name; `fit` says which, so a logo is fitted inside the
+   circle instead of being cropped like a portrait. */
 export type TeamMember = {
   id: number; slug: string; name: string; company: string; role: string;
-  photo: string; logo: string; link: string; show: boolean;
+  pic: string; fit: "cover" | "contain"; link: string; show: boolean;
 };
+
+/* The public image route that serves a card's own photo/logo bytes. */
+export const profilePic = (slug: string, kind: "photo" | "logo") =>
+  `https://digitalcarda.in/api/sig-img/${encodeURIComponent(slug)}/${kind}`;
 
 export function readTeam(raw: unknown): TeamMember[] {
   try {
@@ -46,14 +51,16 @@ export default function Team() {
   const patch = (id: number, p: Partial<TeamMember>) => save(members.map((m) => (m.id === id ? { ...m, ...p } : m)));
   const remove = (id: number) => { save(members.filter((m) => m.id !== id)); toast.success("Member removed"); };
 
-  type Profile = { slug: string; name: string; company?: string; designation?: string; photo?: string; logo?: string };
+  type Profile = { slug: string; name: string; company?: string; designation?: string; hasPhoto?: boolean; hasLogo?: boolean };
+  const picOf = (p: Profile) => p.hasPhoto ? profilePic(p.slug, "photo") : p.hasLogo ? profilePic(p.slug, "logo") : "";
+  const fitOf = (p: Profile): "cover" | "contain" => (p.hasPhoto ? "cover" : "contain");
   const addProfile = (p: Profile) => {
     if (members.length >= limit) { toast.error(`Your plan allows ${limit} team members.`); return; }
     if (members.some((m) => m.slug === p.slug)) { toast.error(`@${p.slug} is already on your card.`); return; }
     save([...members, {
       id: Date.now(), slug: p.slug, name: p.name || p.slug, company: p.company || "",
       role: p.designation || p.company || "",
-      photo: p.photo || "", logo: p.logo || "", link: p.slug, show: true,
+      pic: picOf(p), fit: fitOf(p), link: p.slug, show: true,
     }]);
     setHandle(""); setLookup("");
     toast.success(`${p.name || p.slug} added`);
@@ -64,7 +71,7 @@ export default function Team() {
     try {
       const p = await utils.publish.profileBySlug.fetch({ slug: m.slug });
       if (!p) { toast.error(`@${m.slug} no longer exists.`); return; }
-      patch(m.id, { name: p.name || m.name, company: p.company || m.company, photo: p.photo || "", logo: p.logo || "", role: m.role || p.designation || "" });
+      patch(m.id, { name: p.name || m.name, company: p.company || m.company, pic: picOf(p), fit: fitOf(p), role: m.role || p.designation || "" });
       toast.success("Details refreshed");
     } catch { toast.error("Could not reach that profile — try again."); }
   };
@@ -134,7 +141,7 @@ export default function Team() {
             )}
             {found.data && (
               <div className="flex items-center gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-3">
-                <Avatar photo={found.data.photo} logo={found.data.logo} name={found.data.company || found.data.name} />
+                <Avatar pic={picOf(found.data)} fit={fitOf(found.data)} name={found.data.company || found.data.name} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[14.5px] font-bold text-[#0F172A]">{found.data.name}</p>
                   <p className="truncate text-[12.5px] text-[#64748B]">
@@ -158,7 +165,7 @@ export default function Team() {
               {myProfiles.map((p) => (
                 <button key={p.slug} onClick={() => addProfile(p)} disabled={already(p.slug)}
                   className="flex items-center gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-2.5 text-left hover:border-[#F7B31C] disabled:opacity-50 disabled:hover:border-[#E2E8F0] transition-colors">
-                  <Avatar photo={p.photo} logo={p.logo} name={p.company || p.name} small />
+                  <Avatar pic={picOf(p)} fit={fitOf(p)} name={p.company || p.name} small />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-bold text-[#0F172A]">{p.name}</span>
                     <span className="block truncate text-[11.5px] text-[#64748B]">@{p.slug}</span>
@@ -185,7 +192,7 @@ export default function Team() {
           {members.map((m) => (
             <div key={m.id} className="rounded-2xl border border-[#E2E8F0] bg-white p-3 sm:p-4">
               <div className="flex items-start gap-3">
-                <Avatar photo={m.photo} logo={m.logo} name={m.company || m.name} />
+                <Avatar pic={m.pic} fit={m.fit} name={m.company || m.name} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[14.5px] font-bold text-[#0F172A]">{m.name}</p>
                   <a href={`/${m.slug}`} target="_blank" rel="noopener" className="text-[12.5px] font-semibold text-[#B45309] hover:underline">@{m.slug}</a>
@@ -220,13 +227,13 @@ export default function Team() {
 
 /* Their display picture, else their logo (fitted on white, never cropped), else
    the first letter of the business name. */
-function Avatar({ photo, logo, name, small }: { photo?: string; logo?: string; name: string; small?: boolean }) {
+function Avatar({ pic, fit, name, small }: { pic?: string; fit?: "cover" | "contain"; name: string; small?: boolean }) {
   const size = small ? "w-10 h-10 text-[15px]" : "w-14 h-14 text-[19px]";
-  const src = photo || logo;
+  const logoish = fit === "contain";
   return (
-    <span className={`${size} shrink-0 rounded-full overflow-hidden flex items-center justify-center font-bold text-white ${src && !photo ? "bg-white ring-1 ring-[#E2E8F0]" : "bg-[#F7B31C]"}`}>
-      {src
-        ? <img src={src} alt="" className={`w-full h-full ${photo ? "object-cover" : "object-contain p-1.5"}`} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+    <span className={`${size} shrink-0 rounded-full overflow-hidden flex items-center justify-center font-bold text-white ${pic && logoish ? "bg-white ring-1 ring-[#E2E8F0]" : "bg-[#F7B31C]"}`}>
+      {pic
+        ? <img src={pic} alt="" className={`w-full h-full ${logoish ? "object-contain p-1.5" : "object-cover"}`} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
         : (name || "?").charAt(0).toUpperCase()}
     </span>
   );
