@@ -777,3 +777,51 @@ details[open] > summary .dc-faq-q--light,
   .dc-print-statement li { break-inside: avoid; }
   .dc-print-statement thead { display: table-header-group; }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Diwali offer popup (src/components/AnnouncementPopup.tsx)
+   Lamp flames, rising embers and firework bursts. All of it is
+   decoration, so it stops completely for reduced-motion users.
+   ───────────────────────────────────────────────────────────── */
+@keyframes dcFlame {
+  0%, 100% { transform: scaleY(1) scaleX(1) rotate(-1deg); opacity: 1; }
+  25%      { transform: scaleY(1.12) scaleX(0.94) rotate(1.5deg); opacity: .92; }
+  50%      { transform: scaleY(0.94) scaleX(1.06) rotate(-2deg); opacity: 1; }
+  75%      { transform: scaleY(1.08) scaleX(0.97) rotate(1deg); opacity: .95; }
+}
+@keyframes dcGlowPulse {
+  0%, 100% { opacity: .55; transform: scale(1); }
+  50%      { opacity: .9;  transform: scale(1.12); }
+}
+@keyframes dcEmber {
+  0%   { transform: translateY(0) scale(1); opacity: 0; }
+  15%  { opacity: .9; }
+  80%  { opacity: .5; }
+  100% { transform: translateY(-62px) scale(.6); opacity: 0; }
+}
+@keyframes dcBurst {
+  0%      { transform: scale(.2); opacity: 0; }
+  12%     { opacity: 1; }
+  45%     { transform: scale(1); opacity: .85; }
+  70%,100%{ transform: scale(1.25); opacity: 0; }
+}
+.dc-flame { transform-origin: 50% 100%; animation: dcFlame 1.6s ease-in-out infinite; }
+.dc-diya-glow { animation: dcGlowPulse 2.4s ease-in-out infinite; }
+.dc-ember { animation: dcEmber 5s linear infinite; }
+.dc-burst { animation: dcBurst 6s ease-out infinite; transform-origin: 50% 50%; }
+@media (prefers-reduced-motion: reduce) {
+  .dc-flame, .dc-diya-glow, .dc-ember, .dc-burst { animation: none; }
+  .dc-ember { opacity: .5; }
+  .dc-burst { opacity: .35; transform: scale(1); }
+}
+/* The offer popup slides in from the bottom-right corner. */
+@keyframes dcCornerIn {
+  from { opacity: 0; transform: translate3d(12px, 18px, 0) scale(.96); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="dcCornerIn"] { animation: none !important; }
+}
+
+/* Two-line clamp for the offer popup message. */
+.dc-clamp-2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
