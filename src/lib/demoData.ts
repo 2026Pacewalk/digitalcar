@@ -52,27 +52,27 @@ const PERSONAS: Persona[] = [
  * public/demo/avatars): no real brand, and no photograph of any real person.
  * `folder` names a set of licensed sample photos under public/demo/<folder>/.
  */
-const MEDIA: Record<string, { slug: string; folder?: string }> = {
+const MEDIA: Record<string, { slug: string; folder: string }> = {
   "Skyline Estates": { slug: "skyline-estates", folder: "realestate" },
   "SmileCare Dental Clinic": { slug: "smilecare-dental", folder: "dental" },
-  "Northstar Consulting": { slug: "northstar-consulting" },
+  "Northstar Consulting": { slug: "northstar-consulting", folder: "consulting" },
   "Spice Route Restaurant": { slug: "spice-route", folder: "restaurant" },
   "Glow Beauty Studio": { slug: "glow-studio", folder: "salon" },
-  "Menon & Associates": { slug: "menon-associates" },
-  "Jain & Co.": { slug: "jain-co" },
+  "Menon & Associates": { slug: "menon-associates", folder: "legal" },
+  "Jain & Co.": { slug: "jain-co", folder: "accounting" },
   "Frame Stories": { slug: "frame-stories", folder: "photography" },
   "IronCore Fitness": { slug: "ironcore-fitness", folder: "fitness" },
   "Studio Nivas": { slug: "studio-nivas", folder: "interior" },
-  "Celebrations by Riya": { slug: "celebrations" },
+  "Celebrations by Riya": { slug: "celebrations", folder: "events" },
   "Aara Boutique": { slug: "aara-boutique", folder: "boutique" },
   "Brew & Bake": { slug: "brew-bake", folder: "cafe" },
-  "QuickFix Home Services": { slug: "quickfix" },
-  "Wanderlust Trips": { slug: "wanderlust-trips" },
+  "QuickFix Home Services": { slug: "quickfix", folder: "homeservices" },
+  "Wanderlust Trips": { slug: "wanderlust-trips", folder: "travel" },
   "Apex Learning Academy": { slug: "apex-learning", folder: "coaching" },
-  "AutoHub Motors": { slug: "autohub-motors" },
+  "AutoHub Motors": { slug: "autohub-motors", folder: "automobile" },
   "Suhani Jewels": { slug: "suhani-jewels", folder: "jewellery" },
-  "PixelForge Studios": { slug: "pixelforge" },
-  "SecureLife Advisors": { slug: "securelife" },
+  "PixelForge Studios": { slug: "pixelforge", folder: "agency" },
+  "SecureLife Advisors": { slug: "securelife", folder: "insurance" },
 };
 
 /* Hang the artwork on each persona once, at module load. */
@@ -83,9 +83,11 @@ for (const persona of PERSONAS) {
   c.logo = `/demo/logos/${m.slug}.svg`;
   c.photo = `/demo/avatars/${m.slug}.svg`;
   c.qrcode_on = 1;
-  if (!m.folder) continue;
-  persona.bundle.products.forEach((svcItem, i) => { svcItem.filename = `/demo/${m.folder}/svc-${i + 1}.webp`; });
-  persona.bundle.gallery = [1, 2].map((n) => ({ id: n, name: `${c.company_name} ${n}`, filename: `/demo/${m.folder}/gal-${n}.webp` }));
+  // Licensed sample photographs for every trade (public/demo/<folder>), so the
+  // designs that build their front out of imagery always have real pictures.
+  const dir = `/demo/${m.folder}`;
+  persona.bundle.products.forEach((svcItem, i) => { svcItem.filename = `${dir}/svc-${i + 1}.webp`; });
+  persona.bundle.gallery = [1, 2].map((n) => ({ id: n, name: `${c.company_name} ${n}`, filename: `${dir}/gal-${n}.webp` }));
   c.gallery_on = 1;
 }
 

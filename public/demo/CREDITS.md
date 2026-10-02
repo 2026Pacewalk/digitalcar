@@ -77,3 +77,34 @@ They illustrate fictional sample businesses on the demo pages.
 | /demo/coaching/svc-4.webp | Dom Fou | https://unsplash.com/photos/YRMWVcdyhmI |
 | /demo/coaching/gal-1.webp | Dollar Gill | https://unsplash.com/photos/Kyoshy7BJIQ |
 | /demo/coaching/gal-2.webp | lilartsy | https://unsplash.com/photos/333oj7zFsdg |
+
+<!-- Added for the trades that had no sample photos. svc-4 repeats svc-1 and
+     the two gallery tiles repeat svc-2 and svc-3. -->
+
+| /demo/consulting/svc-1.webp | Dylan Gillis | https://unsplash.com/photos/KdeqA3aTnBY |
+| /demo/consulting/svc-2.webp | Campaign Creators | https://unsplash.com/photos/gMsnXqILjp4 |
+| /demo/consulting/svc-3.webp | Headway | https://unsplash.com/photos/5QgIuuBxKwM |
+| /demo/legal/svc-1.webp | Brusk Dede | https://unsplash.com/photos/tjd5CfdDPRA |
+| /demo/legal/svc-2.webp | Deliberately AI | https://unsplash.com/photos/v-KZt2CRU6Y |
+| /demo/legal/svc-3.webp | Jason Larman | https://unsplash.com/photos/qHJBsvwNAbE |
+| /demo/accounting/svc-1.webp | Towfiqu barbhuiya | https://unsplash.com/photos/jpqyfK7GB4w |
+| /demo/accounting/svc-2.webp | Jakub Żerdzicki | https://unsplash.com/s/photos/accountant-desk-calculator |
+| /demo/accounting/svc-3.webp | Jakub Żerdzicki | https://unsplash.com/s/photos/accountant-desk-calculator |
+| /demo/events/svc-1.webp | José León | https://unsplash.com/s/photos/wedding-event-decoration |
+| /demo/events/svc-2.webp | Evelina Friman | https://unsplash.com/s/photos/wedding-event-decoration |
+| /demo/events/svc-3.webp | The Decor Seo | https://unsplash.com/s/photos/wedding-event-decoration |
+| /demo/homeservices/svc-1.webp | Wesley Caribe | https://unsplash.com/s/photos/plumber-home-repair-tools |
+| /demo/homeservices/svc-2.webp | Konstantin Evdokimov | https://unsplash.com/s/photos/plumber-home-repair-tools |
+| /demo/homeservices/svc-3.webp | Prateek Katyal | https://unsplash.com/s/photos/plumber-home-repair-tools |
+| /demo/travel/svc-1.webp | Johny Goerend | https://unsplash.com/s/photos/travel-airplane-destination |
+| /demo/travel/svc-2.webp | Fabio Sasso | https://unsplash.com/s/photos/travel-airplane-destination |
+| /demo/travel/svc-3.webp | 지민 박 | https://unsplash.com/s/photos/travel-airplane-destination |
+| /demo/automobile/svc-1.webp | Crosby Hinze | https://unsplash.com/s/photos/car-showroom-dealership |
+| /demo/automobile/svc-2.webp | Portafolio fotográfico automotriz | https://unsplash.com/s/photos/car-showroom-dealership |
+| /demo/automobile/svc-3.webp | Erik Mclean | https://unsplash.com/s/photos/car-showroom-dealership |
+| /demo/agency/svc-1.webp | Nirmal Rajendharkumar | https://unsplash.com/s/photos/design-studio-workspace-creative |
+| /demo/agency/svc-2.webp | laura adai | https://unsplash.com/s/photos/design-studio-workspace-creative |
+| /demo/agency/svc-3.webp | Nasik Lababan | https://unsplash.com/s/photos/design-studio-workspace-creative |
+| /demo/insurance/svc-1.webp | Jennifer Kalenberg | https://unsplash.com/s/photos/family-home-insurance-protection |
+| /demo/insurance/svc-2.webp | IGOR LOLATTO | https://unsplash.com/s/photos/family-home-insurance-protection |
+| /demo/insurance/svc-3.webp | Vitaly Gariev | https://unsplash.com/s/photos/family-home-insurance-protection |

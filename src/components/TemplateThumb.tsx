@@ -19,7 +19,14 @@ export default function TemplateThumb({ style, primary, secondary, category, nam
   const html = useMemo(() => {
     if (!mounted) return undefined;
     const demo = demoForProduct({ styleNumber: style, category });
-    return buildCardThumb({ ...DEFAULT_CUSTOMER, ...demo.customer, color: primary || "#F7B31C", color2: secondary || "" } as Parameters<typeof buildCardThumb>[0], style);
+    // Hand the sample's own photos over too: the designs that build their front
+    // from imagery (story slides, poster collage, photo frame…) otherwise show
+    // an empty frame in the gallery.
+    return buildCardThumb(
+      { ...DEFAULT_CUSTOMER, ...demo.customer, color: primary || "#F7B31C", color2: secondary || "" } as Parameters<typeof buildCardThumb>[0],
+      style,
+      { products: demo.products, gallery: demo.gallery } as NonNullable<Parameters<typeof buildCardThumb>[2]>,
+    );
   }, [mounted, style, primary, secondary, category]);
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);

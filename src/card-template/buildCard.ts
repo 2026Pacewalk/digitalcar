@@ -1219,7 +1219,7 @@ ${CONTRAST_GUARD_SCRIPT}
 
 /* Renders only the FIRST PAGE (home section) of a card with a given template —
    used for the template picker thumbnails. No scripts, no other sections. */
-export function buildCardThumb(c: CustomerRecord, themeNum: number, opts: { chrome?: boolean; products?: Product[] } = {}): string {
+export function buildCardThumb(c: CustomerRecord, themeNum: number, opts: { chrome?: boolean; products?: Product[]; gallery?: Gallery[] } = {}): string {
   const theme = Math.min(TEMPLATE_COUNT, Math.max(1, Number(themeNum) || 1));
   const chrome = !!opts.chrome; // show the view count + share icon (for the builder preview)
   // The owner's REAL products when we have them, so a preview matches the live
@@ -1241,7 +1241,10 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number, opts: { chro
           offer_price: s(p.offer_price),
         }))
       : demo;
-    return buildPremiumCardHtml(c as Record<string, unknown>, items, theme - PREMIUM_START, { thumb: true });
+    // Photo-led designs (story slides, poster collage, photo frame…) build their
+    // front out of the gallery, so a preview without it renders an empty frame.
+    const gallery = (opts.gallery || []).filter((g) => s(g.filename));
+    return buildPremiumCardHtml(c as Record<string, unknown>, items, theme - PREMIUM_START, { thumb: true, extras: gallery.length ? { gallery } : undefined });
   }
   if (isLinkBio(theme)) {
     const sampleProducts = real.length

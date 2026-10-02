@@ -387,8 +387,8 @@ const DESIGNS2: Design[] = [
     .pdx{background:#1A120B;color:#fff;}
     .fr{position:relative;min-height:520px;padding:22px 16px 22px;}
     .fr-bg{position:absolute;inset:0;overflow:hidden;}
-    .fr-bg img{width:100%;height:100%;object-fit:cover;filter:saturate(.9);}
-    .fr-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,${mix(t.deep, "#000000", 0.2)}CC,${mix(t.deep, "#000000", 0.45)}F2);}
+    .fr-bg img{width:100%;height:100%;object-fit:cover;filter:saturate(1.05) contrast(1.02);}
+    .fr-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,${mix(t.deep, "#000000", 0.15)}66,${mix(t.deep, "#000000", 0.35)}B8 46%,${mix(t.deep, "#000000", 0.5)}F0);}
     .fr-in{position:relative;z-index:2;text-align:center;}
     .fr-logo{display:flex;justify-content:center;}
     .fr-logo img{max-height:38px;max-width:150px;object-fit:contain;} .fr-logo:has(img){background:rgba(255,255,255,.92);padding:6px 10px;border-radius:12px;width:fit-content;margin:0 auto;}

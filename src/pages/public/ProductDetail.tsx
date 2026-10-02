@@ -23,7 +23,13 @@ const HAPPY_USERS = "1,456+";
 function ThumbFrame({ style, primary, secondary, category, className }: { style: number; primary?: string | null; secondary?: string | null; category?: string | null; className?: string }) {
   const html = useMemo(() => {
     const demo = demoForProduct({ styleNumber: style, category });
-    return buildCardThumb({ ...DEFAULT_CUSTOMER, ...demo.customer, color: primary || "#F7B31C", color2: secondary || "" } as Parameters<typeof buildCardThumb>[0], style);
+    // With the sample's photos, so the image-led designs show their pictures
+    // here exactly as they do on the gallery tile.
+    return buildCardThumb(
+      { ...DEFAULT_CUSTOMER, ...demo.customer, color: primary || "#F7B31C", color2: secondary || "" } as Parameters<typeof buildCardThumb>[0],
+      style,
+      { products: demo.products, gallery: demo.gallery } as NonNullable<Parameters<typeof buildCardThumb>[2]>,
+    );
   }, [style, primary, secondary, category]);
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
