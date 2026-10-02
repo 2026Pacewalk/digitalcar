@@ -102,9 +102,9 @@ They illustrate fictional sample businesses on the demo pages.
 | /demo/automobile/svc-1.webp | Crosby Hinze | https://unsplash.com/s/photos/car-showroom-dealership |
 | /demo/automobile/svc-2.webp | Portafolio fotográfico automotriz | https://unsplash.com/s/photos/car-showroom-dealership |
 | /demo/automobile/svc-3.webp | Erik Mclean | https://unsplash.com/s/photos/car-showroom-dealership |
-| /demo/agency/svc-1.webp | Nirmal Rajendharkumar | https://unsplash.com/s/photos/design-studio-workspace-creative |
-| /demo/agency/svc-2.webp | laura adai | https://unsplash.com/s/photos/design-studio-workspace-creative |
-| /demo/agency/svc-3.webp | Nasik Lababan | https://unsplash.com/s/photos/design-studio-workspace-creative |
+| /demo/agency/svc-1.webp | Annie Spratt | https://unsplash.com/s/photos/modern-office-team-laptop-startup |
+| /demo/agency/svc-2.webp | Cherrydeck | https://unsplash.com/s/photos/modern-office-team-laptop-startup |
+| /demo/agency/svc-3.webp | Jud Mackrill | https://unsplash.com/s/photos/modern-office-team-laptop-startup |
 | /demo/insurance/svc-1.webp | Jennifer Kalenberg | https://unsplash.com/s/photos/family-home-insurance-protection |
 | /demo/insurance/svc-2.webp | IGOR LOLATTO | https://unsplash.com/s/photos/family-home-insurance-protection |
 | /demo/insurance/svc-3.webp | Vitaly Gariev | https://unsplash.com/s/photos/family-home-insurance-protection |
