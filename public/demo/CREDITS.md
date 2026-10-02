@@ -108,3 +108,22 @@ They illustrate fictional sample businesses on the demo pages.
 | /demo/insurance/svc-1.webp | Jennifer Kalenberg | https://unsplash.com/s/photos/family-home-insurance-protection |
 | /demo/insurance/svc-2.webp | IGOR LOLATTO | https://unsplash.com/s/photos/family-home-insurance-protection |
 | /demo/insurance/svc-3.webp | Vitaly Gariev | https://unsplash.com/s/photos/family-home-insurance-protection |
+
+<!-- Backgrounds for the link-in-bio themes (one per theme). -->
+
+| /demo/bio/ivory.webp | Thomas Heintz | https://unsplash.com/s/photos/texture-background-marble-concrete |
+| /demo/bio/aurora.webp | MagicPattern | https://unsplash.com/s/photos/abstract-gradient-background |
+| /demo/bio/midnight.webp | Nat | https://unsplash.com/s/photos/neon-city-night-lights |
+| /demo/bio/sunset.webp | Zetong Li | https://unsplash.com/s/photos/golden-sunset-sky-silk |
+| /demo/bio/ocean.webp | Luke Chesser | https://unsplash.com/s/photos/abstract-gradient-background |
+| /demo/bio/noir.webp | Wesley Tingey | https://unsplash.com/s/photos/texture-background-marble-concrete |
+| /demo/bio/peach.webp | Ben Kupke | https://unsplash.com/s/photos/tropical-leaves-flowers-pastel |
+| /demo/bio/gold.webp | Bree Anne | https://unsplash.com/s/photos/golden-sunset-sky-silk |
+| /demo/bio/cyber.webp | Hiep Duong | https://unsplash.com/s/photos/neon-city-night-lights |
+| /demo/bio/retro.webp | Malena Gonzalez Serena | https://unsplash.com/s/photos/tropical-leaves-flowers-pastel |
+| /demo/bio/editorial.webp | Alex Lvrs | https://unsplash.com/s/photos/texture-background-marble-concrete |
+| /demo/bio/mint.webp | Richa Sharma | https://unsplash.com/s/photos/tropical-leaves-flowers-pastel |
+| /demo/bio/lavender.webp | Codioful (Gradienta) | https://unsplash.com/s/photos/abstract-gradient-background |
+| /demo/bio/navy.webp | Parrish Freeman | https://unsplash.com/s/photos/modern-glass-office-building-blue-sky |
+| /demo/bio/emerald.webp | Chandra Oh | https://unsplash.com/s/photos/tropical-leaves-flowers-pastel |
+| /demo/bio/executive.webp | ETA+ | https://unsplash.com/s/photos/modern-glass-office-building-blue-sky |
