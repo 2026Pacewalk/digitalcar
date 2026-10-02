@@ -8,9 +8,10 @@ import { webpFor } from "@/lib/imageSources";
    click to zoom full-screen. Images are shown with object-contain so their
    native aspect ratio / resolution is preserved — never cropped or stretched.
 
-   An optional `liveCard` node (the interactive/generated card preview) is
-   appended as the LAST slide, so the real marketing mockups lead and the live
-   preview sits at the end.
+   An optional `liveCard` node (the card rendered by the real template) LEADS.
+   The marketing mockups are exported pictures: they date the moment a design is
+   changed, and the newest designs have none at all, so the thing a visitor sees
+   first has to be the live render — it is always what they will get.
 
    Each <img> sits in a <picture> offering the WebP version first (bundled
    /products PNGs only — see webpFor). The <picture> is display:contents so the
@@ -22,7 +23,9 @@ export default function MockupGallery({ images, name, liveCard }: { images: stri
   const [i, setI] = useState(0);
   const [zoom, setZoom] = useState(false);
 
-  const isLive = (idx: number) => hasLive && idx === n - 1;
+  const isLive = (idx: number) => hasLive && idx === 0;
+  /* With the live render leading, slide 1 is the first exported picture. */
+  const picAt = (idx: number) => pics[hasLive ? idx - 1 : idx];
   const go = useCallback((next: number) => setI(((next % n) + n) % n), [n]);
   const prev = useCallback(() => go(i - 1), [go, i]);
   const next = useCallback(() => go(i + 1), [go, i]);
@@ -87,10 +90,10 @@ export default function MockupGallery({ images, name, liveCard }: { images: stri
             aria-label="Zoom image"
           >
             <picture className="contents">
-              {webpFor(pics[i]) && <source srcSet={webpFor(pics[i])!} type="image/webp" />}
+              {webpFor(picAt(i)) && <source srcSet={webpFor(picAt(i))!} type="image/webp" />}
               <img
-                src={pics[i]}
-                alt={`${name} — digital business card mockup ${i + 1}`}
+                src={picAt(i)}
+                alt={`${name} — digital business card mockup ${hasLive ? i : i + 1}`}
                 loading={i === 0 ? "eager" : "lazy"}
                 draggable={false}
                 className="w-full h-full object-contain"
@@ -119,8 +122,8 @@ export default function MockupGallery({ images, name, liveCard }: { images: stri
               {isLive(k)
                 ? <span className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-[#0F172A] text-white"><Play size={15} className="text-[#F7B31C]" /><span className="text-[8px] font-bold uppercase tracking-wide">Live</span></span>
                 : <picture className="contents">
-                    {webpFor(pics[k]) && <source srcSet={webpFor(pics[k])!} type="image/webp" />}
-                    <img src={pics[k]} alt={`${name ? `${name} ` : ""}digital business card — view ${k + 1} of ${pics.length} (thumbnail)`} loading="lazy" draggable={false} className="w-full h-full object-cover" />
+                    {webpFor(picAt(k)) && <source srcSet={webpFor(picAt(k))!} type="image/webp" />}
+                    <img src={picAt(k)} alt={`${name ? `${name} ` : ""}digital business card — view ${hasLive ? k : k + 1} of ${pics.length} (thumbnail)`} loading="lazy" draggable={false} className="w-full h-full object-cover" />
                   </picture>}
             </button>
           ))}
@@ -136,8 +139,8 @@ export default function MockupGallery({ images, name, liveCard }: { images: stri
           {n > 1 && <button onClick={prev} aria-label="Previous" className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"><ChevronLeft size={22} /></button>}
           {n > 1 && <button onClick={next} aria-label="Next" className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"><ChevronRight size={22} /></button>}
           <picture className="contents">
-            {webpFor(pics[i]) && <source srcSet={webpFor(pics[i])!} type="image/webp" />}
-            <img src={pics[i]} alt={`${name} — digital business card mockup ${i + 1}`} draggable={false} className="relative max-w-full max-h-full object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+            {webpFor(picAt(i)) && <source srcSet={webpFor(picAt(i))!} type="image/webp" />}
+            <img src={picAt(i)} alt={`${name} — digital business card mockup ${hasLive ? i : i + 1}`} draggable={false} className="relative max-w-full max-h-full object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
           </picture>
           <span className="absolute bottom-5 left-1/2 -translate-x-1/2 text-[12px] font-medium text-white/80 bg-black/40 px-3 py-1 rounded-full">{i + 1} / {n}</span>
         </div>,
