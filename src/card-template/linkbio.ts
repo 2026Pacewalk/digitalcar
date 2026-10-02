@@ -1,7 +1,8 @@
 /*
  * Link-in-bio ("Linktree-style") card layout.
- * A clean, minimal alternative to the business-card templates: circular photo,
- * name, @handle, tagline, a stack of full-width link buttons, and social icons.
+ * A clean, minimal alternative to the business-card templates: a photo or a
+ * left-aligned brand name, the tagline, a stack of full-width label-only link
+ * buttons, social icons, and a small scan pill at the foot.
  *
  * Link buttons are auto-generated from what the customer already filled in
  * (Call, WhatsApp, Website, Email, Directions + each Product/Service), so any
@@ -279,11 +280,10 @@ body[data-glass="1"] .lb-qr{backdrop-filter:blur(10px);-webkit-backdrop-filter:b
 .lb-handle{font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--lb-sub);margin:0 0 10px;}
 .lb-bio{font-size:13.5px;line-height:1.5;color:var(--lb-sub);margin:0 0 22px;max-width:340px;}
 .lb-links{width:100%;display:flex;flex-direction:column;gap:14px;}
-.lb-link{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:60px;padding:15px 50px;border-radius:var(--lb-radius);background:var(--lb-btn-bg);color:var(--lb-btn-text);border:var(--lb-btn-border);box-shadow:var(--lb-btn-shadow);font-size:14.5px;font-weight:600;text-decoration:none;transition:transform .16s ease,background .2s,box-shadow .2s;}
+.lb-link{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:60px;padding:15px 22px;border-radius:var(--lb-radius);background:var(--lb-btn-bg);color:var(--lb-btn-text);border:var(--lb-btn-border);box-shadow:var(--lb-btn-shadow);font-size:14.5px;font-weight:600;text-decoration:none;transition:transform .16s ease,background .2s,box-shadow .2s;}
 body[data-glass="1"] .lb-link{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
 .lb-link:hover{transform:translateY(-2px);background:var(--lb-btn-hover);}
 .lb-link:active{transform:translateY(0);}
-.lb-link .lb-ic{position:absolute;left:19px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.55;width:20px;text-align:center;}
 .lb-link .lb-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .lb-social{list-style:none;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:0;margin:26px 0 6px;}
 .lb-social a{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;color:var(--lb-social);border:1px solid color-mix(in srgb,var(--lb-social) 35%,transparent);font-size:16px;text-decoration:none;transition:transform .15s,background .2s;}
@@ -350,9 +350,9 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
   const phone = s(c.mobile1).replace(/[^\d+]/g, "");
   const waMsg = encodeURIComponent(`Hi ${s(c.name) || "there"}, I found your card and would love to connect.`);
 
-  const btn = (icon: string, href: string, label: string, target = "_blank", download = "") =>
+  const btn = (href: string, label: string, target = "_blank", download = "") =>
     label && href
-      ? `<a class="lb-link" href="${esc(href)}" ${download ? `download="${esc(download)}"` : `target="${target}" rel="noopener"`}><span class="lb-ic"><i class="${icon}"></i></span><span class="lb-label">${esc(label)}</span></a>`
+      ? `<a class="lb-link" href="${esc(href)}" ${download ? `download="${esc(download)}"` : `target="${target}" rel="noopener"`}><span class="lb-label">${esc(label)}</span></a>`
       : "";
 
   // vCard as a data URI so "Save Contact" works with no JavaScript.
@@ -361,16 +361,16 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
   const vcardHref = `data:text/vcard;charset=utf-8,${encodeURIComponent(vcard)}`;
 
   const links = [
-    btn("fa fa-phone-alt", phone ? `tel:${phone}` : "", "Call Now", "_self"),
-    btn("fab fa-whatsapp", wa ? `https://wa.me/${wa}?text=${waMsg}` : "", "Chat on WhatsApp"),
-    btn("fa fa-globe", safeExternalUrl(c.url), "Visit Website"),
-    btn("fa fa-envelope", s(c.email) ? `mailto:${s(c.email)}` : "", "Email Us", "_self"),
-    btn("fa fa-map-marker-alt", safeExternalUrl(c.google_map), "Get Directions"),
+    btn(phone ? `tel:${phone}` : "", "Call Now", "_self"),
+    btn(wa ? `https://wa.me/${wa}?text=${waMsg}` : "", "Chat on WhatsApp"),
+    btn(safeExternalUrl(c.url), "Visit Website"),
+    btn(s(c.email) ? `mailto:${s(c.email)}` : "", "Email Us", "_self"),
+    btn(safeExternalUrl(c.google_map), "Get Directions"),
     // Each product/service becomes its own labelled button.
     ...products.map((p) => {
       const label = s(p.button_title) || s(p.name);
       const href = safeExternalUrl(p.button) || (wa ? `https://wa.me/${wa}?text=${encodeURIComponent(`Hi, I'm interested in "${s(p.name)}".`)}` : "");
-      return btn("fa fa-arrow-right", href, label);
+      return btn(href, label);
     }),
   ].filter(Boolean).join("");
 
@@ -404,7 +404,7 @@ ${showShare ? shareSheetCss("#111827") : ""}
     ${bio ? `<p class="lb-bio">${bio}</p>` : handle ? `<p class="lb-handle">@${esc(handle)}</p>` : ""}
     <div class="lb-links">
       ${links}
-      ${btn("fa fa-user-plus", vcardHref, "Save Contact", "_self", `${slug || "contact"}.vcf`)}
+      ${btn(vcardHref, "Save Contact", "_self", `${slug || "contact"}.vcf`)}
     </div>
     ${social ? `<ul class="lb-social">${social}</ul>` : ""}
     ${qrSrc ? `<div class="lb-qr"><img src="${qrSrc}" alt="Scan to open this card" ${IMG}><span>Scan my card</span></div>` : ""}
