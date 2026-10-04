@@ -32,6 +32,23 @@
          marks them visible. Public pages are now rendered on the server, so
          without JavaScript the text is in the page but would stay invisible. -->
     <noscript><style>.reveal,.reveal-stagger>*{opacity:1!important;transform:none!important}</style></noscript>
+    <!-- Google Analytics 4. Only loads on the live domain, so local dev and
+         preview builds don't pollute the reports. SPA route changes are counted
+         by GA's enhanced measurement (browser history events). -->
+    <script>
+      (function () {
+        var h = location.hostname;
+        if (h !== "digitalcarda.in" && !h.endsWith(".digitalcarda.in")) return;
+        var s = document.createElement("script");
+        s.async = true;
+        s.src = "https://www.googletagmanager.com/gtag/js?id=G-ZQ76JQ5PY2";
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { dataLayer.push(arguments); };
+        gtag("js", new Date());
+        gtag("config", "G-ZQ76JQ5PY2");
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
