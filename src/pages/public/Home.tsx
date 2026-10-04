@@ -144,7 +144,9 @@ function CardContactSlider() {
           </button>
         </div>
 
-        <div className="absolute bottom-4 right-4 bg-[#0F172A] rounded-full px-3 py-1.5 shadow-lg">
+        {/* Sits above the call bar, not on it — at phone width it was covering
+            the WhatsApp label. */}
+        <div className="absolute bottom-14 right-3 bg-[#0F172A] rounded-full px-3 py-1.5 shadow-lg">
           <span className="text-[9px] font-bold text-white">Save Contact</span>
         </div>
       </div>
@@ -715,7 +717,8 @@ function FeaturesSection() {
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[12.5px] font-semibold text-[#0F172A] ring-1 ring-[#E2E8F0]">
                   <s.icon size={14} className="text-[#D97706]" /> {s.label}
                 </span>
-                {i < all.length - 1 && <ArrowRight aria-hidden="true" size={14} className="text-[#CBD5E1]" />}
+                {/* The arrows only make sense while the four sit on one line. */}
+                {i < all.length - 1 && <ArrowRight aria-hidden="true" size={14} className="hidden text-[#CBD5E1] sm:block" />}
               </li>
             ))}
           </ol>
@@ -965,7 +968,10 @@ function TemplatesSection() {
                     </div>
                   </Link>
                   <div className="p-3.5 text-center">
-                    <Link to={`/digital-business-cards-templates/${p.slug}`} className="text-sm font-semibold text-[#0F172A] group-hover:text-[#F7B31C] transition-colors line-clamp-1">{p.name}</Link>
+                    {/* Every name ends in the same four words; in a narrow tile
+                        that left "Midnight Gold…" and nothing else. Drop the
+                        suffix and let what is left have two lines. */}
+                    <Link to={`/digital-business-cards-templates/${p.slug}`} className="text-sm font-semibold text-[#0F172A] group-hover:text-[#F7B31C] transition-colors line-clamp-2">{p.name.replace(/\s*Digital Business Card$/, "").replace(/\s*Link-in-Bio Card$/, "")}</Link>
                   </div>
                 </article>
               );
