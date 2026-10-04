@@ -562,7 +562,7 @@ const FEATURE_QR = Array.from({ length: 49 }, (_, i) => {
    so the tile shows a real card instead of grey placeholder bars. */
 function BuildArt() {
   return (
-    <div className="relative flex min-h-[150px] flex-1 items-center justify-center">
+    <div className="relative flex min-h-[150px] flex-1 items-center justify-center py-1">
       <div aria-hidden="true" className="absolute inset-x-12 bottom-6 top-10 rounded-full bg-[#F7B31C]/10 blur-3xl" />
       <picture className="contents">
         <source srcSet="/features/build-card.webp" type="image/webp" />
@@ -570,7 +570,7 @@ function BuildArt() {
           src="/features/build-card.png"
           alt="A digital business card open on a phone, with gallery, video, products and publish controls around it"
           width={900} height={1124} loading="lazy" decoding="async" draggable={false}
-          className="relative max-h-[200px] w-auto max-w-full object-contain drop-shadow-[0_22px_44px_rgba(2,6,23,0.55)] motion-safe:animate-[float_6s_ease-in-out_infinite] sm:max-h-[230px] lg:max-h-[250px]"
+          className="relative max-h-[290px] w-auto max-w-full object-contain drop-shadow-[0_22px_44px_rgba(2,6,23,0.55)] motion-safe:animate-[float_6s_ease-in-out_infinite] sm:max-h-[340px] lg:max-h-[330px]"
         />
       </picture>
     </div>
