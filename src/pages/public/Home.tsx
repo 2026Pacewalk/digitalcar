@@ -207,24 +207,20 @@ function HeroSection() {
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-white text-[#92400E] shadow-premium ring-1 ring-[#FEF3C7]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#F7B31C] animate-pulse" /> AI-Powered Digital Cards
             </span>
-            <h1 className="mt-6 text-[2.6rem] sm:text-5xl lg:text-[3.9rem] font-extrabold text-[#0F172A] leading-[1.05] tracking-tight">
-              <span className="relative inline-block text-gradient-gold">
+            {/* The product name holds one line at every width; the audience
+                line sits under it, deliberately smaller. */}
+            <h1 className="mt-6 font-extrabold text-[#0F172A] tracking-tight">
+              <span className="relative inline-block whitespace-nowrap text-gradient-gold text-[1.75rem] leading-[1.05] sm:text-[2.9rem] lg:text-[3.6rem]">
                 Digital Business Card
                 <svg className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 300 10" fill="none" preserveAspectRatio="none">
                   <path d="M2 7c60-5 120-5 180-2s90 3 116-1" stroke="#F7B31C" strokeWidth="3" strokeLinecap="round" opacity="0.5" />
                 </svg>
-              </span>{" "}
-              <span className="sm:whitespace-nowrap">for Every Indian Professional</span>
+              </span>
+              <span className="mt-3 block text-[1.25rem] leading-[1.15] sm:text-[1.9rem] lg:text-[2.35rem]">for Every Indian Professional</span>
             </h1>
             <p className="mt-6 text-base sm:text-lg text-[#64748B] leading-relaxed max-w-lg">
               Create a shareable digital visiting card with QR code, NFC tap, WhatsApp and UPI payments — in about two minutes. No app, no design skills, no reprinting.
             </p>
-            {/* AEO answer block — a self-contained 40–60 word answer that AI search
-                engines and Google's answer box can lift verbatim. Placed here so it
-                sits near the top of the DOM, above the fold. */}
-            <div className="mt-5 rounded-xl bg-white/70 ring-1 ring-[#FEF3C7] px-4 py-3 max-w-xl text-[13.5px] leading-relaxed text-[#334155]">
-              <strong className="text-[#0F172A]">Quick answer:</strong> A digital business card is a link and QR code that replaces printed visiting cards. DigitalCarda makes one in 2 minutes with 50+ templates, WhatsApp, UPI payments, lead capture and analytics. Starts at <strong>₹99/month</strong> with a <strong>30-day free trial</strong> — no card details needed.
-            </div>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Link to="/signup" className="btn-gold h-12 px-7 flex items-center justify-center gap-2 text-base">
                 Start 30-Day Free Trial <ArrowRight size={18} />
@@ -293,6 +289,16 @@ function StatsBand() {
   ];
 
   return (
+    <>
+    {/* The short answer Google's answer box and the AI engines lift verbatim. It
+        used to sit in the hero; it reads better here, and search engines care
+        that it is on the page, not that it is above the fold. */}
+    <section className="px-4 sm:px-6 lg:px-8 pb-6" aria-label="What a digital business card is">
+      <p className="mx-auto max-w-3xl rounded-xl bg-white/70 px-4 py-3 text-[13.5px] leading-relaxed text-[#334155] ring-1 ring-[#FEF3C7]">
+        <strong className="text-[#0F172A]">Quick answer:</strong> A digital business card is a link and QR code that replaces printed visiting cards. DigitalCarda makes one in 2 minutes with 50+ templates, WhatsApp, UPI payments, lead capture and analytics. Starts at <strong>₹99/month</strong> with a <strong>30-day free trial</strong> — no card details needed.
+      </p>
+    </section>
+
     <section className="relative -mt-2 pb-2" aria-label="DigitalCarda in numbers">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <Reveal className="relative overflow-hidden rounded-[28px] sm:rounded-[32px] bg-[#0B1120] ring-1 ring-white/10 shadow-[0_30px_70px_-30px_rgba(2,6,23,0.75)] p-3 sm:p-4 lg:p-5">
@@ -386,6 +392,7 @@ function StatsBand() {
         </Reveal>
       </div>
     </section>
+    </>
   );
 }
 
@@ -404,7 +411,7 @@ function TrustedSection() {
   );
 
   return (
-    <section className="py-14 bg-gradient-to-b from-white to-[#F8FAFC]">
+    <section className="py-10 sm:py-14 bg-gradient-to-b from-white to-[#F8FAFC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center gap-3 mb-8">
           <p className="text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-widest">
@@ -506,10 +513,12 @@ function FeatureChips({ tile, dark }: { tile: FeatureTile; dark?: boolean }) {
   );
 }
 
-function FeatureTileCard({ tile, dark, className = "", children }: { tile: FeatureTile; dark?: boolean; className?: string; children: React.ReactNode }) {
+/* `wide` lays the artwork beside the words instead of above them — a tile that
+   is twice as wide as the others does not need to be twice as tall. */
+function FeatureTileCard({ tile, dark, wide, className = "", children }: { tile: FeatureTile; dark?: boolean; wide?: boolean; className?: string; children: React.ReactNode }) {
   return (
     <article
-      className={`group relative flex flex-col overflow-hidden rounded-[22px] p-5 transition duration-300 hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+      className={`group relative flex flex-col overflow-hidden rounded-[22px] p-4 sm:p-5 transition duration-300 hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
         dark
           ? "bg-[#0B1120] text-white shadow-[0_30px_60px_-30px_rgba(2,6,23,0.75)]"
           : "bg-white shadow-[0_20px_50px_-32px_rgba(15,23,42,0.35)] ring-1 ring-[#0F172A]/[0.06] hover:shadow-[0_28px_60px_-28px_rgba(15,23,42,0.4)]"
@@ -520,8 +529,9 @@ function FeatureTileCard({ tile, dark, className = "", children }: { tile: Featu
         className={`pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full blur-3xl transition-opacity duration-500 ${dark ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
         style={{ background: `${tile.accent}${dark ? "22" : "1F"}` }}
       />
-      <div aria-hidden="true" className="relative flex flex-1 flex-col justify-center">{children}</div>
-      <div className="relative pt-4">
+      <div className={wide ? "relative flex flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-5" : "contents"}>
+      <div aria-hidden="true" className={wide ? "relative flex flex-col justify-center lg:w-[46%]" : "relative flex flex-1 flex-col justify-center"}>{children}</div>
+      <div className={wide ? "relative lg:flex-1" : "relative pt-4"}>
         <div className="flex items-center gap-2.5">
           <span
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
@@ -533,6 +543,7 @@ function FeatureTileCard({ tile, dark, className = "", children }: { tile: Featu
         </div>
         <p className={`mt-1.5 text-[13.5px] leading-relaxed ${dark ? "text-[#94A3B8]" : "text-[#64748B]"}`}>{tile.text}</p>
         <div className="mt-3"><FeatureChips tile={tile} dark={dark} /></div>
+      </div>
       </div>
     </article>
   );
@@ -546,54 +557,29 @@ const FEATURE_QR = Array.from({ length: 49 }, (_, i) => {
   return (r * 3 + c * 5) % 3 === 0;
 });
 
-function FloatChip({ icon: Icon, label, className }: { icon: FeatureIcon; label: string; className: string }) {
-  return (
-    <span className={`absolute hidden items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white shadow-lg ring-1 ring-white/15 backdrop-blur-md sm:inline-flex ${className}`}>
-      <Icon size={13} className="text-[#F7B31C]" /> {label}
-    </span>
-  );
-}
-
+/* The build tile's artwork: a rendered card on a phone with the things you can
+   put on it floating around it. One picture rather than the drawing it replaces,
+   so the tile shows a real card instead of grey placeholder bars. */
 function BuildArt() {
-  const gallery = ["#FDE68A", "#99F6E4", "#C4B5FD", "#FBCFE8", "#BFDBFE", "#FED7AA"];
   return (
-    <div className="relative flex min-h-[230px] flex-1 items-center justify-center">
-      <div className="absolute inset-x-12 bottom-6 top-12 rounded-full bg-[#F7B31C]/10 blur-3xl" />
-      <div className="relative w-[172px] rounded-[28px] bg-[#1E293B] p-2 shadow-2xl ring-1 ring-white/10 motion-safe:animate-[float_6s_ease-in-out_infinite]">
-        <div className="overflow-hidden rounded-[26px] bg-white">
-          <div className="h-16 bg-gradient-to-br from-[#F7B31C] to-[#D97706]" />
-          <div className="-mt-8 flex flex-col items-center px-3 pb-4">
-            <span className="h-14 w-14 rounded-full border-4 border-white bg-gradient-to-br from-[#0F172A] to-[#334155]" />
-            <span className="mt-2 h-2 w-24 rounded bg-[#0F172A]" />
-            <span className="mt-1.5 h-1.5 w-16 rounded bg-[#CBD5E1]" />
-            <span className="mt-3 grid w-full grid-cols-3 gap-1.5">
-              {["Call", "WhatsApp", "Save"].map((t) => (
-                <span key={t} className={`rounded-lg py-1.5 text-center text-[8px] font-bold ${t === "WhatsApp" ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#F1F5F9] text-[#334155]"}`}>{t}</span>
-              ))}
-            </span>
-            <span className="mt-3 grid w-full grid-cols-3 gap-1">
-              {gallery.map((g) => <span key={g} className="aspect-square rounded-md" style={{ background: g }} />)}
-            </span>
-            <span className="mt-3 w-full space-y-1">
-              <span className="block h-1.5 w-full rounded bg-[#E2E8F0]" />
-              <span className="block h-1.5 w-4/5 rounded bg-[#E2E8F0]" />
-            </span>
-          </div>
-        </div>
-      </div>
-      <FloatChip icon={Image} label="Gallery" className="left-[4%] top-[16%] -rotate-6 transition-transform duration-500 group-hover:-translate-y-1" />
-      <FloatChip icon={Play} label="Video" className="right-[4%] top-[28%] rotate-3 transition-transform duration-500 group-hover:-translate-y-1" />
-      <FloatChip icon={ShoppingBag} label="Products" className="bottom-[20%] left-[6%] rotate-2 transition-transform duration-500 group-hover:translate-y-1" />
-      <span className="absolute bottom-[10%] right-[6%] hidden items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#F7B31C] to-[#FBBF24] px-3.5 py-2 text-xs font-bold text-[#0B1120] shadow-[0_10px_24px_-10px_rgba(247,179,28,0.9)] sm:inline-flex">
-        <Zap size={13} /> Publish
-      </span>
+    <div className="relative flex min-h-[150px] flex-1 items-center justify-center">
+      <div aria-hidden="true" className="absolute inset-x-12 bottom-6 top-10 rounded-full bg-[#F7B31C]/10 blur-3xl" />
+      <picture className="contents">
+        <source srcSet="/features/build-card.webp" type="image/webp" />
+        <img
+          src="/features/build-card.png"
+          alt="A digital business card open on a phone, with gallery, video, products and publish controls around it"
+          width={900} height={1124} loading="lazy" decoding="async" draggable={false}
+          className="relative max-h-[200px] w-auto max-w-full object-contain drop-shadow-[0_22px_44px_rgba(2,6,23,0.55)] motion-safe:animate-[float_6s_ease-in-out_infinite] sm:max-h-[230px] lg:max-h-[250px]"
+        />
+      </picture>
     </div>
   );
 }
 
 function ShareArt() {
   return (
-    <div className="flex h-32 items-center justify-center gap-4">
+    <div className="flex h-24 items-center justify-center gap-4">
       <div className="rounded-2xl bg-white p-3 shadow-lg ring-1 ring-[#E2E8F0] transition-transform duration-500 group-hover:-rotate-3 motion-reduce:transition-none">
         <div className="grid grid-cols-7 gap-[3px]">
           {FEATURE_QR.map((on, i) => <span key={i} className={`h-2 w-2 rounded-[2px] ${on ? "bg-[#0F172A]" : ""}`} />)}
@@ -640,7 +626,7 @@ function LeadsArt() {
 
 function PayArt() {
   return (
-    <div className="flex h-32 items-center justify-center">
+    <div className="flex h-24 items-center justify-center">
       <div className="w-full max-w-[200px] rounded-2xl bg-gradient-to-br from-[#EC4899] to-[#BE185D] p-3.5 text-white shadow-[0_18px_36px_-18px_rgba(190,24,93,0.8)] transition-transform duration-500 group-hover:-translate-y-1 motion-reduce:transition-none">
         <span className="flex items-center justify-between">
           <span className="text-[11px] font-medium text-white/75">Pay on card</span>
@@ -658,7 +644,7 @@ function PayArt() {
 function GrowArt() {
   const bars = [38, 52, 45, 68, 60, 82, 96];
   return (
-    <div className="flex h-32 flex-col rounded-2xl bg-[#F8FAFC] p-3.5 ring-1 ring-[#E2E8F0]">
+    <div className="flex h-24 flex-col rounded-2xl bg-[#F8FAFC] p-3 ring-1 ring-[#E2E8F0]">
       <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#64748B]"><Eye size={12} className="text-[#3B82F6]" /> Card views · 7 days</span>
       <span className="mt-3 flex flex-1 items-end gap-2">
         {bars.map((h, i) => (
@@ -675,7 +661,7 @@ function GrowArt() {
 
 function AIArt() {
   return (
-    <div className="h-32 overflow-hidden rounded-2xl bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-3.5 ring-1 ring-[#FDE68A]">
+    <div className="h-24 overflow-hidden rounded-2xl bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-3 ring-1 ring-[#FDE68A]">
       <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#B45309]"><Sparkles size={12} /> Writing your About</span>
       <span className="mt-1.5 block text-[12.5px] leading-snug text-[#78350F]">
         We help families find homes they love — with honest advice and site visits on your schedule
@@ -692,12 +678,12 @@ function FeaturesSection() {
   const FEATURE_COUNT = 41;
 
   return (
-    <section className="relative overflow-hidden py-14 sm:py-16" id="features">
+    <section className="relative overflow-hidden py-10 sm:py-12" id="features">
       <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-40 h-[480px] w-[900px] -translate-x-1/2 rounded-full bg-[#F7B31C]/[0.07] blur-3xl" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* The words "One Digital Card" sit on a small card of their own, so the
             heading shows the product rather than only naming it. */}
-        <Reveal className="mx-auto mb-9 max-w-3xl text-center">
+        <Reveal className="mx-auto mb-6 max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full bg-white py-1 pl-1 pr-3.5 text-xs font-semibold text-[#92400E] shadow-premium ring-1 ring-[#FDE68A]">
             <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#F7B31C] to-[#FBBF24] px-2.5 py-1 text-[11px] font-bold text-[#0B1120]">
               <Sparkles size={12} /> {FEATURE_COUNT}
@@ -705,24 +691,20 @@ function FeaturesSection() {
             features in one card
           </span>
 
-          <h2 className="mt-4 text-[1.6rem] font-extrabold leading-[1.2] tracking-tight text-[#0F172A] sm:text-[2.1rem] lg:text-[2.5rem]">
-            <span className="block">Everything You Need</span>{" "}
-            <span className="mt-2 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-2 sm:mt-2.5">
-              <span>in</span>{" "}
-              <span className="relative inline-flex -rotate-1 items-center gap-2.5 whitespace-nowrap rounded-xl bg-[#0B1120] px-3.5 py-1.5 shadow-[0_16px_30px_-16px_rgba(2,6,23,0.6)] ring-1 ring-white/10 transition-transform duration-500 hover:rotate-0 motion-reduce:transition-none sm:gap-2.5 sm:rounded-2xl sm:py-1.5 sm:pl-3 sm:pr-4">
-                <span aria-hidden="true" className="hidden h-6 w-8 shrink-0 grid-cols-3 gap-[2px] rounded-md bg-gradient-to-br from-[#FDE68A] to-[#D97706] p-1 sm:grid">
-                  {Array.from({ length: 6 }, (_, i) => <span key={i} className="rounded-[2px] bg-[#0B1120]/20" />)}
-                </span>
-                <span className="text-gradient-gold">One Digital Card</span>
-                <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#14B8A6] text-white shadow-lg ring-2 ring-[#F8FAFC]">
-                  <Check size={14} />
-                </span>
-              </span>
+          {/* One line, in the same voice as the "How it works" heading: the
+              phrase that matters carries the gold and the underline. */}
+          <h2 className="mt-3 text-[1.55rem] font-extrabold leading-[1.15] tracking-tight text-[#0F172A] sm:text-[2rem] lg:text-[2.35rem]">
+            Everything You Need in{" "}
+            <span className="relative inline-block whitespace-nowrap text-gradient-gold">
+              One Digital Card
+              <svg aria-hidden="true" className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 300 10" fill="none" preserveAspectRatio="none">
+                <path d="M2 7c60-5 120-5 180-2s90 3 116-1" stroke="#F7B31C" strokeWidth="3" strokeLinecap="round" opacity="0.6" />
+              </svg>
             </span>
           </h2>
 
-          <p className="mx-auto mt-4 max-w-xl text-[14.5px] leading-relaxed text-[#64748B]">Grouped by what you want your card to do.</p>
-          <ol className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+          <p className="mx-auto mt-3 max-w-xl text-[14px] leading-relaxed text-[#64748B]">Grouped by what you want your card to do.</p>
+          <ol className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
             {[
               { icon: CreditCard, label: "Build" },
               { icon: Share2, label: "Share" },
@@ -739,13 +721,13 @@ function FeaturesSection() {
           </ol>
         </Reveal>
 
-        <Reveal stagger className="grid gap-4 md:grid-cols-6 lg:grid-cols-12">
-          <FeatureTileCard tile={build} dark className="md:col-span-6 lg:col-span-7 lg:row-span-2"><BuildArt /></FeatureTileCard>
+        <Reveal stagger className="grid gap-3.5 md:grid-cols-6 lg:grid-cols-12">
+          <FeatureTileCard tile={build} dark wide className="md:col-span-6 lg:col-span-7"><BuildArt /></FeatureTileCard>
           <FeatureTileCard tile={share} className="md:col-span-3 lg:col-span-5"><ShareArt /></FeatureTileCard>
-          <FeatureTileCard tile={leads} className="md:col-span-3 lg:col-span-5"><LeadsArt /></FeatureTileCard>
+          <FeatureTileCard tile={leads} className="md:col-span-3 lg:col-span-4"><LeadsArt /></FeatureTileCard>
           <FeatureTileCard tile={pay} className="md:col-span-2 lg:col-span-4"><PayArt /></FeatureTileCard>
           <FeatureTileCard tile={grow} className="md:col-span-2 lg:col-span-4"><GrowArt /></FeatureTileCard>
-          <FeatureTileCard tile={ai} className="md:col-span-2 lg:col-span-4"><AIArt /></FeatureTileCard>
+          <FeatureTileCard tile={ai} wide className="md:col-span-6 lg:col-span-12"><AIArt /></FeatureTileCard>
 
           {/* Reseller — a wide strip, text beside the drawing */}
           <article className="group relative overflow-hidden rounded-[22px] bg-[#0B1120] p-5 text-white shadow-[0_30px_60px_-30px_rgba(2,6,23,0.75)] sm:p-6 md:col-span-6 lg:col-span-12">
@@ -882,7 +864,7 @@ function AISection() {
   const extracted = ["Logo", "Brand colours", "Services", "Contact details"];
 
   return (
-    <section className="py-20 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] relative overflow-hidden">
+    <section className="py-12 sm:py-16 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] relative overflow-hidden">
       <div className="absolute inset-0 bg-grid-dark opacity-30" />
       <div className="absolute top-0 right-0 w-[340px] h-[340px] bg-[#F7B31C]/10 rounded-full blur-3xl" />
       <div className="absolute bottom-0 left-0 w-[280px] h-[280px] bg-[#14B8A6]/10 rounded-full blur-3xl" />
@@ -950,14 +932,14 @@ function TemplatesSection() {
   // Featured first, then curated display order — show the best 8 real designs.
   const shown = [...products]
     .sort((a, b) => (Number(b.isFeatured) - Number(a.isFeatured)) || (a.displayOrder - b.displayOrder))
-    .slice(0, 8);
+    .slice(0, 10);
   return (
-    <section className="py-20">
+    <section className="py-10 sm:py-14">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Templates" title="Beautiful, Ready-to-Use Templates" subtitle="Pick a professional design, customize colors, upload your logo, add details, and publish instantly." />
-        <Reveal stagger className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+        <Reveal stagger className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
           {isLoading
-            ? Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: 10 }).map((_, i) => (
                 <div key={i} className="rounded-2xl bg-white border border-[#F1F5F9] shadow-premium overflow-hidden">
                   <div className="w-full animate-pulse bg-[#F1F5F9]" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }} />
                   <div className="p-3.5"><div className="h-3.5 w-2/3 mx-auto bg-[#F1F5F9] rounded-full animate-pulse" /></div>
@@ -989,7 +971,7 @@ function TemplatesSection() {
               );
             })}
         </Reveal>
-        <div className="text-center mt-10">
+        <div className="text-center mt-7">
           <Link to="/digital-business-cards-templates" className="btn-navy inline-flex items-center gap-2">Browse All Templates <ChevronRight size={16} /></Link>
         </div>
       </div>
@@ -1132,7 +1114,7 @@ function PersonaSection() {
   const go = (d: number) => setActive((i) => (i + d + PERSONAS.length) % PERSONAS.length);
 
   return (
-    <section className="py-14 sm:py-20 bg-white relative overflow-hidden" id="built-for-you">
+    <section className="py-10 sm:py-14 bg-white relative overflow-hidden" id="built-for-you">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
       <div
         className="absolute left-1/2 top-40 -translate-x-1/2 w-[760px] h-[400px] rounded-full blur-3xl pointer-events-none transition-colors duration-700"
@@ -1374,7 +1356,7 @@ function HowItWorksSection() {
   ];
 
   return (
-    <section className="relative overflow-hidden bg-[#0B1120] py-14 sm:py-16">
+    <section className="relative overflow-hidden bg-[#0B1120] py-10 sm:py-14">
       <div aria-hidden="true" className="absolute inset-0 bg-grid-dark opacity-30" />
       <div aria-hidden="true" className="pointer-events-none absolute -left-32 -top-32 h-[420px] w-[420px] rounded-full bg-[#F7B31C]/15 blur-3xl" />
       <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -right-24 h-[420px] w-[420px] rounded-full bg-[#14B8A6]/10 blur-3xl" />
@@ -1467,7 +1449,7 @@ function AnalyticsSection() {
     { icon: Smartphone, label: "Device Reports" }, { icon: TrendingUp, label: "Monthly Growth" },
   ];
   return (
-    <section className="py-14 sm:py-20 bg-gradient-to-b from-white to-[#F8FAFC] relative overflow-hidden">
+    <section className="py-10 sm:py-14 bg-gradient-to-b from-white to-[#F8FAFC] relative overflow-hidden">
       <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[720px] h-[360px] bg-[#F7B31C]/[0.07] rounded-full blur-3xl pointer-events-none" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative lg:grid lg:grid-cols-[0.8fr_1.2fr] lg:gap-12 lg:items-center">
         <div>
@@ -1574,7 +1556,7 @@ const QR_PLACES = [
 
 function QRNFCSection() {
   return (
-    <section className="py-14 sm:py-20 bg-[#F8FAFC] relative overflow-hidden">
+    <section className="py-10 sm:py-14 bg-[#F8FAFC] relative overflow-hidden">
       {/* ── Phones & tablets ── */}
       <div className="lg:hidden relative max-w-xl mx-auto px-4 sm:px-6">
         <div aria-hidden="true" className="absolute -top-10 left-1/2 -translate-x-1/2 w-[340px] h-[340px] rounded-full bg-[#14B8A6]/10 blur-3xl pointer-events-none" />
@@ -1709,7 +1691,7 @@ function WhereToUseSection() {
   const columns = [LINK_PLACEMENTS.slice(0, half), LINK_PLACEMENTS.slice(half)];
 
   return (
-    <section className="py-20 bg-white relative overflow-hidden" id="where-to-use">
+    <section className="py-10 sm:py-14 bg-white relative overflow-hidden" id="where-to-use">
       <div className="absolute -left-24 top-1/3 w-[420px] h-[420px] bg-[#14B8A6]/[0.06] rounded-full blur-3xl pointer-events-none" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div className="grid lg:grid-cols-12 gap-10 lg:gap-12">
@@ -1806,7 +1788,7 @@ function TestimonialCard({ t, copy = false }: { t: (typeof TESTIMONIALS)[number]
 /* ─── Do More — multi-card · refer & earn · bulk teams ─── */
 function GrowSection() {
   return (
-    <section className="py-20 bg-white">
+    <section className="py-10 sm:py-14 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Do More" title="More Than a Card — a Growth Engine" subtitle="One login unlocks multiple cards, referral rewards and team-wide bulk ordering — everything you need to scale your presence." />
         <Reveal stagger className="grid md:grid-cols-3 gap-5 md:auto-rows-fr">
@@ -2008,7 +1990,7 @@ function TestimonialsSection() {
   // never shows a gap. Hovering pauses it.
   const loop = [...TESTIMONIALS, ...TESTIMONIALS, ...TESTIMONIALS, ...TESTIMONIALS];
   return (
-    <section className="relative py-12 sm:py-16 overflow-hidden bg-gradient-to-b from-white via-[#FFFBEB]/70 to-white">
+    <section className="relative py-10 sm:py-14 overflow-hidden bg-gradient-to-b from-white via-[#FFFBEB]/70 to-white">
       <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-20 h-64 w-[46rem] -translate-x-1/2 rounded-full bg-[#F7B31C]/10 blur-3xl" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Testimonials" title="They Say We Did a Great Job" subtitle="Businesses across India have replaced paper cards with DigitalCarda — here's what they think." />
@@ -2033,7 +2015,7 @@ function TestimonialsSection() {
 function ResellerSection() {
   const features = ["Add Customers", "Assign Packages", "Track Expiry", "Manage Leads", "White Label Branding", "Commission Reports", "Customer Analytics", "Marketing Materials"];
   return (
-    <section className="py-20 bg-white">
+    <section className="py-10 sm:py-14 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <Reveal>
@@ -2086,7 +2068,7 @@ function PricingSection() {
     { name: "Platinum", price: "₹1,999", period: "/ year", popular: false, cta: "Go Platinum", features: ["Everything in Gold", "Up to 3 Cards", "Unlimited Products & Offers", "Remove Branding", "Custom Domain + SEO", "AI Content Tools", "Priority Support"] },
   ];
   return (
-    <section className="py-20 bg-[#F8FAFC]" id="pricing">
+    <section className="py-10 sm:py-14 bg-[#F8FAFC]" id="pricing">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Pricing" title="Simple Pricing for Every Business" subtitle="Choose the plan that fits your needs. Start a 30-day free trial — ₹0, with no payment required." />
         <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pt-3">
@@ -2177,7 +2159,7 @@ function FaqSection() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section className="py-20 bg-[#F8FAFC] relative overflow-hidden" id="faq">
+    <section className="py-10 sm:py-14 bg-[#F8FAFC] relative overflow-hidden" id="faq">
       <JsonLd id="dc-faq-ld" data={FAQ_LD} />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#E2E8F0] to-transparent" />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 relative">

@@ -80,7 +80,7 @@ export function SectionHeading({
   light?: boolean;
 }) {
   return (
-    <Reveal className="text-center max-w-3xl mx-auto mb-12">
+    <Reveal className="text-center max-w-3xl mx-auto mb-8 sm:mb-9">
       {eyebrow && (
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-4 ${light ? "bg-white/10 text-[#F7B31C] ring-1 ring-white/10" : "bg-[#FEF3C7] text-[#92400E]"}`}>
           <Sparkles size={12} /> {eyebrow}
