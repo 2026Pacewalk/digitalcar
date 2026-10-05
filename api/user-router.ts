@@ -6,6 +6,7 @@ import { getDb } from "./queries/connection";
 import { users, resellerProfiles, resellerCommissions, cards, subscriptions, subscriptionPackages, publishedCards, cardTrials } from "@db/schema";
 import { eq, and, sql, desc, inArray, gt, gte } from "drizzle-orm";
 import { PAID_PACKAGE_IDS } from "./lib/entitlement";
+import { nextSnapshotStamp } from "./lib/snapshot-version";
 import { sendEmail } from "./lib/mail";
 import { notifyUser } from "./lib/notify";
 import { accountDetailsEmail, featureUpdateEmail, planUpgradedEmail, planExtendedEmail, passwordChangedEmail } from "./lib/email-templates";
@@ -239,13 +240,19 @@ export const userRouter = createRouter({
       // Keep the published snapshot in step so the customer's dashboard and the
       // public card don't keep showing the old plan.
       try {
-        const rows = await db.select().from(publishedCards).where(eq(publishedCards.userId, user.id));
-        for (const row of rows) {
-          const data = (row.data && typeof row.data === "object" ? row.data : {}) as Record<string, unknown>;
-          const customer = { ...((data.customer as Record<string, unknown>) || {}) };
-          customer.package_id = input.packageId;
-          customer.expired_on = expiredOn;
-          await db.update(publishedCards).set({ data: { ...data, customer } }).where(eq(publishedCards.id, row.id));
+        const ids = await db.select({ id: publishedCards.id }).from(publishedCards).where(eq(publishedCards.userId, user.id));
+        for (const { id } of ids) {
+          // Read and write under the row's lock, with a stamp of its own — a
+          // save landing at this instant is neither undone nor left looking current.
+          await db.transaction(async (tx) => {
+            const [row] = await tx.select().from(publishedCards).where(eq(publishedCards.id, id)).for("update");
+            if (!row) return;
+            const data = (row.data && typeof row.data === "object" ? row.data : {}) as Record<string, unknown>;
+            const customer = { ...((data.customer as Record<string, unknown>) || {}) };
+            customer.package_id = input.packageId;
+            customer.expired_on = expiredOn;
+            await tx.update(publishedCards).set({ data: { ...data, customer }, updatedAt: nextSnapshotStamp(row.updatedAt) }).where(eq(publishedCards.id, id));
+          });
         }
       } catch { /* snapshot mirror is best-effort — never fail the plan change */ }
 

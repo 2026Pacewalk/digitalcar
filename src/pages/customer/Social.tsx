@@ -14,13 +14,21 @@ function PlatformIcon({ p, size = 16 }: { p: SocialPlatform; size?: number }) {
 }
 
 export function SocialEditor() {
-  const { data, val, set, setMany, status } = useCardAutosave();
+  const { data, val, set, setMany, status, replaced } = useCardAutosave();
 
   // Seed the list from the saved record, re-seeding as the record hydrates —
   // until the user edits (then we stop so their changes aren't overwritten).
+  // When the card is REPLACED under this editor (the latest version loaded from
+  // the server, or written by another tab) the list on screen was made from the
+  // copy that is gone: it starts over from the card as it now is. Kept, the
+  // next link change wrote the whole old list back over the newer one.
   const [links, setLinks] = useState<SocialLink[]>([]);
   const dirty = useRef(false);
-  useEffect(() => { if (!dirty.current) setLinks(readSocialLinks(data as Record<string, unknown>)); }, [data]);
+  const seenReplaced = useRef(replaced);
+  useEffect(() => {
+    if (seenReplaced.current !== replaced) { seenReplaced.current = replaced; dirty.current = false; }
+    if (!dirty.current) setLinks(readSocialLinks(data as Record<string, unknown>));
+  }, [data, replaced]);
   // Every link change AUTO-SAVES (debounced): serialize the valid links along
   // with the rest of the pending form — no Save button needed.
   const mutate = (next: SocialLink[]) => {

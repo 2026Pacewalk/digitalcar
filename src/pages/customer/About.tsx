@@ -1,58 +1,31 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Info, Plus, X } from "lucide-react";
 import ModuleShell, { Panel, Field, fieldCls, areaCls, ImagePick, AutoSaveBadge, SectionToggle } from "@/components/customer/ModuleShell";
-import { useCustomer } from "@/hooks/useCustomer";
+import { useCardAutosave } from "@/hooks/useCardAutosave";
 
 export function AboutEditor() {
-  const { data, update } = useCustomer();
-  const [aboutTitle, setAboutTitle] = useState<string | null>(null);
-  const [about, setAbout] = useState<string | null>(null);
-  const [specTitle, setSpecTitle] = useState<string | null>(null);
-  const [specs, setSpecs] = useState<string[]>([]);
+  // AUTO-SAVE through the shared form (no Save button): it holds a field only
+  // until it is stored, lets go of everything when the card is replaced under
+  // it (the latest version loaded from the server, another tab) and stores at
+  // once when the page is being left. This editor used to keep its own copy of
+  // every field and write them ALL back on any change — old text over a card
+  // that had been loaded since, with no keystroke at all.
+  const { val, set, status } = useCardAutosave();
   const [newSpec, setNewSpec] = useState("");
   // Photo + ID/membership fields used by the premium card designs.
-  const [photo, setPhoto] = useState<string | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const photoV = photo ?? String(data.photo ?? "");
-  const fval = (k: string) => (fields[k] !== undefined ? fields[k] : String(data[k] ?? ""));
-  const fset = (k: string, v: string) => setFields((f) => ({ ...f, [k]: v }));
+  const photoV = val("photo");
+  const fval = (k: string) => val(k);
+  const fset = (k: string, v: string) => set(k, v);
 
-  // Sync specialities once the customer data has loaded from storage
-  useEffect(() => {
-    setSpecs(String(data.specialities ?? "").split(",").map((s) => s.trim()).filter(Boolean));
-  }, [data.specialities]);
+  const aboutTitleV = val("about", "About Us");
+  const aboutV = val("about_us");
+  const specTitleV = val("specialties_title", "Our Specialties");
 
-  const aboutTitleV = aboutTitle ?? String(data.about ?? "About Us");
-  const aboutV = about ?? String(data.about_us ?? "");
-  const specTitleV = specTitle ?? String(data.specialties_title ?? "Our Specialties");
-
-  const specsTouched = useRef(false);
-  const addSpec = () => { const v = newSpec.trim(); if (!v) return; specsTouched.current = true; setSpecs((s) => [...s, v]); setNewSpec(""); };
-  const removeSpec = (i: number) => { specsTouched.current = true; setSpecs((s) => s.filter((_, idx) => idx !== i)); };
-
-  // AUTO-SAVE: persist a beat after the last change — no Save button. Skips
-  // until the user actually edits something (nulls = untouched hydration state).
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const timer = useRef<number | null>(null);
-  const touched = aboutTitle !== null || about !== null || specTitle !== null || photo !== null || Object.keys(fields).length > 0 || specsTouched.current;
-  useEffect(() => {
-    if (!touched) return;
-    setStatus("saving");
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
-      update({
-        about: aboutTitleV, about_us: aboutV, specialties_title: specTitleV, specialities: specs.join(","),
-        nature: fval("nature"),
-        photo: photoV,
-        employee_id: fval("employee_id"), blood_group: fval("blood_group"), joining_date: fval("joining_date"),
-        membership_id: fval("membership_id"), membership_type: fval("membership_type"),
-        member_since: fval("member_since"), valid_till: fval("valid_till"),
-      });
-      setStatus("saved");
-    }, 700);
-    return () => { if (timer.current) clearTimeout(timer.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aboutTitle, about, specTitle, specs, photo, fields]);
+  // The specialities are one comma-separated field of the card.
+  const specs = val("specialities").split(",").map((s) => s.trim()).filter(Boolean);
+  const setSpecs = (next: string[]) => set("specialities", next.join(","));
+  const addSpec = () => { const v = newSpec.trim(); if (!v) return; setSpecs([...specs, v]); setNewSpec(""); };
+  const removeSpec = (i: number) => setSpecs(specs.filter((_, idx) => idx !== i));
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -61,17 +34,17 @@ export function AboutEditor() {
       <Panel title="About Us" subtitle="Section title and description">
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Section Title"><input value={aboutTitleV} onChange={(e) => setAboutTitle(e.target.value)} className={fieldCls} placeholder="About Us" /></Field>
+            <Field label="Section Title"><input value={aboutTitleV} onChange={(e) => set("about", e.target.value)} className={fieldCls} placeholder="About Us" /></Field>
             <Field label="Business nature" hint="Shown under your name on the card — e.g. “Digital Marketing Agency”">
               <div className="relative"><Info size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" /><input value={fval("nature")} onChange={(e) => fset("nature", e.target.value)} className={`${fieldCls} pl-9`} placeholder="e.g. Real Estate Advisory" /></div>
             </Field>
           </div>
-          <Field label="Description"><textarea value={aboutV} onChange={(e) => setAbout(e.target.value)} className={areaCls} placeholder="Describe your business, mission and what makes you unique…" /></Field>
+          <Field label="Description"><textarea value={aboutV} onChange={(e) => set("about_us", e.target.value)} className={areaCls} placeholder="Describe your business, mission and what makes you unique…" /></Field>
         </div>
       </Panel>
 
       <Panel title="Specialities" subtitle="Highlight what you do best">
-        <Field label="Section Title"><input value={specTitleV} onChange={(e) => setSpecTitle(e.target.value)} className={fieldCls} placeholder="Our Specialties" /></Field>
+        <Field label="Section Title"><input value={specTitleV} onChange={(e) => set("specialties_title", e.target.value)} className={fieldCls} placeholder="Our Specialties" /></Field>
         <div className="flex flex-wrap gap-2 mt-4 mb-3">
           {specs.map((s, i) => (
             <span key={i} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full bg-[#FEF3C7] text-[#92400E] text-xs font-medium">
@@ -89,7 +62,7 @@ export function AboutEditor() {
 
       <Panel title="Photo & Card Details" subtitle="For the premium Business / ID / Membership card designs">
         <div className="flex items-start gap-4">
-          <ImagePick value={photoV} onChange={(u) => setPhoto(u)} className="w-24 h-24" label="Photo" removable what="photo" />
+          <ImagePick value={photoV} onChange={(u) => set("photo", u)} className="w-24 h-24" label="Photo" removable what="photo" />
           <div className="flex-1 text-[12px] text-[#64748B] pt-1 min-w-0">
             <p className="font-semibold text-[#334155] mb-1">Profile photo</p>
             <p>A clear headshot shown on the ID, Membership and Business-card designs. Your <b>company logo</b> is set separately on the <b>Edit Card</b> page — both appear together on the card.</p>

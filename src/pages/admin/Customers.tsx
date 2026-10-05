@@ -8,14 +8,15 @@ import {
   LayoutGrid, List, Download, ArrowUpDown, Activity, Layers, Send, Copy, Handshake,
 } from "lucide-react";
 import { toast } from "sonner";
-import { imgUrl, decodeSpecialities, loadCustomerContent, loadMySnapshot } from "@/lib/cardContent";
-import { applySnapshotToLocal } from "@/hooks/useCardHydration";
+import { imgUrl, decodeSpecialities, loadCustomerContent, loadMySnapshot, type MySnapshot } from "@/lib/cardContent";
+import { applySnapshotToLocal, readLocalCard, setFirstLoadFailed } from "@/hooks/useCardHydration";
+import { decideOnLoad, sameCard, storedCardIsFor } from "@/lib/snapshotSync";
 import { buildCardHtml } from "@/card-template/buildCard";
 import { fetchAdminData, hideAdminRecords } from "@/lib/adminData";
 import { trpc } from "@/providers/trpc";
 import { accountDetailsWhatsApp, featureUpdateWhatsApp, whatsappLink } from "@/lib/shareTemplates";
-import { scopedKey } from "@/hooks/useCustomer";
-import { setSession, okToReplaceMainSession } from "@/lib/session";
+import { scopedKey, getActiveCardId, setActiveCardId, readCustomer, readUnsaved, writeUnsaved } from "@/hooks/useCustomer";
+import { setSession, okToReplaceMainSession, getToken, getSessionUser, clearSession } from "@/lib/session";
 import { ActionMenu, AdminModal as Modal, type ActionItem } from "@/components/admin/RowActions";
 import AssignResellerModal from "@/components/admin/AssignResellerModal";
 import SendEmailModal from "@/components/admin/SendEmailModal";
@@ -354,9 +355,6 @@ export default function AdminCustomers() {
       authUser = res.user;
       token = res.token;
     } catch { /* no DB account — preview-only */ }
-    // Set the impersonated identity in the MAIN portal (keeping the admin's own
-    // session intact) so scopedKey() targets the client's namespace.
-    setSession(token, authUser, "main");
     // Open the card the customer actually has LIVE. A published snapshot (a
     // new-flow card, or a legacy card that has since been refreshed) is the
     // primary copy, so load it the way the dashboard's own hydration does - which
@@ -364,28 +362,93 @@ export default function AdminCustomers() {
     // Seeding the frozen customers.json record instead made hydration skip (a card
     // "already exists locally"), and the first auto-publish then force-saved the
     // OLD card over the live one.
-    let fromSnapshot = false;
+    // Everything is loaded BEFORE the session is switched or anything is written.
+    // The old site's record is used only when the server says the customer has
+    // NO live card: if the live card can't be read (a server error, no
+    // connection) nothing is opened - that fallback is how years-old content
+    // got put back on a live card.
+    let snap: MySnapshot | null = null;
     if (!token.startsWith("impersonate_")) {
-      try {
-        const snap = await loadMySnapshot();
-        if (snap) fromSnapshot = applySnapshotToLocal(authUser, snap);
-      } catch { /* no snapshot reachable - fall back to the legacy record */ }
+      try { snap = await loadMySnapshot(undefined, token); }
+      catch { toast.error(`Couldn't load ${c.name}'s live card, so nothing was opened. Please try again.`); return; }
     }
+    // The old site's files: the whole card when there is no live one; otherwise
+    // only its uploads, which a snapshot doesn't carry.
     let content: Awaited<ReturnType<typeof loadCustomerContent>> | null = null;
-    try { content = await loadCustomerContent(String(c.slug)); } catch { content = null; }
-    if (!fromSnapshot) {
-      localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(rec));
-      if (content) {
-        localStorage.setItem(scopedKey("dc_products"), JSON.stringify(content.products));
-        localStorage.setItem(scopedKey("dc_gallery"), JSON.stringify(content.gallery));
-        localStorage.setItem(scopedKey("dc_videos"), JSON.stringify(content.videos));
-        localStorage.setItem(scopedKey("dc_offers"), JSON.stringify(content.offers));
-        localStorage.setItem(scopedKey("dc_qrcode"), JSON.stringify(content.qrcodes));
-      }
+    try { content = await loadCustomerContent(String(c.slug), { strict: true }); }
+    catch {
+      if (!snap) { toast.error(`Couldn't load ${c.name}'s card, so nothing was opened. Please try again.`); return; }
     }
-    // Uploads are not part of a snapshot; they still live in the legacy files.
-    if (content) localStorage.setItem(scopedKey("dc_uploads"), JSON.stringify(content.uploads));
+    // Set the impersonated identity in the MAIN portal (keeping the admin's own
+    // session intact) so scopedKey() targets the client's namespace.
+    const mainWas = { token: getToken("main"), user: getSessionUser("main") };
+    setSession(token, authUser, "main");
+    const cardWas = getActiveCardId();
+    let lostEdit = false;
+    try {
+      // setSession doesn't say when storage was too full to take it - and then
+      // every write below would land in someone else's namespace.
+      if (getToken("main") !== token) throw new DOMException("The session couldn't be stored.", "QuotaExceededError");
+      // The snapshot is ONE card's copy; write it into that card, not into
+      // whichever of the customer's cards this browser had open last.
+      if (snap) setActiveCardId(Number(snap.cardId) || 1);
+      // An edit made on an earlier visit from this browser that never got saved
+      // (the admin left before it went out). If the card hasn't changed on the
+      // server since, this browser's copy is kept and the dashboard saves it on
+      // opening, as it does for the owner; if it has, the server's copy is
+      // opened and the admin is told the edit is gone - same rules, decideOnLoad.
+      // (A preview-only session can't save anything: it always opens fresh.)
+      const waiting = !token.startsWith("impersonate_") && localStorage.getItem(scopedKey("dc_customer")) ? readUnsaved() : null;
+      // …and only when the copy here IS this customer's. A preview of an
+      // old-site customer who has no account is stored under their OLD id, which
+      // can be a real account's id: kept on the strength of the id alone, that
+      // customer's card opened — and was then saved — as this one's.
+      const mine = !!waiting && storedCardIsFor(readCustomer().email, [authUser.email, (snap?.data?.customer as { email?: unknown } | undefined)?.email]);
+      const pending = mine ? waiting : null;
+      const answer = snap;
+      const onOpen = pending ? decideOnLoad({
+        failed: false,
+        serverTs: String(answer?.updatedAt ?? ""),
+        localTs: localStorage.getItem(scopedKey("dc_snap_ts")) || "",
+        unsaved: pending,
+        sameContent: () => sameCard(readLocalCard(), answer?.data),
+      }) : "take-server";
+      // (A change left unsaved under this id that can't be shown to be this
+      // customer's is not kept either — and that is said too.)
+      lostEdit = onOpen === "take-server-notify" || (!!waiting && !mine);
+      if (onOpen === "push-local" || onOpen === "keep-local") {
+        // Kept as it is: nothing is written over it.
+      } else if (snap) {
+        if (!applySnapshotToLocal(authUser, snap)) throw new Error("The live card has no content to open.");
+      } else {
+        localStorage.setItem(scopedKey("dc_customer"), JSON.stringify(rec));
+        if (content) {
+          localStorage.setItem(scopedKey("dc_products"), JSON.stringify(content.products));
+          localStorage.setItem(scopedKey("dc_gallery"), JSON.stringify(content.gallery));
+          localStorage.setItem(scopedKey("dc_videos"), JSON.stringify(content.videos));
+          localStorage.setItem(scopedKey("dc_offers"), JSON.stringify(content.offers));
+          localStorage.setItem(scopedKey("dc_qrcode"), JSON.stringify(content.qrcodes));
+        }
+        writeUnsaved(null); // a fresh copy: no edit of an earlier visit is waiting to be saved
+        setFirstLoadFailed(false); // …and it is the whole card, whatever load failed here before
+      }
+      // Uploads are not part of a snapshot; they still live in the legacy files.
+      if (content) localStorage.setItem(scopedKey("dc_uploads"), JSON.stringify(content.uploads));
+    } catch (e) {
+      // Usually this browser's storage is full (it keeps every customer opened
+      // from here). Put the session back as it was and stop - never carry on
+      // into the dashboard with half a card, or with the old site's copy.
+      setActiveCardId(cardWas);
+      if (mainWas.token && mainWas.user) setSession(mainWas.token, mainWas.user, "main");
+      else clearSession("main");
+      const full = e instanceof DOMException && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED");
+      toast.error(full
+        ? `Couldn't open ${c.name}'s card - this browser's storage is full. Clear this site's data in the browser (or use another browser) and try again.`
+        : `Couldn't open ${c.name}'s card, so nothing was changed. Please try again.`, { duration: 10000 });
+      return;
+    }
     toast.success(`Logged in as ${c.name}`);
+    if (lostEdit) toast.warning(`An unsaved change from your earlier visit to ${c.name}'s card couldn't be kept - the card was changed since. The latest version is open.`, { duration: 10000 });
     navigate("/dashboard");
   };
   /* Readable but strong: no look-alike characters, easy to read out on a call. */

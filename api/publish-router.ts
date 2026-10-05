@@ -11,6 +11,7 @@ import { sendEmail } from "./lib/mail";
 import { notifyUser } from "./lib/notify";
 import { cardPublishedEmail } from "./lib/email-templates";
 import { clearExtraViews, forgetExtraViews, moveExtraViews } from "./lib/card-views";
+import { checkSnapshotSave, nextSnapshotStamp } from "./lib/snapshot-version";
 import { getDefaultDesign } from "./template-router";
 
 /* A save that carries no design must not wipe the card's template. A card
@@ -194,11 +195,21 @@ export const publishRouter = createRouter({
       data: z.any(),
       cardId: z.number().int().positive().default(1),
       // Optimistic-concurrency base: the snapshot updatedAt this client last
-      // synced from. When provided and the stored row is NEWER, the save is
-      // rejected — so a browser holding stale localStorage can never silently
-      // overwrite content published from another device ("old images return").
-      // Omitted = force (the user's deliberate Publish click).
+      // synced from. A save over an already-published card must carry it: when
+      // the stored row is NEWER the save is rejected (SNAPSHOT_STALE), and when
+      // it is missing the save is rejected too (SNAPSHOT_NO_BASE) — so a browser
+      // holding stale localStorage can never silently overwrite content
+      // published from another device ("old images return"). A card's first
+      // publish needs neither.
       baseTs: z.string().optional(),
+      // The owner's confirmed "publish mine anyway": skips the check above.
+      // Never sent on its own by a client — only after the owner was told the
+      // card changed elsewhere and chose to overwrite it.
+      force: z.boolean().optional(),
+      // 2 from the dashboard that follows the rule above, on every save. A
+      // page still open from before it sends none, and is let through without
+      // a base for a few more days (OLD_PAGE_SAVE_CUTOFF) so it keeps saving.
+      client: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -216,20 +227,29 @@ export const publishRouter = createRouter({
       const existing = await db.select().from(publishedCards).where(owner);
       await keepDesign(db, data, existing[0]?.data);
       if (existing[0]) {
-        if (input.baseTs) {
-          const rowTs = existing[0].updatedAt ? new Date(existing[0].updatedAt).getTime() : 0;
-          const baseTs = Date.parse(input.baseTs);
-          // Reject ONLY when the stored row is meaningfully NEWER than the base
-          // this client synced from — i.e. someone else published in between.
-          // Deliberately one-sided and generously tolerant: an older row (a
-          // restored/re-imported DB) or small clock skew must never block a
-          // save, or the client deadlocks and the owner's edits never reach
-          // their live card.
-          if (Number.isFinite(baseTs) && rowTs - baseTs > 10_000) {
+        // Checked and written under one row lock, so of two saves made from the
+        // same version only the first goes through. Reject ONLY when the stored
+        // row is NEWER than the base this client synced from — i.e. someone else
+        // published in between — or when the client names no base at all.
+        // Deliberately one-sided: an older row (a restored/re-imported DB) must
+        // never block a save. The rule itself is in lib/snapshot-version.ts.
+        const saved = await db.transaction(async (tx) => {
+          const [cur] = await tx.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner).for("update");
+          const stored = cur?.updatedAt ?? existing[0].updatedAt;
+          const check = checkSnapshotSave(stored, input.baseTs, { force: input.force, client: input.client });
+          if (check === "stale") {
             throw new TRPCError({ code: "CONFLICT", message: "SNAPSHOT_STALE: this card was updated elsewhere — refresh to load the latest version." });
           }
-        }
-        await db.update(publishedCards).set({ slug, data }).where(owner);
+          if (check === "no_base") {
+            throw new TRPCError({ code: "CONFLICT", message: "SNAPSHOT_NO_BASE: this page is out of date — refresh it to load the latest version of your card, then make your change again." });
+          }
+          // Its own stamp for every write (never the same second as the last
+          // one), so the copy another device made before this save is refused.
+          const stamp = nextSnapshotStamp(stored);
+          await tx.update(publishedCards).set({ slug, data, updatedAt: stamp }).where(owner);
+          return { stamp, check };
+        });
+        if (saved.check === "ok_legacy") console.warn(`[publish] save from an old page accepted without a base (user ${ctx.user.id})`);
         // The card moved to a new address. Visit stats are kept by address, so
         // its history moves with it, and its extra views too — except an
         // address a legacy card also uses, whose events may belong to that
@@ -246,8 +266,10 @@ export const publishRouter = createRouter({
           forgetExtraViews(oldSlug);
           forgetExtraViews(newSlug);
         }
-        const fresh = await db.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner);
-        return { ok: true, publicId: existing[0].publicId, updatedAt: fresh[0]?.updatedAt ? new Date(fresh[0].updatedAt).toISOString() : null };
+        // The stamp this save wrote — never a fresh read of the row, which by
+        // now could carry another write's stamp. The client keeps it as the
+        // version of the copy it holds, so it has to name exactly this save.
+        return { ok: true, publicId: existing[0].publicId, updatedAt: saved.stamp.toISOString() };
       }
       const publicId = nanoid(10);
       await db.insert(publishedCards).values({ userId: ctx.user.id, cardId, slug, publicId, data });
@@ -256,6 +278,7 @@ export const publishRouter = createRouter({
       // The signup starter card is inserted in auth-router, so this never
       // doubles up with the welcome email.
       void notifyCardPublished(ctx.user, slug, publicId, data).catch(() => {});
+      // The database stamps a new row itself, so here the stamp is read back.
       const fresh = await db.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner);
       return { ok: true, publicId, updatedAt: fresh[0]?.updatedAt ? new Date(fresh[0].updatedAt).toISOString() : null };
     }),
@@ -269,24 +292,41 @@ export const publishRouter = createRouter({
       theme: z.string(),
       color: z.string().optional(),
       color2: z.string().optional(),
+      // The stamp of the copy the caller holds. Never a reason to refuse — see
+      // `replaced` in the answer, which is how the caller learns it was behind.
+      baseTs: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
       const cardId = input.cardId || 1;
       const owner = and(eq(publishedCards.userId, ctx.user.id), eq(publishedCards.cardId, cardId));
-      const rows = await db.select().from(publishedCards).where(owner);
-      const row = rows[0];
-      if (!row) return { ok: true, published: false }; // not published yet — nothing live to update
-      const data = (row.data && typeof row.data === "object" ? row.data : {}) as Record<string, unknown>;
-      const customer = { ...((data.customer as Record<string, unknown>) || {}), theme: input.theme } as Record<string, unknown>;
-      if (input.color !== undefined) customer.color = input.color;
-      if (input.color2 !== undefined) customer.color2 = input.color2;
-      await db.update(publishedCards).set({ data: { ...data, customer } }).where(owner);
-      // Return the fresh version stamp so the client can keep its dc_snap_ts in
-      // step — otherwise the next freshness check would see "server changed" and
-      // pull the snapshot down OVER any not-yet-published local edits.
-      const fresh = await db.select({ updatedAt: publishedCards.updatedAt }).from(publishedCards).where(owner);
-      return { ok: true, published: true, updatedAt: fresh[0]?.updatedAt ? new Date(fresh[0].updatedAt).toISOString() : null };
+      // Read and written under one row lock: this writes the stored card back
+      // with a new design, so a save landing in between must not be undone. The
+      // content is the server's own copy — never the client's — so no base is
+      // needed; the new stamp makes every other device reload before it saves.
+      const written = await db.transaction(async (tx) => {
+        const [row] = await tx.select().from(publishedCards).where(owner).for("update");
+        if (!row) return null;
+        const data = (row.data && typeof row.data === "object" ? row.data : {}) as Record<string, unknown>;
+        const customer = { ...((data.customer as Record<string, unknown>) || {}), theme: input.theme } as Record<string, unknown>;
+        if (input.color !== undefined) customer.color = input.color;
+        if (input.color2 !== undefined) customer.color2 = input.color2;
+        const stamp = nextSnapshotStamp(row.updatedAt);
+        await tx.update(publishedCards).set({ data: { ...data, customer }, updatedAt: stamp }).where(owner);
+        return { stamp, replaced: new Date(row.updatedAt) };
+      });
+      if (!written) return { ok: true, published: false }; // not published yet — nothing live to update
+      // `updatedAt` is the stamp this write made (never a fresh read of the
+      // row — another write could have landed since) and `replaced` the one it
+      // was applied on. The design went onto the STORED card, which is the
+      // caller's copy only when the caller was at `replaced`: only then may it
+      // take `updatedAt` as its own version. Otherwise its copy is older, and
+      // calling it current would let its next save write over the newer card.
+      return {
+        ok: true, published: true,
+        updatedAt: written.stamp.toISOString(),
+        replaced: Number.isFinite(written.replaced.getTime()) ? written.replaced.toISOString() : null,
+      };
     }),
 
   // Authed: is a slug free for this user's given card? (live check while editing)

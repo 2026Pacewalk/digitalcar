@@ -76,6 +76,9 @@ export default function CustomerSettings() {
   }, [data, accent]);
 
   // Seed the customer's real SEO data (separate `seo` table, keyed by user id) if not present yet.
+  // It is looked up, not changed by the owner, so it is kept in this browser
+  // without counting as an edit (`derived`): nothing is saved because Settings
+  // was opened, and it goes to the server with the owner's next real change.
   useEffect(() => {
     let stored: Record<string, unknown> = {};
     try { stored = JSON.parse(localStorage.getItem(scopedKey("dc_customer")) || "{}"); } catch { /* default */ }
@@ -92,7 +95,7 @@ export default function CustomerSettings() {
           seo_title: row?.seo_title ?? "", seo_description: row?.seo_description ?? "",
           keyword1: row?.keyword1 ?? "", keyword2: row?.keyword2 ?? "", keyword3: row?.keyword3 ?? "",
           keyword4: row?.keyword4 ?? "", keyword5: row?.keyword5 ?? "",
-        });
+        }, { derived: true });
       })
       .catch(() => { /* leave blank */ });
     return () => { cancelled = true; };

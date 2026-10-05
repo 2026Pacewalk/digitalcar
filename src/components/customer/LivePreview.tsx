@@ -40,11 +40,13 @@ export default function LivePreview({ height = 620, frame = true }: { height?: n
   const scrollRef = useRef(0);
   const themeRef = useRef<string | null>(null);
 
-  // Any edit anywhere in the dashboard re-renders the card.
+  // Any edit anywhere in the dashboard re-renders the card — and so does the
+  // latest version arriving from the server or from another tab.
   useEffect(() => {
     const onChange = () => setTick((t) => t + 1);
-    window.addEventListener("dc:content-changed", onChange);
-    return () => window.removeEventListener("dc:content-changed", onChange);
+    const events = ["dc:content-changed", "dc:content-reloaded", "storage"];
+    events.forEach((e) => window.addEventListener(e, onChange));
+    return () => events.forEach((e) => window.removeEventListener(e, onChange));
   }, []);
 
   const slug = String(readCustomer().slug || readCustomer().username || "").trim().toLowerCase();

@@ -91,33 +91,54 @@ export function contentSeeder<K extends keyof Awaited<ReturnType<typeof loadCust
   };
 }
 
+/* The two loaders below answer "no card" with null and THROW when the server
+   couldn't be asked (offline, a 5xx, signed out). The difference matters: the
+   dashboard loads the old site's copy of a card only when there is no live one,
+   and an error mistaken for "no card" put years-old content back on live cards. */
+
 /* Fetch the signed-in user's real legacy card profile (matched by email,
    server-side). Returns the raw legacy customer row (credentials stripped)
-   or null if the user has no legacy card / isn't signed in. */
+   or null if the user has no legacy card. */
 export async function loadMyLegacyProfile(): Promise<Record<string, unknown> | null> {
-  try {
-    const token = getToken("main");
-    const r = await fetch("/api/my/card", { headers: { "x-auth-token": token } });
-    if (!r.ok) return null;
-    return (await r.json()) as Record<string, unknown>;
-  } catch { return null; }
+  const r = await fetch("/api/my/card", { headers: { "x-auth-token": getToken("main") } });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`Couldn't load the card (${r.status})`);
+  return (await r.json()) as Record<string, unknown>;
 }
 
 /* Fetch the signed-in user's published SNAPSHOT (customer + products + gallery +
    videos + offers + qrcodes). The snapshot is the LIVE card's data — the primary
-   copy the dashboard hydrates from. Returns { slug, data, updatedAt } or null. */
-export type MySnapshot = { slug?: string; data?: Record<string, unknown>; updatedAt?: string };
-export async function loadMySnapshot(): Promise<MySnapshot | null> {
-  try {
-    const token = getToken("main");
-    const r = await fetch("/api/my/snapshot", { headers: { "x-auth-token": token } });
-    if (!r.ok) return null;
-    return (await r.json()) as MySnapshot | null;
-  } catch { return null; }
+   copy the dashboard hydrates from. Returns { slug, cardId, data, updatedAt },
+   or null when there is no published card. `cardId` asks for one card of a
+   multi-card account (default: the primary); `token` reads another account's
+   card without signing this browser in as them (admin "Login as Client"). */
+export type MySnapshot = { slug?: string; cardId?: number; data?: Record<string, unknown>; updatedAt?: string };
+export async function loadMySnapshot(cardId?: number, token: string = getToken("main")): Promise<MySnapshot | null> {
+  const r = await fetch(`/api/my/snapshot${cardId ? `?cardId=${cardId}` : ""}`, { headers: { "x-auth-token": token } });
+  if (!r.ok) throw new Error(`Couldn't load the card (${r.status})`);
+  const snap = (await r.json()) as MySnapshot | null;
+  // A server that doesn't know `cardId` answers with the primary card. That is
+  // not this card's copy, and must never be written into it.
+  if (snap && cardId && snap.cardId !== undefined && Number(snap.cardId) !== cardId) return null;
+  return snap;
 }
 
-export async function loadCustomerContent(slug: string) {
-  const j = (u: string) => fetch(u).then((r) => r.json()).catch(() => [] as Raw[]);
+/* The old site's content for a card. A file that can't be fetched counts as
+   empty — fine for showing a card. `strict` is for the callers that go on to
+   SAVE what they loaded (dashboard hydration, admin "Login as Client"): there
+   a failed fetch throws, so a server hiccup can't turn into an empty list that
+   later gets published. (A file this deployment doesn't have is still empty.) */
+export async function loadCustomerContent(slug: string, opts: { strict?: boolean } = {}) {
+  const j = async (u: string): Promise<Raw[]> => {
+    try {
+      const r = await fetch(u);
+      if (!r.ok) throw new Error(`${u} ${r.status}`);
+      try { const rows = await r.json(); return Array.isArray(rows) ? (rows as Raw[]) : []; } catch { return []; }
+    } catch (e) {
+      if (opts.strict) throw e;
+      return [];
+    }
+  };
   const [prods, gals, vids, offs, qrs, ups] = await Promise.all([
     j("/product.json"), j("/gallery.json"), j("/video.json"), j("/offer.json"), j("/qrcode.json"), j("/uploads.json"),
   ]);

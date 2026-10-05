@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { healUploadUrl } from "@/lib/img";
 import { getSessionUser } from "@/lib/session";
+import { markUnsaved, parseUnsaved, tidyingChanged, type UnsavedMark } from "@/lib/snapshotSync";
 
 /* Persist to localStorage, SURFACING a quota failure instead of swallowing it.
    A silent failure here meant "my new image reverted after refresh" — the UI
@@ -34,12 +35,65 @@ function healCustomerImgs<T extends Record<string, unknown>>(rec: T): T {
   return typeof rec.logo === "string" ? { ...rec, logo: healUploadUrl(rec.logo) } : rec;
 }
 
+/* "This browser holds an edit the server hasn't got yet." Set on every real
+   edit and cleared when a save goes through (or when the server's copy replaces
+   this one). It is what lets the next dashboard load tell an edit that never
+   got saved from a copy that is simply old: the first is sent, the second is
+   replaced. Stored beside the card it describes (same user + card scope). */
+export function readUnsaved(key: string = scopedKey("dc_dirty")): UnsavedMark | null {
+  try { return parseUnsaved(localStorage.getItem(key)); } catch { return null; }
+}
+export function writeUnsaved(mark: UnsavedMark | null, key: string = scopedKey("dc_dirty")): void {
+  try {
+    if (mark) localStorage.setItem(key, JSON.stringify(mark));
+    else localStorage.removeItem(key);
+  } catch { /* ignore */ }
+}
+export function noteUnsavedEdit(): void {
+  let localTs = "";
+  try { localTs = localStorage.getItem(scopedKey("dc_snap_ts")) || ""; } catch { /* none recorded */ }
+  writeUnsaved(markUnsaved(readUnsaved(), localTs, `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`));
+}
+
 /* Fire a debounce-able signal whenever the owner edits card content, so an
    auto-publish listener can re-snapshot a live card to its public page.
    (Bulk hydration writes localStorage directly and does NOT call this, so
    loading a card never triggers a publish — only real edits do.) */
 export function signalContentChanged(): void {
+  noteUnsavedEdit();
   try { window.dispatchEvent(new CustomEvent("dc:content-changed")); } catch { /* SSR / no window */ }
+}
+
+/* The stored card was REPLACED (the server's newer copy was loaded), not
+   edited. Open screens re-read it; nothing is saved because of it. Counted per
+   card, so a save that was uploading meanwhile can tell that the copy it sent
+   is no longer the one here (see saveCardSnapshot). */
+const reloads = new Map<string, number>();
+export function signalContentReloaded(): void {
+  const card = scopedKey("dc_customer");
+  reloads.set(card, (reloads.get(card) ?? 0) + 1);
+  try { window.dispatchEvent(new CustomEvent("dc:content-reloaded")); } catch { /* SSR / no window */ }
+}
+/** How many times this tab has loaded a whole copy over the card (see above). */
+export function contentReloads(card: string = scopedKey("dc_customer")): number {
+  return reloads.get(card) ?? 0;
+}
+
+/* Call `resync` whenever the stored card may have changed under an open screen:
+   an edit elsewhere in this tab, the server's copy replacing the local one, or
+   another tab of this browser writing the same key. Without the last two a
+   screen kept showing — and then saved — a copy that was no longer the card. */
+function onStoredChange(key: () => string, resync: () => void): () => void {
+  const win = window;
+  const onStorage = (e: { key: string | null }) => { if (e.key === key()) resync(); };
+  win.addEventListener("dc:content-changed", resync);
+  win.addEventListener("dc:content-reloaded", resync);
+  win.addEventListener("storage", onStorage);
+  return () => {
+    win.removeEventListener("dc:content-changed", resync);
+    win.removeEventListener("dc:content-reloaded", resync);
+    win.removeEventListener("storage", onStorage);
+  };
 }
 
 export type CustomerRecord = Record<string, unknown> & {
@@ -291,6 +345,29 @@ function dropDemoSentinels(c: CustomerRecord): CustomerRecord {
   return out as CustomerRecord;
 }
 
+/* Is the stored record still exactly what seedFromAuth() makes for this account
+   — nothing typed into it, nothing loaded into it? useCustomer() stores that
+   seed when a screen opens on an empty browser, so after a first load that
+   failed it is all there is; hydration must not take it for the card. The two
+   dates are left out: they are "today" on whichever day the seed was made. */
+export function isUntouchedSeed(): boolean {
+  const u = getAuthUser();
+  if (!u || isShowcase(u)) return false;
+  try {
+    const raw = localStorage.getItem(scopedKey("dc_customer"));
+    if (!raw) return false;
+    const norm = (rec: Record<string, unknown>) => {
+      const out = dropDemoSentinels({ ...BLANK_CUSTOMER, ...rec } as CustomerRecord) as Record<string, unknown>;
+      delete out.activated_on; delete out.expired_on;
+      return out;
+    };
+    const stored = norm(JSON.parse(raw) as Record<string, unknown>);
+    const seed = norm(seedFromAuth(u));
+    const keys = new Set([...Object.keys(stored), ...Object.keys(seed)]);
+    return [...keys].every((k) => String(stored[k] ?? "") === String(seed[k] ?? ""));
+  } catch { return false; }
+}
+
 /** Read the current user's card record synchronously (scoped + seeded). */
 export function readCustomer(): CustomerRecord {
   const u = getAuthUser();
@@ -315,11 +392,15 @@ export function useCustomer() {
     try {
       const raw = localStorage.getItem(key);
       if (raw) {
-        const merged = { ...BLANK_CUSTOMER, ...JSON.parse(raw) } as CustomerRecord;
+        const stored = JSON.parse(raw) as Record<string, unknown>;
+        const merged = { ...BLANK_CUSTOMER, ...stored } as CustomerRecord;
         const clean = healCustomerImgs(showcase ? merged : dropDemoSentinels(merged));
         setData(clean);
-        // Persist the cleaned record so the leaked demo values are gone for good.
-        if (!showcase) { try { localStorage.setItem(key, JSON.stringify(clean)); } catch { /* ignore */ } }
+        // Persist the cleaned record so the leaked demo values are gone for good
+        // — but only when cleaning changed something that was in it. Written
+        // back as it was, plus blank fields, it reached every other tab of this
+        // browser as "the card changed", and they dropped what was being typed.
+        if (!showcase && tidyingChanged(stored, clean)) { try { localStorage.setItem(key, JSON.stringify(clean)); } catch { /* ignore */ } }
         return;
       }
     } catch { /* seed below */ }
@@ -334,32 +415,58 @@ export function useCustomer() {
      (say the Social editor embedded in the card builder) is invisible to the
      other (the builder's live preview), so the card appeared not to update.
      Re-read the shared record whenever any instance signals a change. */
-  useEffect(() => {
-    const resync = () => {
-      try {
-        const raw = localStorage.getItem(scopedKey("dc_customer"));
-        if (!raw) return;
-        setData(healCustomerImgs({ ...BLANK_CUSTOMER, ...JSON.parse(raw) } as CustomerRecord));
-      } catch { /* keep what we have */ }
-    };
-    window.addEventListener("dc:content-changed", resync);
-    return () => window.removeEventListener("dc:content-changed", resync);
-  }, []);
+  useEffect(() => onStoredChange(() => scopedKey("dc_customer"), () => {
+    const stored = storedCustomer();
+    if (stored) setData(stored);
+  }), []);
 
-  const update = useCallback((patch: Partial<CustomerRecord>) => {
-    setData((prev) => {
-      const next = { ...prev, ...patch };
-      persistOrWarn(scopedKey("dc_customer"), JSON.stringify(next));
-      // Keep the card registry's label/slug in step with profile edits.
-      if (patch.name !== undefined || patch.company_name !== undefined || patch.slug !== undefined) {
-        syncCardMeta({ name: String(next.company_name || next.name || "My Card"), slug: String(next.slug || "card") });
-      }
-      signalContentChanged();
-      return next;
-    });
+  // This screen's copy, for the one case below where nothing is stored yet.
+  const shown = useRef(data);
+  useEffect(() => { shown.current = data; }, [data]);
+
+  /* Returns whether the patch was stored, so a form can let go of the fields it
+     has handed over (and keep the ones a full storage refused).
+
+     `derived`: the values were worked out by the dashboard itself — brand
+     colours from the logo, the old site's SEO lines — not changed by the owner.
+     They are kept in this browser but are not an edit: the card isn't marked
+     unsaved and nothing is sent. Saved because a page was merely opened, they
+     moved the card's version under every other device (whose next real edit
+     was then refused) and could make a load look like a lost change. They go to
+     the server with the owner's next real edit. */
+  const update = useCallback((patch: Partial<CustomerRecord>, opts: { derived?: boolean } = {}): boolean => {
+    // Build on the STORED record, not this screen's copy of it: another tab, or
+    // the server's newer version, may have changed the card since it was read —
+    // and writing the old copy back would undo that.
+    const next = { ...(storedCustomer() ?? shown.current), ...patch };
+    if (!persistOrWarn(scopedKey("dc_customer"), JSON.stringify(next))) return false; // nothing changed; the toast says why
+    setData(next);
+    // Keep the card registry's label/slug in step with profile edits.
+    if (patch.name !== undefined || patch.company_name !== undefined || patch.slug !== undefined) {
+      syncCardMeta({ name: String(next.company_name || next.name || "My Card"), slug: String(next.slug || "card") });
+    }
+    if (!opts.derived) signalContentChanged();
+    return true;
   }, []);
 
   return { data, update };
+}
+
+/** The card record as stored right now (null when nothing is stored). */
+function storedCustomer(): CustomerRecord | null {
+  try {
+    const raw = localStorage.getItem(scopedKey("dc_customer"));
+    return raw ? healCustomerImgs({ ...BLANK_CUSTOMER, ...JSON.parse(raw) } as CustomerRecord) : null;
+  } catch { return null; }
+}
+
+/** A list as stored right now (null when the key holds no list). */
+function storedList<T>(key: string): T[] | null {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? (JSON.parse(raw) as T[]) : null;
+    return Array.isArray(parsed) ? healItemImgs(parsed) : null;
+  } catch { return null; }
 }
 
 /* Generic localStorage-backed collection (products, gallery, videos, uploads…).
@@ -402,51 +509,40 @@ export function useLocalList<T extends { id: number }>(baseKey: string, seed: T[
 
   /* Mirror of the useCustomer resync above: keep every list instance (and so
      the live preview) in step when another screen adds or edits an item. */
-  useEffect(() => {
-    const resync = () => {
-      try {
-        const raw = localStorage.getItem(key);
-        const parsed = raw ? (JSON.parse(raw) as T[]) : null;
-        if (Array.isArray(parsed)) setItems(healItemImgs(parsed));
-      } catch { /* keep what we have */ }
-    };
-    window.addEventListener("dc:content-changed", resync);
-    return () => window.removeEventListener("dc:content-changed", resync);
-  }, [key]);
+  useEffect(() => onStoredChange(() => key, () => {
+    const stored = storedList<T>(key);
+    if (stored) setItems(stored);
+  }), [key]);
+
+  // This screen's copy, for when nothing is stored yet (a list not started).
+  const shown = useRef(items);
+  useEffect(() => { shown.current = items; }, [items]);
 
   const persist = useCallback((next: T[]) => {
+    if (!persistOrWarn(key, JSON.stringify(next))) return; // nothing changed; the toast says why
     setItems(next);
-    persistOrWarn(key, JSON.stringify(next));
     signalContentChanged();
   }, [key]);
+
+  /* add / update / remove start from the STORED list, not this screen's copy of
+     it. A tab left open while the card was changed elsewhere (another tab, or
+     the server's newer version loaded) would otherwise write its old list back
+     whole — every other item's changes undone by editing one. */
+  const change = useCallback((edit: (cur: T[]) => T[]) => {
+    persist(edit(storedList<T>(key) ?? shown.current));
+  }, [key, persist]);
 
   const add = useCallback((item: Omit<T, "id">) => {
-    setItems((cur) => {
-      const id = Math.max(0, ...cur.map((i) => i.id)) + 1;
-      const next = [...cur, { ...item, id } as T];
-      persistOrWarn(key, JSON.stringify(next));
-      return next;
-    });
-    signalContentChanged();
-  }, [key]);
+    change((cur) => [...cur, { ...item, id: Math.max(0, ...cur.map((i) => i.id)) + 1 } as T]);
+  }, [change]);
 
   const update = useCallback((id: number, patch: Partial<T>) => {
-    setItems((cur) => {
-      const next = cur.map((i) => (i.id === id ? { ...i, ...patch } : i));
-      persistOrWarn(key, JSON.stringify(next));
-      return next;
-    });
-    signalContentChanged();
-  }, [key]);
+    change((cur) => cur.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  }, [change]);
 
   const remove = useCallback((id: number) => {
-    setItems((cur) => {
-      const next = cur.filter((i) => i.id !== id);
-      persistOrWarn(key, JSON.stringify(next));
-      return next;
-    });
-    signalContentChanged();
-  }, [key]);
+    change((cur) => cur.filter((i) => i.id !== id));
+  }, [change]);
 
   return { items, ready, add, update, remove, persist };
 }

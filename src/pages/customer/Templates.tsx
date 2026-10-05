@@ -3,7 +3,8 @@ import { useSearchParams, useNavigate } from "react-router";
 import { LayoutGrid, Check, Eye, Palette, Pipette, RotateCcw, SlidersHorizontal, X, Sparkles, Pencil, Lock, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import ModuleShell, { Panel } from "@/components/customer/ModuleShell";
-import { useCustomer, useLocalList, getActiveCardId, scopedKey } from "@/hooks/useCustomer";
+import { useCustomer, useLocalList } from "@/hooks/useCustomer";
+import { saveCardDesign, hasUnsavedEdit } from "@/hooks/useAutoPublish";
 import { contentSeeder } from "@/lib/cardContent";
 import { brandSecondaryFor } from "@/lib/brandColors";
 import { buildCardThumb } from "@/card-template/buildCard";
@@ -200,7 +201,7 @@ export function TemplatesEditor() {
     setSelId(id); setDirty(!alreadyLive);
     if (p) { setPrimary(""); setSecondary(p.secondary); } // reset custom to preset
   };
-  const updateDesign = trpc.publish.updateDesign.useMutation();
+  const client = trpc.useUtils().client;
   const apply = () => {
     if (!selected) return;
     const color = effPrimary;
@@ -209,6 +210,7 @@ export function TemplatesEditor() {
     // would override this in its preview and be autosaved back over it.
     try { window.dispatchEvent(new CustomEvent("dc:design-applied")); } catch { /* ignore */ }
     settledSel.current = selected.id;
+    const hadEdit = hasUnsavedEdit(); // asked before the design itself becomes one
     update({ theme: String(selected.style), color, color2 });
     setDirty(false);
     // ONE notification per template change: it shows straight away, then updates
@@ -217,22 +219,17 @@ export function TemplatesEditor() {
     const tid = toast.loading(label, { description: "Updating your live card…" });
     // Push the design to the LIVE published snapshot so the public card + QR
     // reflect it immediately (no need to re-open the builder and Publish again).
-    updateDesign.mutate(
-      { cardId: getActiveCardId(), theme: String(selected.style), color, color2 },
-      { onSuccess: (r) => {
-        // Keep the freshness marker in step with the server-side design write, so
-        // the next dashboard load doesn't pull the snapshot over local edits.
-        const ts = (r as { updatedAt?: string | null })?.updatedAt;
-        if (ts) { try { localStorage.setItem(scopedKey("dc_snap_ts"), ts); } catch { /* ignore */ } }
-        toast.success(label, {
-          id: tid,
-          description: r?.published ? "Your live card & QR now show this design" : "Publish your card to show it live",
-        });
-      },
-      onError: () => {
-        toast.success(label, { id: tid, description: "Saved here — publish to update your live card" });
-      } },
-    );
+    // It goes through the same queue as the saves and its answer is awaited
+    // there, whatever page is open by then — see saveCardDesign for what the
+    // answer does to this browser's version of the card.
+    void saveCardDesign((input) => client.publish.updateDesign.mutate(input), { theme: String(selected.style), color, color2 }, { hadEdit }).then((r) => {
+      toast.success(label, {
+        id: tid,
+        description: r.status === "live" ? "Your live card & QR now show this design"
+          : r.status === "not-published" ? "Publish your card to show it live"
+          : "Saved here — publish to update your live card",
+      });
+    });
   };
 
   // Try before applying: while a template is picked but not applied, the phone

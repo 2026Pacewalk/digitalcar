@@ -5,11 +5,14 @@ import {
   Wand2, User, Building2, Phone, MessageCircle, Mail, Globe, MapPin, Info, Palette,
   Eye, Check, Loader2, CloudOff, Rocket, X, ChevronRight, Gift, CalendarClock, Copy, Link2,
   Image as ImageIcon, LayoutGrid, Sparkles, Circle, Square, Briefcase,
-  Share2, ShoppingBag, Wallet, Star, Upload, ChevronLeft,
+  Share2, ShoppingBag, Wallet, Star, Upload, ChevronLeft, AlertTriangle,
 } from "lucide-react";
 import ModuleShell, { PanelFlat, Field, fieldCls, areaCls, ImagePick } from "@/components/customer/ModuleShell";
 import PublishModal from "@/components/customer/PublishModal";
-import { useCustomer, useLocalList, getActiveCardId, scopedKey } from "@/hooks/useCustomer";
+import { useCustomer, useLocalList, scopedKey } from "@/hooks/useCustomer";
+import { saveCardSnapshot, holdAutoSave, takeServerCopy } from "@/hooks/useAutoPublish";
+import { firstLoadFailed, pullLatestSnapshot, readLocalCard, useFirstLoadFailed } from "@/hooks/useCardHydration";
+import { LOAD_FAILED, saveRefusal } from "@/lib/snapshotSync";
 import { useValidityDays } from "@/hooks/useValidityDays";
 import { contentSeeder } from "@/lib/cardContent";
 import { buildCardHtml, isLinkBio } from "@/card-template/buildCard";
@@ -63,7 +66,6 @@ export default function CardStudio() {
   const { data: program } = trpc.referral.myProgram.useQuery();
   const { data: trialState } = trpc.trial.me.useQuery(undefined, { retry: false });
   const startTrial = trpc.trial.start.useMutation();
-  const saveSnapshot = trpc.publish.saveSnapshot.useMutation();
   const utils = trpc.useUtils();
 
   const pkgId = Number(data.package_id);
@@ -72,6 +74,7 @@ export default function CardStudio() {
 
   const [form, setForm] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const loadFailed = useFirstLoadFailed();
   const [showPreview, setShowPreview] = useState(false);
   const [activeTool, setActiveTool] = useState<ToolKey>("basics");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -81,6 +84,9 @@ export default function CardStudio() {
   const [sheetView, setSheetView] = useState<"menu" | "tool">("menu");
   type TrialInfo = { daysLeft: number; endsAt: string | Date | null; status: string } | undefined;
   const [publishInfo, setPublishInfo] = useState<{ first: boolean; trial: TrialInfo } | null>(null);
+  // Publish was refused because the card changed on another device: the owner
+  // is asked which copy to keep. `first` is carried over to a forced retry.
+  const [conflict, setConflict] = useState<{ first: boolean; busy: "" | "load" | "force" } | null>(null);
   const [previewHtml, setPreviewHtml] = useState("");
   const [realViews, setRealViews] = useState<number | null>(null);
   const timer = useRef<number | null>(null);
@@ -105,16 +111,61 @@ export default function CardStudio() {
   const previewThemeRef = useRef<string | null>(null);
 
   const val = (k: string) => (form[k] !== undefined ? form[k] : String(data[k] ?? ""));
+  /* The form holds a field only until it is stored: once update() has written
+     it, the card record is where it lives. A form that kept every field touched
+     since the screen opened wrote them all back on the next keystroke — over
+     whatever had been loaded from the server or changed in another tab since. */
+  const store = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const sent = formRef.current;
+    if (!Object.keys(sent).length) return;
+    let stored = false;
+    try { stored = update(sent); } catch { /* shown as "Unable to save" */ }
+    setStatus(stored ? "saved" : "error");
+    if (!stored) return;
+    const without = (f: Record<string, string>) => {
+      const rest = { ...f };
+      for (const k of Object.keys(sent)) if (rest[k] === sent[k]) delete rest[k];
+      return rest;
+    };
+    formRef.current = without(formRef.current);
+    setForm(without);
+  };
+  const storeRef = useRef(store);
+  useEffect(() => { storeRef.current = store; });
   const set = (k: string, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setStatus("saving");
     if (timer.current) clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
-      try { update(formRef.current); setStatus("saved"); }
-      catch { setStatus("error"); }
-    }, 700);
+    timer.current = window.setTimeout(() => storeRef.current(), 700);
   };
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  // The stored card was replaced under this form — the latest version loaded
+  // from the server, or written by another tab. What the form still holds was
+  // typed onto the copy that is gone: drop it, with its pending write, so a
+  // later keystroke can't put old fields over the card just loaded.
+  useEffect(() => {
+    const drop = () => {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+      if (!Object.keys(formRef.current).length) return;
+      formRef.current = {};
+      setForm({});
+      setStatus("idle");
+    };
+    const onStorage = (e: StorageEvent) => { if (e.key === scopedKey("dc_customer")) drop(); };
+    // The page is being left: store a field still waiting out the pause above.
+    const flush = () => { if (timer.current) storeRef.current(); };
+    window.addEventListener("dc:content-reloaded", drop);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("dc:flush-edits", flush);
+    return () => {
+      window.removeEventListener("dc:content-reloaded", drop);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("dc:flush-edits", flush);
+    };
+  }, []);
 
   // Live preview — rebuilt a beat after edits so typing stays smooth. Uses the
   // REAL view count (base + tracked, from /api/views) so the preview matches the
@@ -145,19 +196,26 @@ export default function CardStudio() {
     return () => clearTimeout(t);
   }, [merged, draft, products.items, gallery.items, videos.items, offers.items, qrcodes.items]);
 
-  // Learn brand colours from the uploaded logo (client-side).
+  // Learn brand colours from the uploaded logo (client-side). They are worked
+  // out from the card, not changed by its owner, so they are kept in this
+  // browser without counting as an edit (`derived`): opening this page used to
+  // save them, which moved the card's version under every other device. They
+  // go to the server with the owner's next real change — and are worked out
+  // again whenever the stored value isn't what the logo gives (a card just
+  // loaded from the server, or last saved from another kind of browser).
   const logoVal = val("logo");
+  const brandStored = String(data.brand_colors || "");
   useEffect(() => {
     if (!logoVal) return;
     let cancelled = false;
     extractBrandColors(logoVal).then((cols) => {
       if (cancelled || !cols.length) return;
       const joined = cols.join(",");
-      if (formRef.current.brand_colors === joined || String(data.brand_colors || "") === joined) return;
-      set("brand_colors", joined);
+      if (formRef.current.brand_colors === joined || brandStored === joined) return;
+      update({ brand_colors: joined }, { derived: true });
     });
     return () => { cancelled = true; };
-  }, [logoVal]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [logoVal, brandStored]); // eslint-disable-line react-hooks/exhaustive-deps
   const brandColors = String(val("brand_colors") || "").split(",").map((x) => x.trim()).filter(Boolean);
 
   const progress = useMemo(() => {
@@ -181,29 +239,59 @@ export default function CardStudio() {
   const [linkCopied, setLinkCopied] = useState(false);
   const copyLink = async () => { try { await navigator.clipboard.writeText(cardUrl); setLinkCopied(true); toast.success("Card link copied"); setTimeout(() => setLinkCopied(false), 1800); } catch { toast.error("Copy failed"); } };
 
-  const publish = async () => {
+  /* `forced` is the owner's answer "Publish mine anyway" to the question below —
+     the only way a copy the server refused is ever sent again. */
+  const publish = async (forced?: { first: boolean }) => {
+    // This browser never managed to load the card: what is on this screen is
+    // a blank one, and publishing it would put that in the real card's place.
+    if (firstLoadFailed()) { toast.error(LOAD_FAILED, { id: "dc-load-failed" }); return; }
     if (!cur("name")) { toast.error("Add your name before publishing."); return; }
     if (!["mobile1", "mobile2", "email"].some((k) => cur(k))) {
       toast.error("Add at least one contact — phone, WhatsApp or email — before publishing."); return;
     }
-    const first = Number(data.published) !== 1;
+    const first = forced ? forced.first : Number(data.published) !== 1;
     if (timer.current) clearTimeout(timer.current);
-    update({ ...formRef.current, published: 1, published_on: String(data.published_on || new Date().toISOString().slice(0, 10)) });
+    timer.current = null;
+    const edits = { ...formRef.current, published: 1, published_on: String(data.published_on || new Date().toISOString().slice(0, 10)) };
+    // Stored now, so the form lets go of them (see store above).
+    if (update(edits)) { formRef.current = {}; setForm({}); }
     setStatus("saved");
-    if (first) logFunnel("published", String(data.product_slug || ""));
-    try {
-      const res = await saveSnapshot.mutateAsync({ slug, cardId: getActiveCardId(), data: {
-        customer: { ...data, ...formRef.current, referral_code: program?.code || "" },
-        products: products.items, gallery: gallery.items, videos: videos.items, offers: offers.items, qrcodes: qrcodes.items,
-      } });
-      // Record which server version local content is now based on, so the
-      // freshness check + auto-publish concurrency guard stay in step.
-      const ts = (res as { updatedAt?: string | null })?.updatedAt;
-      if (ts) { try { localStorage.setItem(scopedKey("dc_snap_ts"), ts); } catch { /* ignore */ } }
-    } catch (e) {
-      const msg = (e as { message?: string })?.message || "";
-      if (/taken/i.test(msg)) { toast.error("That card link is already taken — pick another in Settings."); return; }
+    if (first && !forced) logFunnel("published", String(data.product_slug || ""));
+    // Sent with the version this browser's copy came from (and the new version
+    // is recorded when it goes through), so Publish from a tab left open can't
+    // put an old copy over a card that was changed on another device.
+    // The card is read from storage when the save's turn comes, as auto-save
+    // does: behind a save still uploading, the card as it was at the click
+    // would leave out — and mark as saved — whatever was edited since.
+    const scope = scopedKey("dc_customer");
+    const code = program?.code || "";
+    const result = await saveCardSnapshot((input) => utils.client.publish.saveSnapshot.mutate(input), () => {
+      if (scopedKey("dc_customer") !== scope) return null; // signed out, or another card opened, while it waited
+      const card = readLocalCard();
+      return { slug: String(card.customer.slug || card.customer.username || "your-card"), data: { ...card, customer: { ...card.customer, referral_code: code } } };
+    }, { force: !!forced, holdOnConflict: true }); // refused → automatic saves wait until the owner has answered
+    if (result.status === "skipped") return;
+    if (result.status === "conflict") {
+      if (!mounted.current) {
+        // The owner has left the Card Builder: there is no one to ask. Take the
+        // safe answer, as an automatic save would — and only then let saves run
+        // again, so one already in line doesn't send the refused copy once more.
+        // (Not when another account, or another card, has been opened since:
+        // the latest version of THAT card is not this save's to load.)
+        try { if (scopedKey("dc_customer") === scope) await takeServerCopy(); } finally { holdAutoSave(false); }
+        return;
+      }
+      setConflict({ first, busy: "" });
+      return;
     }
+    if (result.status === "failed") {
+      toast.error(saveRefusal(result.error) === "taken"
+        ? "That card link is already taken — pick another in Settings."
+        : "Couldn't publish your card. Check your connection and try again.");
+      return;
+    }
+    holdAutoSave(false);
+    setConflict(null);
     let trial: TrialInfo;
     try {
       const res = await startTrial.mutateAsync({ productId: Number(data.product_id) || undefined });
@@ -213,17 +301,55 @@ export default function CardStudio() {
     setPublishInfo({ first, trial });
   };
 
+  // The safe answer: take the card as it now is on the server. What was changed
+  // on this screen since is dropped (the form's pending edits included).
+  const loadLatest = async () => {
+    setConflict((c) => (c ? { ...c, busy: "load" } : c));
+    let loaded = false;
+    try { loaded = !!(await pullLatestSnapshot()); } catch { /* offline, or this browser's storage is full */ }
+    if (!loaded) {
+      setConflict((c) => (c ? { ...c, busy: "" } : c));
+      toast.error("Couldn't load the latest version. Check your connection and try again.");
+      return;
+    }
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    formRef.current = {};
+    setForm({});
+    setStatus("idle");
+    holdAutoSave(false);
+    setConflict(null);
+    toast.success("The latest version of your card is loaded.");
+  };
+  const publishMine = async () => {
+    if (!conflict) return;
+    setConflict({ ...conflict, busy: "force" });
+    await publish({ first: conflict.first });
+    setConflict((c) => (c ? { ...c, busy: "" } : c)); // still open only if it didn't go through
+  };
+  // The question exists only while this screen shows it: saves are never left
+  // paused by a screen that has just opened, or by one that has gone.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    holdAutoSave(false);
+    return () => { mounted.current = false; holdAutoSave(false); };
+  }, []);
+
+  // While this browser hasn't managed to load the card nothing typed here is
+  // being saved (see firstLoadFailed) — so it never says "Saved".
+  const shownStatus = loadFailed ? "error" : status;
   const SaveStatus = () => (
     <span className="inline-flex items-center gap-1.5 text-[12px] font-medium">
-      {status === "saving" ? <><Loader2 size={13} className="animate-spin text-[#94A3B8]" /> <span className="text-[#94A3B8]">Saving…</span></>
-        : status === "error" ? <><CloudOff size={13} className="text-red-500" /> <span className="text-red-500">Unable to save</span></>
-        : status === "saved" ? <><Check size={13} className="text-emerald-500" /> <span className="text-emerald-600">Saved</span></>
+      {shownStatus === "saving" ? <><Loader2 size={13} className="animate-spin text-[#94A3B8]" /> <span className="text-[#94A3B8]">Saving…</span></>
+        : shownStatus === "error" ? <><CloudOff size={13} className="text-red-500" /> <span className="text-red-500">Unable to save</span></>
+        : shownStatus === "saved" ? <><Check size={13} className="text-emerald-500" /> <span className="text-emerald-600">Saved</span></>
         : <span className="text-[#CBD5E1]">Auto-save on</span>}
     </span>
   );
 
   const PublishBtn = ({ full }: { full?: boolean }) => (
-    <button onClick={publish} className={`inline-flex items-center justify-center gap-2 ${full ? "flex-1 h-11" : "h-9 px-4"} gradient-gold text-[#0F172A] rounded-xl text-sm font-bold hover:shadow-gold transition-all active:scale-[0.98]`}>
+    <button onClick={() => publish()} className={`inline-flex items-center justify-center gap-2 ${full ? "flex-1 h-11" : "h-9 px-4"} gradient-gold text-[#0F172A] rounded-xl text-sm font-bold hover:shadow-gold transition-all active:scale-[0.98]`}>
       <Rocket size={15} /> Publish
     </button>
   );
@@ -836,6 +962,29 @@ export default function CardStudio() {
 
       {/* Clears the fixed mobile tool bar */}
       <div className="h-20 lg:hidden" />
+
+      {/* Publish was refused: the card changed on another device. No way out but
+          the two answers — and the safe one comes first. */}
+      {conflict && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-labelledby="publish-conflict-title" aria-describedby="publish-conflict-text">
+          <div className="absolute inset-0 bg-[#0F172A]/60 backdrop-blur-sm animate-fade-in" />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm animate-scale-in p-6">
+            <span className="w-12 h-12 rounded-2xl bg-[#FEF3C7] text-[#B45309] flex items-center justify-center"><AlertTriangle size={22} /></span>
+            <h3 id="publish-conflict-title" className="text-lg font-extrabold text-[#0F172A] mt-4">This card was changed on another device.</h3>
+            <p id="publish-conflict-text" className="text-[13px] text-[#64748B] mt-1.5 leading-relaxed">
+              Load the latest version to keep those changes — you'll need to redo what you changed here. Publishing yours replaces them with the card on this screen.
+            </p>
+            <div className="mt-5 space-y-2">
+              <button autoFocus onClick={loadLatest} disabled={!!conflict.busy} className="w-full h-11 inline-flex items-center justify-center gap-2 gradient-gold text-[#0F172A] rounded-xl text-sm font-bold hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-60">
+                {conflict.busy === "load" && <Loader2 size={15} className="animate-spin" />} Load the latest version
+              </button>
+              <button onClick={publishMine} disabled={!!conflict.busy} className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors disabled:opacity-60">
+                {conflict.busy === "force" && <Loader2 size={15} className="animate-spin" />} Publish mine anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {publishInfo && (
         <PublishModal url={cardUrl} name={cur("name")} first={publishInfo.first} trial={publishInfo.trial}

@@ -38,9 +38,11 @@ function useStepsDone(pathname: string): Record<string, boolean> {
   useEffect(() => {
     const bump = () => setVersion((v) => v + 1);
     window.addEventListener("dc:content-changed", bump);
+    window.addEventListener("dc:content-reloaded", bump);
     window.addEventListener("storage", bump);
     return () => {
       window.removeEventListener("dc:content-changed", bump);
+      window.removeEventListener("dc:content-reloaded", bump);
       window.removeEventListener("storage", bump);
     };
   }, []);

@@ -49,7 +49,9 @@ export function useCurrentPlan() {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
-  const legacyPkgId = Number(planRec?.package_id) || 0;
+  // A card record with no package_id (a new signup's starter card) is the free
+  // trial plan — the same default accountPackageId() uses.
+  const legacyPkgId = Number(planRec?.package_id) || 7;
   const currentPkgId = subscription?.package?.id ?? (legacyPkgId || undefined);
   const currentPlan = (packages || []).find((p) => p.id === currentPkgId);
   const currentPlanName = subscription?.package?.name || currentPlan?.name || "Free";

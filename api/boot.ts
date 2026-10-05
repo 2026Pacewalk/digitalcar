@@ -1312,22 +1312,31 @@ app.get("/api/my/card", async (c) => {
 // Used to hydrate the dashboard for NEW-FLOW users (not in customers.json) and
 // on a fresh browser/device, so their real card loads everywhere — not just on
 // the browser where they built it. Read-only, scoped to the token's user.
+// `null` (200) means this user has NO published card — and only that. A failed
+// lookup answers 500: the dashboard treats "no card" as leave to load the old
+// site's copy, which must never happen just because the database hiccuped.
+// `?cardId=N` asks for one card of a multi-card account (default: the primary).
 app.get("/api/my/snapshot", async (c) => {
   const token = c.req.header("x-auth-token") || c.req.header("authorization")?.replace("Bearer ", "");
   const user = token ? await verifyToken(token) : null;
   if (!user) return c.json({ error: "Unauthorized" }, 401);
+  const wanted = c.req.query("cardId");
+  const cardId = Number(wanted);
+  if (wanted !== undefined && !(Number.isInteger(cardId) && cardId > 0)) return c.json({ error: "Invalid cardId" }, 400);
   try {
     const { getDb } = await import("./queries/connection");
     const { publishedCards } = await import("@db/schema");
-    const { eq } = await import("drizzle-orm");
+    const { and, eq } = await import("drizzle-orm");
     const db = getDb();
+    const mine = eq(publishedCards.userId, Number(user.userId));
     const rows = await db.select({ slug: publishedCards.slug, data: publishedCards.data, cardId: publishedCards.cardId, updatedAt: publishedCards.updatedAt })
-      .from(publishedCards).where(eq(publishedCards.userId, Number(user.userId)));
+      .from(publishedCards).where(wanted === undefined ? mine : and(mine, eq(publishedCards.cardId, cardId)));
     if (!rows.length) return c.json(null);
     rows.sort((a, b) => Number(a.cardId) - Number(b.cardId)); // primary card first
     return c.json(rows[0]);
-  } catch {
-    return c.json(null);
+  } catch (e) {
+    console.error("[my/snapshot] loading the card failed:", (e as Error).message);
+    return c.json({ error: "Couldn't load your card. Please try again." }, 500);
   }
 });
 

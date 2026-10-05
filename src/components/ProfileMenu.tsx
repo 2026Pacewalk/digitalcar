@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { User, Settings, KeyRound, HelpCircle, LogOut, ArrowLeft, Wallet, FileText } from "lucide-react";
 import { useAuth, useSessionRole } from "@/hooks/useAuth";
 import { getToken, clearSession, adminReturnPath } from "@/lib/session";
+import { finishSaves } from "@/hooks/useAutoPublish";
 
 /* Role-aware profile / account dropdown — used in the desktop header and the mobile app bar. */
 export default function ProfileMenu() {
@@ -19,7 +20,18 @@ export default function ProfileMenu() {
   // A super-admin using "Login as Client" keeps their admin session in the admin
   // slot while viewing the customer portal — offer a clean way back.
   const impersonating = typeof window !== "undefined" && !window.location.pathname.startsWith("/admin") && !!getToken("admin");
-  const returnToAdmin = () => { const to = adminReturnPath(); clearSession("main"); window.location.href = to; };
+  // Leaving signs the customer out of this browser, and nothing is saved for
+  // them after that: an edit still waiting to go out is sent first. If it
+  // doesn't go through the admin stays here, with the message that says why.
+  const [leaving, setLeaving] = useState(false);
+  const returnToAdmin = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    const to = adminReturnPath();
+    if (!(await finishSaves())) { setLeaving(false); return; }
+    clearSession("main");
+    window.location.href = to;
+  };
 
   // A partner gets partner pages only: profile, money, and the real support page.
   const items = role === "reseller" ? [
@@ -59,9 +71,9 @@ export default function ProfileMenu() {
               </div>
             </div>
             {impersonating && (
-              <button onClick={returnToAdmin} className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-[13px] font-bold text-[#0F172A] bg-[#FEF3C7] hover:brightness-105 transition-all text-left mb-1">
+              <button onClick={returnToAdmin} disabled={leaving} className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-[13px] font-bold text-[#0F172A] bg-[#FEF3C7] hover:brightness-105 transition-all text-left mb-1 disabled:opacity-70">
                 <span className="w-8 h-8 rounded-lg bg-[#F7B31C] flex items-center justify-center shrink-0"><ArrowLeft size={15} className="text-[#0F172A]" /></span>
-                Return to admin
+                {leaving ? "Saving changes…" : "Return to admin"}
               </button>
             )}
             {items.map((m) => (

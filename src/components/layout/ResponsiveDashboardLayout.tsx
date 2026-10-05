@@ -1,9 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { AlertTriangle } from "lucide-react";
 import DashboardLayout from "./DashboardLayout";
 import MobileDashboardLayout from "./MobileDashboardLayout";
 import AnnouncementPopup from "@/components/AnnouncementPopup";
-import { useCardHydration } from "@/hooks/useCardHydration";
+import { useCardHydration, useFirstLoadFailed } from "@/hooks/useCardHydration";
 import { useAutoPublish } from "@/hooks/useAutoPublish";
+import { LOAD_FAILED } from "@/lib/snapshotSync";
 
 /* ─── Responsive Dashboard Layout
  * Desktop: Sidebar + TopBar (DashboardLayout)
@@ -26,6 +28,9 @@ export default function ResponsiveDashboardLayout({
   // First load: pull the signed-in customer's real card into local storage so
   // the dashboard shows their actual profile/products instead of a blank seed.
   const hydrated = useCardHydration();
+  // That load failed and this browser has never held the card: what the pages
+  // below show is a blank one, and nothing typed into it is saved.
+  const loadFailed = useFirstLoadFailed();
   // Keep a live card's public page in sync as the owner edits (auto-publish).
   useAutoPublish();
 
@@ -44,8 +49,19 @@ export default function ResponsiveDashboardLayout({
     );
   }
 
+  // Said on every page, above its content, until a load goes through.
+  const notice = loadFailed && (
+    <div className="px-4 pt-3 sm:px-6 sm:pt-6 mx-auto w-full max-w-[1360px]">
+      <div role="alert" className="flex items-center gap-3 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3">
+        <AlertTriangle size={18} className="text-[#DC2626] shrink-0" />
+        <p className="flex-1 min-w-0 text-[13px] font-semibold text-[#991B1B]">{LOAD_FAILED}</p>
+        <button type="button" onClick={() => window.location.reload()} className="h-9 px-3.5 rounded-xl bg-[#991B1B] text-white text-[12px] font-semibold shrink-0 hover:bg-[#7F1D1D] transition-colors">Reload</button>
+      </div>
+    </div>
+  );
+
   if (isMobile) {
-    return <MobileDashboardLayout>{children}<AnnouncementPopup audience="dashboard" /></MobileDashboardLayout>;
+    return <MobileDashboardLayout>{notice}{children}<AnnouncementPopup audience="dashboard" /></MobileDashboardLayout>;
   }
-  return <DashboardLayout title={title} subtitle={subtitle}>{children}<AnnouncementPopup audience="dashboard" /></DashboardLayout>;
+  return <DashboardLayout title={title} subtitle={subtitle}>{notice}{children}<AnnouncementPopup audience="dashboard" /></DashboardLayout>;
 }

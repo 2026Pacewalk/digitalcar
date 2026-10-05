@@ -11,6 +11,7 @@ import { getToken, clearSession, adminReturnPath } from "@/lib/session";
 import { useAuth, useSessionRole, roleForPath } from "@/hooks/useAuth";
 import { roleTheme } from "@/lib/roleTheme";
 import { readCustomer } from "@/hooks/useCustomer";
+import { finishSaves } from "@/hooks/useAutoPublish";
 import { CONTACT } from "@/lib/publicNav";
 import { haptic, useEdgeToEdge, useKeyboardOpen } from "@/lib/nativeApp";
 import ProfileMenu from "@/components/ProfileMenu";
@@ -339,6 +340,17 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
   };
 
   const impersonating = !path.startsWith("/admin") && !!getToken("admin");
+  // Leaving signs the customer out of this browser: an edit still waiting to
+  // be saved goes out first (see ProfileMenu). If it doesn't go through, stay.
+  const [leaving, setLeaving] = useState(false);
+  const returnToAdmin = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    const to = adminReturnPath();
+    if (!(await finishSaves())) { setLeaving(false); return; }
+    clearSession("main");
+    window.location.href = to;
+  };
   const initial = (user?.fullName || "U").charAt(0).toUpperCase();
   const moreActive = activeTab === -1;
 
@@ -461,10 +473,10 @@ export default function MobileDashboardLayout({ children }: { children: ReactNod
                 <ChevronRight size={16} className="text-[#CBD5E1]" />
               </a>
               {impersonating && (
-                <button type="button" onClick={() => { const to = adminReturnPath(); clearSession("main"); window.location.href = to; }}
-                  className="flex w-full items-center gap-3 border-t border-[#F1F5F9] px-3 py-3 text-left active:bg-[#F8FAFC]">
+                <button type="button" onClick={returnToAdmin} disabled={leaving}
+                  className="flex w-full items-center gap-3 border-t border-[#F1F5F9] px-3 py-3 text-left active:bg-[#F8FAFC] disabled:opacity-70">
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FEF3C7] text-[#B45309]"><ArrowLeft size={16} /></span>
-                  <span className="flex-1 text-[14px] font-semibold text-[#0F172A]">Return to admin</span>
+                  <span className="flex-1 text-[14px] font-semibold text-[#0F172A]">{leaving ? "Saving changes…" : "Return to admin"}</span>
                 </button>
               )}
               <button type="button" onClick={() => { haptic("warning"); logout(); }}
