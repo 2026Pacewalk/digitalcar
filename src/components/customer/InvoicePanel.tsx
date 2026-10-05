@@ -5,14 +5,16 @@ import { trpc } from "@/providers/trpc";
 import { Panel } from "@/components/customer/ModuleShell";
 import type { CustomerRecord } from "@/hooks/useCustomer";
 
-/* ── DigitalCarda seller identity shown on every invoice ── */
+/* ── The seller printed on every invoice: the registered company behind
+   DigitalCarda, as on its GST registration. Invoices are the ONLY place the
+   company name appears — the public site names the brand alone. ── */
 const SELLER = {
-  name: "DigitalCarda",
-  tagline: "Smart Digital Business Cards",
-  address: "MG Road, Bengaluru, Karnataka 560001, India",
+  name: "PACEWALK PRIVATE LIMITED",
+  brand: "DigitalCarda",
+  address: "SCO-209, Green Lotus Avenue, Singhpura Gate, Chandigarh Ambala Highway, Zirakpur, Punjab 140603",
   email: "hello@digitalcarda.in",
-  phone: "+91 98765 43210",
-  gstin: "29AAACD1234F1Z5",
+  phone: "+91 95177 22444",
+  gstin: "03AANCP6196Q1ZI",
   website: "digitalcarda.in",
 };
 
@@ -67,7 +69,8 @@ function invoiceHtml(inv: Inv, buyer: CustomerRecord): string {
     <div class="head">
       <div>
         <p class="brand">Digital<span>Carda</span></p>
-        <p class="muted">${SELLER.tagline}<br>${SELLER.address}<br>${SELLER.email} · ${SELLER.phone}<br><b>GSTIN:</b> ${SELLER.gstin}</p>
+        <p style="font-weight:700;margin-top:4px">${SELLER.name}</p>
+        <p class="muted">Brand: ${SELLER.brand}<br>${SELLER.address}<br>Mobile: ${SELLER.phone} · ${SELLER.email}<br><b>GSTIN:</b> ${SELLER.gstin}</p>
       </div>
       <div style="text-align:right">
         <p style="font-size:20px;font-weight:800;letter-spacing:.02em">TAX INVOICE</p>
@@ -158,7 +161,7 @@ export default function InvoicePanel({ buyer }: { buyer: CustomerRecord }) {
               <div className="relative flex items-start justify-between">
                 <div>
                   <p className="text-lg font-extrabold text-white">Digital<span className="text-[#F7B31C]">Carda</span></p>
-                  <p className="text-[10px] text-white/50">{SELLER.tagline} · GSTIN {SELLER.gstin}</p>
+                  <p className="text-[10px] text-white/50">{SELLER.name} · GSTIN {SELLER.gstin}</p>
                 </div>
                 <button onClick={() => setView(null)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"><X size={16} /></button>
               </div>
@@ -177,7 +180,7 @@ export default function InvoicePanel({ buyer }: { buyer: CustomerRecord }) {
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-[#94A3B8] mb-1">From</p>
                   <p className="text-[12px] font-bold text-[#0F172A]">{SELLER.name}</p>
-                  <p className="text-[10px] text-[#64748B] leading-relaxed">{SELLER.address}<br />{SELLER.email}</p>
+                  <p className="text-[10px] text-[#64748B] leading-relaxed">Brand: {SELLER.brand}<br />{SELLER.address}<br />Mobile: {SELLER.phone}<br />{SELLER.email}</p>
                 </div>
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-[#94A3B8] mb-1">Billed to</p>
