@@ -46,12 +46,16 @@ function invoiceHtml(inv: Inv, buyer: CustomerRecord): string {
   const cycle = termLabel(inv.subscription?.billingCycle);
   const cgst = (Number(inv.taxAmount) / 2).toFixed(2);
   const esc = (v: unknown) => String(v ?? "").replace(/</g, "&lt;");
+  // The invoice opens in a blank window, where a relative address has nothing
+  // to resolve against. The logo is light-on-dark, so it sits on the site's navy.
+  const logo = `${window.location.origin}/logo.png`;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${inv.invoiceNumber}</title>
   <style>
-    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Arial,sans-serif}
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     body{padding:40px;color:#0F172A;font-size:13px}
     .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #F7B31C;padding-bottom:18px}
-    .brand{font-size:24px;font-weight:800}.brand span{color:#F7B31C}
+    .logo{display:inline-block;background:#0F172A;border-radius:10px;padding:10px 16px;line-height:0}
+    .logo img{height:46px;width:auto;display:block;color:#fff;font-size:16px;font-weight:800;line-height:46px}
     .muted{color:#64748B;font-size:11px;line-height:1.6}
     .tag{display:inline-block;background:#DCFCE7;color:#16A34A;font-weight:700;font-size:11px;padding:4px 12px;border-radius:99px;margin-top:6px}
     h2{font-size:15px;margin:22px 0 4px}
@@ -68,8 +72,8 @@ function invoiceHtml(inv: Inv, buyer: CustomerRecord): string {
   </style></head><body>
     <div class="head">
       <div>
-        <p class="brand">Digital<span>Carda</span></p>
-        <p style="font-weight:700;margin-top:4px">${SELLER.name}</p>
+        <div class="logo"><img src="${logo}" alt="DigitalCarda"></div>
+        <p style="font-weight:700;margin-top:10px">${SELLER.name}</p>
         <p class="muted">Brand: ${SELLER.brand}<br>${SELLER.address}<br>Mobile: ${SELLER.phone} · ${SELLER.email}<br><b>GSTIN:</b> ${SELLER.gstin}</p>
       </div>
       <div style="text-align:right">
@@ -160,8 +164,8 @@ export default function InvoicePanel({ buyer }: { buyer: CustomerRecord }) {
               <div className="absolute -right-8 -top-10 w-32 h-32 rounded-full bg-[#F7B31C]/20 blur-2xl pointer-events-none" />
               <div className="relative flex items-start justify-between">
                 <div>
-                  <p className="text-lg font-extrabold text-white">Digital<span className="text-[#F7B31C]">Carda</span></p>
-                  <p className="text-[10px] text-white/50">{SELLER.name} · GSTIN {SELLER.gstin}</p>
+                  <img src="/logo.png" alt="DigitalCarda" className="h-9 w-auto object-contain" />
+                  <p className="mt-1.5 text-[10px] text-white/50">{SELLER.name} · GSTIN {SELLER.gstin}</p>
                 </div>
                 <button onClick={() => setView(null)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"><X size={16} /></button>
               </div>
