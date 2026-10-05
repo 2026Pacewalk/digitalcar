@@ -4,12 +4,16 @@ const __dirname = import.meta.dirname
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
+import { withoutTagManager } from "./api/lib/tag-manager"
 
 // https://vite.dev/config/
 export default defineConfig(({ isSsrBuild }) => ({
   plugins: [
     devServer({ entry: "api/boot.ts", exclude: [/^\/(?!api\/).*$/] }),
-    inspectAttr(), react()],
+    inspectAttr(), react(),
+    // Local dev serves index.html itself (not through api/lib/vite.ts), so the
+    // Tag Manager snippet is taken out here: dev never reports into the container.
+    { name: "dc-no-tag-manager-in-dev", apply: "serve" as const, transformIndexHtml: (html: string) => withoutTagManager(html) }],
   server: {
     // Honor a harness/host-assigned PORT (e.g. when 3000 is taken by another
     // dev server); fall back to 3000 when run standalone.

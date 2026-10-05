@@ -12,6 +12,7 @@ import { blogMeta, BLOG_POST_PATH } from "./blog-meta";
 import { industryMeta, INDUSTRY_PATH } from "./industry-meta";
 import { getIndustry } from "../../src/data/industries";
 import { loadSettings, publicSettings } from "./app-settings";
+import { pageForHost } from "./tag-manager";
 
 /** Emptied when settings change, so the next page carries the new details. */
 export let clearHtmlCache: () => void = () => {};
@@ -335,7 +336,7 @@ export function serveStaticFiles(app: App) {
     const hit = htmlCache.get(cacheKey);
     if (hit && Date.now() - hit.at < HTML_TTL) {
       c.header("Cache-Control", EDGE_CACHE);
-      return c.html(hit.html);
+      return c.html(pageForHost(hit.html, c.req.header("host")));
     }
     let content = readShell();
     let cacheable = false;
@@ -391,7 +392,9 @@ export function serveStaticFiles(app: App) {
       // this makes crawler/social TTFB ~edge speed globally; a no-op without it.
       c.header("Cache-Control", EDGE_CACHE);
     }
-    return c.html(content, status);
+    // The cached page keeps the Tag Manager snippet; it is dropped per request
+    // for any host that isn't the live site (tag-manager.ts).
+    return c.html(pageForHost(content, c.req.header("host")), status);
   };
 
   // The homepage would otherwise be served as a raw file by serveStatic, so
