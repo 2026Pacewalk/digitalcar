@@ -10,6 +10,7 @@ import {
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { trpc } from "@/providers/trpc";
 import TemplateThumb, { THUMB_W, THUMB_H } from "@/components/TemplateThumb";
+import TemplateCoverflow from "@/components/public/TemplateCoverflow";
 import { STANDEE_STYLES, standeeMarkup } from "@/lib/standee";
 import { useReveal, Reveal, SectionHeading } from "@/components/public/Reveal";
 import JsonLd from "@/components/seo/JsonLd";
@@ -937,46 +938,38 @@ function TemplatesSection() {
     .sort((a, b) => (Number(b.isFeatured) - Number(a.isFeatured)) || (a.displayOrder - b.displayOrder))
     .slice(0, 10);
   return (
-    <section className="py-10 sm:py-14">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="relative overflow-hidden py-10 sm:py-14">
+      {/* warm light behind the fan, so the angled cards read as 3D */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white via-[#FFFBEB]/70 to-white" />
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/3 h-[26rem] w-[52rem] max-w-[95vw] -translate-x-1/2 rounded-full bg-[#F7B31C]/12 blur-3xl" />
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Templates" title="Beautiful, Ready-to-Use Templates" subtitle="Pick a professional design, customize colors, upload your logo, add details, and publish instantly." />
-        <Reveal stagger className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
-          {isLoading
-            ? Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="rounded-2xl bg-white border border-[#F1F5F9] shadow-premium overflow-hidden">
-                  <div className="w-full animate-pulse bg-[#F1F5F9]" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }} />
-                  <div className="p-3.5"><div className="h-3.5 w-2/3 mx-auto bg-[#F1F5F9] rounded-full animate-pulse" /></div>
-                </div>
-              ))
-            : shown.map((p) => {
+        {isLoading ? (
+          <div className="flex items-center justify-center gap-4 h-[380px] sm:h-[440px] lg:h-[480px]" aria-hidden="true">
+            {[0.78, 1, 0.78].map((s, i) => (
+              <div key={i} className="w-[min(250px,62vw)] rounded-[22px] bg-[#F1F5F9] animate-pulse sm:w-[260px] lg:w-[278px]"
+                style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}`, transform: `scale(${s})`, opacity: s === 1 ? 1 : 0.6 }} />
+            ))}
+          </div>
+        ) : (
+          <TemplateCoverflow
+            ariaLabel="Card templates"
+            items={shown.map((p) => {
               const feat = Array.isArray(p.images) && p.images.length ? p.images[0] : null;
-              return (
-                <article key={p.id} className="group rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium hover:shadow-premium-lg hover:-translate-y-1.5 transition-all duration-300">
-                  <Link to={`/digital-business-cards-templates/${p.slug}`} className="relative block active:scale-[0.99] transition-transform">
-                    {p.isFeatured && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0F172A] text-[#F7B31C] shadow-sm">★ Featured</span>}
-                    {/* Prefer the product's uploaded feature image; fall back to the generated card thumbnail. */}
-                    {feat
-                      ? <div className="w-full bg-gradient-to-b from-[#F8FAFC] to-[#EEF2F7]" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }}>
-                          <picture>
-                            {webpFor(feat) && <source srcSet={webpFor(feat)!} type="image/webp" />}
-                            <img src={feat} alt={`${p.name} — digital business card`} loading="lazy" className="w-full h-full object-cover object-top" />
-                          </picture>
-                        </div>
-                      : <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} name={p.name} />}
-                    <div className="absolute inset-0 hidden md:flex items-center justify-center bg-[#0F172A]/0 group-hover:bg-[#0F172A]/30 transition-colors duration-300">
-                      <span className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white text-[#0F172A] text-[13px] font-bold shadow-lg"><Eye size={14} /> Live Preview</span>
-                    </div>
-                  </Link>
-                  <div className="p-3.5 text-center">
-                    {/* Every name ends in the same four words; in a narrow tile
-                        that left "Midnight Gold…" and nothing else. Drop the
-                        suffix and let what is left have two lines. */}
-                    <Link to={`/digital-business-cards-templates/${p.slug}`} className="text-sm font-semibold text-[#0F172A] group-hover:text-[#F7B31C] transition-colors line-clamp-2">{p.name.replace(/\s*Digital Business Card$/, "").replace(/\s*Link-in-Bio Card$/, "")}</Link>
-                  </div>
-                </article>
-              );
+              return {
+                id: p.id,
+                name: p.name,
+                slug: p.slug,
+                category: p.category,
+                image: feat,
+                imageWebp: feat ? webpFor(feat) : null,
+                featured: !!p.isFeatured,
+                // No uploaded picture: fall back to the drawn card preview.
+                art: <TemplateThumb style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} name={p.name} />,
+              };
             })}
-        </Reveal>
+          />
+        )}
         <div className="text-center mt-7">
           <Link to="/digital-business-cards-templates" className="btn-navy inline-flex items-center gap-2">Browse All Templates <ChevronRight size={16} /></Link>
         </div>
