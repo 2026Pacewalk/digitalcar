@@ -38,9 +38,11 @@ function placement(offset: number, depth: number, rotate: number, gap: number) {
   return {
     // The -50%/-50% has to live in here: this transform replaces the one the
     // centring classes would set, so without it the card hangs off the middle.
-    transform: `translate(-50%, -50%) translateX(${offset * gap}%) translateZ(${-far * depth}px) rotateY(${-side * rotate}deg) scale(${Math.max(0.6, 1 - far * 0.08)})`,
+    transform: `translate(-50%, -50%) translateX(${offset * gap}%) translateZ(${-far * depth}px) rotateY(${-side * rotate}deg) scale(${Math.max(0.6, 1 - far * 0.12)})`,
     zIndex: 50 - far,
-    opacity: far === 0 ? 1 : far <= 2 ? 0.88 : 0.55,
+    opacity: far === 0 ? 1 : far === 1 ? 0.72 : 0.45,
+    // Out of focus, literally: the eye lands on the middle card first.
+    filter: far === 0 ? "none" : `saturate(${1 - far * 0.2}) brightness(${1 - far * 0.06}) blur(${far * 0.7}px)`,
   };
 }
 
@@ -118,9 +120,9 @@ export default function TemplateCoverflow({ items, ariaLabel = "Card templates" 
     return () => window.removeEventListener("resize", on);
   }, []);
   const { depth, rotate, gap, visible } = useMemo(() => (
-    w < 640 ? { depth: 100, rotate: 8, gap: 62, visible: 1 }
-      : w < 1024 ? { depth: 120, rotate: 12, gap: 58, visible: 2 }
-        : { depth: 140, rotate: 15, gap: 54, visible: 3 }
+    w < 640 ? { depth: 110, rotate: 10, gap: 66, visible: 1 }
+      : w < 1024 ? { depth: 130, rotate: 13, gap: 72, visible: 2 }
+        : { depth: 150, rotate: 15, gap: 78, visible: 3 }
   ), [w]);
 
   if (!count) return null;
@@ -237,18 +239,19 @@ function Card({ item, active, tabbable = true }: { item: CoverflowItem; active: 
             </picture>
           ) : item.art}
 
-          {item.featured && (
+          {/* Badge and caption belong to the card in the middle only. On the
+              ones behind, overlapping labels just sliced each other up. */}
+          {item.featured && active && (
             <span className="absolute right-2.5 top-2.5 rounded-full bg-[#0F172A] px-2.5 py-1 text-[10px] font-bold text-[#F7B31C] shadow-sm">★ Featured</span>
           )}
 
-          {/* name sits on the picture, like the reference */}
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0B1120]/92 via-[#0B1120]/55 to-transparent px-4 pb-3.5 pt-10 text-left">
+          <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0B1120]/92 via-[#0B1120]/55 to-transparent px-4 pb-3.5 pt-10 text-left transition-opacity duration-300 ${
+            active ? "opacity-100" : "opacity-0"}`}>
             <h3 className="text-[15px] font-extrabold leading-tight text-white">
               {item.name.replace(/\s*Digital Business Card$/, "").replace(/\s*Link-in-Bio Card$/, "")}
             </h3>
             {item.category && <p className="mt-0.5 text-[11.5px] font-semibold uppercase tracking-[0.12em] text-[#FCD34D]">{item.category}</p>}
-            <span className={`mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12px] font-bold text-[#0F172A] transition-all duration-300 ${
-              active ? "opacity-100 translate-y-0" : "pointer-events-none translate-y-1 opacity-0"}`}>
+            <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12px] font-bold text-[#0F172A]">
               <Eye size={13} /> Live preview
             </span>
           </div>
