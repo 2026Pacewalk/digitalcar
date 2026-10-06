@@ -16,6 +16,7 @@ import { DEMO_USERS } from "@/hooks/useAuth";
 import { getToken, getSessionUser, setSession, clearSession } from "@/lib/session";
 import GoogleSignInButton, { useGoogleClientId, type GoogleSignInResult } from "@/components/auth/GoogleSignInButton";
 import { EMAIL_RE, emailSuggestion } from "@/lib/emailHelpers";
+import { isChosenPlanPath } from "@contracts/product-offer";
 
 /* Remembers the IDENTIFIER only — never the password. Opt-in, cleared the
    moment the box is unchecked. The first name rides along only so the page can
@@ -338,7 +339,9 @@ export default function Login({ adminMode = false, resellerMode = false }: { adm
     noteMethod("google");
     if (res.created) {
       toast.success("Account created! Welcome to DigitalCarda.");
-      navigate("/dashboard/build");
+      // Came to sign in on the way to a plan they chose to buy, and Google made
+      // the account just now: the plan is still where they are going.
+      navigate(isChosenPlanPath(next) && nextFits(res.user.role, next) ? next : "/dashboard/build");
       return;
     }
     arrive(res.user.role, res.user.fullName);
@@ -488,7 +491,11 @@ export default function Login({ adminMode = false, resellerMode = false }: { adm
                 {!adminMode && !partner && next && (
                   <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] px-3.5 py-2.5">
                     <Check size={15} className="text-[#B45309] mt-0.5 shrink-0" aria-hidden="true" />
-                    <p className="text-[12.5px] leading-snug text-[#92400E]">Sign in to reactivate this card — your link and QR stay exactly the same.</p>
+                    {/* Sent here by "Sign in" on the sign-up page after choosing a
+                        plan to buy: say where signing in leads. */}
+                    <p className="text-[12.5px] leading-snug text-[#92400E]">{isChosenPlanPath(next)
+                      ? "Sign in to continue to the plan you chose. You see the price before you pay."
+                      : "Sign in to reactivate this card — your link and QR stay exactly the same."}</p>
                   </div>
                 )}
 

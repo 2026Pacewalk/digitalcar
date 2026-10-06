@@ -43,6 +43,17 @@ async function readFeatures(db: ReturnType<typeof getDb>): Promise<{ customer: F
   } catch { return DEFAULT_FEATURES; }
 }
 
+/* Plan prices are printed into pages the server keeps for a few minutes
+   (/pricing, and every product page's price and structured data). Drop those
+   when a plan changes, so no page goes on stating a price checkout no longer
+   charges while the product feed already states the new one. */
+async function dropCachedPages() {
+  try {
+    const { clearHtmlCache } = await import("./lib/vite");
+    clearHtmlCache();
+  } catch { /* the plan is saved; the kept pages expire by themselves in minutes */ }
+}
+
 export const packageRouter = createRouter({
   // Public: the dynamic feature list (pricing page + product cards read this).
   features: publicQuery.query(async () => readFeatures(getDb())),
@@ -118,6 +129,7 @@ export const packageRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const result = await db.insert(subscriptionPackages).values(input).$returningId();
+      await dropCachedPages();
       return db.query.subscriptionPackages.findFirst({
         where: eq(subscriptionPackages.id, result[0].id),
       });
@@ -156,6 +168,7 @@ export const packageRouter = createRouter({
       const db = getDb();
       const { id, ...data } = input;
       await db.update(subscriptionPackages).set(data).where(eq(subscriptionPackages.id, id));
+      await dropCachedPages();
       return db.query.subscriptionPackages.findFirst({
         where: eq(subscriptionPackages.id, id),
       });
@@ -166,6 +179,7 @@ export const packageRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       await db.delete(subscriptionPackages).where(eq(subscriptionPackages.id, input.id));
+      await dropCachedPages();
       return { success: true };
     }),
 });

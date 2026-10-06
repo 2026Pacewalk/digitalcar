@@ -6,7 +6,9 @@ import path from "path";
 import { pathToFileURL } from "url";
 import { metaFor, injectCardMeta, cardSummaryHtml, type CardMeta } from "./card-og";
 import { cardSeo } from "../../src/lib/cardSeo";
-import { OFFER_POLICY } from "../../src/lib/offerPolicy";
+import { mayKeepProductPage, productSeo, type ProductOffer } from "@contracts/product-offer";
+import type { Product } from "@db/schema";
+import { productLd } from "./merchant-feed";
 import { ogSignature } from "./card-og";
 import { blogMeta, BLOG_POST_PATH } from "./blog-meta";
 import { industryMeta, INDUSTRY_PATH } from "./industry-meta";
@@ -20,9 +22,9 @@ export let clearHtmlCache: () => void = () => {};
 type App = Hono<{ Bindings: HttpBindings }>;
 const SITE = "https://digitalcarda.in";
 
-// Server-side meta + Product/Breadcrumb JSON-LD for product pages (§50, §52),
-// so a product landing page is indexable with structured data even without JS.
-// Cached briefly so repeated crawler hits don't re-query the DB every time.
+// Meta built from the database (customer cards below; product rows have their
+// own cache), kept briefly so repeated crawler hits don't re-query the DB every
+// time.
 const metaCache = new Map<string, { meta: CardMeta | null; at: number }>();
 const META_TTL = 5 * 60_000;
 
@@ -33,49 +35,66 @@ async function publicCaller(url: string) {
   return appRouter.createCaller({ req: new Request(url), resHeaders: new Headers() });
 }
 
-async function productMeta(pathname: string, distPath: string): Promise<CardMeta | null> {
+/* Server-side meta + Product/Breadcrumb JSON-LD for product pages (§50, §52),
+   so a product landing page is indexable with structured data even without JS.
+
+   publishedProduct: the published product a URL is for, or null, cached like
+   the meta above. One row feeds everything a product page says — its <head>,
+   its structured data, and the page React renders from it (ssrSeeds) — so
+   those can't describe two different states of the product. */
+const productCache = new Map<string, { row: Product | null; at: number }>();
+
+async function publishedProduct(pathname: string): Promise<Product | null> {
   const m = pathname.match(/^\/digital-business-cards-templates\/([^/]+)\/?$/);
   if (!m) return null;
   const slug = decodeURIComponent(m[1]).toLowerCase();
-  const hit = metaCache.get(slug);
-  if (hit && Date.now() - hit.at < META_TTL) return hit.meta;
+  const hit = productCache.get(slug);
+  if (hit && Date.now() - hit.at < META_TTL) return hit.row;
 
-  let result: CardMeta | null = null;
+  let row: Product | null = null;
   try {
     const { getDb } = await import("../queries/connection");
     const { products } = await import("@db/schema");
     const { eq } = await import("drizzle-orm");
     const rows = await getDb().select().from(products).where(eq(products.slug, slug));
-    const p = rows[0];
-    if (p && p.status === "published") {
-      const url = `${SITE}/digital-business-cards-templates/${slug}`;
-      const title = p.seoTitle || `${p.name} — DigitalCarda`;
-      const description = p.seoDescription || p.tagline || `${p.name} — try it free for ${p.trialDays} days. No app, no printing.`;
-      // OG/Twitter/Merchant need ABSOLUTE image URLs. Product images may be stored
-      // as site-relative paths (/products/…) — absolutize them here.
-      const abs = (u: string) => (/^https?:/i.test(u) ? u : `${SITE}${u.startsWith("/") ? "" : "/"}${u}`);
-      const rawImgs = ((p.images as string[] | null) || []).filter(Boolean);
-      const imgs = rawImgs.map(abs);
-      // Prefer the 1200×630 og.jpg banner (correct social size) sitting next to the
-      // feature image; fall back to the feature image, then the site default.
-      let image = imgs[0] || `${SITE}/why-businessman.png`;
-      let imageW: number | undefined, imageH: number | undefined, imageType: string | undefined;
-      if (rawImgs[0]) {
-        const ogRel = rawImgs[0].replace(/[^/]+$/, "og.jpg");
-        if (fs.existsSync(path.join(distPath, ogRel))) { image = abs(ogRel); imageW = 1200; imageH = 630; imageType = "image/jpeg"; }
-      }
-      const price = Number(p.salePrice || p.price).toFixed(2);
-      const product = { "@context": "https://schema.org", "@type": "Product", name: p.name, description, brand: { "@type": "Brand", name: "DigitalCarda" }, ...(imgs.length ? { image: imgs } : { image }), offers: { "@type": "Offer", priceCurrency: p.currency || "INR", price, availability: "https://schema.org/InStock", url, ...OFFER_POLICY } };
-      const breadcrumb = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
-        { "@type": "ListItem", position: 1, name: "Home", item: SITE },
-        { "@type": "ListItem", position: 2, name: "Digital Business Cards", item: `${SITE}/digital-business-cards-templates` },
-        { "@type": "ListItem", position: 3, name: p.name, item: url },
-      ] };
-      result = { title, description, image, url, ogType: "product", jsonLd: JSON.stringify([product, breadcrumb]), imageW, imageH, imageType, imageAlt: `${p.name} — digital business card`, h1: p.name, locale: "en_IN" };
-    }
-  } catch { result = null; }
-  metaCache.set(slug, { meta: result, at: Date.now() });
-  return result;
+    row = rows[0]?.status === "published" ? rows[0] : null;
+  } catch {
+    // The lookup itself failed, which says nothing about the product. It is
+    // not remembered: remembered, every visit for the next five minutes would
+    // be told "no such product" and get a bare page marked noindex.
+    return null;
+  }
+  if (productCache.size > 500) productCache.clear();
+  productCache.set(slug, { row, at: Date.now() });
+  return row;
+}
+
+/* A product page's <head>. `offer` is the Gold 1-year price as read for THIS
+   request (serveHtml), or null. The head carries exactly one Product block, and
+   only when the design is listed and that price was read (productLd decides);
+   otherwise it states no product and no price — never a price of 0. */
+function productMeta(p: Product, offer: ProductOffer | null, distPath: string): CardMeta {
+  const url = `${SITE}/digital-business-cards-templates/${p.slug}`;
+  const { title, description } = productSeo(p);
+  // OG/Twitter need ABSOLUTE image URLs. Product images may be stored as
+  // site-relative paths (/products/…) — absolutize them here.
+  const abs = (u: string) => (/^https?:/i.test(u) ? u : `${SITE}${u.startsWith("/") ? "" : "/"}${u}`);
+  const rawImgs = ((p.images as string[] | null) || []).filter(Boolean);
+  // Prefer the 1200×630 og.jpg banner (correct social size) sitting next to the
+  // feature image; fall back to the feature image, then the site default.
+  let image = rawImgs[0] ? abs(rawImgs[0]) : `${SITE}/why-businessman.png`;
+  let imageW: number | undefined, imageH: number | undefined, imageType: string | undefined;
+  if (rawImgs[0]) {
+    const ogRel = rawImgs[0].replace(/[^/]+$/, "og.jpg");
+    if (fs.existsSync(path.join(distPath, ogRel))) { image = abs(ogRel); imageW = 1200; imageH = 630; imageType = "image/jpeg"; }
+  }
+  const product = productLd(p, offer);
+  const breadcrumb = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: SITE },
+    { "@type": "ListItem", position: 2, name: "Digital Business Cards", item: `${SITE}/digital-business-cards-templates` },
+    { "@type": "ListItem", position: 3, name: p.name, item: url },
+  ] };
+  return { title, description, image, url, ogType: "product", jsonLd: JSON.stringify(product ? [product, breadcrumb] : [breadcrumb]), imageW, imageH, imageType, imageAlt: `${p.name} — digital business card`, h1: p.name, locale: "en_IN" };
 }
 
 /* /demo/<product> opens a template as a working sample card. It duplicates the
@@ -85,8 +104,9 @@ async function productMeta(pathname: string, distPath: string): Promise<CardMeta
 async function demoMeta(pathname: string, distPath: string): Promise<CardMeta | null> {
   const m = pathname.match(/^\/demo\/([^/]+)\/?$/);
   if (!m) return null;
-  const product = await productMeta(`/digital-business-cards-templates/${m[1]}`, distPath);
-  if (!product) return null;
+  const row = await publishedProduct(`/digital-business-cards-templates/${m[1]}`);
+  if (!row) return null;
+  const product = productMeta(row, null, distPath);
   return { ...product, title: `${product.h1 ?? product.title} — Live Demo | DigitalCarda`, robots: "noindex, follow", jsonLd: undefined, h1: `${product.h1 ?? product.title} — live demo card` };
 }
 
@@ -226,10 +246,14 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
+/** What serveHtml already read for a product page: its row, and the Gold 1-year
+    price (null when unreadable). */
+type ProductPage = { row: Product; offer: ProductOffer | null };
+
 /** The API data each page reads on its first render. Inputs must match the
     page's own useQuery call exactly, or it misses the cache and shows its
     loading state instead of the content. A failed fetch is simply left out. */
-async function ssrSeeds(clean: string): Promise<SsrSeed[]> {
+async function ssrSeeds(clean: string, page?: ProductPage): Promise<SsrSeed[]> {
   const caller = await publicCaller(`${SITE}${clean}`);
   const jobs: Promise<SsrSeed | null>[] = [];
   const seed = (procPath: string, input: unknown, run: () => Promise<unknown>) =>
@@ -244,7 +268,13 @@ async function ssrSeeds(clean: string): Promise<SsrSeed[]> {
   }
   if (product) {
     const slug = decodeURIComponent(product[1]);
-    seed("product.bySlug", { slug }, () => caller.product.bySlug({ slug }));
+    // The page is rendered from the very row and price its <head> was built
+    // from, so the price on the page and the one in its structured data are one
+    // value. The price is what src/hooks/useProductOffer.ts reads: it has to be
+    // in this HTML, because Google's crawler may not call /api/ (robots.txt).
+    // An unreadable price is not seeded — the page then shows none.
+    seed("product.bySlug", { slug }, async () => page?.row ?? caller.product.bySlug({ slug }));
+    if (page?.offer) seed("product.offer", undefined, async () => page.offer);
   }
   if (clean === "/pricing") {
     seed("package.features", undefined, () => caller.package.features());
@@ -255,12 +285,14 @@ async function ssrSeeds(clean: string): Promise<SsrSeed[]> {
   return (await Promise.all(jobs)).filter((x): x is SsrSeed => x !== null);
 }
 
-async function renderPublic(clean: string, href: string): Promise<{ html: string; state: string } | null> {
+/** `seeded` names the data the page was rendered with (tRPC procedure paths). */
+async function renderPublic(clean: string, href: string, page?: ProductPage): Promise<{ html: string; state: string; seeded: Set<string> } | null> {
   const mod = await loadSsr();
   if (!mod) return null;
   try {
-    const seeds = await withTimeout(ssrSeeds(clean), SSR_DATA_TIMEOUT_MS, "data").catch(() => [] as SsrSeed[]);
-    return await withTimeout(mod.render(href, seeds), SSR_RENDER_TIMEOUT_MS, "render");
+    const seeds = await withTimeout(ssrSeeds(clean, page), SSR_DATA_TIMEOUT_MS, "data").catch(() => [] as SsrSeed[]);
+    const out = await withTimeout(mod.render(href, seeds), SSR_RENDER_TIMEOUT_MS, "render");
+    return { ...out, seeded: new Set(seeds.map((s) => s.path)) };
   } catch (e) {
     console.error(`[ssr] ${clean} fell back to client rendering: ${(e as Error).message}`);
     return null;
@@ -340,13 +372,21 @@ export function serveStaticFiles(app: App) {
     }
     let content = readShell();
     let cacheable = false;
+    let oneOff = false;
     let status: 200 | 404 = 200;
     try {
+      // A product page states one price — the Gold plan's 1-year price — in two
+      // places: on the page and in its structured data. It is read once here
+      // (null when it can't be) and both are built from this one value.
+      const productRow = await publishedProduct(pathname);
+      const productPage: ProductPage | undefined = productRow
+        ? { row: productRow, offer: await (await import("./product-offer")).currentProductOffer() }
+        : undefined;
       // The blog and the industry pages are checked first: their paths are ours,
       // so a customer card that happened to use the slug "blog" or "industries"
       // can never take over those pages' <head>. (The hub used to reach
       // cardSnapshotMeta before metaFor, so a card named "industries" could.)
-      const meta = blogMeta(pathname) || industryMeta(pathname) || (await productMeta(pathname, distPath)) || (await demoMeta(pathname, distPath))
+      const meta = blogMeta(pathname) || industryMeta(pathname) || (productPage ? productMeta(productPage.row, productPage.offer, distPath) : null) || (await demoMeta(pathname, distPath))
         || (await cardSnapshotMeta(pathname)) || metaFor(pathname, distPath);
       // Soft-404 guard: render a product page only when that product exists.
       // Otherwise an unknown slug would come back as a 200 with a full "not
@@ -358,11 +398,21 @@ export function serveStaticFiles(app: App) {
       // because industry pages are ordinary "website" pages.
       const industryOk = !industryMatch || !!getIndustry(industryMatch[1]);
       if (!blogOk || !industryOk) status = 404;
-      const ssr = ssrWanted && productOk && blogOk && industryOk ? await renderPublic(clean, pathname + search) : null;
+      const ssr = ssrWanted && productOk && blogOk && industryOk ? await renderPublic(clean, pathname + search, productPage) : null;
+
+      // Structured data may state a price only when this same HTML shows it:
+      // the page was rendered here, from that product and that price. If
+      // rendering fell back to the browser (where a crawler can't fetch the
+      // price), the head carries no Product block.
+      const priceShown = !!ssr && ssr.seeded.has("product.bySlug") && ssr.seeded.has("product.offer");
+      const head = productPage?.offer && !priceShown ? productMeta(productPage.row, null, distPath) : meta;
+      // A listed design's page that is going out without its price is served
+      // this once and not kept, here or at the CDN (mayKeepProductPage).
+      oneOff = !!productPage && !mayKeepProductPage(productPage.row, priceShown);
 
       // With rendered markup the page has its real <h1>; the hidden placeholder
       // heading is only for pages that still arrive empty.
-      if (meta) { content = injectCardMeta(content, ssr ? { ...meta, h1: undefined, bodyHtml: undefined } : meta); cacheable = true; }
+      if (head) { content = injectCardMeta(content, ssr ? { ...head, h1: undefined, bodyHtml: undefined } : head); cacheable = !oneOff; }
       // A URL nothing recognises — not a page, product, article or card — still
       // gets the app shell (the app shows its own "not found" screen), but it must
       // not be indexed: a 200 with a generic title is what Google reports as a
@@ -392,6 +442,9 @@ export function serveStaticFiles(app: App) {
       // this makes crawler/social TTFB ~edge speed globally; a no-op without it.
       c.header("Cache-Control", EDGE_CACHE);
     }
+    // Said outright, so a CDN rule that caches pages by default can't keep the
+    // copy without a price either.
+    if (oneOff) c.header("Cache-Control", "no-store");
     // The cached page keeps the Tag Manager snippet; it is dropped per request
     // for any host that isn't the live site (tag-manager.ts).
     return c.html(pageForHost(content, c.req.header("host")), status);

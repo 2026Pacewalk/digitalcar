@@ -20,6 +20,7 @@ import {
 import { CITY_LINKS, COMPARE_LINKS, CONTACT, FOOTER_GROUPS, FOOTER_GUIDES, LEGAL_LINKS, SOCIAL_LINKS } from "@/lib/publicNav";
 import { TUTORIAL } from "@/data/tutorial";
 import { InstallAppRow } from "@/components/mobile/InstallApp";
+import { NO_RENEWAL_NOTE } from "@contracts/product-offer";
 
 /** Every feature here is live in the product. */
 const FEATURES: { icon: LucideIcon; label: string; href: string }[] = [
@@ -242,7 +243,8 @@ export default function SiteFooter({ signupHref }: { signupHref: string }) {
                 Your whole business, one tap away.
               </h2>
               <ul className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] font-semibold text-[#422006]">
-                {["Live in minutes", "50+ designs", "No app to install", "Cancel anytime"].map((t) => (
+                {/* The last two are the one note on renewal and refunds, one tick each. */}
+                {["Live in minutes", "50+ designs", "No app to install", ...NO_RENEWAL_NOTE.split(" · ")].map((t) => (
                   <li key={t} className="inline-flex items-center gap-1.5"><Check size={15} strokeWidth={3} aria-hidden="true" /> {t}</li>
                 ))}
               </ul>

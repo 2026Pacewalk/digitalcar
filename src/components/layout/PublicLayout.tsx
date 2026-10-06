@@ -1,5 +1,5 @@
 import { useLocation, Outlet } from "react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useEdgeToEdge } from "@/lib/nativeApp";
 import { DEFAULT_SEO, seoForPath, breadcrumbJsonLd } from "@/lib/publicSeo";
 import { SOCIAL_LINKS } from "@/lib/publicNav";
@@ -16,8 +16,13 @@ import type { PageSeo } from "@/lib/publicSeo";
 
    Deliberately NO AggregateRating: review markup must reflect genuinely
    collected, verifiable ratings, and inventing it risks a manual action.
-   Add it only once real reviews are being captured. */
-const SITE_LD = {
+   Add it only once real reviews are being captured.
+
+   `withAppOffer` is false on a product page. That page states one price — the
+   1-year price in its own Product block (api/lib/merchant-feed.ts) — and a
+   second Offer beside it, at the monthly "from" price, reads to Google as a
+   different price for the same page. */
+const siteLd = (withAppOffer: boolean) => ({
   "@context": "https://schema.org",
   "@graph": [
     {
@@ -56,16 +61,20 @@ const SITE_LD = {
       url: "https://digitalcarda.in/",
       publisher: { "@id": "https://digitalcarda.in/#organization" },
       description: "Create a digital business card with QR code, WhatsApp chat, payment links, products, gallery, lead capture and analytics — no app to install.",
-      offers: {
-        "@type": "Offer",
-        price: "99",
-        priceCurrency: "INR",
-        description: "Plans from Rs. 99/month, with a 30-day free trial that needs no payment.",
-        url: "https://digitalcarda.in/pricing",
-      },
+      ...(withAppOffer ? {
+        offers: {
+          "@type": "Offer",
+          price: "99",
+          priceCurrency: "INR",
+          description: "Plans from Rs. 99/month, with a 30-day free trial that needs no payment.",
+          url: "https://digitalcarda.in/pricing",
+        },
+      } : {}),
     },
   ],
-};
+});
+const SITE_LD = siteLd(true);
+const SITE_LD_ON_PRODUCT = siteLd(false);
 
 /** Title, description and Open Graph text for a page the SEO table knows. */
 function applyPageSeo(seo: PageSeo) {
@@ -165,9 +174,21 @@ export default function PublicLayout() {
     s.textContent = ld;
   }, [location.pathname]);
 
+  /* The server writes a page's own structured data — a product's Product block,
+     an article's or an industry page's blocks — into <head> for the URL it
+     served (the one ld+json script there without an id). Once the visitor moves
+     to another page inside the site, it describes a page they have left, so it
+     goes. Nothing in the browser writes a product's block again: the server's
+     copy is the only one, and crawlers always load the page itself. */
+  const servedPath = useRef(location.pathname);
+  useEffect(() => {
+    if (location.pathname === servedPath.current) return;
+    document.head.querySelectorAll('script[type="application/ld+json"]:not([id])').forEach((el) => el.remove());
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
-      <JsonLd id="dc-site-ld" data={SITE_LD} />
+      <JsonLd id="dc-site-ld" data={productMatch ? SITE_LD_ON_PRODUCT : SITE_LD} />
       <SiteHeader signupHref={signupHref} />
 
       <main><Outlet /></main>

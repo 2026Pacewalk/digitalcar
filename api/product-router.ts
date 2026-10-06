@@ -3,6 +3,7 @@ import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { products } from "@db/schema";
 import { and, eq, asc, inArray } from "drizzle-orm";
+import { currentProductOffer } from "./lib/product-offer";
 
 /* ── Ecommerce product catalogue ──────────────────────────────────
    A product is a sellable listing (name, price, category, images, SEO)
@@ -65,6 +66,11 @@ export const productRouter = createRouter({
     const rows = await db.select().from(products).where(eq(products.slug, input.slug));
     return rows[0] ?? null;
   }),
+
+  // ── Public: what a listed design costs — the Gold plan's 1-year price, the
+  //    one checkout charges. Null when it can't be read; the page then shows
+  //    no price. Product pages get it with their HTML (api/lib/vite.ts). ──
+  offer: publicQuery.query(() => currentProductOffer()),
 
   // ── Admin: full catalogue with optional status filter ──
   listAll: adminQuery

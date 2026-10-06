@@ -11,9 +11,9 @@ import { demoForProduct } from "@/lib/demoData";
 import { logFunnel } from "@/lib/funnel";
 import MockupGallery from "@/components/MockupGallery";
 import { webpFor } from "@/lib/imageSources";
-import { OFFER_POLICY } from "@/lib/offerPolicy";
+import { useProductOffer } from "@/hooks/useProductOffer";
+import { KEPT_AFTER_TRIAL, LINK_STAYS_NOTE, NO_RENEWAL_NOTE, buyPath, offerCopy, productListing, productSeo } from "@contracts/product-offer";
 
-const inr = (v?: string | number | null) => "₹" + Number(v || 0).toLocaleString("en-IN");
 const THUMB_W = 375, THUMB_H = 560;
 
 // Aggregate social proof — mirrors the figures used on the marketing home page.
@@ -49,7 +49,7 @@ function ThumbFrame({ style, primary, secondary, category, className }: { style:
 const BENEFITS = [
   { icon: Smartphone, t: "Opens on any phone — no app", d: "Tap the link or scan the QR and your card opens instantly on any iPhone or Android. Nothing to download, ever." },
   { icon: MessageCircle, t: "Turns taps into customers", d: "One-tap call, WhatsApp and a built-in enquiry form let interested people reach you in a second — and every lead is captured for you." },
-  { icon: QrCode, t: "One link & QR — forever", d: "Print your QR once. Change your details, offers or even the whole design later; your link and QR never change." },
+  { icon: QrCode, t: "One link & QR — print it once", d: `Change your details, offers or even the whole design later — your card link, and the QR code that opens it, ${LINK_STAYS_NOTE}.` },
 ];
 
 const COMPARE = [
@@ -68,15 +68,22 @@ const FEATURES = [
   { icon: QrCode, label: "Scannable QR Code" }, { icon: BarChart3, label: "Visitor Analytics" },
   { icon: Star, label: "Google Reviews" }, { icon: Share2, label: "Instant Sharing" },
 ];
-const INCLUDED = ["Your own public card URL", "Permanent QR code", "Lead / enquiry capture", "Unlimited edits — anytime", "Works on every phone, no app", "30-day free trial to start"];
+const INCLUDED = ["Your own public card URL", "Your own QR code", "Lead / enquiry capture", "Unlimited edits — anytime", "Works on every phone, no app", "30-day free trial to start"];
 const STEPS = [
   { t: "Choose", d: "Pick this design." }, { t: "Customise", d: "Add your details, logo and links." },
   { t: "Publish", d: "Go live with one tap." }, { t: "Share", d: "Send the link or QR anywhere." },
 ];
-const FAQS = [
+/* `afterTrial` is the answer to what the trial leads to. On a design with a
+   price it states the amount (offerCopy); without one it can only point at the
+   plans, and an add-on also says it is paid for on top of the plan. It is the
+   first question because the first answer is the open one — the only one in
+   the page as the server sends it. */
+const AFTER_TRIAL_NO_PRICE = `${KEPT_AFTER_TRIAL} To keep it live, you choose a plan — the prices are on our pricing page. Nothing is charged unless you choose to pay.`;
+const AFTER_TRIAL_ADDON = `${KEPT_AFTER_TRIAL} To keep it live, you choose a plan and add this design to it as a paid extra — the plan prices are on our pricing page. Nothing is charged unless you choose to pay.`;
+const faqsFor = (afterTrial: string) => [
+  { q: "What happens after the 30-day free trial?", a: afterTrial },
   { q: "Do I need to install an app?", a: "No. Your card opens in any web browser and works on every phone — nothing to download." },
-  { q: "What happens after the 30-day free trial?", a: "Your card and all its content stay safely saved. Activate a plan to keep it live — you never rebuild it." },
-  { q: "Can I change the design later?", a: "Yes. Switch designs anytime — your card URL and QR code stay exactly the same, so printed codes never break." },
+  { q: "Can I change the design later?", a: `Yes. Switch designs anytime — your card link ${LINK_STAYS_NOTE}, so a QR code you have already printed keeps working.` },
   { q: "How do people share or save my card?", a: "Via the link, the QR code, WhatsApp, or one-tap Save Contact straight into their phonebook." },
   { q: "Is there any setup or printing cost?", a: "None. It's fully digital — instant activation, no printing, no delivery." },
 ];
@@ -85,6 +92,9 @@ export default function ProductDetail() {
   const { slug = "" } = useParams();
   const { data: product, isLoading } = trpc.product.bySlug.useQuery({ slug }, { enabled: !!slug });
   const { data: all = [] } = trpc.product.catalogue.useQuery();
+  // The Gold plan's 1-year price, already in the HTML the server sent. Rupees
+  // for every visitor: it never goes through the ₹/$ switch (useCurrency).
+  const offer = useProductOffer();
   const [faqOpen, setFaqOpen] = useState<number | null>(0);
   const [showBar, setShowBar] = useState(false);
 
@@ -104,37 +114,22 @@ export default function ProductDetail() {
 
   useEffect(() => { if (product?.slug) logFunnel("product_view", product.slug); }, [product?.slug]);
 
-  // Per-product SEO + structured data (genuine data only — no fake ratings).
+  // Per-product SEO — the same title and description the server wrote into the
+  // HTML (productSeo), so they don't change once the page has loaded. The
+  // Product structured data is written by the server only (api/lib/vite.ts), so
+  // the page carries one copy of it.
   useEffect(() => {
     if (!product) return;
-    const title = product.seoTitle || `${product.name} — DigitalCarda`;
+    const { title, description } = productSeo(product);
     document.title = title;
     const setMeta = (sel: string, attr: string, val: string) => {
       let el = document.querySelector(sel);
       if (!el) { el = document.createElement("meta"); el.setAttribute(attr.startsWith("og") ? "property" : "name", attr); document.head.appendChild(el); }
       el.setAttribute("content", val);
     };
-    const desc = product.seoDescription || product.tagline || `${product.name} — a digital business card you can try free for ${product.trialDays} days.`;
-    setMeta('meta[name="description"]', "description", desc);
+    setMeta('meta[name="description"]', "description", description);
     setMeta('meta[property="og:title"]', "og:title", title);
-    setMeta('meta[property="og:description"]', "og:description", desc);
-
-    const ld = {
-      "@context": "https://schema.org", "@type": "Product", name: product.name, description: desc,
-      brand: { "@type": "Brand", name: "DigitalCarda" },
-      ...(product.images?.length ? { image: product.images } : {}),
-      offers: {
-        "@type": "Offer", priceCurrency: product.currency || "INR",
-        price: Number(product.salePrice || product.price).toFixed(2),
-        availability: "https://schema.org/InStock",
-        url: `https://digitalcarda.in/digital-business-cards-templates/${product.slug}`,
-        ...OFFER_POLICY,
-      },
-    };
-    let s = document.getElementById("pdp-ld");
-    if (!s) { s = document.createElement("script"); s.id = "pdp-ld"; (s as HTMLScriptElement).type = "application/ld+json"; document.head.appendChild(s); }
-    s.textContent = JSON.stringify(ld);
-    return () => { document.getElementById("pdp-ld")?.remove(); };
+    setMeta('meta[property="og:description"]', "og:description", description);
   }, [product]);
 
   if (isLoading) return <div className="pt-28 pb-20 text-center text-[#64748B]">Loading…</div>;
@@ -146,22 +141,42 @@ export default function ProductDetail() {
     </div>
   );
 
-  const price = product.salePrice || product.price;
-  const onSale = !!product.salePrice && Number(product.salePrice) < Number(product.price);
+  /* A listed design has a price and a way to buy it. The server writes an Offer
+     into this page's structured data under exactly this condition (productLd),
+     so what the page shows and what it tells Google are one decision. The price
+     is the plan's — products.price is never shown. Every other design shows no
+     price and no Buy button. */
+  const listing = productListing(product);
+  const sale = offer && listing.listed ? { ...offerCopy(offer), months: offer.months, buyHref: buyPath(offer, product.slug) } : null;
+  // An add-on is bought on top of a plan, so it is not "included in your plan".
+  const isAddon = !listing.listed && listing.reason === "addon";
+  const noPrice = isAddon
+    ? { head: "Paid add-on", body: "You add this design to a DigitalCarda plan as a paid extra. It is not part of the plan's price." }
+    : { head: `Free to try for ${product.trialDays} days`, body: "No payment details needed to start. To keep your card live after that, you choose a plan." };
   const signupHref = `/signup?product=${encodeURIComponent(product.slug)}`;
+  const faqs = faqsFor(sale ? sale.afterTrial : isAddon ? AFTER_TRIAL_ADDON : AFTER_TRIAL_NO_PRICE);
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen pt-20">
       {/* Sticky buy-bar (desktop only) — on mobile the global layout already shows
-          a "Start 30-Day Free Trial" bar, so we don't duplicate it here. */}
+          a "Start 30-Day Free Trial" bar, so we don't duplicate it here.
+          The round back-to-top button floats over this bar's right-hand end
+          (SiteFooter: 56px wide, 24px from the edge). On screens too narrow for
+          the bar's content to end left of it, the extra right padding keeps
+          the Buy button clear, so its label and every click on it are its own. */}
       <div className={`hidden lg:block fixed bottom-0 inset-x-0 z-40 transition-transform duration-300 ${showBar ? "translate-y-0" : "translate-y-full"}`}>
         <div className="bg-white/95 backdrop-blur border-t border-[#E2E8F0] shadow-[0_-6px_24px_rgba(15,23,42,0.08)]">
-          <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
+          <div className="max-w-6xl mx-auto px-4 pr-24 min-[1344px]:pr-4 py-2.5 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[13px] font-bold text-[#0F172A] truncate">{product.name}</p>
-              <p className="text-[12px] text-[#64748B]"><span className="font-semibold text-emerald-600">Included in your plan</span> · {product.trialDays}-day free trial</p>
+              {sale
+                ? <p className="text-[12px] text-[#64748B] truncate"><span className="font-bold text-[#0F172A]">{sale.priceLine}</span>{` · ${sale.planLine} · ${sale.taxLine}`}</p>
+                : <p className="text-[12px] text-[#64748B]"><span className={`font-semibold ${isAddon ? "text-[#0F172A]" : "text-emerald-600"}`}>{isAddon ? noPrice.head : "Free to try"}</span>{` · ${product.trialDays}-day free trial`}</p>}
             </div>
-            <Link to={signupHref} className="shrink-0 h-11 px-5 rounded-xl gradient-gold text-[#0F172A] font-bold flex items-center gap-2 hover:shadow-gold transition-all text-sm whitespace-nowrap">Try Free <ArrowRight size={16} /></Link>
+            <div className="shrink-0 flex items-center gap-2">
+              {sale && <Link to={signupHref} className="h-11 px-4 rounded-xl border-2 border-[#0F172A] text-[#0F172A] font-bold flex items-center hover:bg-[#0F172A] hover:text-white transition-colors text-sm whitespace-nowrap">Try Free</Link>}
+              <Link to={sale ? sale.buyHref : signupHref} className="h-11 px-5 rounded-xl gradient-gold text-[#0F172A] font-bold flex items-center gap-2 hover:shadow-gold transition-all text-sm whitespace-nowrap">{sale ? sale.buyLabel : "Try Free"} <ArrowRight size={16} /></Link>
+            </div>
           </div>
         </div>
       </div>
@@ -174,10 +189,25 @@ export default function ProductDetail() {
           <span className="text-[#334155] font-medium truncate">{product.name}</span>
         </nav>
 
-        {/* Hero */}
+        {/* Phones show the gallery first, which fills the screen — so the price
+            is stated above it too, not only a scroll further down. */}
+        {sale && (
+          <Link to={sale.buyHref} className="lg:hidden mb-4 flex items-center justify-between gap-3 rounded-xl bg-white border border-[#F7B31C] px-3.5 py-2.5 shadow-premium">
+            <span className="min-w-0">
+              <span className="block text-[15px] font-extrabold text-[#0F172A] leading-tight">{sale.priceLine}</span>
+              <span className="block text-[12px] text-[#64748B] leading-snug">{`${sale.planLine} · ${sale.taxLine}`}</span>
+            </span>
+            <span className="shrink-0 h-9 px-3.5 rounded-lg gradient-gold text-[#0F172A] text-[13px] font-bold inline-flex items-center gap-1 whitespace-nowrap">Buy now <ArrowRight size={14} /></span>
+          </Link>
+        )}
+
+        {/* Hero. Both columns are min-w-0: the gallery's row of thumbnails is wider
+            than a 375px phone, and without it that row sets the width of the
+            whole column — pushing the price and buttons past the screen edge
+            instead of scrolling inside the gallery. */}
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 pb-10">
           {/* Media gallery — marketing mockups lead (feature image first) */}
-          <div className="relative">
+          <div className="relative min-w-0">
             <div className="sticky top-24">
               <MockupGallery
                 images={(product.images as string[]) || []}
@@ -189,8 +219,8 @@ export default function ProductDetail() {
           </div>
 
           {/* Details */}
-          <div>
-            {product.category && <p className="text-[11px] font-bold text-[#F7B31C] uppercase tracking-[0.14em]">{product.category}</p>}
+          <div className="min-w-0">
+            {product.category &&<p className="text-[11px] font-bold text-[#F7B31C] uppercase tracking-[0.14em]">{product.category}</p>}
             <h1 className="mt-1.5 text-[1.7rem] sm:text-3xl lg:text-[2.6rem] font-extrabold text-[#0F172A] tracking-tight text-balance leading-[1.1]">{product.name}</h1>
             <p className="mt-3 text-[15px] sm:text-base text-[#475569] leading-relaxed">{product.tagline || "A smart, shareable digital business card that makes you look established — and turns every share into a new lead."}</p>
 
@@ -200,26 +230,56 @@ export default function ProductDetail() {
               <span className="text-[13px] text-[#64748B]"><b className="text-[#0F172A]">{RATING}</b>/5 · Loved by <b className="text-[#0F172A]">{HAPPY_USERS}</b> businesses</span>
             </div>
 
-            {/* No per-design price — every template is included in the plan. */}
-            <div className="flex items-baseline gap-2.5 mt-5">
-              <span className="text-2xl font-extrabold text-emerald-600">Included in your plan</span>
-            </div>
-            <p className="text-[13px] text-[#64748B] mt-1">Pick any design — your subscription covers them all.</p>
-            <span className="inline-flex items-center gap-1.5 mt-3 text-[12px] font-bold text-[#92400E] bg-[#FEF3C7] px-3 py-1.5 rounded-full">◷ {product.trialDays}-Day Free Trial · No credit card needed</span>
+            {sale ? (
+              /* What it costs and how to buy it, together: the price for the
+                 whole term, what that price covers, and the two ways to start. */
+              <div id="buy" className="mt-5 rounded-2xl bg-white border-2 border-[#F7B31C] shadow-premium p-4 sm:p-5 scroll-mt-24">
+                <p className="text-[11px] font-bold text-[#92400E] uppercase tracking-[0.12em]">{sale.planLine}</p>
+                <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                  <span className="text-[2.6rem] leading-none font-extrabold text-[#0F172A] tracking-tight tabular-nums">{sale.price}</span>
+                  <span className="text-[15px] font-semibold text-[#475569]">{`for ${sale.months} months`}</span>
+                </p>
+                <ul className="mt-3.5 grid sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                  {[sale.taxLine, sale.payLine, sale.refundLine, sale.trialLine].map((t) => (
+                    <li key={t} className="flex items-start gap-2 text-[13px] text-[#334155] leading-snug"><Check size={15} className="text-emerald-600 shrink-0 mt-px" />{t}</li>
+                  ))}
+                </ul>
+                <Link to={sale.buyHref} className="mt-4 w-full h-[52px] rounded-xl gradient-gold text-[#0F172A] font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all text-[15px] active:scale-[0.99]">{sale.buyLabel} <ArrowRight size={18} /></Link>
+                <Link to={signupHref} className="mt-2.5 w-full h-11 rounded-xl border-2 border-[#0F172A] text-[#0F172A] font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#0F172A] hover:text-white transition-colors">Try This Card Free</Link>
+                <p className="mt-3 text-[12px] text-[#64748B] leading-relaxed">
+                  Buy now takes you through a free sign-up first, then to payment. See our{" "}
+                  <Link to="/refund-policy" className="font-semibold text-[#B45309] hover:text-[#92400E] underline underline-offset-2">refund policy</Link> and{" "}
+                  <Link to="/terms-of-service" className="font-semibold text-[#B45309] hover:text-[#92400E] underline underline-offset-2">terms</Link>.
+                </p>
+              </div>
+            ) : (
+              /* No price to state for this design, so none is shown. */
+              <>
+                <div className="flex items-baseline gap-2.5 mt-5">
+                  <span className={`text-2xl font-extrabold ${isAddon ? "text-[#0F172A]" : "text-emerald-600"}`}>{noPrice.head}</span>
+                </div>
+                <p className="text-[13px] text-[#64748B] mt-1">
+                  {noPrice.body}{" "}
+                  <Link to="/pricing" className="font-semibold text-[#B45309] hover:text-[#92400E] underline underline-offset-2">See plans and prices</Link>
+                </p>
+              </>
+            )}
 
             <ul className="mt-6 grid sm:grid-cols-2 gap-y-2.5 gap-x-4">
-              {[[Zap, "Instant digital activation"], [Smartphone, "No app required"], [Share2, "Share instantly"], [ShieldCheck, "Permanent URL & QR"]].map(([Ic, t]) => {
+              {[[Zap, "Instant digital activation"], [Smartphone, "No app required"], [Share2, "Share instantly"], [ShieldCheck, "Your own link & QR code"]].map(([Ic, t]) => {
                 const I = Ic as typeof Zap;
                 return <li key={t as string} className="flex items-center gap-2.5 text-[14px] text-[#334155]"><span className="w-7 h-7 rounded-lg bg-[#FEF3C7] flex items-center justify-center shrink-0"><I size={15} className="text-[#F7B31C]" /></span>{t as string}</li>;
               })}
             </ul>
 
-            <div className="mt-7">
-              <Link to={signupHref} className="w-full h-[52px] rounded-xl gradient-gold text-[#0F172A] font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all text-[15px] active:scale-[0.99]">Try This Card Free <ArrowRight size={18} /></Link>
-            </div>
+            {!sale && (
+              <div className="mt-7">
+                <Link to={signupHref} className="w-full h-[52px] rounded-xl gradient-gold text-[#0F172A] font-bold flex items-center justify-center gap-2 hover:shadow-gold transition-all text-[15px] active:scale-[0.99]">Try This Card Free <ArrowRight size={18} /></Link>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-[12px] text-[#64748B]">
               <span className="inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-emerald-600" /> Secure & private</span>
-              <span className="inline-flex items-center gap-1.5"><Check size={14} className="text-emerald-600" /> Cancel anytime</span>
+              <span className="inline-flex items-center gap-1.5"><Check size={14} className="text-emerald-600" /> {NO_RENEWAL_NOTE}</span>
               <span className="inline-flex items-center gap-1.5"><Check size={14} className="text-emerald-600" /> Set up in minutes</span>
             </div>
           </div>
@@ -317,7 +377,7 @@ export default function ProductDetail() {
         {/* FAQ */}
         <Section title="Frequently asked questions">
           <div className="max-w-3xl space-y-2.5">
-            {FAQS.map((f, i) => (
+            {faqs.map((f, i) => (
               <div key={i} className="rounded-2xl bg-white border border-[#F1F5F9] overflow-hidden shadow-premium">
                 <button onClick={() => setFaqOpen(faqOpen === i ? null : i)} aria-expanded={faqOpen === i} className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left">
                   <span className="min-w-0"><span className="dc-faq-q">{f.q}</span></span>
@@ -347,7 +407,9 @@ export default function ProductDetail() {
                       : <ThumbFrame style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />}
                     <div className="p-3">
                       <p className="text-[13px] font-bold text-[#0F172A] line-clamp-1">{p.name}</p>
-                      <p className="text-[11px] font-semibold text-emerald-600 mt-0.5">Included in your plan</p>
+                      {/* No "included in your plan" here: among these can be an
+                          add-on, which is bought on top of a plan. */}
+                      <p className="text-[11px] font-semibold text-emerald-600 mt-0.5">View design</p>
                     </div>
                   </Link>
                 );
@@ -363,8 +425,20 @@ export default function ProductDetail() {
             <div className="flex items-center justify-center gap-1 mb-3">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={15} className="fill-[#F7B31C] text-[#F7B31C]" />)}</div>
             <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-[#F7B31C]"><Sparkles size={13} /> Ready in minutes</span>
             <h2 className="mt-3 text-2xl sm:text-[2rem] font-extrabold text-white tracking-tight text-balance">Get your {product.name} today</h2>
-            <p className="mt-2 text-[#94A3B8] max-w-lg mx-auto">Start your {product.trialDays}-day free trial — no app, no printing, no credit card upfront. Cancel anytime.</p>
-            <Link to={signupHref} className="mt-6 inline-flex items-center gap-2 h-[52px] px-8 rounded-xl gradient-gold text-[#0F172A] font-bold hover:shadow-gold transition-all active:scale-[0.99]">Try This Card Free <ArrowRight size={18} /></Link>
+            {sale ? (
+              <>
+                <p className="mt-2 text-[#94A3B8] max-w-lg mx-auto">{`${sale.priceLine}. ${sale.taxLine}. ${sale.payLine} ${sale.trialLine}`}</p>
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Link to={sale.buyHref} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 h-[52px] px-8 rounded-xl gradient-gold text-[#0F172A] font-bold hover:shadow-gold transition-all active:scale-[0.99]">{sale.buyLabel} <ArrowRight size={18} /></Link>
+                  <Link to={signupHref} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 h-[52px] px-8 rounded-xl border-2 border-white/30 text-white font-bold hover:bg-white/10 transition-colors">Try This Card Free</Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-[#94A3B8] max-w-lg mx-auto">{`Start your ${product.trialDays}-day free trial — no app, no printing, no credit card upfront. ${NO_RENEWAL_NOTE}.`}</p>
+                <Link to={signupHref} className="mt-6 inline-flex items-center gap-2 h-[52px] px-8 rounded-xl gradient-gold text-[#0F172A] font-bold hover:shadow-gold transition-all active:scale-[0.99]">Try This Card Free <ArrowRight size={18} /></Link>
+              </>
+            )}
             <p className="mt-3 text-[12px] text-white/50">Join {HAPPY_USERS} businesses already growing with DigitalCarda</p>
           </div>
         </div>

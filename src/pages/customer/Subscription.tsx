@@ -13,6 +13,7 @@ import { openRazorpayCheckout } from "@/lib/razorpay";
 import { useCurrency } from "@/hooks/useCurrency";
 import CurrencySwitch from "@/components/CurrencySwitch";
 import { formatMoney, roundMoney, chargeFor, currencySymbol, isCurrency, type Currency, type AddonCycle } from "@contracts/money";
+import { planPageCurrency } from "@contracts/product-offer";
 
 const PLAN_ICONS = [Zap, Package, CreditCard, Calendar];
 const TERM_LABEL: Record<"monthly" | "yearly" | "triennial", string> = { monthly: "Monthly", yearly: "Yearly", triennial: "3-Year" };
@@ -45,16 +46,21 @@ export default function CustomerSubscription() {
   });
   const [cycle, setCycle] = useState<Term>(urlTerm ?? "yearly");
   const cyclePinned = useRef(urlTerm !== null);
+  // Arrived from a product page's Buy button (&currency=INR), which showed the
+  // price in ₹: this visit is in ₹, until the visitor uses the ₹/$ switch.
+  // Kept here so a remount doesn't bring it back after they have.
+  const [openInInr, setOpenInInr] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("currency") === "INR");
   const [payFor, setPayFor] = useState<PayFor | null>(null);
   return (
     <ResponsiveDashboardLayout>
-      <SubscriptionBody cycle={cycle} setCycle={setCycle} cyclePinned={cyclePinned} payFor={payFor} setPayFor={setPayFor} />
+      <SubscriptionBody cycle={cycle} setCycle={setCycle} cyclePinned={cyclePinned} openInInr={openInInr} setOpenInInr={setOpenInInr} payFor={payFor} setPayFor={setPayFor} />
     </ResponsiveDashboardLayout>
   );
 }
 
-function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
+function SubscriptionBody({ cycle, setCycle, cyclePinned, openInInr, setOpenInInr, payFor, setPayFor }: {
   cycle: Term; setCycle: (c: Term) => void; cyclePinned: { current: boolean };
+  openInInr: boolean; setOpenInInr: (v: boolean) => void;
   payFor: PayFor | null; setPayFor: (p: PayFor | null) => void;
 }) {
   const utils = trpc.useUtils();
@@ -67,10 +73,25 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
   // same lock). With USD switched off `available` is false and `cur` is INR, so
   // the page is exactly what it was before USD existed.
   const { currency, setCurrency, available, locked, prices } = useCurrency({ lockedTo: currentCurrency });
-  const cur: Currency = currency === "USD" && prices ? "USD" : "INR";
+  // The buyer was shown this plan's price in ₹ (openInInr): the page is in ₹ for
+  // this visit — never over a running $ plan, which fixes the currency. It is
+  // not saved as their ₹/$ choice, so /pricing and the rest of the site stay as
+  // they had them (planPageCurrency).
+  const cur: Currency = planPageCurrency({ quotedInRupees: openInInr, locked, chosen: currency, usdPriced: !!prices });
+  // The ₹/$ switch. Once the visitor picks for themselves that choice stands,
+  // on a reload or coming Back too — so the Buy link's mark leaves the address.
+  const pickCurrency = (c: Currency) => {
+    if (openInInr) {
+      setOpenInInr(false);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("currency");
+      window.history.replaceState(window.history.state, "", url);
+    }
+    setCurrency(c);
+  };
   const lockNote = `Your current plan was paid in ${currencySymbol(currency)}. Upgrades are charged in ${currencySymbol(currency)} until it ends.`;
   const { data: discount } = trpc.referral.myDiscount.useQuery();
-  const { data: orders } = trpc.payment.myOrders.useQuery();
+  const { data: orders, isLoading: ordersLoading } = trpc.payment.myOrders.useQuery();
   const pendingOrder = (orders || []).find((o) => o.status === "pending");
 
   const [now, setNow] = useState(() => Date.now());
@@ -80,11 +101,9 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
   // Open the page on the member's actual term, so the first thing they see is
   // the plan they're on — once real data is in. Once snapped, or once they click
   // a tab or choose a plan, it stays put.
-  // Chosen in the mobile app (?plan=6): point at that plan once plans show.
+  // Chosen before arriving (?plan=6 — the mobile app, or a Buy button on the
+  // site): point at that plan once plans show (see `asked` below).
   const [urlPlan] = useState(() => (typeof window === "undefined" ? 0 : Number(new URLSearchParams(window.location.search).get("plan")) || 0));
-  useEffect(() => {
-    if (urlPlan && dataReady) document.getElementById(`plan-${urlPlan}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [urlPlan, dataReady]);
   useEffect(() => {
     if (cyclePinned.current || !dataReady || !userCycle) return;
     setCycle(userCycle);
@@ -162,6 +181,23 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
     setPayFor({ id: packageId, name, amount, cycle, currency: cur });
   };
 
+  // Arrived with a plan already chosen (?plan=<id> — a Buy button on the site,
+  // or the mobile app). Once it is known to be a paid plan this member can buy
+  // now, it gets its own line at the top with payment one click away. The price
+  // is the same one its card shows; an id that names no such plan is ignored.
+  const plansSettled = dataReady && !ordersLoading; // the plan, and any payment awaiting verification, are known
+  const askedPlan = urlPlan && plansSettled && !pendingOrder ? visiblePackages.find((p) => p.id === urlPlan) : undefined;
+  const askedPrice = askedPlan && !(currentPkgId === askedPlan.id && !planExpired) ? priceOf(askedPlan, cycle, cur) : null;
+  const asked = askedPlan && askedPrice?.isPaid ? { plan: askedPlan, finalPrice: askedPrice.finalPrice, base: askedPrice.base } : null;
+  // Without that line (their own plan, a plan not on offer to them, a payment
+  // still being verified) the page scrolls to the plan's card, as it always has.
+  // With it, the page stays at the top, where the line is.
+  const askedShown = !!asked;
+  useEffect(() => {
+    if (!urlPlan || !plansSettled || askedShown) return;
+    document.getElementById(`plan-${urlPlan}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [urlPlan, plansSettled, askedShown]);
+
   // $ can't be paid right now: move to ₹ and carry on with the same plan and term
   // at its ₹ price. Not offered while a running $ plan locks the currency.
   const switchToInr = locked ? undefined : () => {
@@ -191,6 +227,28 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
             </div>
           </div>
         </div>
+
+        {/* Arrived with a plan already chosen: name it, with the way to pay */}
+        {asked && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border-2 border-[#F7B31C] bg-white px-4 py-3.5 shadow-premium">
+            <span className="hidden sm:flex w-10 h-10 rounded-xl gradient-gold items-center justify-center shrink-0"><CreditCard size={18} className="text-[#0F172A]" /></span>
+            <div className="flex-1 min-w-0">
+              {/* When a discount has come off (the limited-time offer, a referral,
+                  an upgrade credit) the plan's own price is shown struck through
+                  beside it, as on the plan's card — so a buyer who was quoted
+                  that price on the way here sees why the amount is lower. */}
+              <p className="text-sm font-bold text-[#0F172A]">
+                {`Your choice: ${asked.plan.name} · ${TERM_LABEL[cycle]} — ${money(asked.finalPrice, cur)}`}
+                {asked.finalPrice < asked.base && <>{" "}<span className="font-normal text-[#94A3B8] line-through">{money(asked.base, cur)}</span></>}
+              </p>
+              <p className="text-[12px] text-[#64748B]">You pay once. Nothing renews by itself.</p>
+            </div>
+            <button onClick={() => choose(asked.plan.id, asked.plan.name, asked.finalPrice)}
+              className="h-11 px-5 rounded-xl gradient-gold text-[#0F172A] text-sm font-bold hover:shadow-gold active:scale-[0.98] transition-all whitespace-nowrap">
+              Continue to payment
+            </button>
+          </div>
+        )}
 
         {/* Arrived from an offer popup with a coupon link */}
         {urlCoupon && (
@@ -267,7 +325,7 @@ function SubscriptionBody({ cycle, setCycle, cyclePinned, payFor, setPayFor }: {
               </button>
             ))}
           </div>
-          {available && <CurrencySwitch value={cur} onChange={setCurrency} disabled={locked} note={locked ? lockNote : undefined} />}
+          {available && <CurrencySwitch value={cur} onChange={pickCurrency} disabled={locked} note={locked ? lockNote : undefined} />}
           {available && locked && <p className="basis-full text-center text-[11.5px] text-[#64748B]">{lockNote}</p>}
         </div>
 

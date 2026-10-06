@@ -9,10 +9,11 @@ import { planFeatures, type PlanPkg } from "@/lib/planFeatures";
 import { NFC_PRODUCTS, NFC_DELIVERY } from "@/lib/nfcProducts";
 import { Reveal } from "@/components/public/Reveal";
 import JsonLd from "@/components/seo/JsonLd";
-import { OFFER_POLICY } from "@/lib/offerPolicy";
+import { offerLd } from "@/lib/offerPolicy";
+import { buyPath, subscriptionTitle } from "@contracts/product-offer";
 import CurrencySwitch from "@/components/CurrencySwitch";
 import { useCurrency } from "@/hooks/useCurrency";
-import { formatMoney, roundMoney, type Currency, type UsdPriceTable } from "@contracts/money";
+import { formatMoney, roundMoney, type Currency, type PlanCycle, type UsdPriceTable } from "@contracts/money";
 
 /* ── Billing periods ──────────────────────────────────────────── */
 type Period = "monthly" | "yearly" | "3year";
@@ -33,6 +34,7 @@ const DOMAIN_INR = 499;
 /* ── Plans (prices in the page's currency; ₹ unless the visitor picked $) ── */
 type Plan = {
   name: string; tagline: string; icon: typeof IdCard; accent: string; popular?: boolean;
+  slug?: string;                    // the plan as stored; absent on the static fallback
   cards: number;                    // digital cards the plan allows
   price: Record<Period, number>;
   cta: string;
@@ -46,6 +48,15 @@ type Plan = {
 const TRIAL_PROMO = "FREE30D";
 const TRIAL_CTA = "Start Free for 30 Days";
 const TRIAL_SIGNUP = `/signup?promo=${TRIAL_PROMO}`;
+
+/* Where a plan's button leads. A paid plan carries itself and the term the
+   visitor has selected (e.g. /signup?plan=gold&cycle=yearly), so the new account
+   lands on that plan, ready to pay — not in the free trial with nothing chosen.
+   Only a plan read from the database is named; the fallback figures shown while
+   plans can't be read lead to the plain sign-up, as before. */
+const PERIOD_CYCLE: Record<Period, PlanCycle> = { monthly: "monthly", yearly: "yearly", "3year": "triennial" };
+const planHref = (p: Plan, period: Period) =>
+  p.price.monthly === 0 ? TRIAL_SIGNUP : p.slug ? buyPath({ plan: p.slug, cycle: PERIOD_CYCLE[period] }) : "/signup";
 
 const PLANS: Plan[] = [
   {
@@ -128,6 +139,7 @@ const periodLabel = (period: Period) => (period === "monthly" ? "/mo" : period =
    page. Falls back to the static PLANS while the query loads. ── */
 type DbPkg = {
   id?: number; // keys the USD price table; the static fallbacks have none
+  slug?: string | null; // names the plan in its button's link; the static fallbacks have none
   name: string; description?: string | null; monthlyPrice: string | number; yearlyPrice: string | number;
   threeYearPrice?: string | number | null;
   maxCards: number; maxProducts: number; maxGalleryImages: number; maxVideos: number;
@@ -165,6 +177,7 @@ function buildPlans(pkgs: DbPkg[], usd?: PeriodPrices | null): Plan[] {
     const three = num(p.threeYearPrice) || Math.round(yearly * 2.5);
     return {
       name: isFree ? "Free Trial" : p.name,
+      slug: p.slug || undefined,
       tagline: p.description || "",
       icon: ICON_BY[p.name] || Star,
       accent: ACCENT_BY[p.name] || "#F7B31C",
@@ -379,8 +392,16 @@ export default function Pricing() {
   /* Structured data: the FAQ, plus the paid plans as real Offers built from the
      LIVE prices so the markup can never drift from what is on screen. Built
      during render from the ₹ plans (never the $ ones: the markup says INR), so it
-     is in the server-rendered HTML and matches on hydration. */
-  const paid = inrPlans.filter((p) => p.price.monthly > 0);
+     is in the server-rendered HTML and matches on hydration.
+
+     Each Offer states the 1-YEAR price, the term this page opens on — not the
+     monthly one: Google accepts a software subscription only when it is prepaid
+     for a year or more. And only from the plans as read from the database:
+     while they are loading, or can't be read, the page shows its fallback
+     figures but states no Offer. The amount is in whole rupees, as the plan
+     card shows it and as checkout charges it (roundMoney), so a price stored
+     with paise is not stated to Google as an amount nobody pays. */
+  const paid = dbPkgs ? inrPlans.filter((p) => roundMoney(p.price.yearly, "INR") > 0) : [];
   const ld = {
     "@context": "https://schema.org",
     "@graph": [
@@ -397,14 +418,10 @@ export default function Pricing() {
         name: "DigitalCarda digital business card",
         description: "A digital business card with QR code, WhatsApp chat, payment links, products, gallery, lead capture and analytics.",
         brand: { "@type": "Brand", name: "DigitalCarda" },
-        offers: paid.map((p) => ({
-          "@type": "Offer",
-          name: p.name,
-          price: String(p.price.monthly),
-          priceCurrency: "INR",
-          availability: "https://schema.org/InStock",
+        offers: paid.map((p) => offerLd({
+          name: subscriptionTitle(p.name),
+          price: roundMoney(p.price.yearly, "INR").toFixed(2),
           url: "https://digitalcarda.in/pricing",
-          ...OFFER_POLICY,
         })),
       }] : []),
     ],
@@ -552,8 +569,9 @@ export default function Pricing() {
                     {sv > 0 && <span key={`sv-${period}`} className="dc-rise text-[11px] font-extrabold text-[#166534] bg-[#DCFCE7] px-2 py-0.5 rounded-full">Save {sv}%</span>}
                   </div>
 
-                  {/* CTA — the free plan carries the promo code so it applies itself */}
-                  <Link to={isFree ? TRIAL_SIGNUP : "/signup"}
+                  {/* CTA — the free plan carries the promo code so it applies itself;
+                      a paid plan carries itself and the selected term (planHref) */}
+                  <Link to={planHref(plan, period)}
                     className={`dc-btn group relative mt-6 lg:mt-4 w-full h-[52px] lg:h-11 rounded-2xl lg:rounded-xl text-[15px] lg:text-[14px] font-extrabold flex items-center justify-center gap-2 overflow-hidden transition-all duration-300 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#F7B31C] ${plan.popular ? "gradient-gold text-[#0F172A] shadow-gold hover:-translate-y-0.5 dc-btn-shine" : isFree ? "bg-[#0F172A] text-white hover:bg-[#1E293B] hover:-translate-y-0.5 dc-btn-shine" : "bg-white text-[#0F172A] ring-2 ring-[#0F172A] hover:bg-[#0F172A] hover:text-white"}`}>
                     <span className="relative z-10">{plan.cta}</span>
                     <ArrowRight size={17} className="relative z-10 transition-transform duration-300 group-hover:translate-x-1" />
@@ -697,7 +715,7 @@ export default function Pricing() {
                     <td className="px-3.5 sm:px-6 py-4" />
                     {plans.map((p) => (
                       <td key={p.name} className={`px-1 sm:px-4 py-4 text-center ${p.popular ? "bg-[#FFFBEB]/70" : ""}`}>
-                        <Link to={p.price.monthly === 0 ? TRIAL_SIGNUP : "/signup"}
+                        <Link to={planHref(p, period)}
                           className={`group inline-flex items-center justify-center gap-1 h-9 sm:h-10 w-full max-w-[150px] rounded-xl text-[11.5px] sm:text-[13px] font-bold transition-all active:scale-95 ${p.popular ? "gradient-gold text-[#0F172A] hover:shadow-gold" : "bg-[#0F172A] text-white hover:bg-[#1E293B]"}`}>
                           {p.price.monthly === 0 ? "Try free" : "Choose"} <ArrowRight size={13} className="hidden sm:block transition-transform group-hover:translate-x-0.5" />
                         </Link>

@@ -22,3 +22,23 @@ export const OFFER_POLICY = {
     deliveryTime: { "@type": "ShippingDeliveryTime", handlingTime: day(0), transitTime: day(0) },
   },
 } as const;
+
+/** One Offer for something a visitor can buy: a single price in rupees, in
+    stock, with the return and delivery facts above. A design's product page
+    (api/lib/merchant-feed.ts) and the plans on /pricing both build theirs here,
+    so they read the same way. `price` is a plain decimal ("999.00") and must be
+    an amount that can really be paid at `url` — a 1-year plan price, never 0.
+    Price, currency, availability and condition are the four values Google needs
+    to keep a listing up to date from the page; the feed says condition "new" too. */
+export function offerLd({ price, url, name }: { price: string; url: string; name?: string }) {
+  return {
+    "@type": "Offer",
+    ...(name ? { name } : {}),
+    priceCurrency: "INR",
+    price,
+    availability: "https://schema.org/InStock",
+    itemCondition: "https://schema.org/NewCondition",
+    url,
+    ...OFFER_POLICY,
+  };
+}

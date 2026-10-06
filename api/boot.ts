@@ -1748,20 +1748,16 @@ app.get("/sitemap-pages.xml", async (c) => c.body((await buildSitemaps()).pages,
 app.get("/sitemap-cards.xml", async (c) => c.body((await buildSitemaps()).cards, 200, XML));
 
 // Block the raw public files outright (defence-in-depth alongside the CDN rule).
-// Google Merchant product feed (RSS 2.0 + g: namespace), generated from the
-// published catalogue (§48). Prices match the product pages (§49); every item
-// is honestly described as a DIGITAL service — no physical/NFC claims (§47).
+// Google Merchant product feed (RSS 2.0 + g: namespace): the listed designs,
+// each at the Gold plan's 1-year price — the price its page shows and checkout
+// charges (§48, §49). What goes in, and why, is in api/lib/merchant-feed.ts.
+// When the products or the price can't be read it answers 503, never an empty
+// feed: an empty feed tells Google to remove every product.
 // Note: this only makes the feed eligible; Google approval is never guaranteed.
 const serveMerchantFeed = async (c: import("hono").Context) => {
-  let rows: import("./lib/merchant-feed").FeedProduct[] = [];
-  try {
-    const { getDb } = await import("./queries/connection");
-    const { products } = await import("@db/schema");
-    const { eq } = await import("drizzle-orm");
-    rows = await getDb().select().from(products).where(eq(products.status, "published")) as unknown as import("./lib/merchant-feed").FeedProduct[];
-  } catch { /* products table may not exist yet */ }
-  const { buildProductFeedXml } = await import("./lib/merchant-feed");
-  return c.body(buildProductFeedXml(rows), 200, { "content-type": "application/xml; charset=utf-8" });
+  const { merchantFeedResponse } = await import("./lib/merchant-feed");
+  const feed = await merchantFeedResponse(async () => (await import("./lib/product-offer")).loadFeedSource());
+  return c.body(feed.body, feed.status, feed.headers);
 };
 // Canonical Merchant Center feed URL + legacy alias.
 app.get("/merchant-feed.xml", serveMerchantFeed);

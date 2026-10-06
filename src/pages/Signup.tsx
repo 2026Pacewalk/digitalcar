@@ -13,11 +13,15 @@ import { slugifyUsername } from "@/lib/username";
 import { scopedKey, DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { logFunnel } from "@/lib/funnel";
-import { setSession } from "@/lib/session";
+import { getToken, setSession } from "@/lib/session";
 import GoogleSignInButton, { useGoogleClientId, type GoogleSignInResult } from "@/components/auth/GoogleSignInButton";
+import { useProductOffer } from "@/hooks/useProductOffer";
+import { NO_RENEWAL_NOTE, afterSignupPath, offerCopy, planChoice, planPagePath, productListing, signInPath } from "@contracts/product-offer";
 
 /** The free-trial voucher applied to every new account (see /pricing). */
 const TRIAL_PROMO = "FREE30D";
+/** A plan's term, as the buyer reads it. */
+const TERM_NAME = { monthly: "1 month", yearly: "1 year", triennial: "3 years" } as const;
 
 const STRENGTH = [
   { label: "Too short", color: "#94A3B8" },
@@ -82,6 +86,56 @@ export default function Signup() {
     return "";
   }, [selectedProduct, themeParam, colorParam, color2Param]);
   useEffect(() => { if (productSlug) logFunnel("try_free", productSlug); }, [productSlug]);
+
+  /* A "Buy" button (a product page, or a paid plan on /pricing) arrives here as
+     ?plan=gold&cycle=yearly. It changes one thing: after sign-up the new account
+     lands on the plan page with that plan and term already chosen, instead of
+     the card builder. The link is only a pre-selection — it is checked against
+     the plans really on sale, and one naming anything else is treated as if it
+     named nothing. What is charged is always decided by the server. */
+  const planParam = searchParams.get("plan");
+  const cycleParam = searchParams.get("cycle");
+  const plansQ = trpc.package.list.useQuery(undefined, { enabled: !!planParam, staleTime: 5 * 60_000 });
+  const plansOnSale = plansQ.data;
+  const chosenPlan = planChoice(planParam, cycleParam, plansOnSale);
+  // A Buy link that carries a design came from that design's product page,
+  // where the price is in ₹ for every visitor — so the plan page opens in ₹.
+  const planPageFor = (plans: typeof plansOnSale | null) => {
+    const choice = planChoice(planParam, cycleParam, plans);
+    return choice ? planPagePath(choice, { quotedInRupees: !!productSlug }) : "";
+  };
+  const planPage = planPageFor(plansOnSale);
+  // A buyer who already has an account signs in instead — and still arrives at
+  // the plan they chose, not at a dashboard with nothing selected.
+  const signInHref = signInPath(planPage);
+  /** The plan page for the plan this visit came to buy, or "" when it named
+      none. Worked out again at the moment it is needed, in case the plans had
+      not arrived when the form was sent. */
+  const planPageNow = async (): Promise<string> => {
+    if (!planParam) return "";
+    return planPageFor(plansOnSale ?? await utils.package.list.fetch().catch(() => null));
+  };
+  // Already signed in as a customer on arriving here to buy: there is no account
+  // to create, so go straight to the plan. The server confirms who it is first.
+  // (Read once: a session this page itself creates is sent on by its own code.)
+  const [arrivedSignedIn] = useState(() => !!getToken("main"));
+  const hasSession = !!planParam && arrivedSignedIn;
+  const meQ = trpc.auth.me.useQuery(undefined, { enabled: hasSession, retry: false, staleTime: 60_000 });
+  const signedInBuyer = hasSession && meQ.data?.role === "customer";
+  useEffect(() => {
+    if (planPage && signedInBuyer) navigate(planPage, { replace: true });
+  }, [planPage, signedInBuyer, navigate]);
+  // Until that is settled the form stays out of sight, so a signed-in buyer is
+  // never shown a sign-up form on the way to their plan. If the session turns
+  // out to be no good, or the link names no plan on sale, the form is shown.
+  const goingToPlan = hasSession && (meQ.isLoading || (signedInBuyer && (plansQ.isLoading || !!planPage)));
+  // The price of the chosen design, when it has one: the plan's, never the
+  // product row's (which is 0 on designs that are not sold this way). Left out
+  // when the link names a different plan or term from the one that price is for.
+  const offer = useProductOffer({ enabled: !!productSlug });
+  const designPrice = offer && selectedProduct && productListing(selectedProduct).listed
+    && (!chosenPlan || (chosenPlan.plan === offer.plan && chosenPlan.cycle === offer.cycle))
+    ? `${offerCopy(offer).priceLine} on the ${offer.planName} plan` : "";
 
   const [form, setForm] = useState({ fullName: "", businessName: "", email: "", mobile: "", password: "" });
   const [agreed, setAgreed] = useState(false);
@@ -272,7 +326,7 @@ export default function Signup() {
         mobile1: digits ? `+91 ${fmtMobile(digits)}` : "",
       }, cardSeed);
       toast.success(selectedProduct ? `Account created! Let's make your ${selectedProduct.name} yours.` : "Account created! Welcome to DigitalCarda.");
-      navigate("/dashboard/build");
+      navigate(afterSignupPath({ created: true, role: "customer" }, await planPageNow()));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not create account";
       setFormError(/too many|rate limit/i.test(msg) ? "Too many attempts from this connection. Please wait a few minutes and try again." : msg);
@@ -282,18 +336,20 @@ export default function Signup() {
   };
 
   /* Signed in with Google. A brand-new account starts its card exactly as an
-     email signup does; an existing account is simply signed in. */
-  const handleGoogle = (res: GoogleSignInResult) => {
+     email signup does; an existing account is simply signed in. Either way a
+     customer who came here to buy a plan goes on to that plan (afterSignupPath). */
+  const handleGoogle = async (res: GoogleSignInResult) => {
     setSession(res.token, res.user, "main");
+    const account = { created: res.created, role: res.user.role };
     if (!res.created) {
       toast.success("Welcome back! You already had an account, so we signed you in.");
-      navigate(res.user.role === "reseller" ? "/reseller" : "/dashboard");
+      navigate(afterSignupPath(account, await planPageNow()));
       return;
     }
     logFunnel("registration", productSlug || undefined, res.user.id);
     seedNewCard(res.user.id, res.cardSlug || res.user.fullName || res.user.email.split("@")[0], {}, buildCardSeed());
     toast.success(selectedProduct ? `Account created! Let's make your ${selectedProduct.name} yours.` : "Account created! Welcome to DigitalCarda.");
-    navigate("/dashboard/build");
+    navigate(afterSignupPath(account, await planPageNow()));
   };
 
   /* The design + content the visitor chose BEFORE signing up: the product or
@@ -378,6 +434,12 @@ export default function Signup() {
   const FieldError = ({ id, msg }: { id: string; msg?: string }) =>
     msg ? <p id={id} className="dc-rise mt-1.5 text-[11.5px] font-medium text-[#DC2626] flex items-start gap-1"><AlertCircle size={12} className="mt-px shrink-0" aria-hidden="true" />{msg}</p> : null;
 
+  if (goingToPlan) return (
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center px-4" role="status">
+      <p className="inline-flex items-center gap-2 text-sm font-medium text-[#64748B]"><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Taking you to your plan…</p>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] lg:flex lg:items-start">
       <a href="#signup-main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-3 focus:left-3 focus:rounded-lg focus:bg-[#0F172A] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">
@@ -401,7 +463,7 @@ export default function Signup() {
               <Link to="/" aria-label="DigitalCarda home" className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
                 <img src="/logo.png" alt="" className="h-8 w-auto object-contain" />
               </Link>
-              <Link to="/login" className="text-[13px] font-semibold text-[#FCD34D] hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
+              <Link to={signInHref} className="text-[13px] font-semibold text-[#FCD34D] hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
                 Sign in
               </Link>
             </div>
@@ -424,7 +486,7 @@ export default function Signup() {
             <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#64748B] hover:text-[#0F172A] transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F7B31C]">
               <ArrowLeft size={16} aria-hidden="true" /> Home
             </Link>
-            <p className="text-sm text-[#64748B]">Already have an account? <Link to="/login" className="font-semibold text-[#B45309] hover:text-[#92400E]">Sign in</Link></p>
+            <p className="text-sm text-[#64748B]">Already have an account? <Link to={signInHref} className="font-semibold text-[#B45309] hover:text-[#92400E]">Sign in</Link></p>
           </div>
 
           <div className="relative max-w-[560px] w-full mx-auto rounded-[24px] bg-white border border-[#E2E8F0] shadow-premium-lg overflow-hidden">
@@ -445,7 +507,18 @@ export default function Signup() {
               </div>
 
               <h1 className="font-display text-[1.6rem] sm:text-[1.85rem] font-extrabold text-[#0F172A] tracking-tight leading-tight">Create your free card</h1>
-              <p className="text-sm text-[#64748B] mt-1">₹0 for 30 days · Live in minutes · Cancel anytime</p>
+              <p className="text-sm text-[#64748B] mt-1">₹0 for 30 days · Live in minutes · {NO_RENEWAL_NOTE}</p>
+
+              {/* Came from a Buy button: say what happens to the plan they chose. */}
+              {chosenPlan && (
+                <div className="mt-5 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#FEF3C7] to-[#FFF7E6] border border-[#FDE68A] px-4 py-3">
+                  <span className="w-9 h-9 rounded-xl gradient-gold flex items-center justify-center shrink-0"><CreditCard size={17} className="text-[#0F172A]" aria-hidden="true" /></span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[#92400E]">You&apos;re buying the {chosenPlan.planName} plan · {TERM_NAME[chosenPlan.cycle]}</p>
+                    <p className="text-[11px] text-[#B45309]">Create your account first — it&apos;s free and needs no payment details. You pay on the next step, where you see the price before you pay.</p>
+                  </div>
+                </div>
+              )}
 
               {selectedProduct && (
                 <div className="mt-5 flex items-center gap-3 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-3">
@@ -456,7 +529,7 @@ export default function Signup() {
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold text-[#B45309] uppercase tracking-wide">You&apos;re creating</p>
                     <p className="text-sm font-bold text-[#0F172A] leading-tight line-clamp-2">{selectedProduct.name}</p>
-                    <p className="text-[11px] text-[#64748B] mt-1">₹{Number(selectedProduct.salePrice || selectedProduct.price).toLocaleString("en-IN")}/yr · {selectedProduct.trialDays}-day free trial · no card</p>
+                    <p className="text-[11px] text-[#64748B] mt-1">{`${designPrice ? `${designPrice} · ` : ""}${selectedProduct.trialDays}-day free trial · no card`}</p>
                   </div>
                 </div>
               )}
@@ -575,7 +648,7 @@ export default function Signup() {
                     <FieldError id="su-email-err" msg={errors.email} />
                     {!errors.email && taken.email && (
                       <p id="su-email-err" className="dc-rise mt-1.5 text-[11.5px] font-medium text-[#DC2626]">
-                        This email already has an account. <Link to="/login" className="underline font-semibold text-[#B45309]">Sign in instead</Link>
+                        This email already has an account. <Link to={signInHref} className="underline font-semibold text-[#B45309]">Sign in instead</Link>
                       </p>
                     )}
                   </div>
@@ -594,7 +667,7 @@ export default function Signup() {
                     <FieldError id="su-mobile-err" msg={errors.mobile} />
                     {!errors.mobile && taken.mobile && (
                       <p id="su-mobile-err" className="dc-rise mt-1.5 text-[11.5px] font-medium text-[#DC2626]">
-                        This number is already linked to another account. <Link to="/login" className="underline font-semibold text-[#B45309]">Sign in instead</Link>
+                        This number is already linked to another account. <Link to={signInHref} className="underline font-semibold text-[#B45309]">Sign in instead</Link>
                       </p>
                     )}
                   </div>
@@ -688,20 +761,20 @@ export default function Signup() {
                   className="group w-full h-[52px] gradient-gold text-[#0F172A] rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 hover:shadow-gold transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed">
                   {loading
                     ? <><Loader2 size={18} className="animate-spin" aria-hidden="true" /> Creating your card…</>
-                    : <>Create my free card <ArrowRight size={18} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></>}
+                    : <>{chosenPlan ? "Create account & continue to payment" : "Create my free card"} <ArrowRight size={18} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></>}
                 </button>
 
                 <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11.5px] text-[#64748B]">
                   <span className="inline-flex items-center gap-1"><ShieldCheck size={13} className="text-[#16A34A]" aria-hidden="true" /> Secure SSL sign-up</span>
                   <span className="inline-flex items-center gap-1"><CreditCard size={13} className="text-[#16A34A]" aria-hidden="true" /> No payment details</span>
-                  <span className="inline-flex items-center gap-1"><Check size={13} className="text-[#16A34A]" aria-hidden="true" /> Cancel anytime</span>
+                  <span className="inline-flex items-center gap-1"><Check size={13} className="text-[#16A34A]" aria-hidden="true" /> {NO_RENEWAL_NOTE}</span>
                 </div>
               </form>
             </div>
           </div>
 
           <p className="lg:hidden mt-6 text-center text-sm text-[#64748B]">
-            Already have an account? <Link to="/login" className="text-[#B45309] hover:text-[#92400E] font-semibold">Sign in</Link>
+            Already have an account? <Link to={signInHref} className="text-[#B45309] hover:text-[#92400E] font-semibold">Sign in</Link>
           </p>
         </main>
       </div>
