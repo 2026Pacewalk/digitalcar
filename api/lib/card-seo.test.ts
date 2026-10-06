@@ -121,3 +121,33 @@ describe("cardSeo sitemap bar", () => {
     expect(cardSeo({ slug: "d", customer: { name: "D", about_us: about }, paused: true }).inSitemap).toBe(false);
   });
 });
+
+describe("cardSeo and legacy mangled text", () => {
+  /* Card text imported from the old site is UTF-8-as-latin1 mangled; the card
+     body repairs it on render, and so must the <head>, or a WhatsApp preview
+     shows the raw mangling. */
+  const customer = {
+    name: "Property1313",
+    company_name: "Property1313",
+    nature: "Real Estate",
+    address: "SCO-209, Green Lotus Avenue, Zirakpur, Punjab 140603",
+    about_us:
+      "Your Gateway to Endless Possibilities \u00c3\u00a2\u00e2\u0082\u00ac\u00e2\u0080\u009c We are More Than a Property Search Engine.",
+  };
+
+  it("repairs the description, the title and the structured data", () => {
+    const seo = cardSeo({ slug: "property1313", customer });
+    expect(seo.description).toContain("Possibilities \u2013 We are More Than");
+    expect(seo.about).toContain("Possibilities \u2013 We are");
+    for (const text of [seo.title, seo.description, seo.keywords, seo.jsonLd])
+      expect(text).not.toMatch(/[\u00c2\u00c3\u00e2]/);
+  });
+
+  it("repairs an owner-written SEO description too", () => {
+    const seo = cardSeo({
+      slug: "p",
+      customer: { ...customer, seo_description: "Luxury flats \u00e2\u20ac\u201c Zirakpur" },
+    });
+    expect(seo.description).toBe("Luxury flats \u2013 Zirakpur");
+  });
+});

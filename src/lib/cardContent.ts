@@ -3,6 +3,7 @@
 import { scopedKey } from "@/hooks/useCustomer";
 import { IMG_BASE, healUploadUrl } from "@/lib/img";
 import { getToken } from "@/lib/session";
+import { fixMojibake } from "@/lib/mojibake";
 
 export function imgUrl(folder: string, f: unknown): string {
   const name = String(f ?? "").trim();
@@ -33,27 +34,9 @@ export function decodeSpecialities(raw: unknown): string {
     .join(",");
 }
 
-/* Characters produced by UTF-8-as-latin1 mangling (and Windows-1252 punctuation).
-   A run of 2+ of these is unrecoverable garbage — usually a mangled bullet/checkmark. */
-const MOJI_CLUSTER = /[-¿ÂÃÅâŒœŠšŸŽžˆ˜–—‘’‚“”„†‡•…‰‹›€™]{2,}/g;
-
-/* Legacy data is doubly UTF-8-as-latin1 mangled (e.g. ₹ shows as "Ã¢âÂ¹",
-   a bullet shows as "Ã¢Åâ"). Reverse the reversible layers, patch the common
-   symbols, then collapse any remaining garbage cluster into a clean bullet. */
-export function fixMojibake(raw: unknown): string {
-  let out = String(raw ?? "");
-  for (let i = 0; i < 2; i++) {
-    if (!/[ÃÂ]/.test(out)) break;
-    try { const d = decodeURIComponent(escape(out)); if (!d || d === out) break; out = d; } catch { break; }
-  }
-  return out
-    .replace(/Ã¢[^\x00-\x7F]*Â?¹|â[^\x00-\x7F]*¹|â‚¹/g, "₹")
-    .replace(/â€™/g, "'")
-    .replace(/â€œ|â€/g, '"')
-    .replace(/â€“|â€”/g, "-")
-    .replace(MOJI_CLUSTER, "•")
-    .replace(/[ÂÃ](?=\s|$|•)/g, "");
-}
+/* Mojibake repair lives in its own import-free module so the server can use
+   it too; still exported from here because the card template imports it here. */
+export { fixMojibake };
 
 /* Product descriptions are HTML-encoded; decode entities but keep the markup. */
 export function decodeHtml(html: unknown): string {

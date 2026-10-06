@@ -14,6 +14,7 @@
 
 import sharp from "sharp";
 import QRCode from "qrcode";
+import { fixMojibake } from "../../src/lib/mojibake";
 
 const W = 1200, H = 630;
 const GOLD = "#F7B31C", NAVY = "#0F1D33";
@@ -53,7 +54,8 @@ const esc = (s: unknown) =>
 /** Trim to a width that fits, adding an ellipsis. Rough but font-independent. */
 function fit(text: string, max: number): string {
   const t = String(text || "").trim();
-  return t.length > max ? t.slice(0, max - 1).trimEnd() + "…" : t;
+  const chars = [...t];   // by code point: half a surrogate pair kills the render
+  return chars.length > max ? chars.slice(0, max - 1).join("").trimEnd() + "…" : t;
 }
 
 /** Data-URI or http(s) image → base64 data URI sharp can inline in the SVG.
@@ -125,10 +127,13 @@ export async function renderCardOg(card: OgCard): Promise<Buffer> {
   const avatar = photo || logo;
   const badge = photo && logo ? logo : null;
 
-  const name = fit(card.name || card.slug, 24);
-  const role = fit(card.designation || "", 32);
-  const company = fit(card.company || "", 34);
-  const initial = (String(card.name || card.slug).trim()[0] || "D").toUpperCase();
+  // Legacy cards hold this text UTF-8-as-latin1 mangled (23 fields of the 510
+  // legacy rows do), so repair it here as well, or the preview image shows the
+  // mangling the card and its <head> no longer show.
+  const name = fit(fixMojibake(card.name || card.slug), 24);
+  const role = fit(fixMojibake(card.designation || ""), 32);
+  const company = fit(fixMojibake(card.company || ""), 34);
+  const initial = ([...fixMojibake(card.name || card.slug).trim()][0] || "D").toUpperCase();
   // Long names used to run under the QR panel at a fixed 56px. Size the name to
   // the room left of it (x 262 to ~808); DejaVu Sans Bold averages ~0.6em a glyph.
   const nameSize = Math.max(38, Math.min(56, Math.floor(540 / (Math.max(name.length, 1) * 0.6))));

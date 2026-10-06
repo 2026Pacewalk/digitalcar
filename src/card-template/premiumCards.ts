@@ -75,7 +75,7 @@ const galleryAlt = (c: PCRecord, g: { name?: string }, i: number) => {
 };
 
 const initialPh = (c: PCRecord, bg: string) => {
-  const i = (s(c.name)[0] || "D").toUpperCase();
+  const i = ([...s(c.name)][0] || "D").toUpperCase();
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='200' height='220'><rect width='200' height='220' fill='${bg}'/><text x='50%' y='50%' font-size='96' fill='#fff' text-anchor='middle' font-family='Arial' dominant-baseline='central'>${i}</text></svg>`).replace(/'/g, "%27")}`;
 };
 

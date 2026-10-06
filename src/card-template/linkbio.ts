@@ -343,7 +343,7 @@ export function buildLinkBioHtml(c: LBRecord, products: LBProduct[] = [], varian
   const handle = s(c.username) || s(c.slug);
   const bio = esc(s(c.designation) || (s(c.about_us).slice(0, 110)));
   const slug = s(c.slug);
-  const initial = (s(c.name)[0] || "D").toUpperCase();
+  const initial = ([...s(c.name)][0] || "D").toUpperCase();
   const avatarPh = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><rect width='160' height='160' fill='${accent}'/><text x='50%' y='50%' font-size='74' fill='#fff' text-anchor='middle' font-family='Arial' dominant-baseline='central'>${initial}</text></svg>`).replace(/'/g, "%27")}`;
 
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");

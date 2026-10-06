@@ -110,6 +110,17 @@ const TEAM_CSS = `
 @media (max-width:360px){.dc-team{gap:14px 8px;}.dc-team-ph{width:64px;height:64px;}}
 `;
 const s = (v: unknown) => String(v ?? "").trim();
+
+/* Who the card is for. Legacy rows hold these UTF-8-as-latin1 mangled, and the
+   card used to print the mangling while its own <head> and preview image
+   showed the repaired text. */
+const IDENTITY = ["name", "company_name", "designation", "nature", "address"] as const;
+const repairIdentity = <T extends Record<string, unknown>>(c: T): T => ({
+  ...c,
+  ...Object.fromEntries(
+    IDENTITY.filter((f) => typeof c[f] === "string").map((f) => [f, fixMojibake(c[f])]),
+  ),
+});
 const on = (v: unknown) => Number(v ?? 1) === 1;
 const esc = (v: unknown) => s(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 // Legacy rich-text fields (product/offer descriptions, about) are stored as HTML
@@ -284,6 +295,7 @@ body.dc-compact .section-container.dc-open > *:not(.section-header){animation:dc
 `;
 
 export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: Gallery[], videos: Vid[], offers: Offer[] = [], qrcodes: Qr[] = [], reviews: Review[] = []): string {
+  c = repairIdentity(c);
   // Link-in-bio and premium single-screen cards use completely different layouts.
   const tNum = Math.min(TEMPLATE_COUNT, Math.max(1, Number(c.theme) || 1));
   if (isPremiumCard(tNum)) return buildPremiumCardHtml(c as Record<string, unknown>, products as unknown as Parameters<typeof buildPremiumCardHtml>[1], tNum - PREMIUM_START, { extras: { gallery, videos, offers } });
@@ -326,7 +338,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     (shareSub ? `\n${shareSub}` : "") +
     `\n\nEverything in one tap — call, WhatsApp, directions, products & save the contact:\n${cardUrl}`;
   const specs = s(c.specialities).split(/[,|]/).map((x) => x.trim()).filter(Boolean);
-  const initial = (s(c.name)[0] || "D").toUpperCase();
+  const initial = ([...s(c.name)][0] || "D").toUpperCase();
   const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='${s(c.logo_shape) === "round" ? 70 : 12}' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`).replace(/'/g, "%27")}`;
 
   // Paid-plan trust badge on the logo — Gold (pkg 5) = crown, Platinum (pkg 6) =
@@ -521,7 +533,7 @@ export function buildCardHtml(c: CustomerRecord, products: Product[], gallery: G
     ? `<div class="grev-list">${reviews.slice(0, 5).map((rv) => `
         <div class="grev-card">
           <div class="grev-card-top">
-            <span class="grev-ava">${(s(rv.name)[0] || "G").toUpperCase()}</span>
+            <span class="grev-ava">${([...s(rv.name)][0] || "G").toUpperCase()}</span>
             <span class="grev-card-meta">
               <span class="grev-name">${esc(rv.name) || "Google user"}</span>
               ${starRow(Number(rv.rating) || 5, "grev-stars-sm")}
@@ -1255,7 +1267,7 @@ export function buildCardThumb(c: CustomerRecord, themeNum: number, opts: { chro
   const accent = s(c.color) || "#F7B31C";
   const secondary = s(c.color2);
   const wa = s(c.mobile2 || c.mobile1).replace(/[^\d+]/g, "");
-  const initial = (s(c.name)[0] || "D").toUpperCase();
+  const initial = ([...s(c.name)][0] || "D").toUpperCase();
   const logoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><rect width='140' height='140' rx='${s(c.logo_shape) === "round" ? 70 : 12}' fill='${accent}'/><text x='50%' y='50%' font-size='64' fill='#fff' text-anchor='middle' font-family='Arial,sans-serif' dominant-baseline='central'>${initial}</text></svg>`).replace(/'/g, "%27")}`;
   const social = renderSocialIcons(c, false)
     || `<li><a href="javascript:void(0)"><i class="fab fa-facebook-f"></i></a></li><li><a href="javascript:void(0)"><i class="fab fa-instagram"></i></a></li>`;
