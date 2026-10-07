@@ -51,6 +51,7 @@ const STORE_LD = {
     returnPolicyCountry: "IN",
     returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
     merchantReturnDays: 7,
+    returnMethod: "https://schema.org/ReturnByMail",
     returnFees: "https://schema.org/FreeReturn",
     refundType: "https://schema.org/FullRefund",
     merchantReturnLink: "https://digitalcarda.in/refund-policy",

@@ -312,11 +312,9 @@ describe("the Product block on a design's page", () => {
     expect(JSON.stringify(ld).match(/"@type":"Offer"/g)).toHaveLength(1);
   });
 
-  it("carries the 7-day return policy the site promises", () => {
-    expect(offer.hasMerchantReturnPolicy).toMatchObject({
-      "@type": "MerchantReturnPolicy", applicableCountry: "IN", merchantReturnDays: 7,
-      returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-      merchantReturnLink: "https://digitalcarda.in/refund-policy",
+  it("references the store-level return policy", () => {
+    expect(offer.hasMerchantReturnPolicy).toEqual({
+      "@id": "https://digitalcarda.in/refund-policy#policy",
     });
   });
 
