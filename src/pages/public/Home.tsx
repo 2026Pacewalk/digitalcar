@@ -17,6 +17,46 @@ import JsonLd from "@/components/seo/JsonLd";
 import { webpFor } from "@/lib/imageSources";
 import { TESTIMONIALS } from "@/data/testimonials";
 
+
+/* Merchant/brand entity for Google Search. Product offers reference this @id as
+   their seller, and the return policy matches the public refund policy. */
+const STORE_LD = {
+  "@context": "https://schema.org",
+  "@type": "OnlineStore",
+  "@id": "https://digitalcarda.in/#store",
+  name: "DigitalCarda",
+  url: "https://digitalcarda.in/",
+  logo: "https://digitalcarda.in/logo.png",
+  email: "hello@digitalcarda.in",
+  telephone: "+91 95177 22444",
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: "SCO-209, Green Lotus Avenue, Chandigarh Ambala Expressway",
+    addressLocality: "Zirakpur",
+    addressRegion: "Punjab",
+    postalCode: "140603",
+    addressCountry: "IN",
+  },
+  contactPoint: {
+    "@type": "ContactPoint",
+    contactType: "customer service",
+    email: "hello@digitalcarda.in",
+    telephone: "+91 95177 22444",
+    availableLanguage: ["en", "hi"],
+  },
+  hasMerchantReturnPolicy: {
+    "@type": "MerchantReturnPolicy",
+    "@id": "https://digitalcarda.in/refund-policy#policy",
+    applicableCountry: "IN",
+    returnPolicyCountry: "IN",
+    returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+    merchantReturnDays: 7,
+    returnFees: "https://schema.org/FreeReturn",
+    refundType: "https://schema.org/FullRefund",
+    merchantReturnLink: "https://digitalcarda.in/refund-policy",
+  },
+};
+
 /* ─── Animated number counter (rAF, fires when in view) ─── */
 function Counter({ end, duration = 2000, separator = true }: { end: number; duration?: number; separator?: boolean }) {
   const { ref, visible } = useReveal<HTMLSpanElement>();
@@ -2218,6 +2258,7 @@ const SHOW_PRICING_SECTION = false;
 export default function Home() {
   return (
     <>
+      <JsonLd id="dc-store-ld" data={STORE_LD} />
       {/* 1. Hook and proof */}
       <HeroSection />
       <StatsBand />

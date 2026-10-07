@@ -38,6 +38,12 @@ export function offerLd({ price, url, name }: { price: string; url: string; name
     price,
     availability: "https://schema.org/InStock",
     itemCondition: "https://schema.org/NewCondition",
+    seller: {
+      "@type": "Organization",
+      "@id": "https://digitalcarda.in/#store",
+      name: "DigitalCarda",
+      url: "https://digitalcarda.in/",
+    },
     url,
     ...OFFER_POLICY,
   };

@@ -291,6 +291,7 @@ describe("the Product block on a design's page", () => {
     expect(ld.sku).toBe("midnight-gold-card");
     expect(ld.mpn).toBe("midnight-gold-card");
     expect(ld.brand).toEqual({ "@type": "Brand", name: "DigitalCarda" });
+    expect(ld.category).toBe("Digital Business Cards > Real Estate");
     expect(ld.image).toBe("https://digitalcarda.in/products/midnight-gold/midnight-gold-digital-business-card.png");
     expect(ld.description).toBe(feedDescription(row(), OFFER));
   });
@@ -304,6 +305,7 @@ describe("the Product block on a design's page", () => {
     // Condition is the fourth value Google needs to update a listing from the
     // page (with price, currency and availability); the feed item says "new".
     expect(offer.itemCondition).toBe("https://schema.org/NewCondition");
+    expect(offer.seller).toMatchObject({ "@type": "Organization", "@id": "https://digitalcarda.in/#store", name: "DigitalCarda" });
     expect(values(buildFeedItem(row(), OFFER), "g:condition")).toEqual(["new"]);
     expect(offer.url).toBe("https://digitalcarda.in/digital-business-cards-templates/midnight-gold-card");
     expect(offer.name).toBe("Midnight Gold Digital Business Card (1-Year Subscription)");

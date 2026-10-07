@@ -178,6 +178,7 @@ export function productLd(p: FeedProduct, offer: ProductOffer | null, base = SIT
   const image = listedImage(p, base);
   if (!image) return null;
   const name = clean(p.name);
+  const category = clean(p.category);
   return {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -186,6 +187,7 @@ export function productLd(p: FeedProduct, offer: ProductOffer | null, base = SIT
     sku: p.slug,
     mpn: p.slug,
     brand: { "@type": "Brand", name: BRAND },
+    category: category ? `Digital Business Cards > ${category}` : "Digital Business Cards",
     image,
     offers: offerLd({ name: subscriptionTitle(name), price: offerAmount(offer), url: productUrl(p.slug, base) }),
   };
