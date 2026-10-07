@@ -18,6 +18,7 @@ import {
   Loader2, MapPin, Sparkles,
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
+import { trackEvent } from "@/lib/analytics";
 import { Reveal, SectionHeading } from "@/components/public/Reveal";
 
 const WA_NUMBER = "919517722444";
@@ -49,6 +50,7 @@ export default function Contact() {
 
   const send = trpc.contact.send.useMutation({
     onSuccess: () => {
+      trackEvent("generate_lead", { lead_source: "contact_form", requirement: form.requirement || "other" });
       setSubmitted(true);
       toast.success("Enquiry sent — a confirmation is on its way to your inbox.");
     },
