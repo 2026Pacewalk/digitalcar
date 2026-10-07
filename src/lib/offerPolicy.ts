@@ -7,13 +7,11 @@
 const day = (n: number) => ({ "@type": "QuantitativeValue", minValue: n, maxValue: n, unitCode: "DAY" });
 
 export const OFFER_POLICY = {
+  // Keep the standard return policy defined once at the store level and
+  // reference it from every Offer. Google recommends a global policy for
+  // standard returns and an @id reference from individual offers.
   hasMerchantReturnPolicy: {
-    "@type": "MerchantReturnPolicy",
-    applicableCountry: "IN",
-    returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-    merchantReturnDays: 7,
-    returnFees: "https://schema.org/FreeReturn",
-    merchantReturnLink: "https://digitalcarda.in/refund-policy",
+    "@id": "https://digitalcarda.in/refund-policy#policy",
   },
   shippingDetails: {
     "@type": "OfferShippingDetails",
