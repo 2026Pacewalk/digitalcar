@@ -13,6 +13,7 @@ import { slugifyUsername } from "@/lib/username";
 import { scopedKey, DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
 import { buildCardThumb } from "@/card-template/buildCard";
 import { logFunnel } from "@/lib/funnel";
+import { trackEvent } from "@/lib/analytics";
 import { getToken, setSession } from "@/lib/session";
 import GoogleSignInButton, { useGoogleClientId, type GoogleSignInResult } from "@/components/auth/GoogleSignInButton";
 import { useProductOffer } from "@/hooks/useProductOffer";
@@ -318,6 +319,8 @@ export default function Signup() {
       });
       setSession(res.token, res.user, "main");
       logFunnel("registration", productSlug || undefined, res.user?.id);
+      trackEvent("sign_up", { method: "email", user_id: res.user?.id, promo_code: promo, product_slug: productSlug || undefined });
+      trackEvent("trial_activated", { method: "email", user_id: res.user?.id, promo_code: promo });
       // Seed the dashboard with the link the SERVER actually created.
       seedNewCard(res.user?.id, res.cardSlug || form.businessName || form.fullName || form.email.split("@")[0], {
         name: form.fullName.trim(),
@@ -347,6 +350,8 @@ export default function Signup() {
       return;
     }
     logFunnel("registration", productSlug || undefined, res.user.id);
+    trackEvent("sign_up", { method: "google", user_id: res.user.id, promo_code: promo, product_slug: productSlug || undefined });
+    trackEvent("trial_activated", { method: "google", user_id: res.user.id, promo_code: promo });
     seedNewCard(res.user.id, res.cardSlug || res.user.fullName || res.user.email.split("@")[0], {}, buildCardSeed());
     toast.success(selectedProduct ? `Account created! Let's make your ${selectedProduct.name} yours.` : "Account created! Welcome to DigitalCarda.");
     navigate(afterSignupPath(account, await planPageNow()));
