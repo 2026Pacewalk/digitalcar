@@ -7,13 +7,17 @@ import { TRPCProvider, getBrowserQueryClient } from '@/providers/trpc'
 import './index.css'
 import App from './App.tsx'
 import { captureInstallPrompt, registerServiceWorker } from '@/lib/nativeApp'
+import { installLeadClickTracking } from '@/lib/analytics'
 
 const rootEl = document.getElementById('root')!
 
 // Phone-app behaviour: hold the browser's install offer until the dashboard
 // shows it, and register the offline/fast-open worker (production site only).
 captureInstallPrompt()
-if (import.meta.env.PROD) registerServiceWorker()
+if (import.meta.env.PROD) {
+  registerServiceWorker()
+  installLeadClickTracking()
+}
 const queryClient = getBrowserQueryClient()
 
 // Public marketing pages arrive already rendered by the server (api/lib/vite.ts),
