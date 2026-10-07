@@ -1,6 +1,7 @@
 import ResponsiveDashboardLayout from "@/components/layout/ResponsiveDashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import { trpc } from "@/providers/trpc";
+import { trackEvent } from "@/lib/analytics";
 import { Check, Zap, Package, Calendar, CreditCard, Gift, Loader2, BadgePercent, Copy, X, Clock, TicketPercent } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
@@ -577,6 +578,12 @@ function PayModal({ plan, offerPct, cycle, currency, onClose, onDone, onSwitchTo
     setRzpBusy(true);
     try {
       const order = await rzpCreate.mutateAsync({ packageId: plan.id, billingCycle: cycle, wantsOffer: offerPct > 0, couponCode: coupon?.code, currency });
+      trackEvent("begin_checkout", {
+        currency: order.currency,
+        value: Number(order.amount) / 100,
+        billing_cycle: cycle,
+        items: [{ item_id: String(plan.id), item_name: plan.name }],
+      });
       const rzp = await openRazorpayCheckout({
         key: order.keyId,
         amount: order.amount,
@@ -601,6 +608,13 @@ function PayModal({ plan, offerPct, cycle, currency, onClose, onDone, onSwitchTo
               packageId: plan.id,
               billingCycle: cycle,
               wantsOffer: offerPct > 0,
+            });
+            trackEvent("purchase", {
+              transaction_id: resp.razorpay_payment_id,
+              currency: order.currency,
+              value: Number(order.amount) / 100,
+              billing_cycle: cycle,
+              items: [{ item_id: String(plan.id), item_name: plan.name }],
             });
             toast.success("Payment successful — your plan is now active 🎉");
             onDone();
@@ -630,6 +644,14 @@ function PayModal({ plan, offerPct, cycle, currency, onClose, onDone, onSwitchTo
     if (reference.trim().length < 3) return toast.error("Enter your UPI/transaction reference (UTR)");
     try {
       await createOrder.mutateAsync({ packageId: plan.id, billingCycle: cycle, method, reference: reference.trim(), wantsOffer: offerPct > 0, couponCode: coupon?.code });
+      trackEvent("payment_submitted", {
+        method,
+        currency: "INR",
+        value: amount,
+        billing_cycle: cycle,
+        item_id: String(plan.id),
+        item_name: plan.name,
+      });
       toast.success("Payment submitted — we'll verify and activate your plan shortly");
       onDone();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
