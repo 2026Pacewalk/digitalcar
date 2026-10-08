@@ -102,10 +102,6 @@ export type NotListedReason =
    This is the only such list: the feed, the structured data and the page all
    ask productListing() below. Remove a line when its reason no longer holds. */
 export const NOT_LISTED: Readonly<Record<string, { reason: NotListedReason; why: string }>> = {
-  "emerald-card": {
-    reason: "image",
-    why: "Its main image has text added on top (a '30d Trial' badge, a headline, an icon bar). Google disapproves product images with promotional overlays. List it again once the first image is a clean one.",
-  },
   "poster-collage-card": {
     reason: "image",
     why: "Its mockups were exported while the poster design wrote the business name in ink on blocks of the brand colour, and this design's colour IS that ink (#111827) — so the name shows as solid black blocks. The design itself is fixed (src/card-template/premiumDesigns.ts), and its page and live demo read correctly; list it again once the four pictures are re-exported.",

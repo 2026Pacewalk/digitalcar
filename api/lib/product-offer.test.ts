@@ -105,10 +105,10 @@ describe("which designs are listed", () => {
   });
 
   it("holds back the designs on the not-listed list, each for its stated reason", () => {
-    expect(Object.keys(NOT_LISTED).sort()).toEqual(["emerald-card", "employee-id-card", "indigo-card", "membership-card", "poster-collage-card"]);
+    expect(Object.keys(NOT_LISTED).sort()).toEqual(["employee-id-card", "indigo-card", "membership-card", "poster-collage-card"]);
     for (const entry of Object.values(NOT_LISTED)) expect(entry.why.length).toBeGreaterThan(20);
     // Even priced and pictured exactly like a listed design.
-    expect(productListing(product({ slug: "emerald-card" }))).toEqual({ listed: false, reason: "image" });
+    expect(productListing(product({ slug: "poster-collage-card" }))).toEqual({ listed: false, reason: "image" });
     expect(productListing(product({ slug: "employee-id-card" }))).toEqual({ listed: false, reason: "addon" });
     expect(productListing(product({ slug: "membership-card" }))).toEqual({ listed: false, reason: "addon" });
     expect(productListing(product({ slug: "indigo-card" }))).toEqual({ listed: false, reason: "retired" });
@@ -197,7 +197,7 @@ describe("keeping a product page the server has built", () => {
   });
 
   it("keeps the page of a design that shows no price anyway", () => {
-    for (const p of [product({ slug: "teal-breeze-card", price: "0.00" }), product({ slug: "employee-id-card" }), product({ slug: "emerald-card" }), product({ images: [] })]) {
+    for (const p of [product({ slug: "teal-breeze-card", price: "0.00" }), product({ slug: "employee-id-card" }), product({ slug: "poster-collage-card" }), product({ images: [] })]) {
       expect(mayKeepProductPage(p, false)).toBe(true);
       expect(mayKeepProductPage(p, true)).toBe(true);
     }

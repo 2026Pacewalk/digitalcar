@@ -31,7 +31,7 @@ const row = (over: Partial<FeedProduct> = {}): FeedProduct => ({
 const CATALOGUE: FeedProduct[] = [
   row({ id: 2, slug: "ocean-blue-card", name: "Ocean Blue Digital Business Card", category: null, images: ["/products/ocean-blue/ocean-blue-digital-business-card.png"] }),
   row({ id: 1 }),
-  row({ id: 3, slug: "emerald-card", name: "Emerald Digital Business Card" }),                        // main image has overlays
+  row({ id: 62, slug: "poster-collage-card", name: "Poster Collage Digital Business Card" }),          // held back for its pictures
   row({ id: 41, slug: "teal-breeze-card", name: "Teal Breeze Digital Business Card", price: "0.00" }), // not priced
   row({ id: 42, slug: "indigo-card", name: "Indigo Digital Business Card", price: "0.00" }),           // retired
   row({ id: 49, slug: "employee-id-card", name: "Employee ID Card", price: "0.00" }),                  // paid add-on
@@ -76,8 +76,8 @@ describe("which designs are in the feed", () => {
     expect(itemsOf(xml)).toHaveLength(3);
   });
 
-  it("leaves out unpriced designs, the paid add-ons, the retired design and emerald-card", () => {
-    for (const slug of ["teal-breeze-card", "indigo-card", "employee-id-card", "membership-card", "emerald-card", "bento-grid-card", "priced-no-picture-card", "draft-card", "archived-card"]) {
+  it("leaves out unpriced designs, the paid add-ons, the retired design and the one held back for its pictures", () => {
+    for (const slug of ["teal-breeze-card", "indigo-card", "employee-id-card", "membership-card", "poster-collage-card", "bento-grid-card", "priced-no-picture-card", "draft-card", "archived-card"]) {
       expect(xml).not.toContain(slug);
       expect(buildFeedItem(CATALOGUE.find((p) => p.slug === slug)!, OFFER)).toBe("");
     }

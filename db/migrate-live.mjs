@@ -603,6 +603,29 @@ try {
   log("• design pricing skipped (" + (e.code || e.message) + ")");
 }
 
+// Phase 37e: nine older designs have had their four pictures all along but
+// were created at price 0 by the catalogue sync and never priced, so they too
+// were "not offered for sale" — in the gallery, missing from the feed. Same
+// step as 37d for them. The two paid add-ons and the retired design also sit
+// at 0 and are deliberately NOT here: they are held back by name in
+// contracts/product-offer.ts and must stay unlisted.
+try {
+  const PRICE_ME_TOO = [
+    "amber-card", "bloom-profile-card", "corporate-business-card", "corporate-navy-card",
+    "emerald-prestige-card", "executive-card", "professional-profile-card", "sky-card",
+    "teal-breeze-card",
+  ];
+  const [res] = await conn.query(
+    `UPDATE products SET price = 999.00, currency = 'INR'
+      WHERE slug IN (${PRICE_ME_TOO.map(() => "?").join(", ")}) AND (price IS NULL OR price = 0)`,
+    PRICE_ME_TOO,
+  );
+  if (res.affectedRows) log(`✓ products: ${res.affectedRows} older design(s) priced at ₹999`);
+  else log("• older designs already priced (skipped)");
+} catch (e) {
+  log("• older design pricing skipped (" + (e.code || e.message) + ")");
+}
+
 console.log("\n✅  Migration complete — additive only, no existing data touched.\n");
 console.log("   Next: seed products (node db/seed-products.mjs) once the app has");
 console.log("   generated its template presets, then set real INR prices in admin.\n");
