@@ -8,10 +8,11 @@ import { productImageAlt, webpFor } from "@/lib/imageSources";
    click to zoom full-screen. Images are shown with object-contain so their
    native aspect ratio / resolution is preserved — never cropped or stretched.
 
-   An optional `liveCard` node (the card rendered by the real template) LEADS.
-   The marketing mockups are exported pictures: they date the moment a design is
-   changed, and the newest designs have none at all, so the thing a visitor sees
-   first has to be the live render — it is always what they will get.
+   The marketing mockups lead and an optional `liveCard` node (the card rendered
+   by the real template) comes LAST. The live render used to lead, because the
+   newest designs had no pictures at all and an empty-looking gallery was worse
+   than a dated one; every design has its four mockups now, so the gallery opens
+   on the picture that sells the design and ends on the real thing to try.
 
    Each <img> sits in a <picture> offering the WebP version first (bundled
    /products PNGs only — see webpFor). The <picture> is display:contents so the
@@ -23,9 +24,9 @@ export default function MockupGallery({ images, name, liveCard }: { images: stri
   const [i, setI] = useState(0);
   const [zoom, setZoom] = useState(false);
 
-  const isLive = (idx: number) => hasLive && idx === 0;
-  /* With the live render leading, slide 1 is the first exported picture. */
-  const picAt = (idx: number) => pics[hasLive ? idx - 1 : idx];
+  /* The live render is the slide after the last picture. */
+  const isLive = (idx: number) => hasLive && idx === pics.length;
+  const picAt = (idx: number) => pics[idx];
   const go = useCallback((next: number) => setI(((next % n) + n) % n), [n]);
   const prev = useCallback(() => go(i - 1), [go, i]);
   const next = useCallback(() => go(i + 1), [go, i]);
