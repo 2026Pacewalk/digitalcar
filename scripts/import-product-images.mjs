@@ -61,10 +61,41 @@ const NAME_TO_SLUG = {
   "Tangerine": "tangerine-card",
   "Violet": "violet-card",
   "royal purple": "royal-purple-card",
+
+  // Batch 2026-10-07: the 20 designs that shipped without mockups (styles 53-72).
+  "Agency Stack Digital Business Card": "agency-stack-card",
+  "Bento Grid Digital Business Card": "bento-grid-card",
+  "Boarding Pass Digital Business Card": "boarding-pass-card",
+  "Bold Circles Digital Business Card": "bold-circles-card",
+  "Chat Thread Digital Business Card": "chat-thread-card",
+  "Corporate Slate Digital Business Card": "corporate-slate-card",
+  "Diagonal Split Digital Business Card": "diagonal-split-card",
+  "Flip Card": "flip-card",
+  "Geo Yellow Digital Business Card": "geo-yellow-card",
+  "Link Hub Digital Business Card": "link-hub-card",
+  "Map First Digital Business Card": "map-first-card",
+  "Pastel Portrait Digital Business Card": "pastel-portrait-card",
+  "Photo Frame Digital Business Card": "photo-frame-card",
+  "Poster Collage Digital Business Card": "poster-collage-card",
+  "Ribbon Wave Digital Business Card": "ribbon-wave-card",
+  "Sky Profile Digital Business Card": "sky-profile-card",
+  "Story Slides Digital Business Card": "story-slides-card",
+  "Terminal Digital Business Card": "terminal-card",
+  "Timeline Digital Business Card": "timeline-card",
+  "Vinyl Player Digital Business Card": "vinyl-player-card",
 };
 
-// image index (1-4) → filename suffix, matching the existing 3 products.
-const SUFFIX = { 1: "", 2: "-features", 3: "-preview", 4: "-services" };
+/* Image index (1-4) → filename suffix. The mockup tool's export order changed
+   between batches, so the order is named rather than assumed: check the files
+   before importing a new batch and pass ORDER if they differ.
+     legacy  (the first batches) hero, callouts, titled, long page
+     v2      (2026-10-07)        hero, titled, callouts, long page            */
+const ORDERS = {
+  legacy: { 1: "", 2: "-features", 3: "-preview", 4: "-services" },
+  v2: { 1: "", 2: "-preview", 3: "-features", 4: "-services" },
+};
+const SUFFIX = ORDERS[process.env.ORDER || "v2"];
+if (!SUFFIX) { console.error(`ORDER must be one of: ${Object.keys(ORDERS).join(", ")}`); process.exit(1); }
 
 const url = process.env.DATABASE_URL;
 if (!url) { console.error("Set DATABASE_URL"); process.exit(1); }
@@ -84,7 +115,13 @@ try {
       const src = path.join(SRC, `${driveName} ${idx}.png`);
       if (!fs.existsSync(src)) { missing = true; skipped.push(`${slug}: missing "${driveName} ${idx}.png"`); break; }
       const outName = `${base}${SUFFIX[idx]}.png`;
-      await sharp(src).resize(WIDTH).png({ compressionLevel: 9, palette: true, quality: 90 }).toFile(path.join(outDir, outName));
+      // Never enlarge: a 1122px export upscaled to 1149 is softer, not sharper.
+      // Lossless at level 9 beats the palette here (449 KB vs 454 KB on a
+      // 1.6 MB render) and keeps the gradients clean for Merchant Center.
+      await sharp(src)
+        .resize({ width: WIDTH, withoutEnlargement: true })
+        .png({ compressionLevel: 9, effort: 10 })
+        .toFile(path.join(outDir, outName));
       images.push(`/products/${folder}/${outName}`);
     }
     if (missing) continue;

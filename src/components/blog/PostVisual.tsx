@@ -8,21 +8,27 @@
    inline SVG draws instantly with no extra download. The dev server has no
    image route, so it always uses the SVG. */
 import BlogCover, { coverDescription } from "./BlogCover";
+import { webpFor } from "@/lib/imageSources";
 import { BLOG_ART_SIZES, blogArtPath, type BlogPost } from "@/data/blog";
 
 export default function PostVisual({ post, priority = false }: { post: BlogPost; priority?: boolean }) {
   if (post.image) {
+    const webp = webpFor(post.image.src);
     return (
-      <img
-        src={post.image.src}
-        alt={post.image.alt}
-        width={post.image.width}
-        height={post.image.height}
-        loading={priority ? "eager" : "lazy"}
-        fetchPriority={priority ? "high" : "auto"}
-        decoding="async"
-        className="block h-full w-full object-cover"
-      />
+      /* display:contents, so the <img> keeps exactly the box it had alone. */
+      <picture className="contents">
+        {webp && <source srcSet={webp} type="image/webp" />}
+        <img
+          src={post.image.src}
+          alt={post.image.alt}
+          width={post.image.width}
+          height={post.image.height}
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
+          decoding="async"
+          className="block h-full w-full object-cover"
+        />
+      </picture>
     );
   }
   if (priority && !import.meta.env.DEV) {

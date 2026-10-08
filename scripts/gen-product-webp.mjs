@@ -10,7 +10,12 @@ import sharp from "sharp";
 import fs from "fs";
 import path from "path";
 
-const ROOT = path.resolve(process.cwd(), "public", "products");
+/* public/blog holds the article cover photos as JPEG (~200 KB each), which
+   src/lib/imageSources.ts offers as WebP the same way. Both folders are walked
+   here so one run keeps every served picture's WebP up to date. */
+const ROOTS = [path.resolve(process.cwd(), "public", "products"), path.resolve(process.cwd(), "public", "blog")];
+const ROOT = ROOTS[0];
+const SOURCE = /\.(png|jpe?g)$/i;
 const QUALITY = 80;
 const EFFORT = 5;
 
@@ -19,7 +24,10 @@ function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...walk(full));
-    else if (entry.isFile() && /\.png$/i.test(entry.name)) out.push(full);
+    // og.jpg is the 1200×630 social banner. It is fetched by Facebook and
+    // WhatsApp, never offered through a <picture>, and several of them do not
+    // accept WebP — leave it as the JPEG it has to be.
+    else if (entry.isFile() && SOURCE.test(entry.name) && entry.name.toLowerCase() !== "og.jpg") out.push(full);
   }
   return out;
 }
@@ -29,14 +37,14 @@ if (!fs.existsSync(ROOT)) {
   process.exit(1);
 }
 
-const pngs = walk(ROOT).sort();
+const pngs = ROOTS.filter((r) => fs.existsSync(r)).flatMap((r) => walk(r)).sort();
 const mb = (bytes) => (bytes / 1024 / 1024).toFixed(2);
 let written = 0, skipped = 0, failed = 0;
 let pngBytes = 0, webpBytes = 0;
 
 for (const png of pngs) {
-  const webp = png.replace(/\.png$/i, ".webp");
-  const rel = path.relative(ROOT, png);
+  const webp = png.replace(SOURCE, ".webp");
+  const rel = path.relative(path.dirname(ROOT), png);
   const pngStat = fs.statSync(png);
   pngBytes += pngStat.size;
 

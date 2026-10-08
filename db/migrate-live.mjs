@@ -576,6 +576,33 @@ try {
   log("• product media backfill skipped (" + (e.code || e.message) + ")");
 }
 
+// Phase 37d: the 20 designs added in October 2026 were created with price 0,
+// which means "not offered for sale" — no feed item, no Product block, no Buy
+// button — and they stayed that way after their mockups arrived. Price them at
+// the catalogue's ₹999 like every other listed design. products.price never
+// decides an amount (contracts/product-offer.ts): checkout charges the Gold
+// plan's yearly price, so this only turns the designs on for sale.
+// Narrow on purpose: named slugs, and only while the price is still 0, so an
+// admin's own price is never touched and a re-run changes nothing.
+try {
+  const PRICE_ME = [
+    "agency-stack-card", "bento-grid-card", "boarding-pass-card", "bold-circles-card",
+    "chat-thread-card", "corporate-slate-card", "diagonal-split-card", "flip-card",
+    "geo-yellow-card", "link-hub-card", "map-first-card", "pastel-portrait-card",
+    "photo-frame-card", "poster-collage-card", "ribbon-wave-card", "sky-profile-card",
+    "story-slides-card", "terminal-card", "timeline-card", "vinyl-player-card",
+  ];
+  const [res] = await conn.query(
+    `UPDATE products SET price = 999.00, currency = 'INR'
+      WHERE slug IN (${PRICE_ME.map(() => "?").join(", ")}) AND (price IS NULL OR price = 0)`,
+    PRICE_ME,
+  );
+  if (res.affectedRows) log(`✓ products: ${res.affectedRows} design(s) priced at ₹999`);
+  else log("• designs already priced (skipped)");
+} catch (e) {
+  log("• design pricing skipped (" + (e.code || e.message) + ")");
+}
+
 console.log("\n✅  Migration complete — additive only, no existing data touched.\n");
 console.log("   Next: seed products (node db/seed-products.mjs) once the app has");
 console.log("   generated its template presets, then set real INR prices in admin.\n");

@@ -10,7 +10,7 @@ import { DEFAULT_CUSTOMER } from "@/hooks/useCustomer";
 import { demoForProduct } from "@/lib/demoData";
 import { logFunnel } from "@/lib/funnel";
 import MockupGallery from "@/components/MockupGallery";
-import { webpFor } from "@/lib/imageSources";
+import { productImageAlt, webpFor } from "@/lib/imageSources";
 import { useProductOffer } from "@/hooks/useProductOffer";
 import { KEPT_AFTER_TRIAL, LINK_STAYS_NOTE, NO_RENEWAL_NOTE, buyPath, offerCopy, productListing, productSeo } from "@contracts/product-offer";
 
@@ -401,7 +401,7 @@ export default function ProductDetail() {
                       ? <div className="w-full bg-gradient-to-b from-[#F8FAFC] to-[#EEF2F7]" style={{ aspectRatio: `${THUMB_W} / ${THUMB_H}` }}>
                           <picture className="contents">
                             {webpFor(feat) && <source srcSet={webpFor(feat)!} type="image/webp" />}
-                            <img src={feat} alt={`${p.name} — digital business card`} loading="lazy" className="w-full h-full object-cover object-top" />
+                            <img src={feat} alt={productImageAlt(feat, p.name)} loading="lazy" decoding="async" className="w-full h-full object-cover object-top" />
                           </picture>
                         </div>
                       : <ThumbFrame style={p.styleNumber} primary={p.primaryColor} secondary={p.secondaryColor} category={p.category} />}
