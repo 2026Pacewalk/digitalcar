@@ -29,7 +29,7 @@ const whatsapp = injected.whatsappNumber || "919517722444";
 export const CONTACT = {
   email: injected.supportEmail || "hello@digitalcarda.in",
   phone,
-  phoneHref: `tel:${phone.replace(/[^d+]/g, "")}`,
+  phoneHref: `tel:${phone.replace(/[^\d+]/g, "")}`,
   whatsappHref: `https://wa.me/${whatsapp}?text=Hi%20DigitalCarda`,
 };
 
@@ -38,10 +38,12 @@ export const BRAND_NAME = injected.brandName || "DigitalCarda";
 /** Official profiles only. `icon` is a hosted brand mark (public/sig). Also
  *  feeds the Organization `sameAs` structured data in PublicLayout. */
 export const SOCIAL_LINKS: { label: string; href: string; icon: string }[] = [
-  { label: "Instagram", href: "https://www.instagram.com/digitalcarda/", icon: "/sig/s-instagram.png" },
-  { label: "Facebook", href: "https://www.facebook.com/DigitalCarda/", icon: "/sig/s-facebook.png" },
-  { label: "Pinterest", href: "https://in.pinterest.com/digitalcarda/", icon: "/sig/s-pinterest.png" },
-  { label: "YouTube", href: "https://www.youtube.com/@DigitalCarda-k9v", icon: "/sig/s-youtube.png" },
+  { label: "Instagram", href: "https://www.instagram.com/digitalcarda.in/", icon: "/sig/s-instagram.png" },
+  { label: "Facebook", href: "https://www.facebook.com/DigitalCarda.in/", icon: "/sig/s-facebook.png" },
+  { label: "Threads", href: "https://www.threads.com/@digitalcarda.in", icon: "/sig/s-threads.png" },
+  { label: "YouTube", href: "https://www.youtube.com/@digitalcardaofficial", icon: "/sig/s-youtube.png" },
+  { label: "Pinterest", href: "https://in.pinterest.com/digitalcarda", icon: "/sig/s-pinterest.png" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/company/digitalcarda/", icon: "/sig/s-linkedin.png" },
 ];
 
 const PRODUCT: NavGroup = {
