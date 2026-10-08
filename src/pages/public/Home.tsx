@@ -84,115 +84,36 @@ function Counter({ end, duration = 2000, separator = true }: { end: number; dura
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Card slider (hero visual)
+   Hero visual
    ───────────────────────────────────────────────────────────── */
-const SLIDER_CARDS = [
-  { id: 1, name: "AARAV MEHTA", title: "DIRECTOR", company: "NAYARA INTERIORS", phone: "+91 98110 24680", website: "nayarainteriors.in", email: "aarav@nayarainteriors.in", address: "504 Trident Tower, Sector 44, Gurugram", views: 5173 },
-  { id: 2, name: "DR. PRIYA PATEL", title: "CARDIOLOGIST", company: "HEART CARE", phone: "+91 98250 33445", website: "heartcare.in", email: "dr.priya@heartcare.in", address: "Apollo Hospital, Jubilee Hills, Hyderabad", views: 3421 },
-  { id: 3, name: "RAJ SHARMA", title: "CEO", company: "PIXELCRAFT", phone: "+91 98722 55110", website: "pixelcraft.in", email: "raj@pixelcraft.in", address: "Sector 17, Chandigarh", views: 2890 },
-  { id: 4, name: "VIKRAM MEHTA", title: "FOUNDER", company: "STYLEHUB", phone: "+91 98111 22333", website: "stylehub.com", email: "vikram@stylehub.com", address: "Bandra West, Mumbai", views: 4156 },
-  { id: 5, name: "CHEF SANJAY", title: "HEAD CHEF", company: "SPICE GARDEN", phone: "+91 98123 44556", website: "spicegarden.com", email: "sanjay@spicegarden.com", address: "Connaught Place, New Delhi", views: 1987 },
-  { id: 6, name: "DR. ANJALI RAO", title: "CONSULTANT", company: "STRATEGY FIRST", phone: "+91 98450 66778", website: "strategyfirst.com", email: "anjali@strategyfirst.com", address: "MG Road, Bangalore", views: 2754 },
-];
 
-function CardContactSlider() {
-  const [current, setCurrent] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+/** The one picture the hero shows: two real cards, on two phones.
 
-  const nextSlide = useCallback(() => setCurrent((p) => (p + 1) % SLIDER_CARDS.length), []);
-  const prevSlide = useCallback(() => setCurrent((p) => (p - 1 + SLIDER_CARDS.length) % SLIDER_CARDS.length), []);
-
-  useEffect(() => {
-    if (!isAutoPlaying) return;
-    const timer = setInterval(nextSlide, 4000);
-    return () => clearInterval(timer);
-  }, [isAutoPlaying, nextSlide]);
-
-  const total = SLIDER_CARDS.length + 1; // slide 0 = product mockup image, rest = live cards
-  const isImage = current === 0;
-  const card = SLIDER_CARDS[Math.max(0, current - 1)];
-
+    It used to be the first slide of a carousel that turned through six
+    invented contact cards every four seconds. One picture says what the
+    product is at a glance, and a hero that moves on its own pulls attention
+    off the buttons beside it, so it stays still. */
+function HeroCardVisual() {
   return (
-    <div className="relative flex flex-col items-center" onMouseEnter={() => setIsAutoPlaying(false)} onMouseLeave={() => setIsAutoPlaying(true)}>
-      <div className="relative flex justify-center w-full">
-      {/* Glow behind the phone */}
+    <div className="relative flex justify-center w-full">
+      {/* Glow behind the phones */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-[300px] h-[440px] rounded-[48px] bg-gradient-to-b from-[#F7B31C]/25 via-[#F7B31C]/5 to-transparent blur-2xl" />
       </div>
 
-      {isImage ? (
-        <div className="relative w-[340px] min-h-[470px] flex items-center justify-center">
-          <picture>
-            <source srcSet="/hero/digital-business-card-app-mockup.webp" type="image/webp" />
-            <img
-              src="/hero/digital-business-card-app-mockup.png"
-              width="1000" height="1403"
-              alt="Two smartphones showing DigitalCarda digital business cards — a marketing consultant and an event & wedding planner profile with call, WhatsApp, email and QR sharing"
-              loading="eager"
-              fetchPriority="high"
-              className="w-[300px] sm:w-[330px] h-auto drop-shadow-2xl"
-            />
-          </picture>
-        </div>
-      ) : (
-      <div className="relative w-[340px] bg-white rounded-[28px] shadow-premium-lg overflow-hidden border border-[#F1F5F9] ring-1 ring-black/5">
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-[#F7B31C]">
-          <div className="flex items-center gap-1.5">
-            <Eye size={12} className="text-white" />
-            <span className="text-[10px] font-semibold text-white tabular-nums">{card.views.toLocaleString()}</span>
-          </div>
-          <button className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center" aria-label="Share card">
-            <Share2 size={12} className="text-white" />
-          </button>
-        </div>
-
-        {/* Name banner */}
-        <div className="relative mx-5 mt-3">
-          <div className="bg-[#F7B31C] py-3 px-6 text-center relative" style={{ clipPath: "polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)" }}>
-            <p className="text-sm font-bold text-white tracking-wide">{card.name}</p>
-            <p className="text-[10px] text-white/80 font-medium mt-0.5">{card.title}</p>
-          </div>
-        </div>
-
-        <p className="text-center text-[9px] text-[#94A3B8] mt-2 tracking-wider uppercase font-medium">{card.company}</p>
-
-        {/* Contact rows */}
-        <div className="mx-5 mt-2 rounded-xl overflow-hidden bg-[#374151]">
-          {[
-            { icon: Phone, text: card.phone },
-            { icon: Globe, text: card.website },
-            { icon: Mail, text: card.email },
-            { icon: MapPin, text: card.address },
-          ].map((row, i) => (
-            <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${i < 3 ? "border-b border-white/10" : ""}`}>
-              <div className="w-8 h-8 rounded-lg bg-[#F7B31C] flex items-center justify-center shrink-0">
-                <row.icon size={14} className="text-white" />
-              </div>
-              <span className="text-[10px] text-white/90 font-medium truncate">{row.text}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Actions */}
-        <div className="mx-5 mt-3 grid grid-cols-2 gap-0 rounded-xl overflow-hidden mb-5">
-          <button className="flex items-center justify-center gap-2 py-3 bg-[#F7B31C] hover:bg-[#D97706] transition-colors">
-            <Phone size={14} className="text-white" />
-            <span className="text-xs font-semibold text-white">CALL</span>
-          </button>
-          <button className="flex items-center justify-center gap-2 py-3 bg-[#F7B31C] hover:bg-[#D97706] transition-colors border-l border-white/20">
-            <MessageCircle size={14} className="text-white" />
-            <span className="text-xs font-semibold text-white">WHATSAPP</span>
-          </button>
-        </div>
-
-        {/* Sits above the call bar, not on it — at phone width it was covering
-            the WhatsApp label. */}
-        <div className="absolute bottom-14 right-3 bg-[#0F172A] rounded-full px-3 py-1.5 shadow-lg">
-          <span className="text-[9px] font-bold text-white">Save Contact</span>
-        </div>
+      <div className="relative w-[340px] min-h-[470px] flex items-center justify-center">
+        <picture>
+          <source srcSet="/hero/digital-business-card-app-mockup.webp" type="image/webp" />
+          <img
+            src="/hero/digital-business-card-app-mockup.png"
+            width="1000" height="1403"
+            alt="Two smartphones showing DigitalCarda digital business cards — a marketing consultant and an event & wedding planner profile with call, WhatsApp, email and QR sharing"
+            loading="eager"
+            fetchPriority="high"
+            className="w-[300px] sm:w-[330px] h-auto drop-shadow-2xl"
+          />
+        </picture>
       </div>
-      )}
 
       {/* Floating chips */}
       <div className="hidden sm:flex absolute -left-4 top-16 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-premium-lg border border-[#F1F5F9] animate-float">
@@ -208,22 +129,6 @@ function CardContactSlider() {
           <p className="text-[10px] font-bold text-[#0F172A] leading-none">New Lead</p>
           <p className="text-[9px] text-[#94A3B8] mt-0.5">Just now</p>
         </div>
-      </div>
-
-      {/* Arrows */}
-      <button onClick={prevSlide} aria-label="Previous card" className="absolute -left-2 sm:left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white shadow-premium border border-[#F1F5F9] flex items-center justify-center hover:bg-[#F8FAFC] transition-colors text-[#64748B] hover:text-[#F7B31C]">
-        <ChevronLeft size={18} />
-      </button>
-      <button onClick={nextSlide} aria-label="Next card" className="absolute -right-2 sm:right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white shadow-premium border border-[#F1F5F9] flex items-center justify-center hover:bg-[#F8FAFC] transition-colors text-[#64748B] hover:text-[#F7B31C]">
-        <ChevronRight size={18} />
-      </button>
-      </div>
-
-      {/* Dots — one per slide (mockup image + live cards) */}
-      <div className="flex items-center justify-center gap-1.5 mt-4">
-        {Array.from({ length: total }).map((_, i) => (
-          <button key={i} onClick={() => setCurrent(i)} aria-label={`Show slide ${i + 1}`} className={`h-1.5 rounded-full transition-all duration-300 ${i === current ? "w-6 bg-[#F7B31C]" : "w-1.5 bg-[#E2E8F0] hover:bg-[#CBD5E1]"}`} />
-        ))}
       </div>
     </div>
   );
@@ -304,7 +209,7 @@ function HeroSection() {
 
           {/* Right */}
           <Reveal className="lg:pl-6">
-            <CardContactSlider />
+            <HeroCardVisual />
           </Reveal>
         </div>
       </div>
@@ -338,7 +243,10 @@ function StatsBand() {
         used to sit in the hero; it reads better here, and search engines care
         that it is on the page, not that it is above the fold. */}
     <section className="px-4 sm:px-6 lg:px-8 pb-6" aria-label="What a digital business card is">
-      <p className="mx-auto max-w-3xl rounded-xl bg-white/70 px-4 py-3 text-[13.5px] leading-relaxed text-[#334155] ring-1 ring-[#FEF3C7]">
+      {/* Wide enough on a desktop to read as two lines rather than three —
+          the paragraph is one answer, and a ragged third line of four words
+          reads like an afterthought. Phones keep the narrower measure. */}
+      <p className="mx-auto max-w-3xl lg:max-w-6xl rounded-xl bg-white/70 px-4 py-3 text-[13.5px] leading-relaxed text-[#334155] ring-1 ring-[#FEF3C7]">
         <strong className="text-[#0F172A]">Quick answer:</strong> A digital business card is a link and QR code that replaces printed visiting cards. DigitalCarda makes one in 2 minutes with 50+ templates, WhatsApp, UPI payments, lead capture and analytics. Starts at <strong>₹99/month</strong> with a <strong>30-day free trial</strong> — no card details needed.
       </p>
     </section>
