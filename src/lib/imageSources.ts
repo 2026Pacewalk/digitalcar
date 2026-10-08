@@ -16,21 +16,34 @@ export function webpFor(src: string | null | undefined): string | null {
   return m && !/\/og$/i.test(m[1]) ? `${m[1]}.webp` : null;
 }
 
-/* What a design's picture actually shows, as alt text.
+/* The designs whose four pictures are known to be named for what they show.
+   The mockup tool exported earlier batches in several different orders, so on
+   those designs -preview may be the long page and -services the callout panel;
+   only this batch was checked frame by frame (scripts/import-product-images.mjs,
+   ORDER v2). Add a folder here only after looking at its four files. */
+const DESCRIBED = new Set([
+  "agency-stack", "bento-grid", "boarding-pass", "bold-circles", "chat-thread",
+  "corporate-slate", "diagonal-split", "flip", "geo-yellow", "link-hub",
+  "map-first", "pastel-portrait", "photo-frame", "poster-collage", "ribbon-wave",
+  "sky-profile", "story-slides", "terminal", "timeline", "vinyl-player",
+]);
 
-   Every design ships the same four views, and scripts/import-product-images.mjs
-   names them by what they are, so the file name is enough to describe the
-   picture. "Mockup 2 of 4" tells a screen-reader user nothing and gives Google
-   Images nothing to index; this says what is in the frame.
+/* What a design's picture shows, as alt text.
 
-   Anything else — an admin upload, a design with pictures out of this set —
-   falls back to naming the design, which is still true of every picture of it. */
+   "Mockup 2 of 4" tells a screen-reader user nothing and gives Google Images
+   nothing to index. Where the file name is known to describe the frame, say
+   what is in it; everywhere else name the design, which is true of every
+   picture of it. Alt text that confidently describes the wrong picture is
+   worse than alt text that says little. */
 export function productImageAlt(src: string | null | undefined, name: string): string {
   const design = (name || "").trim() || "Digital business card";
+  const generic = `${design} — digital business card`;
   const file = String(src || "").toLowerCase();
-  if (!/^\/products\//.test(file)) return `${design} — digital business card`;
+  const folder = /^\/products\/([^/]+)\//.exec(file)?.[1];
+  if (!folder || !DESCRIBED.has(folder)) return generic;
   if (file.includes("-preview")) return `${design} on a phone beside its scan-to-connect QR code stand`;
   if (file.includes("-features")) return `${design}: no app to install, your own link and QR code, one-tap call, WhatsApp chat, lead capture and visitor analytics`;
   if (file.includes("-services")) return `The full ${design} page — services, photo gallery, Google reviews and enquiry form`;
+  if (/-(showcase|thumb|\d)\./.test(file)) return generic;
   return `${design} open on a phone, showing one-tap call, WhatsApp and save-contact buttons`;
 }

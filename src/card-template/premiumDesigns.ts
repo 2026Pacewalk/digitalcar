@@ -10,7 +10,7 @@
  * So every feature switched on in the Card Builder works on all ten.
  */
 import {
-  HEAD, IMG, esc, s, legible, mix, premiumSocials, pwContentSections, safeHref,
+  HEAD, IMG, contrast, esc, s, legible, mix, premiumSocials, pwContentSections, safeHref,
   type PCProduct, type PCRecord, type PremiumExtras,
 } from "./premiumCards";
 import { shareSheetCss, shareSheetHtml, shareSheetJs } from "./shareSheet";
@@ -723,8 +723,12 @@ const DESIGNS: Design[] = [
     .po-b{grid-column:span 2;grid-row:span 2;}
     .po-c{grid-column:span 2;grid-row:span 1;background:${t.accent};}
     .po-type{position:relative;margin-top:-34px;z-index:3;}
-    .po-name{font-family:'Sora',sans-serif;font-size:42px;line-height:.92;font-weight:800;letter-spacing:-.04em;text-transform:uppercase;color:${t.ink};mix-blend-mode:multiply;word-break:break-word;}
-    .po-name span{background:${t.accent};padding:0 6px;color:${t.ink};}
+    /* The name is ink lettering on blocks of the brand colour. A dark brand
+       colour hides it — at #111827 it is the ink exactly, so the name reads as
+       solid blocks — and multiply would swallow white lettering just as badly.
+       So a dark colour switches the lettering to white and drops the blend. */
+    .po-name{font-family:'Sora',sans-serif;font-size:42px;line-height:.92;font-weight:800;letter-spacing:-.04em;text-transform:uppercase;color:${t.ink};${contrast(t.ink, t.accent) >= contrast("#ffffff", t.accent) ? "mix-blend-mode:multiply;" : ""}word-break:break-word;}
+    .po-name span{background:${t.accent};padding:0 6px;color:${contrast(t.ink, t.accent) >= contrast("#ffffff", t.accent) ? t.ink : "#ffffff"};}
     .po-role{display:inline-block;margin-top:10px;font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;background:${t.ink};color:#fff;padding:6px 11px;border-radius:999px;}
     .po-about{font-size:13.5px;color:${t.muted};margin-top:12px;max-width:36ch;}
     .po-logo{position:absolute;right:16px;top:-26px;width:62px;height:62px;border-radius:50%;background:#fff;border:1px solid ${t.line};display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:4;}

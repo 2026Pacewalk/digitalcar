@@ -7,7 +7,11 @@ import { currentProductOffer } from "./lib/product-offer";
 
 /* ── Ecommerce product catalogue ──────────────────────────────────
    A product is a sellable listing (name, price, category, images, SEO)
-   wrapping a design (styleNumber 1..44). Public reads see only published
+   wrapping a design (styleNumber). The bound on that number below is kept
+   deliberately loose: every release adds designs, and a bound that tracked the
+   count silently blocked every edit to the newest ones (styles 61-72 could not
+   be saved at all). buildCard clamps anything out of range when it renders.
+   Public reads see only published
    products; super-admin manages the full catalogue. Products are ARCHIVED,
    never hard-deleted, so historical customer links stay intact (Section 46). */
 
@@ -31,7 +35,7 @@ const productInput = z.object({
   name: z.string().min(1),
   tagline: z.string().optional(),
   description: z.string().optional(),
-  styleNumber: z.number().int().min(1).max(60).default(1),
+  styleNumber: z.number().int().min(1).max(500).default(1),
   category: z.string().optional().nullable(),
   price: money.default("0.00"),
   salePrice: money.optional().nullable(),

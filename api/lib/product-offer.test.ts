@@ -105,7 +105,7 @@ describe("which designs are listed", () => {
   });
 
   it("holds back the designs on the not-listed list, each for its stated reason", () => {
-    expect(Object.keys(NOT_LISTED).sort()).toEqual(["emerald-card", "employee-id-card", "indigo-card", "membership-card"]);
+    expect(Object.keys(NOT_LISTED).sort()).toEqual(["emerald-card", "employee-id-card", "indigo-card", "membership-card", "poster-collage-card"]);
     for (const entry of Object.values(NOT_LISTED)) expect(entry.why.length).toBeGreaterThan(20);
     // Even priced and pictured exactly like a listed design.
     expect(productListing(product({ slug: "emerald-card" }))).toEqual({ listed: false, reason: "image" });
